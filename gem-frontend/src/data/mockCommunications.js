@@ -1,0 +1,43 @@
+export const defaultCommunications = [
+  {
+    id: "comm_001",
+    title: "PayBill",
+    media: "Email/Phone",
+    category: "Owing",
+    sent: 50,
+    total: 75,
+    message: "This is a reminder to complete your payment. Thanks.",
+    createdAt: "2025-01-07T10:00:00.000Z",
+  },
+  {
+    id: "comm_002",
+    title: "Come Again",
+    media: "Phone",
+    category: "Marketing",
+    sent: 37,
+    total: 37,
+    message: "It has been long since we saw you. Come back this week!",
+    createdAt: "2025-01-05T15:10:00.000Z",
+  },
+  {
+    id: "comm_003",
+    title: "Free Workout",
+    media: "Email/Phone",
+    category: "Gift",
+    sent: 7,
+    total: 11,
+    message: "Congratulations! You have a free workout session available.",
+    createdAt: "2025-01-03T09:30:00.000Z",
+  },
+  {
+    id: "comm_004",
+    title: "Forgot you...",
+    media: "Phone",
+    category: "Personal",
+    sent: 1,
+    total: 1,
+    message: "Hi Marvin, this is just a quick check-in. Hope you're doing well!",
+    createdAt: "2025-01-02T19:00:00.000Z",
+  },
+];
+export default defaultCommunications;

@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+gem-frontend/node_modules/
+gem-backend/node_modules/
+
+# Environment files — NEVER commit these (contain passwords & secrets)
+.env
+.env.local
+.env.production
+gem-frontend/.env
+gem-frontend/.env.local
+gem-backend/.env
+gem-backend/.env.local
+
+# Build output
+gem-frontend/dist/
+gem-frontend/build/
+
+# Uploaded files
+gem-backend/uploads/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Prisma
+gem-backend/prisma/*.db

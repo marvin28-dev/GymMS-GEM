@@ -1,0 +1,2 @@
+ALTER TABLE "Member" ADD COLUMN "howHeard" TEXT;
+ALTER TABLE "Member" ADD COLUMN "notes" TEXT;

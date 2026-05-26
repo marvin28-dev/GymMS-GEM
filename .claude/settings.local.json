@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npx prisma *)",
+      "Bash(node --input-type=module --eval \"import\\('./src/pages/FrontDeskPage.jsx'\\)\")",
+      "Bash(npx --yes acorn --ecma2020 --module \"src/pages/FrontDeskPage.jsx\")",
+      "Bash(npx --yes acorn --ecma2020 --module \"src/pages/AttendancePage.jsx\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\efuet\\\\Project\\\\Marvin_DOC\\\\GymMS\\\\GEM\\\\gem-frontend\\\\src\" -Recurse -Filter \"*.jsx\")",
+      "Bash(Measure-Object)",
+      "Bash(Select-Object -ExpandProperty Count)",
+      "Bash(node -e \"try { require\\('@paralleldrive/cuid2'\\); console.log\\('ok'\\); } catch\\(e\\) { console.log\\('missing'\\); }\")",
+      "Bash(Get-Content \"c:\\\\Users\\\\efuet\\\\Project\\\\Marvin_DOC\\\\GymMS\\\\GEM\\\\gem-backend\\\\prisma\\\\migrations\\\\20260427222958_gem\\\\migration.sql\")",
+      "Bash(Select-String -Pattern \"Task|task\")",
+      "Bash(Select-Object -First 20)",
+      "Bash(node -e \"const p = require\\('./src/utils/prisma'\\); p.member.findFirst\\(\\).then\\(m => { console.log\\('fields:', Object.keys\\(m || {}\\)\\); process.exit\\(0\\); }\\).catch\\(e => { console.error\\('error:', e.message\\); process.exit\\(1\\); }\\)\")",
+      "Bash(node -e \"const { PrismaClient } = require\\('@prisma/client'\\); const fields = Object.keys\\(new PrismaClient\\(\\)._dmmf?.datamodel?.models?.find\\(m => m.name === 'Member'\\)?.fields?.reduce\\(\\(a,f\\) => \\({...a,[f.name]:1}\\), {}\\) || {}\\); console.log\\(fields.join\\(', '\\)\\);\")",
+      "Bash(node -e \"const { Prisma } = require\\('@prisma/client'\\); const fields = Prisma.MemberScalarFieldEnum; console.log\\(Object.keys\\(fields\\).join\\(', '\\)\\);\")",
+      "Bash(node --input-type=module --eval \"import { readFileSync } from 'fs'; const src = readFileSync\\('./src/pages/MembersPage.jsx','utf8'\\); console.log\\('Lines:', src.split\\('\\\\n'\\).length\\); console.log\\('Last 3 lines:', src.split\\('\\\\n'\\).slice\\(-3\\).join\\('|'\\)\\);\")",
+      "Bash(node --input-type=module --eval \"import { readFileSync } from 'fs'; const src = readFileSync\\('./src/pages/MemberProfilePage.jsx','utf8'\\); console.log\\('Lines:', src.split\\('\\\\n'\\).length\\); console.log\\('Last 3 lines:', src.split\\('\\\\n'\\).slice\\(-3\\).join\\('|'\\)\\);\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\efuet\\\\Project\\\\Marvin_DOC\\\\GymMS\\\\GEM\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Recurse -Path . -Name)",
+      "Bash(Select-Object -First 50)",
+      "Bash(npm run *)",
+      "Bash(npx vite *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\efuet\\\\Project\\\\Marvin_DOC\\\\GymMS\\\\GEM\" -Recurse -Directory -Name)",
+      "Bash(findstr /n \"photo\\\\|localStorage\\\\|base64\" gem-frontend\\\\src\\\\pages\\\\MembersPage.jsx)",
+      "Bash(awk -F: '{print $1}')",
+      "Bash(node -e ' *)"
+    ]
+  }
+}

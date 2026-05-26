@@ -1,0 +1,383 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Gym {
+  id                          String   @id @default(cuid())
+  code                        String   @unique
+  name                        String
+  location                    String?
+  phone                       String?
+  email                       String?
+  currency                    String   @default("XAF")
+  registrationFee             Int      @default(0)
+  registrationFeeRequired     Boolean  @default(false)
+  registrationFeeFrequency    String   @default("yearly")
+  registrationGracePeriodDays Int      @default(7)
+  minUpfrontPercent           Int      @default(50)
+  paymentDeadlineDays         Int      @default(30)
+  managerCode                 String?
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  staff           Staff[]
+  members         Member[]
+  packages        Package[]
+  products        Product[]
+  tasks           Task[]
+  expenses        Expense[]
+  notifications   Notification[]
+  equipmentIssues EquipmentIssue[]
+  attendances     Attendance[]
+  payments        Payment[]
+  sales           Sale[]
+  calendarEvents  CalendarEvent[]
+  communications  Communication[]
+  timecards       TimeCard[]
+}
+
+model Staff {
+  id           String    @id @default(cuid())
+  gymId        String
+  firstName    String
+  lastName     String
+  email        String
+  phone        String?
+  role         StaffRole
+  department   String?
+  joinDate     DateTime?
+  accessCode        String?
+  shiftStart        String?
+  schedule          Json?
+  passwordHash      String
+  avatarColor       String?
+  photo             String?
+  photoId           String?
+  emergencyContact  String?
+  emergencyPhone    String?
+  salary            Float?
+  isActive          Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  gym            Gym             @relation(fields: [gymId], references: [id])
+  tasksAssigned  Task[]          @relation("AssignedTo")
+  tasksCreated   Task[]          @relation("CreatedBy")
+  timecards      TimeCard[]
+  payments       Payment[]
+  attendances    Attendance[]
+  calendarEvents CalendarEvent[]
+  communications Communication[]
+
+  @@unique([gymId, email])
+}
+
+model Member {
+  id              String       @id @default(cuid())
+  gymId           String
+  memberCode      String       @unique
+  firstName       String
+  lastName        String
+  phone           String?
+  email           String?
+  gender          String?
+  avatarColor     String?
+  photo           String?
+  accessCode      String?
+  status          MemberStatus @default(active)
+  balance         Float        @default(0)
+  startDate       DateTime?
+  endDate         DateTime?
+  lastVisit       DateTime?
+  regFeeDate      DateTime?
+  freezeStartDate DateTime?
+  preFreezEndDate DateTime?
+  passesTotal     Int?
+  passesRemaining Int?
+  isVisitor       Boolean      @default(false)
+  dob             String?
+  houseNumber     String?
+  street          String?
+  city            String?
+  postalCode      String?
+  emergencyContact String?
+  emergencyPhone  String?
+  howHeard        String?
+  notes           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  gym         Gym          @relation(fields: [gymId], references: [id])
+  packageId   String?
+  package     Package?     @relation(fields: [packageId], references: [id])
+  payments    Payment[]
+  attendances Attendance[]
+
+  @@unique([gymId, accessCode])
+}
+
+model Package {
+  id           String   @id @default(cuid())
+  gymId        String
+  code         String?
+  name         String
+  price        Float
+  minPayment   Float    @default(0)
+  duration     String?
+  sessions     String   @default("Unlimited")
+  access       String?
+  durationDays Int?
+  maxPasses    Int?
+  description  String?
+  isVisitor    Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  gym     Gym      @relation(fields: [gymId], references: [id])
+  members Member[]
+}
+
+model Payment {
+  id           String        @id @default(cuid())
+  gymId        String
+  memberId     String
+  staffId      String?
+  amount       Float
+  method       PaymentMethod
+  type         PaymentType
+  note         String?
+  reference    String?
+  balanceAfter Float?
+  createdAt    DateTime      @default(now())
+
+  gym    Gym    @relation(fields: [gymId], references: [id])
+  member Member @relation(fields: [memberId], references: [id])
+  staff  Staff? @relation(fields: [staffId], references: [id])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  gymId       String
+  name        String
+  category    String
+  price       Float
+  stock       Int      @default(0)
+  description String?
+  photo       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  gym       Gym        @relation(fields: [gymId], references: [id])
+  saleItems SaleItem[]
+}
+
+model Sale {
+  id        String        @id @default(cuid())
+  gymId     String
+  total     Float
+  method    PaymentMethod
+  createdAt DateTime      @default(now())
+
+  gym   Gym        @relation(fields: [gymId], references: [id])
+  items SaleItem[]
+}
+
+model SaleItem {
+  id        String @id @default(cuid())
+  saleId    String
+  productId String
+  quantity  Int
+  unitPrice Float
+
+  sale    Sale    @relation(fields: [saleId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Attendance {
+  id       String    @id @default(cuid())
+  gymId    String
+  memberId String
+  staffId  String?
+  checkIn  DateTime  @default(now())
+  checkOut DateTime?
+  note     String?
+
+  gym    Gym    @relation(fields: [gymId], references: [id])
+  member Member @relation(fields: [memberId], references: [id])
+  staff  Staff? @relation(fields: [staffId], references: [id])
+}
+
+model Task {
+  id           String     @id @default(cuid())
+  gymId        String
+  title        String
+  description  String?
+  priority     Priority   @default(medium)
+  status       TaskStatus @default(todo)
+  dueDate      DateTime?
+  dueTime      String?
+  assignedToId String?
+  createdById  String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  gym        Gym    @relation(fields: [gymId], references: [id])
+  assignedTo Staff? @relation("AssignedTo", fields: [assignedToId], references: [id])
+  createdBy  Staff? @relation("CreatedBy", fields: [createdById], references: [id])
+}
+
+model Expense {
+  id        String         @id @default(cuid())
+  gymId     String
+  title     String
+  category  String
+  amount    Float
+  date      DateTime
+  paidTo      String?
+  method      PaymentMethod?
+  note        String?
+  recordedBy  String?
+  createdAt   DateTime       @default(now())
+
+  gym Gym @relation(fields: [gymId], references: [id])
+}
+
+model EquipmentIssue {
+  id          String        @id @default(cuid())
+  gymId       String
+  equipment   String
+  location    String?
+  description String
+  severity    IssueSeverity @default(medium)
+  status      IssueStatus   @default(open)
+  reportedAt  DateTime      @default(now())
+  resolvedAt  DateTime?
+
+  gym Gym @relation(fields: [gymId], references: [id])
+}
+
+model TimeCard {
+  id       String    @id @default(cuid())
+  gymId    String
+  staffId  String
+  date     DateTime
+  punchIn  DateTime?
+  punchOut DateTime?
+
+  gym   Gym   @relation(fields: [gymId], references: [id])
+  staff Staff @relation(fields: [staffId], references: [id])
+}
+
+model CalendarEvent {
+  id           String   @id @default(cuid())
+  gymId        String
+  title        String
+  date         DateTime
+  time         String?
+  duration     String?
+  instructorId String?
+  staffIds     String?
+  location     String?
+  spots        Int?
+  color        String?
+  description  String?
+  repeat       String?
+  repeatUntil  String?
+  seriesId     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  gym        Gym    @relation(fields: [gymId], references: [id])
+  instructor Staff? @relation(fields: [instructorId], references: [id])
+}
+
+model Communication {
+  id          String   @id @default(cuid())
+  gymId       String
+  subject     String
+  body        String
+  sentById    String?
+  targetGroup String?
+  createdAt   DateTime @default(now())
+
+  gym    Gym    @relation(fields: [gymId], references: [id])
+  sentBy Staff? @relation(fields: [sentById], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  gymId     String
+  title     String
+  body      String
+  type      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  gym Gym @relation(fields: [gymId], references: [id])
+}
+
+enum StaffRole {
+  general_manager
+  manager
+  accountant
+  front_desk
+  coach
+  instructor
+  trainer
+}
+
+enum MemberStatus {
+  active
+  expiring
+  pending
+  suspended
+  frozen
+  expired
+  deactivated
+  visitor
+}
+
+enum PaymentMethod {
+  cash
+  card
+  bank_transfer
+  mobile_money
+}
+
+enum PaymentType {
+  membership
+  registration
+  product
+  other
+}
+
+enum Priority {
+  low
+  medium
+  high
+}
+
+enum TaskStatus {
+  todo
+  in_progress
+  done
+}
+
+enum IssueSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum IssueStatus {
+  open
+  in_progress
+  resolved
+}

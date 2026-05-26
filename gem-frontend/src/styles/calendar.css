@@ -1,0 +1,78 @@
+.rbc-calendar {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+.rbc-toolbar {
+  display: none;
+}
+
+.rbc-month-view {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #E2E8F0;
+}
+
+.rbc-header {
+  font-weight: 800;
+  color: #334155;
+  padding: 10px 6px;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.rbc-day-bg+.rbc-day-bg {
+  border-left: 1px solid #E2E8F0;
+}
+
+.rbc-month-row+.rbc-month-row {
+  border-top: 1px solid #E2E8F0;
+}
+
+.rbc-today {
+  background: rgba(67, 56, 202, 0.06);
+}
+
+.rbc-event {
+  border-radius: 10px;
+  padding: 3px 6px;
+  font-weight: 800;
+  margin-bottom: 2px !important;
+}
+
+.rbc-off-range-bg {
+  background: #F8FAFC;
+}
+
+/* --- Consistent compact event chips (NO background override) --- */
+.rbc-event {
+  margin: 2px 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  /* ✅ do NOT set background here, or you kill the event colors */
+}
+
+.gem-rbc-event {
+  display: inline-flex !important;
+  align-items: center !important;
+
+  max-width: 78% !important;
+  min-height: 22px !important;
+  padding: 2px 10px !important;
+  border-radius: 999px !important;
+
+  font-weight: 800 !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+
+  color: #fff !important;
+  box-shadow: 0 6px 12px rgba(15, 23, 42, 0.10) !important;
+}
+
+/* Clip text nicely */
+.gem-rbc-event .rbc-event-content {
+  display: block !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  color: #fff !important;
+}

@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+/* ── Base / Obsidian (dark default) ─────────────────────────────── */
+:root {
+  color-scheme: dark;
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-card: #16161f;
+  --bg-card-hover: #1c1c28;
+  --bg-elevated: #1e1e2a;
+  --border: #2a2a3a;
+  --border-subtle: #1e1e2e;
+  --text-primary: #f0ede6;
+  --text-secondary: #8a8a9a;
+  --text-muted: #5a5a6a;
+  --accent-gold: #c9a96e;
+  --accent-gold-dim: rgba(201,169,110,0.15);
+  --accent-gold-glow: rgba(201,169,110,0.08);
+  --accent-green: #4ade80;
+  --accent-green-dim: rgba(74,222,128,0.12);
+  --accent-red: #f87171;
+  --accent-red-dim: rgba(248,113,113,0.12);
+  --accent-blue: #60a5fa;
+  --accent-blue-dim: rgba(96,165,250,0.12);
+  --accent-purple: #a78bfa;
+  --accent-purple-dim: rgba(167,139,250,0.12);
+  --accent-yellow: #fbbf24;
+  --accent-yellow-dim: rgba(251,191,36,0.12);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03);
+  --shadow-elevated: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+/* ── Ivory (light) ───────────────────────────────────────────────── */
+[data-theme="light"] {
+  color-scheme: light;
+  --bg-primary: #f2f2f7;
+  --bg-secondary: #e8e8f0;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8f8fc;
+  --bg-elevated: #eeeef6;
+  --border: #d0d0e0;
+  --border-subtle: #e2e2ee;
+  --text-primary: #0a0a1a;
+  --text-secondary: #555570;
+  --text-muted: #9090aa;
+  --accent-gold: #b08a40;
+  --accent-gold-dim: rgba(176,138,64,0.12);
+  --accent-gold-glow: rgba(176,138,64,0.07);
+  --accent-green: #16a34a;
+  --accent-green-dim: rgba(22,163,74,0.1);
+  --accent-red: #dc2626;
+  --accent-red-dim: rgba(220,38,38,0.1);
+  --accent-blue: #2563eb;
+  --accent-blue-dim: rgba(37,99,235,0.1);
+  --accent-purple: #7c3aed;
+  --accent-purple-dim: rgba(124,58,237,0.1);
+  --accent-yellow: #d97706;
+  --accent-yellow-dim: rgba(217,119,6,0.1);
+  --shadow-card: 0 1px 4px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.05);
+  --shadow-elevated: 0 8px 32px rgba(0,0,0,0.14);
+}
+
+/* ── Midnight (deep navy) ────────────────────────────────────────── */
+[data-theme="midnight"] {
+  color-scheme: dark;
+  --bg-primary: #060a18;
+  --bg-secondary: #09102a;
+  --bg-card: #0d1630;
+  --bg-card-hover: #121e3e;
+  --bg-elevated: #172448;
+  --border: #1e2e5e;
+  --border-subtle: #121e48;
+  --text-primary: #dce8ff;
+  --text-secondary: #6278a8;
+  --text-muted: #384f78;
+  --accent-gold: #e0b860;
+  --accent-gold-dim: rgba(224,184,96,0.15);
+  --accent-gold-glow: rgba(224,184,96,0.08);
+  --accent-green: #34d399;
+  --accent-green-dim: rgba(52,211,153,0.12);
+  --accent-red: #fb7185;
+  --accent-red-dim: rgba(251,113,133,0.12);
+  --accent-blue: #818cf8;
+  --accent-blue-dim: rgba(129,140,248,0.12);
+  --accent-purple: #c084fc;
+  --accent-purple-dim: rgba(192,132,252,0.12);
+  --accent-yellow: #fcd34d;
+  --accent-yellow-dim: rgba(252,211,77,0.12);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.5), 0 0 0 1px rgba(100,150,255,0.04);
+  --shadow-elevated: 0 8px 32px rgba(0,0,0,0.6);
+}
+
+/* ── Forest (dark green) ─────────────────────────────────────────── */
+[data-theme="forest"] {
+  color-scheme: dark;
+  --bg-primary: #060d08;
+  --bg-secondary: #0a140c;
+  --bg-card: #0e1810;
+  --bg-card-hover: #121e14;
+  --bg-elevated: #162619;
+  --border: #1c3420;
+  --border-subtle: #122418;
+  --text-primary: #dcf0e0;
+  --text-secondary: #5a9068;
+  --text-muted: #3a6045;
+  --accent-gold: #c8a84a;
+  --accent-gold-dim: rgba(200,168,74,0.15);
+  --accent-gold-glow: rgba(200,168,74,0.08);
+  --accent-green: #4ade80;
+  --accent-green-dim: rgba(74,222,128,0.15);
+  --accent-red: #f87171;
+  --accent-red-dim: rgba(248,113,113,0.12);
+  --accent-blue: #60a5fa;
+  --accent-blue-dim: rgba(96,165,250,0.12);
+  --accent-purple: #a78bfa;
+  --accent-purple-dim: rgba(167,139,250,0.12);
+  --accent-yellow: #fbbf24;
+  --accent-yellow-dim: rgba(251,191,36,0.12);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.5), 0 0 0 1px rgba(60,150,70,0.04);
+  --shadow-elevated: 0 8px 32px rgba(0,0,0,0.6);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root { height: 100%; min-height: 100vh; }
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px var(--bg-elevated) inset;
+  -webkit-text-fill-color: var(--text-primary);
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-fade { animation: fadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modalSlideIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.modal-overlay-enter { animation: overlayIn 0.2s ease-out; }
+.modal-content-enter { animation: modalSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }

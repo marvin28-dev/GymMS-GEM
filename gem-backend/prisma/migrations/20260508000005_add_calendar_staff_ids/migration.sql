@@ -1,0 +1,1 @@
+ALTER TABLE "CalendarEvent" ADD COLUMN IF NOT EXISTS "staffIds" TEXT;
