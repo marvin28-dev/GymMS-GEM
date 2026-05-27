@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { isDemoMode } from "../utils/auth";
 
 import {
   Avatar,
@@ -409,9 +410,20 @@ function PinLogin({ onSuccess }) {
               </Button>
             </Box>
 
-            <Typography sx={{ mt: 1, fontWeight: 800, fontSize: 12 }} color="text.secondary">
-              Default PIN (for now): <b>{DEFAULT_FRONTDESK_PIN}</b>
-            </Typography>
+            {isDemoMode() ? (
+              <Box sx={{ mt: 1, width: '100%', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: 3, p: 1.5, textAlign: 'center' }}>
+                <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#c9a96e', textTransform: 'uppercase', letterSpacing: '1px', mb: 0.5 }}>
+                  Demo — Front Desk PIN
+                </Typography>
+                <Typography sx={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 26, fontWeight: 800, color: '#c9a96e', letterSpacing: '8px' }}>
+                  {DEFAULT_FRONTDESK_PIN}
+                </Typography>
+              </Box>
+            ) : (
+              <Typography sx={{ mt: 1, fontWeight: 800, fontSize: 12 }} color="text.secondary">
+                Default PIN (for now): <b>{DEFAULT_FRONTDESK_PIN}</b>
+              </Typography>
+            )}
           </Stack>
         </GemCard>
       </Box>
