@@ -5,7 +5,7 @@ import { getGymByCode } from '../services/gym.service';
 import { isAuthed } from '../utils/auth';
 
 const DEMO_CODES = [
-  { code: 'elite', label: 'Elite Fitness Club', location: 'Yaoundé' },
+  { code: 'elite', label: 'Elite Fitness Club', location: 'Yaoundé', hint: 'marvin@elite.cm · admin123' },
 ];
 
 export default function GymCodePage() {
@@ -159,6 +159,7 @@ function DemoGym({ gym, onSelect }) {
         <div style={{ textAlign: 'left' }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{gym.label}</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{gym.location} · code: <span style={{ color: 'var(--accent-gold)', fontFamily: 'JetBrains Mono, monospace' }}>{gym.code}</span></div>
+          {gym.hint && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>🔑 {gym.hint}</div>}
         </div>
       </div>
       <ChevronRight size={15} color={hov ? 'var(--accent-gold)' : 'var(--text-muted)'} style={{ transition: 'color 0.18s' }} />

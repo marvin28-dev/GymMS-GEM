@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Eye, EyeOff, ArrowLeft, Dumbbell, MapPin, Lock, Mail, LogIn } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, Dumbbell, MapPin, Lock, Mail, LogIn, Sparkles, Copy, Check } from 'lucide-react';
 import { setAuth, isAuthed } from '../utils/auth';
 import { login as loginApi } from '../services/auth.service';
 import { getGymByCode } from '../services/gym.service';
+
+const DEMO_ACCOUNTS = [
+  { label: 'General Manager', role: 'Full access', email: 'marvin@elite.cm', password: 'admin123', color: '#c9a96e' },
+  { label: 'Front Desk',      role: 'Member check-in & payments', email: 'sandrine@elite.cm', password: 'admin123', color: '#f59e0b' },
+  { label: 'Trainer',         role: 'Schedule & attendance', email: 'michel@elite.cm', password: 'admin123', color: '#60a5fa' },
+];
 
 const DEFAULT_GYM = { name: 'Loading...', location: '', color: '#c9a96e', bg: 'rgba(201,169,110,0.07)', initials: '...', tagline: 'Welcome back' };
 
@@ -23,6 +29,7 @@ export default function GymLoginPage() {
     if (isAuthed()) nav('/dashboard', { replace: true });
   }, []);
 
+  const isDemo = gymCode === 'elite';
   const [gymInfo, setGymInfo] = useState(DEFAULT_GYM);
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPw, setShowPw] = useState(false);
@@ -30,6 +37,7 @@ export default function GymLoginPage() {
   const [apiError, setApiError] = useState('');
   const [loading, setLoading] = useState(false);
   const [inputFocus, setInputFocus] = useState('');
+  const [copiedField, setCopiedField] = useState('');
 
   useEffect(() => {
     getGymByCode(gymCode)
@@ -39,6 +47,18 @@ export default function GymLoginPage() {
 
   const gym = gymInfo;
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const useDemo = (account) => {
+    setForm({ email: account.email, password: account.password });
+    setErrors({});
+    setApiError('');
+  };
+
+  const copyText = (text, field) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(''), 1500);
+  };
 
   const validate = () => {
     const e = {};
@@ -231,11 +251,72 @@ export default function GymLoginPage() {
             </div>
           </form>
 
+          {/* Demo credentials panel */}
+          {isDemo && (
+            <div style={{ marginTop: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <Sparkles size={13} color="var(--accent-gold)" />
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1.2px' }}>
+                  Demo accounts — click to auto-fill
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {DEMO_ACCOUNTS.map(acc => (
+                  <button
+                    key={acc.email}
+                    onClick={() => useDemo(acc)}
+                    style={{
+                      background: form.email === acc.email ? `${acc.color}15` : 'var(--bg-card)',
+                      border: `1px solid ${form.email === acc.email ? acc.color + '60' : 'var(--border-subtle)'}`,
+                      borderRadius: 10, padding: '10px 14px', cursor: 'pointer',
+                      fontFamily: 'DM Sans', display: 'flex', alignItems: 'center',
+                      justifyContent: 'space-between', transition: 'all 0.18s', width: '100%',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 7, background: `${acc.color}20`, border: `1px solid ${acc.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: acc.color }}>
+                          {acc.label.split(' ').map(w => w[0]).join('')}
+                        </span>
+                      </div>
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{acc.label}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{acc.role}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 10, color: acc.color, fontWeight: 600 }}>
+                      {form.email === acc.email ? '✓ Selected' : 'Use this'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div style={{ marginTop: 10, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>PASSWORD (all accounts)</div>
+                  <div style={{ fontSize: 13, fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-primary)', fontWeight: 600 }}>admin123</div>
+                </div>
+                <button onClick={() => copyText('admin123', 'pw')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedField === 'pw' ? '#34d399' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontFamily: 'DM Sans' }}>
+                  {copiedField === 'pw' ? <Check size={12} /> : <Copy size={12} />}
+                  {copiedField === 'pw' ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <p style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: 'var(--text-muted)' }}>
-            Wrong gym?{' '}
-            <span style={{ color: gym.color, cursor: 'pointer', fontWeight: 600 }} onClick={() => nav('/login')}>
-              Search for your gym
-            </span>
+            {isDemo ? (
+              <>Exploring the demo?{' '}
+                <span style={{ color: gym.color, cursor: 'pointer', fontWeight: 600 }} onClick={() => nav('/login')}>
+                  Find your own gym
+                </span>
+              </>
+            ) : (
+              <>Wrong gym?{' '}
+                <span style={{ color: gym.color, cursor: 'pointer', fontWeight: 600 }} onClick={() => nav('/login')}>
+                  Search for your gym
+                </span>
+              </>
+            )}
           </p>
         </div>
       </div>
