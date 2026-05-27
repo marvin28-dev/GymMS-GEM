@@ -21,6 +21,7 @@ import { getAll as getAttendance, checkIn as checkInApi } from '../services/atte
 import { getMyGym } from '../services/gym.service';
 import { create as createSale } from '../services/sales.service';
 import { getAll as getEquipmentIssues, create as createEquipmentIssue } from '../services/equipment.service';
+import { isDemoMode } from '../utils/auth';
 
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const formatMoney = (v) => `${Number(v || 0).toLocaleString('fr-FR')} FCFA`;
@@ -780,6 +781,12 @@ export default function FrontDeskPage() {
                     : <span style={{ fontSize:12, color:'var(--text-muted)', fontFamily:'DM Sans' }}>{t('frontDesk.enterPinToLogin')}</span>}
                 </div>
                 {loginError && <div style={{ background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', borderRadius:8, padding:'8px 14px', fontSize:12, color:'var(--accent-red)', fontFamily:'DM Sans', textAlign:'center', width:'100%' }}>{loginError}</div>}
+                {isDemoMode() && selStaff?.accessCode && (
+                  <div style={{ background:'rgba(201,169,110,0.08)', border:'1px solid rgba(201,169,110,0.3)', borderRadius:10, padding:'10px 16px', width:'100%', textAlign:'center' }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#c9a96e', textTransform:'uppercase', letterSpacing:'1px', marginBottom:4 }}>Demo — PIN for {selStaff.firstName}</div>
+                    <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:22, fontWeight:800, color:'#c9a96e', letterSpacing:'6px' }}>{selStaff.accessCode}</div>
+                  </div>
+                )}
                 <div style={{ width:'100%' }}>
                   <LoginPinPad onDigit={d => { if (loginPin.length < 6) { setLoginPin(p=>p+d); setLoginError(''); } }} onBack={() => { setLoginPin(p=>p.slice(0,-1)); setLoginError(''); }} onConfirm={handleLoginConfirm} confirmEnabled={loginPin.length >= 3}/>
                 </div>
