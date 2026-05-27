@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { isDemoMode } from "../utils/auth";
+import FrontDeskTour from "../components/FrontDeskTour";
 
 import {
   Avatar,
@@ -194,9 +195,10 @@ function seedProductsIfEmpty() {
 }
 
 /* ----------------------------- Shared shell ----------------------------- */
-function SectionShell({ title, children, right }) {
+function SectionShell({ title, children, right, ...rest }) {
   return (
     <Box
+      {...rest}
       sx={{
         height: "100%",
         border: "1px solid",
@@ -1175,7 +1177,7 @@ export default function FrontDeskMode() {
         gap: 2,
       }}
     >
-      <GemCard contentSx={{ p: 1.6 }}>
+      <GemCard data-fdtour="header" contentSx={{ p: 1.6 }}>
         <Box sx={{ display: "flex", alignItems: { xs: "flex-start", md: "center" }, justifyContent: "space-between", gap: 1.5, flexWrap: "wrap" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
             <Avatar sx={{ bgcolor: "primary.main" }}>
@@ -1252,7 +1254,7 @@ export default function FrontDeskMode() {
               <Box sx={{ mt: "auto" }} />
             </SectionShell>
 
-            <SectionShell title="Checkin Member or Staff" right={<Box sx={{ width: 24 }} />}>
+            <SectionShell data-fdtour="checkin-search" title="Checkin Member or Staff" right={<Box sx={{ width: 24 }} />}>
               <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
                 <GemTextField
                   value={query}
@@ -1474,6 +1476,7 @@ export default function FrontDeskMode() {
             </SectionShell>
 
             <SectionShell
+              data-fdtour="checkin-recent"
               title="Recent Checkin"
               right={
                 <FormControl size="small" sx={{ width: 140 }}>
@@ -1593,14 +1596,14 @@ export default function FrontDeskMode() {
         )}
 
         {tab === 1 && (
-          <Box sx={{ height: "100%", overflow: "auto", pr: 0.5 }}>
+          <Box data-fdtour="signup" sx={{ height: "100%", overflow: "auto", pr: 0.5 }}>
             <AddMemberVisitorPage onCancel={() => setTab(0)} onSave={(payload) => handleSignupSave(payload)} />
           </Box>
         )}
 
         {tab === 2 && (
           <Box sx={{ height: "100%" }}>
-            <SectionShell title="Product Sale">
+            <SectionShell data-fdtour="product-sale" title="Product Sale">
               <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "300px 1fr" }, gap: 2, flex: 1, minHeight: 0 }}>
                 <Box
                   sx={{
@@ -1800,7 +1803,7 @@ export default function FrontDeskMode() {
 
         {tab === 3 && (
           <Box sx={{ height: "100%" }}>
-            <SectionShell title="Operations">
+            <SectionShell data-fdtour="operations" title="Operations">
               <Box
                 sx={{
                   flex: 1,
@@ -1936,6 +1939,8 @@ export default function FrontDeskMode() {
       <EodReportDialog open={eodOpen} onClose={() => setEodOpen(false)} onGenerate={handleGenerateReport} />
 
       <Snackbar open={Boolean(snack)} autoHideDuration={2200} onClose={() => setSnack("")} message={snack} />
+
+      {isDemoMode() && <FrontDeskTour setTab={setTab} />}
     </Box>
   );
 }
