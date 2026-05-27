@@ -12,7 +12,7 @@ export default function AppLayout() {
       <Sidebar />
       <div style={{ marginLeft: 260, flex: 1, display: 'flex', flexDirection: 'column' }}>
         <Header />
-        <main key={pathname} className="page-fade" style={{ padding: 28, flex: 1 }}>
+        <main key={pathname} data-tour="main-content" className="page-fade" style={{ padding: 28, flex: 1 }}>
           <Outlet />
         </main>
       </div>

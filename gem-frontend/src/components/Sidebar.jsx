@@ -172,6 +172,7 @@ export default function Sidebar() {
 
   return (
     <div
+      data-tour="sidebar"
       style={{
         position: 'fixed',
         top: 0,

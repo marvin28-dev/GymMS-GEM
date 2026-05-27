@@ -1,11 +1,20 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   X, ChevronRight, ChevronLeft, Users, CreditCard, Monitor,
-  BarChart3, Users2, LayoutGrid, Settings, Sparkles, ArrowRight,
-  CheckCircle, Dumbbell,
+  BarChart3, Users2, LayoutGrid, Sparkles, CheckCircle, Dumbbell, Lock,
 } from 'lucide-react';
 
+const SIDEBAR_W = 260;
+const HEADER_H = 64;
+
+/* ─────────────────────────────────────────────────────────────────
+   Tour steps
+   spotlight: CSS selector of the element to highlight
+   cardPos:   'center' | 'bottom-right' | 'top-right'
+              'bottom-right' = card at bottom-right of screen (over main content)
+              'top-right'    = card just right of sidebar, near top
+   ───────────────────────────────────────────────────────────────── */
 const STEPS = [
   {
     id: 'welcome',
@@ -13,35 +22,59 @@ const STEPS = [
     color: '#c9a96e',
     label: 'Welcome',
     title: 'Welcome to GEM',
-    subtitle: 'GymElite Manager',
-    desc: "You're now inside a fully working gym management system. This short tour will show you around — it only takes 2 minutes.",
+    subtitle: 'GymElite Manager · Demo',
+    desc: "You're inside a fully working gym management system — real members, payments, and staff. This short tour walks you through every section.",
+    bullets: ['8 members with real membership statuses', '5 staff members across different roles', 'Live payments, attendance & reports'],
     tip: null,
-    path: null,
-    bullets: ['Real member & payment data', 'Role-based staff access', 'All features unlocked'],
+    pinInfo: null,
+    path: '/dashboard',
+    spotlight: null,
+    cardPos: 'center',
+  },
+  {
+    id: 'sidebar',
+    icon: LayoutGrid,
+    color: '#a78bfa',
+    label: 'Sidebar',
+    title: 'Navigate the System',
+    subtitle: 'The sidebar is your map',
+    desc: 'Every section is one click away. Your staff role controls which sections you can access — a Trainer sees less than a Manager.',
+    bullets: ['Dashboard, Members, Attendance, Calendar', 'Front Desk, Tasks, Sales, Operations', 'Payments, Reports, Staff, Settings'],
+    tip: 'Try clicking "Members" in the sidebar now — the page changes instantly.',
+    pinInfo: null,
+    path: '/dashboard',
+    spotlight: '[data-tour="sidebar"]',
+    cardPos: 'top-right',
   },
   {
     id: 'dashboard',
     icon: LayoutGrid,
     color: '#a78bfa',
     label: 'Dashboard',
-    title: 'Your Command Centre',
-    subtitle: 'Dashboard',
-    desc: 'The dashboard gives you an instant snapshot of your gym: daily check-ins, revenue today, active members, and any urgent alerts.',
-    tip: 'Click Dashboard in the sidebar to see today\'s overview.',
+    title: 'Dashboard Overview',
+    subtitle: 'Everything that matters today',
+    desc: "Revenue today, active members, check-ins, expiring memberships, and overdue payments — all on one screen when you log in.",
+    bullets: ['KPI cards update in real time', 'Alerts for members who need attention', 'Calendar & task overview'],
+    tip: 'Scroll down to see the full activity feed and calendar.',
+    pinInfo: null,
     path: '/dashboard',
-    bullets: ['KPIs at a glance', 'Pending tasks & alerts', 'Recent activity feed'],
+    spotlight: '[data-tour="main-content"]',
+    cardPos: 'bottom-right',
   },
   {
     id: 'members',
     icon: Users,
     color: '#60a5fa',
     label: 'Members',
-    title: 'Manage Your Members',
-    subtitle: 'Members',
-    desc: 'Every member has a full profile: membership status, payment history, attendance log, notes, and messages — all in one place.',
-    tip: 'Click any member row to open their full profile.',
+    title: 'Member Management',
+    subtitle: 'Every member. Every detail.',
+    desc: 'The complete member list with status badges, balance, and last check-in. Click any row to open their full profile.',
+    bullets: ['Filter by status: active, frozen, expired, visitor', 'Click a member → full profile with history', 'Renew, freeze, cancel, or extend memberships'],
+    tip: 'Click on "Armand Kamga" in the list to open his full profile with payment history.',
+    pinInfo: null,
     path: '/members',
-    bullets: ['Active, frozen, expired, visitor statuses', 'Renew, freeze, cancel memberships', 'Track balance & payment history'],
+    spotlight: '[data-tour="main-content"]',
+    cardPos: 'bottom-right',
   },
   {
     id: 'frontdesk',
@@ -49,290 +82,429 @@ const STEPS = [
     color: '#34d399',
     label: 'Front Desk',
     title: 'Front Desk Mode',
-    subtitle: 'Quick Check-in',
-    desc: 'A touchscreen-optimised interface designed for your receptionist. Members tap their code to check in. Payments are recorded in seconds.',
-    tip: 'Perfect for a tablet at your front counter.',
+    subtitle: 'Built for your reception counter',
+    desc: 'A fast touchscreen interface for member check-in and payments. Staff first select their name, then enter their personal PIN.',
+    bullets: ['Member check-in by code or name search', 'Record payments instantly at the desk', 'Sell visitor day passes & products'],
+    tip: null,
+    pinInfo: [
+      { name: 'Sandrine Kom', role: 'Front Desk', pin: '5163' },
+      { name: 'Marvin Ekokobe', role: 'General Manager', pin: '9721' },
+      { name: 'Michel Roko', role: 'Trainer', pin: '3847' },
+    ],
     path: '/front-desk',
-    bullets: ['One-tap member check-in', 'Record payments on the spot', 'Visitor & day-pass management'],
+    spotlight: '[data-tour="main-content"]',
+    cardPos: 'bottom-right',
   },
   {
     id: 'payments',
     icon: CreditCard,
     color: '#f59e0b',
     label: 'Payments',
-    title: 'Track Every Payment',
-    subtitle: 'Payments & Finance',
-    desc: 'Every franc in and out is recorded. See the full payment history, member balances, and filter by date, method, or staff member.',
-    tip: 'Use the Payments page to audit any transaction.',
+    title: 'Payment Tracking',
+    subtitle: 'Every transaction recorded',
+    desc: 'The complete payment ledger for your gym. Filter by date, member, or payment method. See per-member balances at a glance.',
+    bullets: ['Cash, card, mobile money, bank transfer', 'Partial payments with balance carry-over', 'Staff-recorded payment attribution'],
+    tip: 'Use the date filter at the top to see only this month\'s payments.',
+    pinInfo: null,
     path: '/payments',
-    bullets: ['Cash, card, mobile money', 'Per-member balance tracking', 'Partial payment support'],
+    spotlight: '[data-tour="main-content"]',
+    cardPos: 'bottom-right',
   },
   {
     id: 'reports',
     icon: BarChart3,
     color: '#fb7185',
     label: 'Reports',
-    title: 'Business Analytics',
-    subtitle: 'Reports & Accounting',
-    desc: 'Revenue trends, attendance patterns, and expense breakdowns — everything you need to make smart decisions about your gym.',
-    tip: 'Check Reports at end of month for a full financial summary.',
+    title: 'Reports & Accounting',
+    subtitle: 'Know your numbers',
+    desc: 'Monthly revenue charts, expense breakdown, and membership trends. Everything you need to make smart decisions about your gym.',
+    bullets: ['Revenue & expense charts by month', 'Membership growth & retention stats', 'Export summaries for accounting'],
+    tip: 'Check this page at month-end for a full financial summary.',
+    pinInfo: null,
     path: '/accounting',
-    bullets: ['Monthly revenue charts', 'Expense tracking', 'Attendance trends'],
+    spotlight: '[data-tour="main-content"]',
+    cardPos: 'bottom-right',
   },
   {
     id: 'staff',
     icon: Users2,
     color: '#a78bfa',
     label: 'Staff',
-    title: 'Manage Your Team',
-    subtitle: 'Staff & Operations',
-    desc: 'Add staff, assign roles (Manager, Trainer, Front Desk…), track their timecards, and control what each person can access.',
-    tip: 'Each role automatically limits what staff can see and do.',
+    title: 'Staff Management',
+    subtitle: 'Your team. Your rules.',
+    desc: 'Add staff, assign roles, and control access. Track timecards and schedule shifts. Each role automatically limits what the person can see.',
+    bullets: ['7 roles: Manager, Trainer, Front Desk, Coach…', 'Role-based access — staff only see what they need', 'Timecard punch in/out per staff member'],
+    tip: 'Click any staff card to view their profile, edit their role, or see their schedule.',
+    pinInfo: null,
     path: '/staff',
-    bullets: ['7 role types with custom access', 'Timecard punch in/out', 'Staff schedule management'],
+    spotlight: '[data-tour="main-content"]',
+    cardPos: 'bottom-right',
   },
   {
     id: 'done',
     icon: CheckCircle,
     color: '#34d399',
-    label: 'Done',
+    label: 'Done!',
     title: "You're all set!",
-    subtitle: 'Tour Complete',
-    desc: 'That\'s the full system. Now explore on your own — click anything in the sidebar, open member profiles, try recording a payment.',
+    subtitle: 'Tour complete — explore freely',
+    desc: "That's the whole system. Now it's yours to explore. Click anything, open member profiles, try recording a payment — nothing breaks.",
+    bullets: ['Tap ✦ bottom-right anytime to replay this tour', 'Try logging out and signing in as a different role', 'All data resets regularly — feel free to experiment'],
     tip: null,
-    path: null,
-    bullets: ['Click the ? button anytime to replay this tour', 'Use the sidebar to navigate', 'Try different staff roles for different views'],
+    pinInfo: null,
+    path: '/dashboard',
+    spotlight: null,
+    cardPos: 'center',
   },
 ];
 
-const TOUR_DONE_KEY = 'gem_tour_done';
-
+/* ─────────────────────────────────────────────────────────────────
+   Hook — auto-shows tour on first demo login
+   ───────────────────────────────────────────────────────────────── */
 export function useDemoTour() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    const isDemoMode = localStorage.getItem('gem_demo_mode') === '1';
-    const tourDone = localStorage.getItem(TOUR_DONE_KEY) === '1';
-    if (isDemoMode && !tourDone) {
-      setTimeout(() => setShow(true), 600);
+    const isDemo = localStorage.getItem('gem_demo_mode') === '1';
+    const done = localStorage.getItem('gem_tour_done') === '1';
+    if (isDemo && !done) {
+      const t = setTimeout(() => setShow(true), 700);
+      return () => clearTimeout(t);
     }
   }, []);
 
   const open = () => setShow(true);
   const close = () => {
     setShow(false);
-    localStorage.setItem(TOUR_DONE_KEY, '1');
+    localStorage.setItem('gem_tour_done', '1');
   };
-
   return { show, open, close };
 }
 
+/* ─────────────────────────────────────────────────────────────────
+   Main Tour component
+   ───────────────────────────────────────────────────────────────── */
 export default function DemoTour({ onClose }) {
   const [step, setStep] = useState(0);
-  const [animDir, setAnimDir] = useState(0);
+  const [spotRect, setSpotRect] = useState(null);
   const [fading, setFading] = useState(false);
+  const [navigating, setNavigating] = useState(false);
   const nav = useNavigate();
+  const location = useLocation();
 
-  const total = STEPS.length;
   const current = STEPS[step];
-  const Icon = current.icon;
-  const isLast = step === total - 1;
+  const isLast = step === STEPS.length - 1;
   const isFirst = step === 0;
 
-  const transition = (newStep, dir) => {
+  /* Navigate to step's page */
+  useEffect(() => {
+    if (current.path && location.pathname !== current.path) {
+      setNavigating(true);
+      nav(current.path);
+      const t = setTimeout(() => setNavigating(false), 400);
+      return () => clearTimeout(t);
+    } else {
+      setNavigating(false);
+    }
+  }, [step]);
+
+  /* Find and track spotlight element */
+  const updateRect = useCallback(() => {
+    if (!current.spotlight) { setSpotRect(null); return; }
+    const el = document.querySelector(current.spotlight);
+    if (el) setSpotRect(el.getBoundingClientRect());
+  }, [current.spotlight]);
+
+  useEffect(() => {
+    setSpotRect(null);
+    if (!current.spotlight) return;
+    // Delay to let page render after navigation
+    const t1 = setTimeout(updateRect, 200);
+    const t2 = setTimeout(updateRect, 600);
+    window.addEventListener('resize', updateRect);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      window.removeEventListener('resize', updateRect);
+    };
+  }, [step, location.pathname, updateRect]);
+
+  const changeStep = (to) => {
     setFading(true);
-    setAnimDir(dir);
-    setTimeout(() => {
-      setStep(newStep);
-      setFading(false);
-    }, 180);
+    setTimeout(() => { setStep(to); setFading(false); }, 200);
   };
 
-  const next = () => {
-    if (isLast) { finish(); return; }
-    if (STEPS[step + 1].path) nav(STEPS[step + 1].path);
-    transition(step + 1, 1);
-  };
+  const next = () => isLast ? finish() : changeStep(step + 1);
+  const prev = () => !isFirst && changeStep(step - 1);
+  const finish = () => { localStorage.setItem('gem_tour_done', '1'); onClose(); };
 
-  const prev = () => {
-    if (isFirst) return;
-    if (STEPS[step - 1].path) nav(STEPS[step - 1].path);
-    transition(step - 1, -1);
-  };
+  const Icon = current.icon;
 
-  const jumpTo = (i) => {
-    if (STEPS[i].path) nav(STEPS[i].path);
-    transition(i, i > step ? 1 : -1);
-  };
+  /* Card position style */
+  const cardStyle = resolveCardStyle(current.cardPos, spotRect);
 
-  const finish = () => {
-    localStorage.setItem(TOUR_DONE_KEY, '1');
-    onClose();
-  };
+  /* Spotlight padding */
+  const PAD = 6;
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9000,
-      background: 'rgba(6,6,10,0.85)',
-      backdropFilter: 'blur(4px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'DM Sans, sans-serif',
-      padding: 24,
-    }}>
-      <div style={{
-        width: '100%', maxWidth: 520,
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: 24,
-        boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
-        overflow: 'hidden',
-        position: 'relative',
-      }}>
-        {/* Coloured top strip */}
-        <div style={{ height: 4, background: `linear-gradient(90deg, ${current.color}, ${current.color}88)`, transition: 'background 0.4s' }} />
-
-        {/* Close button */}
-        <button
-          onClick={finish}
-          style={{ position: 'absolute', top: 16, right: 16, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', transition: 'all 0.15s' }}
+    <>
+      {/* ── Overlay ──────────────────────────────────────────────── */}
+      {current.spotlight && spotRect ? (
+        <svg
+          style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh', zIndex: 8500, pointerEvents: 'none' }}
         >
-          <X size={15} />
-        </button>
-
-        {/* Step indicator pills */}
-        <div style={{ display: 'flex', gap: 4, padding: '18px 24px 0', flexWrap: 'wrap' }}>
-          {STEPS.map((s, i) => (
-            <button
-              key={s.id}
-              onClick={() => jumpTo(i)}
-              title={s.label}
-              style={{
-                height: 4, flex: 1, minWidth: 12,
-                background: i <= step ? current.color : 'var(--border-subtle)',
-                border: 'none', borderRadius: 2, cursor: 'pointer',
-                transition: 'background 0.3s',
-                opacity: i === step ? 1 : i < step ? 0.6 : 0.3,
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Step counter */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 24px 0' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-            {current.label}
-          </span>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{step + 1} / {total}</span>
-        </div>
-
-        {/* Content */}
+          <defs>
+            <mask id="gem-tour-mask">
+              <rect width="100%" height="100%" fill="white" />
+              <rect
+                x={spotRect.x - PAD}
+                y={spotRect.y - PAD}
+                width={spotRect.width + PAD * 2}
+                height={spotRect.height + PAD * 2}
+                rx={10}
+                fill="black"
+              />
+            </mask>
+          </defs>
+          {/* Dark overlay with cutout */}
+          <rect width="100%" height="100%" fill="rgba(0,0,0,0.70)" mask="url(#gem-tour-mask)" />
+          {/* Glowing border around spotlight */}
+          <rect
+            x={spotRect.x - PAD}
+            y={spotRect.y - PAD}
+            width={spotRect.width + PAD * 2}
+            height={spotRect.height + PAD * 2}
+            rx={10}
+            fill="none"
+            stroke={current.color}
+            strokeWidth="1.5"
+            opacity="0.5"
+          />
+        </svg>
+      ) : (
         <div style={{
-          padding: '20px 28px 28px',
-          opacity: fading ? 0 : 1,
-          transform: fading ? `translateX(${animDir * 20}px)` : 'translateX(0)',
-          transition: 'opacity 0.18s, transform 0.18s',
+          position: 'fixed', inset: 0, zIndex: 8500,
+          background: 'rgba(0,0,0,0.75)',
+          backdropFilter: current.cardPos === 'center' ? 'blur(3px)' : 'none',
+        }} />
+      )}
+
+      {/* ── Tooltip Card ─────────────────────────────────────────── */}
+      <div style={{
+        position: 'fixed',
+        zIndex: 8501,
+        fontFamily: 'DM Sans, sans-serif',
+        ...cardStyle,
+        opacity: fading || navigating ? 0 : 1,
+        transition: 'opacity 0.2s',
+        pointerEvents: 'all',
+      }}>
+        <div style={{
+          background: 'var(--bg-card)',
+          border: `1px solid var(--border-subtle)`,
+          borderTop: `3px solid ${current.color}`,
+          borderRadius: current.cardPos === 'center' ? 20 : 16,
+          boxShadow: '0 16px 60px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.4)',
+          overflow: 'hidden',
         }}>
-          {/* Icon */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
-            <div style={{ width: 60, height: 60, borderRadius: 18, background: `${current.color}15`, border: `2px solid ${current.color}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: `0 0 30px ${current.color}20` }}>
-              <Icon size={28} color={current.color} strokeWidth={1.6} />
-            </div>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: current.color, textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: 4 }}>{current.subtitle}</div>
-              <h3 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.3px', margin: 0 }}>{current.title}</h3>
-            </div>
-          </div>
+          <div style={{ padding: current.cardPos === 'center' ? '24px 28px' : '18px 20px' }}>
 
-          {/* Description */}
-          <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.75, marginBottom: 18 }}>
-            {current.desc}
-          </p>
-
-          {/* Bullets */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: current.tip ? 18 : 24 }}>
-            {current.bullets.map(b => (
-              <div key={b} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                <div style={{ width: 18, height: 18, borderRadius: '50%', background: `${current.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-                  <span style={{ fontSize: 9, color: current.color, fontWeight: 900 }}>✓</span>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: current.cardPos === 'center' ? 48 : 38,
+                  height: current.cardPos === 'center' ? 48 : 38,
+                  borderRadius: current.cardPos === 'center' ? 14 : 10,
+                  background: `${current.color}15`,
+                  border: `1.5px solid ${current.color}35`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  boxShadow: `0 0 20px ${current.color}20`,
+                }}>
+                  <Icon size={current.cardPos === 'center' ? 24 : 18} color={current.color} strokeWidth={1.7} />
                 </div>
-                <span style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{b}</span>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: current.color, textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: 3 }}>
+                    {current.subtitle}
+                  </div>
+                  <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: current.cardPos === 'center' ? 20 : 16, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.3px', lineHeight: 1.2 }}>
+                    {current.title}
+                  </div>
+                </div>
               </div>
-            ))}
-          </div>
-
-          {/* Tip */}
-          {current.tip && (
-            <div style={{ background: `${current.color}0c`, border: `1px solid ${current.color}25`, borderRadius: 10, padding: '10px 14px', marginBottom: 24, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <Sparkles size={13} color={current.color} style={{ flexShrink: 0, marginTop: 2 }} />
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}><strong style={{ color: current.color }}>Try it:</strong> {current.tip}</span>
+              <button onClick={finish} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 7, width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0 }}>
+                <X size={13} />
+              </button>
             </div>
-          )}
 
-          {/* Navigation */}
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {!isFirst && (
-              <button
-                onClick={prev}
-                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 18px', fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', gap: 6 }}
-              >
-                <ChevronLeft size={14} /> Back
+            {/* Description */}
+            <p style={{ fontSize: current.cardPos === 'center' ? 14 : 13, color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 14 }}>
+              {current.desc}
+            </p>
+
+            {/* Bullets */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 14 }}>
+              {current.bullets.map(b => (
+                <div key={b} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+                  <div style={{ width: 16, height: 16, borderRadius: '50%', background: `${current.color}18`, border: `1px solid ${current.color}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                    <span style={{ fontSize: 8, color: current.color, fontWeight: 900 }}>✓</span>
+                  </div>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.55 }}>{b}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Front desk PIN table */}
+            {current.pinInfo && (
+              <div style={{ background: `${current.color}08`, border: `1px solid ${current.color}28`, borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+                  <Lock size={12} color={current.color} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: current.color, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                    Staff PINs — select name then enter PIN
+                  </span>
+                </div>
+                {current.pinInfo.map(p => (
+                  <div key={p.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{p.role}</div>
+                    </div>
+                    <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 15, fontWeight: 700, color: current.color, background: `${current.color}18`, padding: '3px 10px', borderRadius: 6, letterSpacing: '2px' }}>
+                      {p.pin}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Tip */}
+            {current.tip && (
+              <div style={{ background: `${current.color}08`, border: `1px solid ${current.color}22`, borderRadius: 8, padding: '9px 12px', marginBottom: 14, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <Sparkles size={12} color={current.color} style={{ flexShrink: 0, marginTop: 1 }} />
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                  <strong style={{ color: current.color }}>Try it: </strong>{current.tip}
+                </span>
+              </div>
+            )}
+
+            {/* Progress bar */}
+            <div style={{ display: 'flex', gap: 3, marginBottom: 14 }}>
+              {STEPS.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => changeStep(i)}
+                  style={{
+                    flex: 1, height: 3, borderRadius: 2, border: 'none', cursor: 'pointer', padding: 0,
+                    background: i < step ? `${current.color}60` : i === step ? current.color : 'var(--border-subtle)',
+                    transition: 'background 0.3s',
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Step counter */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                Step {step + 1} of {STEPS.length}
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {!isFirst && (
+                  <button onClick={prev} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '8px 14px', fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <ChevronLeft size={13} /> Back
+                  </button>
+                )}
+                <button onClick={next} style={{
+                  background: `linear-gradient(135deg, ${current.color}, ${current.color}cc)`,
+                  border: 'none', borderRadius: 8, padding: '9px 18px',
+                  fontSize: 13, fontWeight: 700, color: '#0a0a0f',
+                  cursor: 'pointer', fontFamily: 'DM Sans',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  boxShadow: `0 3px 14px ${current.color}40`,
+                }}>
+                  {isLast
+                    ? <><Sparkles size={13} /> Explore now</>
+                    : <>{STEPS[step + 1]?.label} <ChevronRight size={13} /></>
+                  }
+                </button>
+              </div>
+            </div>
+
+            {!isLast && (
+              <button onClick={finish} style={{ width: '100%', marginTop: 8, background: 'none', border: 'none', fontSize: 11, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'DM Sans', padding: '3px 0', textAlign: 'center' }}>
+                Skip tour
               </button>
             )}
-            <button
-              onClick={next}
-              style={{
-                flex: 1, background: `linear-gradient(135deg, ${current.color}, ${current.color}bb)`,
-                border: 'none', borderRadius: 10, padding: '12px 20px',
-                fontSize: 14, fontWeight: 700, color: '#0a0a0f',
-                cursor: 'pointer', fontFamily: 'DM Sans',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: `0 4px 16px ${current.color}35`,
-                transition: 'all 0.2s',
-              }}
-            >
-              {isLast ? (
-                <><Sparkles size={14} /> Start Exploring</>
-              ) : (
-                <>{STEPS[step + 1] ? `Next: ${STEPS[step + 1].label}` : 'Next'} <ChevronRight size={14} /></>
-              )}
-            </button>
           </div>
-
-          {!isLast && (
-            <button onClick={finish} style={{ width: '100%', marginTop: 10, background: 'none', border: 'none', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'DM Sans', padding: '4px 0' }}>
-              Skip tour → go straight to the dashboard
-            </button>
-          )}
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
-/* Floating replay button shown inside the app during demo mode */
+/* ─────────────────────────────────────────────────────────────────
+   Card position resolver
+   ───────────────────────────────────────────────────────────────── */
+function resolveCardStyle(cardPos, spotRect) {
+  if (cardPos === 'center') {
+    return {
+      top: '50%', left: '50%',
+      transform: 'translate(-50%, -50%)',
+      width: 460,
+      maxWidth: 'calc(100vw - 40px)',
+    };
+  }
+
+  if (cardPos === 'top-right') {
+    // Right of sidebar, near the top — used when sidebar is spotlit
+    return {
+      left: SIDEBAR_W + 20,
+      top: HEADER_H + 20,
+      width: 400,
+      maxWidth: 'calc(100vw - 300px)',
+    };
+  }
+
+  // 'bottom-right': card at bottom-right, clear of any nav
+  // when main content is spotlit, card sits over it at the bottom
+  return {
+    right: 24,
+    bottom: 24,
+    width: 400,
+    maxWidth: `calc(100vw - ${SIDEBAR_W + 40}px)`,
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Floating replay button (shown in-app during demo mode)
+   ───────────────────────────────────────────────────────────────── */
 export function DemoTourButton({ onClick }) {
   const [hov, setHov] = useState(false);
-  const isDemoMode = localStorage.getItem('gem_demo_mode') === '1';
-  if (!isDemoMode) return null;
+  if (localStorage.getItem('gem_demo_mode') !== '1') return null;
 
   return (
     <button
       onClick={onClick}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
-      title="Replay tour"
+      title="Replay demo tour"
       style={{
-        position: 'fixed', bottom: 24, right: 24, zIndex: 8000,
+        position: 'fixed', bottom: 24, right: 24, zIndex: 7000,
         background: hov ? '#c9a96e' : 'var(--bg-card)',
-        border: `1.5px solid ${hov ? '#c9a96e' : 'rgba(201,169,110,0.4)'}`,
-        borderRadius: 14, padding: hov ? '10px 18px' : '10px 14px',
-        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
-        boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-        transition: 'all 0.2s', fontFamily: 'DM Sans',
+        border: `1.5px solid ${hov ? '#c9a96e' : 'rgba(201,169,110,0.45)'}`,
+        borderRadius: hov ? 12 : 12,
+        padding: hov ? '9px 16px' : '9px 12px',
+        cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 7,
+        boxShadow: hov ? '0 4px 20px rgba(201,169,110,0.35)' : '0 2px 12px rgba(0,0,0,0.3)',
+        transition: 'all 0.2s',
+        fontFamily: 'DM Sans',
       }}
     >
-      <Sparkles size={15} color={hov ? '#0a0a0f' : '#c9a96e'} />
-      {hov && <span style={{ fontSize: 13, fontWeight: 700, color: '#0a0a0f', whiteSpace: 'nowrap' }}>Replay tour</span>}
+      <Sparkles size={14} color={hov ? '#0a0a0f' : '#c9a96e'} />
+      {hov && (
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#0a0a0f', whiteSpace: 'nowrap' }}>
+          Replay tour
+        </span>
+      )}
     </button>
   );
 }
