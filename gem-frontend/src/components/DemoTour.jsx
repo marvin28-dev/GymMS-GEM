@@ -230,19 +230,23 @@ const STEPS = [
 ];
 
 /* ─────────────────────────────────────────────────────────────────
-   Hook — auto-shows tour on first demo login
+   Hook — auto-shows tour on first demo login.
+   Lives in App.jsx (outside AppLayout) so it must re-check localStorage
+   on every navigation, since the component mounts before login.
    ───────────────────────────────────────────────────────────────── */
 export function useDemoTour() {
   const [show, setShow] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
+    if (show) return; // already open — don't schedule another
     const isDemo = localStorage.getItem('gem_demo_mode') === '1';
     const done = localStorage.getItem('gem_tour_done') === '1';
     if (isDemo && !done) {
       const t = setTimeout(() => setShow(true), 700);
       return () => clearTimeout(t);
     }
-  }, []);
+  }, [location.pathname, show]); // re-check after every navigation
 
   const open = () => setShow(true);
   const close = () => {
