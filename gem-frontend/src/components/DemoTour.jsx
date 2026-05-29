@@ -342,6 +342,7 @@ export function useDemoTour() {
 export default function DemoTour({ onClose }) {
   const [step, setStep] = useState(0);
   const [spotRect, setSpotRect] = useState(null);
+  const [spotVisible, setSpotVisible] = useState(false); // triggers smooth expand after rect ready
   const [fading, setFading] = useState(false);
   const [navigating, setNavigating] = useState(false);
   const nav = useNavigate();
@@ -380,13 +381,19 @@ export default function DemoTour({ onClose }) {
 
   /* Find and track spotlight element */
   const updateRect = useCallback(() => {
-    if (!current.spotlight) { setSpotRect(null); return; }
+    if (!current.spotlight) { setSpotRect(null); setSpotVisible(false); return; }
     const el = document.querySelector(current.spotlight);
-    if (el) setSpotRect(el.getBoundingClientRect());
+    if (el) {
+      setSpotRect(el.getBoundingClientRect());
+      // Double rAF: let the browser paint the collapsed (0×0) state first,
+      // then flip spotVisible → triggers the CSS expand animation
+      requestAnimationFrame(() => requestAnimationFrame(() => setSpotVisible(true)));
+    }
   }, [current.spotlight]);
 
   useEffect(() => {
     setSpotRect(null);
+    setSpotVisible(false);
     if (!current.spotlight) return;
     // t1/t2: catch normal navigation renders
     // t3: catch tab-switch renders (tab fires at 800ms, elements only mount after that)
@@ -417,51 +424,66 @@ export default function DemoTour({ onClose }) {
   const isFrontDesk = location.pathname.startsWith('/front-desk');
   const cardStyle = resolveCardStyle(current.cardPos, spotRect, isFrontDesk);
 
-  /* Spotlight padding */
+  /* Spotlight geometry — collapses to 0×0 at screen centre when not ready,
+     expands smoothly via CSS transition once spotVisible flips true         */
   const PAD = 6;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const ease = 'cubic-bezier(0.4, 0, 0.2, 1)';
+  const hasSpot = !!(current.spotlight && spotVisible && spotRect);
+  const spotX = hasSpot ? spotRect.x - PAD : vw / 2;
+  const spotY = hasSpot ? spotRect.y - PAD : vh / 2;
+  const spotW = hasSpot ? spotRect.width + PAD * 2 : 0;
+  const spotH = hasSpot ? spotRect.height + PAD * 2 : 0;
+
+  /* Card is hidden until spotlight is ready (prevents the position-jump glitch).
+     For steps with no spotlight the card shows immediately.                  */
+  const cardOpacity = fading || navigating || (current.spotlight && !spotVisible) ? 0 : 1;
 
   return (
     <>
-      {/* ── Overlay ──────────────────────────────────────────────── */}
-      {current.spotlight && spotRect ? (
-        <svg
-          style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh', zIndex: 8500, pointerEvents: 'none' }}
-        >
-          <defs>
-            <mask id="gem-tour-mask">
-              <rect width="100%" height="100%" fill="white" />
+      {/* ── Blur layer (center / no-spotlight steps only) ────────── */}
+      {current.cardPos === 'center' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 8499,
+          backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)',
+          pointerEvents: 'none',
+        }} />
+      )}
+
+      {/* ── Overlay SVG — always rendered so the mask can animate ── */}
+      <svg style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh', zIndex: 8500, pointerEvents: 'none' }}>
+        <defs>
+          <mask id="gem-tour-mask">
+            <rect width="100%" height="100%" fill="white" />
+            {current.spotlight && (
               <rect
-                x={spotRect.x - PAD}
-                y={spotRect.y - PAD}
-                width={spotRect.width + PAD * 2}
-                height={spotRect.height + PAD * 2}
-                rx={10}
-                fill="black"
+                style={{
+                  x: spotX, y: spotY, width: spotW, height: spotH,
+                  rx: 10, fill: 'black',
+                  transition: `x 0.45s ${ease}, y 0.45s ${ease}, width 0.45s ${ease}, height 0.45s ${ease}`,
+                }}
               />
-            </mask>
-          </defs>
-          {/* Dark overlay with cutout */}
-          <rect width="100%" height="100%" fill="rgba(0,0,0,0.70)" mask="url(#gem-tour-mask)" />
-          {/* Glowing border around spotlight */}
+            )}
+          </mask>
+        </defs>
+        {/* Dark overlay with cutout when there is a spotlight */}
+        <rect
+          width="100%" height="100%"
+          fill="rgba(0,0,0,0.75)"
+          mask={current.spotlight ? 'url(#gem-tour-mask)' : undefined}
+        />
+        {/* Glow ring — appears with the spotlight */}
+        {hasSpot && (
           <rect
-            x={spotRect.x - PAD}
-            y={spotRect.y - PAD}
-            width={spotRect.width + PAD * 2}
-            height={spotRect.height + PAD * 2}
-            rx={10}
+            x={spotX} y={spotY} width={spotW} height={spotH} rx={10}
             fill="none"
             stroke={current.color}
             strokeWidth="1.5"
             opacity="0.5"
           />
-        </svg>
-      ) : (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 8500,
-          background: 'rgba(0,0,0,0.75)',
-          backdropFilter: current.cardPos === 'center' ? 'blur(3px)' : 'none',
-        }} />
-      )}
+        )}
+      </svg>
 
       {/* ── Tooltip Card ─────────────────────────────────────────── */}
       <div style={{
@@ -469,8 +491,8 @@ export default function DemoTour({ onClose }) {
         zIndex: 8501,
         fontFamily: 'DM Sans, sans-serif',
         ...cardStyle,
-        opacity: fading || navigating ? 0 : 1,
-        transition: 'opacity 0.2s',
+        opacity: cardOpacity,
+        transition: 'opacity 0.35s ease',
         pointerEvents: 'all',
       }}>
         <div style={{
