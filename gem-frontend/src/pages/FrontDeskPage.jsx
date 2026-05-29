@@ -836,7 +836,7 @@ export default function FrontDeskPage() {
 
   // Left sidebar (always visible)
   const leftPanel = (
-    <div style={{ borderRight:'1px solid var(--border-subtle)', padding:20, display:'flex', flexDirection:'column', gap:20, overflowY:'auto' }}>
+    <div data-fdtour="left-panel" style={{ borderRight:'1px solid var(--border-subtle)', padding:20, display:'flex', flexDirection:'column', gap:20, overflowY:'auto' }}>
       <SchedulePanel events={scheduleEvents}/>
       <div style={{ borderTop:'1px solid var(--border-subtle)', paddingTop:16 }}>
         <div style={{ fontSize:10, fontWeight:700, letterSpacing:'1.5px', color:'var(--text-muted)', marginBottom:12, fontFamily:'DM Sans' }}>{t('frontDesk.staffOnDuty')}</div>
