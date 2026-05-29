@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { isDemoMode } from '../utils/auth';
 import {
   Search, X, UserCheck, ChevronLeft, ChevronRight, MessageSquare,
   AlertTriangle, CheckCircle, AlertCircle, Clock, LogOut, ArrowLeft,
@@ -311,7 +312,17 @@ export default function FrontDeskPage() {
 
   // ── Session ────────────────────────────────────────────────────────────────
   const [session, setSession] = useState(() => {
-    try { const s = sessionStorage.getItem('fd_session'); return s ? JSON.parse(s) : null; } catch { return null; }
+    try {
+      const s = sessionStorage.getItem('fd_session');
+      if (s) return JSON.parse(s);
+      // In demo mode, auto-create a session so the login screen is skipped
+      if (isDemoMode()) {
+        const demo = { staffId: 'demo', staffName: 'Marvin Ekokobe' };
+        sessionStorage.setItem('fd_session', JSON.stringify(demo));
+        return demo;
+      }
+      return null;
+    } catch { return null; }
   });
   const [loginStep,     setLoginStep]     = useState('select');
   const [selStaff,      setSelStaff]      = useState(null);
@@ -321,6 +332,14 @@ export default function FrontDeskPage() {
   // ── Shared UI ──────────────────────────────────────────────────────────────
   const [activeTab,     setActiveTab]     = useState('CHECK-IN');
   const [memberDrawer,  setMemberDrawer]  = useState(null); // memberId string
+
+  // Listen for tab-switch events from the main DemoTour
+  useEffect(() => {
+    const FD_TABS = ['CHECK-IN', 'SIGN UP', 'PRODUCT SALE', 'OPERATIONS'];
+    const h = (e) => { const t = FD_TABS[e.detail.tab]; if (t) setActiveTab(t); };
+    window.addEventListener('gem-fd-tab', h);
+    return () => window.removeEventListener('gem-fd-tab', h);
+  }, []);
 
   // ── CHECK-IN ───────────────────────────────────────────────────────────────
   const [pinInput,      setPinInput]      = useState('');
@@ -836,7 +855,7 @@ export default function FrontDeskPage() {
     <div className="page-fade" style={{ minHeight:'100vh', background:'var(--bg-base)', display:'flex', flexDirection:'column' }}>
 
       {/* Header */}
-      <div style={{ background:'var(--bg-card)', borderBottom:'1px solid var(--border-subtle)', padding:'0 28px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56, flexShrink:0 }}>
+      <div data-fdtour="header" style={{ background:'var(--bg-card)', borderBottom:'1px solid var(--border-subtle)', padding:'0 28px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56, flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:14 }}>
           <span style={{ fontFamily:'Manrope', fontSize:17, fontWeight:800, color:'var(--accent-gold)', letterSpacing:'1px' }}>{(gymData?.name||'GEM FITNESS').toUpperCase()}</span>
           <span style={{ background:'var(--accent-gold-dim)', color:'var(--accent-gold)', fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, letterSpacing:'1.5px' }}>{t('frontDesk.frontDeskMode')}</span>
@@ -867,7 +886,7 @@ export default function FrontDeskPage() {
 
         {/* ── CENTER ─────────────────────────────────────────────────────── */}
         {activeTab === 'CHECK-IN' && (
-          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'24px 28px', overflowY:'auto' }}>
+          <div data-fdtour="checkin-search" style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'24px 28px', overflowY:'auto' }}>
             <div style={{ width:'100%', maxWidth:440 }}>
               <div style={{ fontSize:10, fontWeight:700, letterSpacing:'1.5px', color:'var(--text-muted)', marginBottom:16, fontFamily:'DM Sans', textAlign:'center' }}>{t('frontDesk.checkInMemberOrStaff')}</div>
               {/* Search */}
@@ -936,7 +955,7 @@ export default function FrontDeskPage() {
 
         {/* ── SIGN UP ─────────────────────────────────────────────────────── */}
         {activeTab === 'SIGN UP' && (
-          <div style={{ overflowY:'auto', padding:'24px 28px', display:'flex', flexDirection:'column', gap:16 }}>
+          <div data-fdtour="signup" style={{ overflowY:'auto', padding:'24px 28px', display:'flex', flexDirection:'column', gap:16 }}>
             <div style={{ fontSize:10, fontWeight:700, letterSpacing:'1.5px', color:'var(--text-muted)', fontFamily:'DM Sans' }}>{t('frontDesk.registration')}</div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
               {/* New Member card */}
@@ -961,7 +980,7 @@ export default function FrontDeskPage() {
 
         {/* ── PRODUCT SALE ──────────────────────────────────────────────── */}
         {activeTab === 'PRODUCT SALE' && (
-          <div style={{ overflowY:'auto', padding:'24px 28px' }}>
+          <div data-fdtour="product-sale" style={{ overflowY:'auto', padding:'24px 28px' }}>
             <div style={{ fontSize:10, fontWeight:700, letterSpacing:'1.5px', color:'var(--text-muted)', marginBottom:16, fontFamily:'DM Sans' }}>{t('frontDesk.productSaleLabel')}</div>
             {/* Category filter */}
             <div style={{ display:'flex', gap:6, marginBottom:18, flexWrap:'wrap' }}>
@@ -985,7 +1004,7 @@ export default function FrontDeskPage() {
 
         {/* ── OPERATIONS ──────────────────────────────────────────────────── */}
         {activeTab === 'OPERATIONS' && (
-          <div style={{ overflowY:'auto', padding:'24px 28px', display:'flex', flexDirection:'column', gap:24 }}>
+          <div data-fdtour="operations" style={{ overflowY:'auto', padding:'24px 28px', display:'flex', flexDirection:'column', gap:24 }}>
             <div style={{ fontSize:10, fontWeight:700, letterSpacing:'1.5px', color:'var(--text-muted)', fontFamily:'DM Sans' }}>{t('frontDesk.todaysSummary')}</div>
 
             {/* ── Daily Summary Strip ── */}
@@ -1046,7 +1065,7 @@ export default function FrontDeskPage() {
 
         {/* ── RIGHT COLUMN ─────────────────────────────────────────────────── */}
         {activeTab === 'CHECK-IN' && (
-          <div style={{ borderLeft:'1px solid var(--border-subtle)', display:'flex', flexDirection:'column', overflowY:'auto' }}>
+          <div data-fdtour="checkin-recent" style={{ borderLeft:'1px solid var(--border-subtle)', display:'flex', flexDirection:'column', overflowY:'auto' }}>
             <div style={{ padding:'16px 18px', borderBottom:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
               <span style={{ fontSize:10, fontWeight:700, letterSpacing:'1.5px', color:'var(--text-muted)', fontFamily:'DM Sans' }}>{t('frontDesk.recentCheckIns')}</span>
               <select value={timeFilter} onChange={e=>setTimeFilter(e.target.value)} style={{ background:'var(--bg-elevated)', border:'1px solid var(--border-subtle)', borderRadius:6, padding:'3px 8px', fontSize:11, color:'var(--text-secondary)', fontFamily:'DM Sans', cursor:'pointer', outline:'none' }}>

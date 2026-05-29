@@ -93,7 +93,7 @@ const STEPS = [
     bullets: ['Auto-logged in as Manager for this demo', 'Optimised for touchscreen operation', 'Completely separate from the management dashboard'],
     tip: null,
     pinInfo: null,
-    path: '/front-desk/mode',
+    path: '/front-desk',
     spotlight: '[data-fdtour="header"]',
     cardPos: 'bottom-right',
     fdTab: 0,
@@ -109,7 +109,7 @@ const STEPS = [
     bullets: ['Type a name or 4-digit access code', 'QR code scanning supported', 'Shows membership status right away (active / expired)'],
     tip: 'Try typing "Armand" to find and check in a demo member.',
     pinInfo: null,
-    path: '/front-desk/mode',
+    path: '/front-desk',
     spotlight: '[data-fdtour="checkin-search"]',
     cardPos: 'bottom-right',
     fdTab: 0,
@@ -125,7 +125,7 @@ const STEPS = [
     bullets: ['Updates immediately after each check-in', 'Distinguishes member vs. staff arrivals', 'Membership status badge on every entry'],
     tip: null,
     pinInfo: null,
-    path: '/front-desk/mode',
+    path: '/front-desk',
     spotlight: '[data-fdtour="checkin-recent"]',
     cardPos: 'bottom-right',
     fdTab: 0,
@@ -141,7 +141,7 @@ const STEPS = [
     bullets: ['Browse products with stock level and price', 'Attach sale to a specific member (optional)', 'Cash or mobile money — inventory updates automatically'],
     tip: null,
     pinInfo: null,
-    path: '/front-desk/mode',
+    path: '/front-desk',
     spotlight: '[data-fdtour="product-sale"]',
     cardPos: 'bottom-right',
     fdTab: 2,
@@ -157,7 +157,7 @@ const STEPS = [
     bullets: ['Task checklist for the current shift', 'Staff schedule and class timetable', 'End-of-day cash reconciliation report'],
     tip: null,
     pinInfo: null,
-    path: '/front-desk/mode',
+    path: '/front-desk',
     spotlight: '[data-fdtour="operations"]',
     cardPos: 'bottom-right',
     fdTab: 3,
@@ -331,7 +331,7 @@ export default function DemoTour({ onClose }) {
   const Icon = current.icon;
 
   /* Card position style */
-  const isFrontDesk = location.pathname.startsWith('/front-desk/mode');
+  const isFrontDesk = location.pathname.startsWith('/front-desk');
   const cardStyle = resolveCardStyle(current.cardPos, spotRect, isFrontDesk);
 
   /* Spotlight padding */
