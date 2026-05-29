@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { isDemoMode } from "../utils/auth";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
+import CssBaseline from "@mui/material/CssBaseline";
 
 import {
   Avatar,
@@ -816,6 +818,22 @@ function EodReportDialog({ open, onClose, onGenerate }) {
   );
 }
 
+/* ── Dark MUI theme — kiosk always renders dark regardless of app theme ── */
+const fdDarkTheme = createTheme({
+  palette: {
+    mode: 'dark',
+    background: { default: '#0a0a0f', paper: '#16161f' },
+    primary: { main: '#c9a96e' },
+    divider: 'rgba(255,255,255,0.08)',
+    text: { primary: '#f0ede6', secondary: '#8a8a9a' },
+  },
+  shape: { borderRadius: 16 },
+  typography: {
+    fontFamily: ['DM Sans', 'Inter', 'system-ui', 'sans-serif'].join(','),
+    button: { fontWeight: 800, textTransform: 'none' },
+  },
+});
+
 /* ----------------------------- Main Component ----------------------------- */
 export default function FrontDeskMode() {
   const theme = useTheme();
@@ -1180,9 +1198,16 @@ export default function FrontDeskMode() {
     setSnack("EOD report generated ✅");
   };
 
-  if (!session) return <PinLogin onSuccess={(s) => setSession(s)} />;
+  if (!session) return (
+    <ThemeProvider theme={fdDarkTheme}>
+      <CssBaseline />
+      <PinLogin onSuccess={(s) => setSession(s)} />
+    </ThemeProvider>
+  );
 
   return (
+    <ThemeProvider theme={fdDarkTheme}>
+    <CssBaseline />
     <Box
       sx={{
         height: "100dvh",
@@ -1956,5 +1981,6 @@ export default function FrontDeskMode() {
 
       <Snackbar open={Boolean(snack)} autoHideDuration={2200} onClose={() => setSnack("")} message={snack} />
     </Box>
+    </ThemeProvider>
   );
 }
