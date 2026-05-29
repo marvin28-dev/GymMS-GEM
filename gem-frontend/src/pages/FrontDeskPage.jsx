@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import { isDemoMode } from '../utils/auth';
 import {
   Search, X, UserCheck, ChevronLeft, ChevronRight, MessageSquare,
   AlertTriangle, CheckCircle, AlertCircle, Clock, LogOut, ArrowLeft,
@@ -332,6 +331,15 @@ export default function FrontDeskPage() {
   // ── Shared UI ──────────────────────────────────────────────────────────────
   const [activeTab,     setActiveTab]     = useState('CHECK-IN');
   const [memberDrawer,  setMemberDrawer]  = useState(null); // memberId string
+
+  // Demo mode: ensure session exists so login screen is never shown
+  useEffect(() => {
+    if (isDemoMode() && !session) {
+      const demo = { staffId: 'demo', staffName: 'Marvin Ekokobe' };
+      sessionStorage.setItem('fd_session', JSON.stringify(demo));
+      setSession(demo);
+    }
+  }, []);
 
   // Listen for tab-switch events from the main DemoTour
   useEffect(() => {

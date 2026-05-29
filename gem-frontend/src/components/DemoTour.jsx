@@ -288,11 +288,11 @@ export default function DemoTour({ onClose }) {
       localStorage.setItem('gem_fd_tour_done', '1');
     }
 
-    // Switch FrontDeskMode tab for FD steps
+    // Switch FrontDeskPage tab for FD steps
     if (current.fdTab !== undefined) {
       timers.push(setTimeout(() => {
         window.dispatchEvent(new CustomEvent('gem-fd-tab', { detail: { tab: current.fdTab } }));
-      }, 600));
+      }, 800));
     }
 
     return () => timers.forEach(clearTimeout);
