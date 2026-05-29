@@ -613,10 +613,17 @@ export default function DemoTour({ onClose }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   Card position resolver
-   isFrontDesk: true when on /front-desk/mode (no sidebar)
+   Card position resolver — auto-positions away from the spotlight
+   so the card never covers the element being explained.
    ───────────────────────────────────────────────────────────────── */
 function resolveCardStyle(cardPos, spotRect, isFrontDesk) {
+  const CARD_W = 400;
+  const PAD = 20;
+  const leftEdge = isFrontDesk ? PAD : SIDEBAR_W + PAD;
+  const maxW = isFrontDesk
+    ? `calc(100vw - ${PAD * 2}px)`
+    : `calc(100vw - ${SIDEBAR_W + 40}px)`;
+
   if (cardPos === 'center') {
     return {
       top: '50%', left: '50%',
@@ -626,22 +633,31 @@ function resolveCardStyle(cardPos, spotRect, isFrontDesk) {
     };
   }
 
-  if (cardPos === 'top-right') {
-    return {
-      left: isFrontDesk ? 20 : SIDEBAR_W + 20,
-      top: HEADER_H + 20,
-      width: 400,
-      maxWidth: 'calc(100vw - 60px)',
-    };
+  // When a spotlight rect is known, auto-pick the corner furthest from it
+  if (spotRect) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const cx = spotRect.left + spotRect.width / 2;
+    const cy = spotRect.top + spotRect.height / 2;
+
+    // Spotlight in left half → card goes to the right side, and vice-versa
+    const placeOnRight = cx < vw * 0.55;
+    // Spotlight in top half → card goes to the bottom, and vice-versa
+    const placeAtBottom = cy < vh * 0.55;
+
+    const style = { width: CARD_W, maxWidth: maxW };
+    if (placeOnRight) style.right = PAD;
+    else style.left = leftEdge;
+    if (placeAtBottom) style.bottom = PAD;
+    else style.top = HEADER_H + PAD;
+    return style;
   }
 
-  // bottom-right
-  return {
-    right: 24,
-    bottom: 24,
-    width: 400,
-    maxWidth: isFrontDesk ? 'calc(100vw - 48px)' : `calc(100vw - ${SIDEBAR_W + 40}px)`,
-  };
+  // Fallback when no spotlight rect yet
+  if (cardPos === 'top-right') {
+    return { left: leftEdge, top: HEADER_H + PAD, width: CARD_W, maxWidth: maxW };
+  }
+  return { right: PAD, bottom: PAD, width: CARD_W, maxWidth: maxW };
 }
 
 /* ─────────────────────────────────────────────────────────────────
