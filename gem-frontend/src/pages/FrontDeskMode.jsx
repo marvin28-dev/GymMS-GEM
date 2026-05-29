@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { isDemoMode } from "../utils/auth";
-import FrontDeskTour from "../components/FrontDeskTour";
 
 import {
   Avatar,
@@ -1956,8 +1955,6 @@ export default function FrontDeskMode() {
       <EodReportDialog open={eodOpen} onClose={() => setEodOpen(false)} onGenerate={handleGenerateReport} />
 
       <Snackbar open={Boolean(snack)} autoHideDuration={2200} onClose={() => setSnack("")} message={snack} />
-
-      <FrontDeskTour setTab={setTab} />
     </Box>
   );
 }
