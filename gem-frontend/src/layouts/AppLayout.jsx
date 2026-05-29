@@ -1,11 +1,9 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
-import DemoTour, { useDemoTour, DemoTourButton } from '../components/DemoTour';
 
 export default function AppLayout() {
   const { pathname } = useLocation();
-  const { show, open, close } = useDemoTour();
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
@@ -16,9 +14,6 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
-
-      {show && <DemoTour onClose={close} />}
-      {!show && <DemoTourButton onClick={open} />}
     </div>
   );
 }

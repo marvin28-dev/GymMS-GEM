@@ -822,8 +822,25 @@ export default function FrontDeskMode() {
   const theme = useTheme();
   const navigate = useNavigate();
 
-  const [session, setSession] = useState(() => getJSON(FRONTDESK_SESSION_LS_KEY, null));
+  const [session, setSession] = useState(() => {
+    const stored = getJSON(FRONTDESK_SESSION_LS_KEY, null);
+    if (stored) return stored;
+    // In demo mode, auto-create a session so the PIN screen is skipped
+    if (isDemoMode()) {
+      const s = { staffName: 'Marvin Ekokobe', role: 'General Manager', at: Date.now() };
+      setJSON(FRONTDESK_SESSION_LS_KEY, s);
+      return s;
+    }
+    return null;
+  });
   const [tab, setTab] = useState(0);
+
+  // Listen for tab-switch events dispatched by the main DemoTour
+  useEffect(() => {
+    const h = (e) => setTab(e.detail.tab);
+    window.addEventListener('gem-fd-tab', h);
+    return () => window.removeEventListener('gem-fd-tab', h);
+  }, []);
 
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [dayDialogOpen, setDayDialogOpen] = useState(false);

@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   X, ChevronRight, ChevronLeft, Users, CreditCard, Monitor,
-  BarChart3, Users2, LayoutGrid, Sparkles, CheckCircle, Dumbbell, Lock,
+  BarChart3, Users2, LayoutGrid, Sparkles, CheckCircle, Dumbbell,
+  ShoppingBag, Settings, ClipboardList,
 } from 'lucide-react';
 
 const SIDEBAR_W = 260;
@@ -10,10 +11,10 @@ const HEADER_H = 64;
 
 /* ─────────────────────────────────────────────────────────────────
    Tour steps
-   spotlight: CSS selector of the element to highlight
+   spotlight: CSS selector — supports both data-tour and data-fdtour attrs
    cardPos:   'center' | 'bottom-right' | 'top-right'
-              'bottom-right' = card at bottom-right of screen (over main content)
-              'top-right'    = card just right of sidebar, near top
+   fdTab:     when set, dispatches gem-fd-tab event so FrontDeskMode
+              switches to that tab (0=checkin, 1=signup, 2=products, 3=ops)
    ───────────────────────────────────────────────────────────────── */
 const STEPS = [
   {
@@ -23,13 +24,14 @@ const STEPS = [
     label: 'Welcome',
     title: 'Welcome to GEM',
     subtitle: 'GymElite Manager · Demo',
-    desc: "You're inside a fully working gym management system — real members, payments, and staff. This short tour walks you through every section.",
-    bullets: ['8 members with real membership statuses', '5 staff members across different roles', 'Live payments, attendance & reports'],
+    desc: "You're inside a fully working gym management system — real members, payments, and staff. This tour walks you through every section including the front desk kiosk.",
+    bullets: ['8 members with real membership statuses', '5 staff members across different roles', 'Live payments, attendance & full front desk'],
     tip: null,
     pinInfo: null,
     path: '/dashboard',
     spotlight: null,
     cardPos: 'center',
+    fdTab: undefined,
   },
   {
     id: 'sidebar',
@@ -45,6 +47,7 @@ const STEPS = [
     path: '/dashboard',
     spotlight: '[data-tour="sidebar"]',
     cardPos: 'top-right',
+    fdTab: undefined,
   },
   {
     id: 'dashboard',
@@ -60,6 +63,7 @@ const STEPS = [
     path: '/dashboard',
     spotlight: '[data-tour="main-content"]',
     cardPos: 'bottom-right',
+    fdTab: undefined,
   },
   {
     id: 'members',
@@ -75,26 +79,90 @@ const STEPS = [
     path: '/members',
     spotlight: '[data-tour="main-content"]',
     cardPos: 'bottom-right',
+    fdTab: undefined,
   },
+  /* ── Front Desk Mode — 5 steps ─────────────────────────────────── */
   {
-    id: 'frontdesk',
+    id: 'frontdesk-intro',
     icon: Monitor,
     color: '#34d399',
     label: 'Front Desk',
     title: 'Front Desk Mode',
-    subtitle: 'Built for your reception counter',
-    desc: 'A fast touchscreen interface for member check-in and payments. Staff first select their name, then enter their personal PIN.',
-    bullets: ['Member check-in by code or name search', 'Record payments instantly at the desk', 'Sell visitor day passes & products'],
+    subtitle: 'Your reception kiosk',
+    desc: 'A separate full-screen interface built for the reception counter. No sidebar, no clutter — just the tools staff need to run the desk.',
+    bullets: ['Auto-logged in as Manager for this demo', 'Optimised for touchscreen operation', 'Completely separate from the management dashboard'],
     tip: null,
-    pinInfo: [
-      { name: 'Sandrine Kom', role: 'Front Desk', pin: '5163' },
-      { name: 'Marvin Ekokobe', role: 'General Manager', pin: '9721' },
-      { name: 'Michel Roko', role: 'Trainer', pin: '3847' },
-    ],
-    path: '/front-desk',
-    spotlight: '[data-tour="main-content"]',
+    pinInfo: null,
+    path: '/front-desk/mode',
+    spotlight: '[data-fdtour="header"]',
     cardPos: 'bottom-right',
+    fdTab: 0,
   },
+  {
+    id: 'frontdesk-checkin',
+    icon: Users,
+    color: '#34d399',
+    label: 'Check-in',
+    title: 'Member Check-in',
+    subtitle: 'The most-used feature at the desk',
+    desc: 'Search any member or staff by name or access code to record their arrival instantly. One tap and they\'re checked in.',
+    bullets: ['Type a name or 4-digit access code', 'QR code scanning supported', 'Shows membership status right away (active / expired)'],
+    tip: 'Try typing "Armand" to find and check in a demo member.',
+    pinInfo: null,
+    path: '/front-desk/mode',
+    spotlight: '[data-fdtour="checkin-search"]',
+    cardPos: 'bottom-right',
+    fdTab: 0,
+  },
+  {
+    id: 'frontdesk-recent',
+    icon: ClipboardList,
+    color: '#34d399',
+    label: 'Recent',
+    title: 'Recent Check-ins',
+    subtitle: 'Live activity log',
+    desc: "See everyone who walked in today in real time — members and staff both appear here with timestamps and membership status.",
+    bullets: ['Updates immediately after each check-in', 'Distinguishes member vs. staff arrivals', 'Membership status badge on every entry'],
+    tip: null,
+    pinInfo: null,
+    path: '/front-desk/mode',
+    spotlight: '[data-fdtour="checkin-recent"]',
+    cardPos: 'bottom-right',
+    fdTab: 0,
+  },
+  {
+    id: 'frontdesk-products',
+    icon: ShoppingBag,
+    color: '#f59e0b',
+    label: 'Products',
+    title: 'Product Sales',
+    subtitle: 'Sell at the counter',
+    desc: 'Sell gym merchandise, drinks, and supplements directly from the front desk. All sales are logged and feed into the daily revenue report.',
+    bullets: ['Browse products with stock level and price', 'Attach sale to a specific member (optional)', 'Cash or mobile money — inventory updates automatically'],
+    tip: null,
+    pinInfo: null,
+    path: '/front-desk/mode',
+    spotlight: '[data-fdtour="product-sale"]',
+    cardPos: 'bottom-right',
+    fdTab: 2,
+  },
+  {
+    id: 'frontdesk-ops',
+    icon: Settings,
+    color: '#fb7185',
+    label: 'Operations',
+    title: 'Shift Operations',
+    subtitle: 'Run the shift from here',
+    desc: 'Manage daily tasks, check who is on duty, view upcoming classes, and generate the end-of-day summary — without switching to the main dashboard.',
+    bullets: ['Task checklist for the current shift', 'Staff schedule and class timetable', 'End-of-day cash reconciliation report'],
+    tip: null,
+    pinInfo: null,
+    path: '/front-desk/mode',
+    spotlight: '[data-fdtour="operations"]',
+    cardPos: 'bottom-right',
+    fdTab: 3,
+  },
+  /* ── Back to main app ──────────────────────────────────────────── */
   {
     id: 'payments',
     icon: CreditCard,
@@ -104,11 +172,12 @@ const STEPS = [
     subtitle: 'Every transaction recorded',
     desc: 'The complete payment ledger for your gym. Filter by date, member, or payment method. See per-member balances at a glance.',
     bullets: ['Cash, card, mobile money, bank transfer', 'Partial payments with balance carry-over', 'Staff-recorded payment attribution'],
-    tip: 'Use the date filter at the top to see only this month\'s payments.',
+    tip: "Use the date filter at the top to see only this month's payments.",
     pinInfo: null,
     path: '/payments',
     spotlight: '[data-tour="main-content"]',
     cardPos: 'bottom-right',
+    fdTab: undefined,
   },
   {
     id: 'reports',
@@ -124,6 +193,7 @@ const STEPS = [
     path: '/accounting',
     spotlight: '[data-tour="main-content"]',
     cardPos: 'bottom-right',
+    fdTab: undefined,
   },
   {
     id: 'staff',
@@ -139,6 +209,7 @@ const STEPS = [
     path: '/staff',
     spotlight: '[data-tour="main-content"]',
     cardPos: 'bottom-right',
+    fdTab: undefined,
   },
   {
     id: 'done',
@@ -154,6 +225,7 @@ const STEPS = [
     path: '/dashboard',
     spotlight: null,
     cardPos: 'center',
+    fdTab: undefined,
   },
 ];
 
@@ -195,16 +267,31 @@ export default function DemoTour({ onClose }) {
   const isLast = step === STEPS.length - 1;
   const isFirst = step === 0;
 
-  /* Navigate to step's page */
+  /* Navigate to step's page + switch FD tab if needed */
   useEffect(() => {
+    const timers = [];
+
     if (current.path && location.pathname !== current.path) {
       setNavigating(true);
       nav(current.path);
-      const t = setTimeout(() => setNavigating(false), 400);
-      return () => clearTimeout(t);
+      timers.push(setTimeout(() => setNavigating(false), 500));
     } else {
       setNavigating(false);
     }
+
+    // Mark FD tour done so FrontDeskTour doesn't auto-show during this tour
+    if (current.id.startsWith('frontdesk')) {
+      localStorage.setItem('gem_fd_tour_done', '1');
+    }
+
+    // Switch FrontDeskMode tab for FD steps
+    if (current.fdTab !== undefined) {
+      timers.push(setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('gem-fd-tab', { detail: { tab: current.fdTab } }));
+      }, 600));
+    }
+
+    return () => timers.forEach(clearTimeout);
   }, [step]);
 
   /* Find and track spotlight element */
@@ -240,7 +327,8 @@ export default function DemoTour({ onClose }) {
   const Icon = current.icon;
 
   /* Card position style */
-  const cardStyle = resolveCardStyle(current.cardPos, spotRect);
+  const isFrontDesk = location.pathname.startsWith('/front-desk/mode');
+  const cardStyle = resolveCardStyle(current.cardPos, spotRect, isFrontDesk);
 
   /* Spotlight padding */
   const PAD = 6;
@@ -442,8 +530,9 @@ export default function DemoTour({ onClose }) {
 
 /* ─────────────────────────────────────────────────────────────────
    Card position resolver
+   isFrontDesk: true when on /front-desk/mode (no sidebar)
    ───────────────────────────────────────────────────────────────── */
-function resolveCardStyle(cardPos, spotRect) {
+function resolveCardStyle(cardPos, spotRect, isFrontDesk) {
   if (cardPos === 'center') {
     return {
       top: '50%', left: '50%',
@@ -454,22 +543,20 @@ function resolveCardStyle(cardPos, spotRect) {
   }
 
   if (cardPos === 'top-right') {
-    // Right of sidebar, near the top — used when sidebar is spotlit
     return {
-      left: SIDEBAR_W + 20,
+      left: isFrontDesk ? 20 : SIDEBAR_W + 20,
       top: HEADER_H + 20,
       width: 400,
-      maxWidth: 'calc(100vw - 300px)',
+      maxWidth: 'calc(100vw - 60px)',
     };
   }
 
-  // 'bottom-right': card at bottom-right, clear of any nav
-  // when main content is spotlit, card sits over it at the bottom
+  // bottom-right
   return {
     right: 24,
     bottom: 24,
     width: 400,
-    maxWidth: `calc(100vw - ${SIDEBAR_W + 40}px)`,
+    maxWidth: isFrontDesk ? 'calc(100vw - 48px)' : `calc(100vw - ${SIDEBAR_W + 40}px)`,
   };
 }
 
