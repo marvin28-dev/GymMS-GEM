@@ -1940,7 +1940,7 @@ export default function FrontDeskMode() {
 
       <Snackbar open={Boolean(snack)} autoHideDuration={2200} onClose={() => setSnack("")} message={snack} />
 
-      {isDemoMode() && <FrontDeskTour setTab={setTab} />}
+      <FrontDeskTour setTab={setTab} />
     </Box>
   );
 }

@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   X, ChevronRight, ChevronLeft, Monitor, Users, ShoppingBag,
-  Settings, CheckCircle, Dumbbell, Sparkles, Lock, ClipboardList,
+  Settings, CheckCircle, Dumbbell, Sparkles, ClipboardList,
 } from 'lucide-react';
-import { isDemoMode } from '../utils/auth';
 
 /* ─────────────────────────────────────────────────────────────────
    Steps — each step may switch tabs via `tabIndex`
@@ -175,9 +174,8 @@ export default function FrontDeskTour({ setTab }) {
   const [spotRect, setSpotRect] = useState(null);
   const [fading, setFading] = useState(false);
 
-  /* Auto-show on first demo visit */
+  /* Auto-show on first visit to Front Desk Mode */
   useEffect(() => {
-    if (!isDemoMode()) return;
     const done = localStorage.getItem('gem_fd_tour_done') === '1';
     if (!done) {
       const t = setTimeout(() => setShow(true), 800);
@@ -232,11 +230,7 @@ export default function FrontDeskTour({ setTab }) {
   const prev = () => !isFirst && changeStep(step - 1);
 
   if (!show) {
-    /* Floating replay button */
-    if (!isDemoMode()) return null;
-    return (
-      <FdTourButton onClick={() => { setStep(0); setShow(true); }} />
-    );
+    return <FdTourButton onClick={() => { setStep(0); setShow(true); }} />;
   }
 
   const Icon = current.icon;
