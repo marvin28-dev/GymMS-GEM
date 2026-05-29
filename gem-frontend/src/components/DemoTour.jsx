@@ -388,13 +388,16 @@ export default function DemoTour({ onClose }) {
   useEffect(() => {
     setSpotRect(null);
     if (!current.spotlight) return;
-    // Delay to let page render after navigation
+    // t1/t2: catch normal navigation renders
+    // t3: catch tab-switch renders (tab fires at 800ms, elements only mount after that)
     const t1 = setTimeout(updateRect, 200);
     const t2 = setTimeout(updateRect, 600);
+    const t3 = setTimeout(updateRect, 1100);
     window.addEventListener('resize', updateRect);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
+      clearTimeout(t3);
       window.removeEventListener('resize', updateRect);
     };
   }, [step, location.pathname, updateRect]);
