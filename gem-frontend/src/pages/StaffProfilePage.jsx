@@ -874,8 +874,10 @@ export default function StaffProfilePage() {
             options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]} />
           <GemSelect label="Access Level" value={editForm.accessLevel || (editForm.role === 'Manager' ? 'Admin' : 'Staff')} onChange={e => setEF('accessLevel', e.target.value)}
             options={['Admin', 'Manager', 'Staff', 'Read Only'].map(a => ({ value: a, label: a }))} />
-          <GemInput label="Emergency Contact Name" value={editForm.emergencyContact || ''} onChange={e => setEF('emergencyContact', e.target.value)} />
-          <GemInput label="Emergency Phone" value={editForm.emergencyPhone || ''} onChange={e => setEF('emergencyPhone', e.target.value)} />
+          <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <GemInput label="Emergency Contact Name" value={editForm.emergencyContact || ''} onChange={e => setEF('emergencyContact', e.target.value)} />
+            <GemInput label="Emergency Phone" value={editForm.emergencyPhone || ''} onChange={e => setEF('emergencyPhone', e.target.value)} />
+          </div>
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6, display: 'block', fontFamily: 'DM Sans', fontWeight: 500 }}>Photo ID (passport, national ID, driver's license)</label>
             <input ref={editPhotoIdRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleEditPhotoIdChange} />
