@@ -1,8 +1,8 @@
 const KEY          = 'gem_auth';
 const ACTIVITY_KEY = 'gem_last_activity';
 
-// Inactivity timeout — 1 minute for testing (change back to 30 * 60 * 1000 for production)
-const INACTIVITY_MS = 1 * 60 * 1000;
+// Inactivity timeout — 5 minutes of no user interaction triggers the warning
+const INACTIVITY_MS = 5 * 60 * 1000;
 
 const today = () => new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD'
 
