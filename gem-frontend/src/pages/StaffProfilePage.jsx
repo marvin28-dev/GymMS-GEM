@@ -236,7 +236,14 @@ export default function StaffProfilePage() {
   const fn = memberData.firstName || (memberData.name || '').split(' ')[0] || '';
   const ln = memberData.lastName || (memberData.name || '').split(' ').slice(1).join(' ') || '';
 
-  const openEdit = () => { setEditForm({ ...memberData }); setShowEditModal(true); };
+  const openEdit = () => {
+    setEditForm({
+      ...memberData,
+      // Ensure department always has a real value so the select doesn't silently hold ''
+      department: memberData.department || 'Management',
+    });
+    setShowEditModal(true);
+  };
 
   function handleEditPhotoChange(e) {
     const file = e.target.files?.[0];
@@ -400,7 +407,7 @@ export default function StaffProfilePage() {
             <div style={{ display: 'inline-block', background: 'var(--accent-gold-dim)', color: 'var(--accent-gold)', fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20, marginBottom: 12 }}>{memberData.role}</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
               {[
-                { label: 'Department', value: memberData.department },
+                { label: 'Department', value: memberData.department || '—' },
                 { label: 'Employment', value: memberData.employmentType || 'Full Time' },
                 { label: 'Phone', value: memberData.phone },
                 { label: 'Email', value: memberData.email },
@@ -480,7 +487,7 @@ export default function StaffProfilePage() {
             {[
               { label: 'Full Name', value: memberData.name },
               { label: 'Role', value: memberData.role },
-              { label: 'Department', value: memberData.department },
+              { label: 'Department', value: memberData.department || '—' },
               { label: 'Phone', value: memberData.phone },
               { label: 'Email', value: memberData.email },
               { label: 'Join Date', value: memberData.joinDate },
@@ -972,7 +979,7 @@ export default function StaffProfilePage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Manrope, sans-serif' }}>{memberData.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{memberData.role} · {memberData.department}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{memberData.role}{memberData.department ? ` · ${memberData.department}` : ''}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Pay Period</div>
