@@ -368,8 +368,8 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
         {/* ── Emergency Contact ── */}
         <SectionHeader title={t('members.emergencyContact')} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <GemInput label={t('members.contactName')} placeholder="Full name" value={form.emergencyContact} onChange={e => set('emergencyContact', e.target.value)} />
-          <GemInput label={t('members.emergencyPhone')} placeholder="+237 6XX XXX XXX" value={form.emergencyPhone} onChange={e => set('emergencyPhone', e.target.value)} />
+          <GemInput label="Contact Name" placeholder="Full name" value={form.emergencyContact} onChange={e => set('emergencyContact', e.target.value)} />
+          <GemInput label="Contact Number" placeholder="+237 6XX XXX XXX" value={form.emergencyPhone} onChange={e => set('emergencyPhone', e.target.value)} />
         </div>
 
         {/* ── Documents & Notes ── */}
