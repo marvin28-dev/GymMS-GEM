@@ -3,7 +3,7 @@ import AppLayout from "../layouts/AppLayout";
 import ProtectedRoute from "./ProtectedRoute";
 import { appRoutes } from "./routeConfig";
 import ScrollToTop from "../components/ScrollToTop";
-import { isAuthed } from "../utils/auth";
+import { isAuthed, checkDailyExpiry } from "../utils/auth";
 
 import LandingPage from "../pages/LandingPage";
 import SignUpPage from "../pages/SignUpPage";
@@ -14,6 +14,9 @@ import FrontDeskPage from "../pages/FrontDeskPage";
 import MemberProfilePage from "../pages/MemberProfilePage";
 
 export default function AppRoutes() {
+  // Clear expired auth before any route logic so isAuthed() reflects reality
+  checkDailyExpiry();
+
   return (
     <>
     <ScrollToTop />
