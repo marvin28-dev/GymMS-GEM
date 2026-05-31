@@ -246,16 +246,26 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
     fontWeight: 500,
   };
 
+  const SectionHeader = ({ title }) => (
+    <div style={{
+      fontSize: 11, textTransform: 'uppercase', letterSpacing: '1.5px',
+      color: 'var(--text-muted)', fontWeight: 600, marginTop: 6,
+      paddingBottom: 8, borderBottom: '1px solid var(--border-subtle)',
+    }}>{title}</div>
+  );
+
   return (
     <Modal open={open} onClose={onClose} title={mode === 'edit' ? t('staff.editStaff') : t('staff.addStaff')} maxWidth={620}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* Profile photo upload */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '70vh', overflowY: 'auto', paddingRight: 4 }}>
+
+        {/* ── Profile Photo ── */}
+        <SectionHeader title={t('members.profilePhoto')} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <input ref={photoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoChange} />
           <div
             onClick={() => photoRef.current?.click()}
             style={{
-              width: 80, height: 80, borderRadius: '50%',
+              width: 80, height: 80, borderRadius: '50%', flexShrink: 0,
               border: `2px dashed ${form.photoData ? 'var(--accent-gold)' : 'var(--border)'}`,
               background: 'var(--bg-elevated)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -269,11 +279,16 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
               : <Camera size={28} color="var(--text-muted)" />
             }
           </div>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>
-            {form.photoData ? t('staff.clickToChangePhoto') : t('staff.uploadProfilePhoto')}
-          </span>
+          <div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
+              {form.photoData ? t('staff.clickToChangePhoto') : t('staff.uploadProfilePhoto')}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, fontFamily: 'DM Sans' }}>JPG, PNG or WEBP. Max 5MB.</div>
+          </div>
         </div>
 
+        {/* ── Personal Information ── */}
+        <SectionHeader title={t('members.personalInfo')} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <GemInput label={`${t('members.firstName')} *`} placeholder={t('members.firstName')} value={form.firstName} onChange={e => set('firstName', e.target.value)} />
           <GemInput label={`${t('members.lastName')} *`} placeholder={t('members.lastName')} value={form.lastName} onChange={e => set('lastName', e.target.value)} />
@@ -282,6 +297,11 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
           <div style={{ gridColumn: '1 / -1' }}>
             <GemInput label={t('common.address')} placeholder="Quartier Bastos, Yaoundé" value={form.address} onChange={e => set('address', e.target.value)} />
           </div>
+        </div>
+
+        {/* ── Employment Details ── */}
+        <SectionHeader title="Employment Details" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <GemSelect label={`${t('staff.role')} *`} value={form.role} onChange={e => set('role', e.target.value)}
             options={['Manager','Trainer','Instructor','Front Desk','Receptionist','Other'].map(r => ({ value: r, label: r }))} />
           <GemSelect label={t('staff.department')} value={form.department} onChange={e => set('department', e.target.value)}
@@ -318,18 +338,15 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
             <label style={labelStyle}>{t('staff.monthlySalary')}</label>
             <input type="number" placeholder="e.g. 250000" style={{ ...fieldStyle, padding: '9px 14px' }} value={form.salary} onChange={e => set('salary', e.target.value)} />
           </div>
+        </div>
+
+        {/* ── Access & Status ── */}
+        <SectionHeader title="Access & Status" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <GemSelect label={t('common.status')} value={form.status} onChange={e => set('status', e.target.value)}
             options={[{ value: 'active', label: t('common.active') }, { value: 'inactive', label: t('common.inactive') }]} />
           <GemSelect label={t('staff.loginAccess')} value={form.accessLevel} onChange={e => set('accessLevel', e.target.value)}
             options={['Admin','Manager','Staff','ReadOnly'].map(l => ({ value: l, label: l }))} />
-          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 14 }}>
-            <div style={{ flex: 1 }}>
-              <GemInput label={t('members.contactName')} placeholder={t('members.contactName')} value={form.emergencyContact} onChange={e => set('emergencyContact', e.target.value)} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <GemInput label={t('members.emergencyPhone')} placeholder="+237 6XX XXX XXX" value={form.emergencyPhone} onChange={e => set('emergencyPhone', e.target.value)} />
-            </div>
-          </div>
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={labelStyle}>{t('staff.roleProfile')}</label>
             <select value={form.roleProfile} onChange={e => set('roleProfile', e.target.value)}
@@ -346,7 +363,19 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
               ) : null;
             })()}
           </div>
-          <div style={{ gridColumn: '1 / -1' }}>
+        </div>
+
+        {/* ── Emergency Contact ── */}
+        <SectionHeader title={t('members.emergencyContact')} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <GemInput label={t('members.contactName')} placeholder="Full name" value={form.emergencyContact} onChange={e => set('emergencyContact', e.target.value)} />
+          <GemInput label={t('members.emergencyPhone')} placeholder="+237 6XX XXX XXX" value={form.emergencyPhone} onChange={e => set('emergencyPhone', e.target.value)} />
+        </div>
+
+        {/* ── Documents & Notes ── */}
+        <SectionHeader title="Documents & Notes" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
             <label style={labelStyle}>{t('staff.photoId')}</label>
             <input ref={photoIdRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoIdChange} />
             <div
@@ -376,17 +405,18 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
               )}
             </div>
           </div>
-          <div style={{ gridColumn: '1 / -1' }}>
+          <div>
             <label style={labelStyle}>{t('common.notes')}</label>
             <textarea style={{ ...fieldStyle, minHeight: 80 }} placeholder={t('staff.additionalNotes')} value={form.notes} onChange={e => set('notes', e.target.value)} />
           </div>
         </div>
+
         {saveError && (
           <div style={{ background: 'var(--accent-red-dim)', border: '1px solid var(--accent-red)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>
             {saveError}
           </div>
         )}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 8, borderTop: '1px solid var(--border-subtle)' }}>
           <button style={secondaryBtn} onClick={onClose} disabled={saving}>{t('common.cancel')}</button>
           <button
             style={{ ...primaryBtn, opacity: saving ? 0.6 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}
