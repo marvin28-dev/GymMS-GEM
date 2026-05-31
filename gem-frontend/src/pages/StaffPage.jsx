@@ -320,8 +320,14 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
           </div>
           <GemSelect label={t('common.status')} value={form.status} onChange={e => set('status', e.target.value)}
             options={[{ value: 'active', label: t('common.active') }, { value: 'inactive', label: t('common.inactive') }]} />
-          <GemInput label={t('members.contactName')} placeholder={t('members.contactName')} value={form.emergencyContact} onChange={e => set('emergencyContact', e.target.value)} />
-          <GemInput label={t('members.emergencyPhone')} placeholder="+237 6XX XXX XXX" value={form.emergencyPhone} onChange={e => set('emergencyPhone', e.target.value)} />
+          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 14 }}>
+            <div style={{ flex: 1 }}>
+              <GemInput label={t('members.contactName')} placeholder={t('members.contactName')} value={form.emergencyContact} onChange={e => set('emergencyContact', e.target.value)} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <GemInput label={t('members.emergencyPhone')} placeholder="+237 6XX XXX XXX" value={form.emergencyPhone} onChange={e => set('emergencyPhone', e.target.value)} />
+            </div>
+          </div>
           <GemSelect label={t('staff.loginAccess')} value={form.accessLevel} onChange={e => set('accessLevel', e.target.value)}
             options={['Admin','Manager','Staff','ReadOnly'].map(l => ({ value: l, label: l }))} />
           <div style={{ gridColumn: '1 / -1' }}>
