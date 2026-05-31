@@ -39,7 +39,7 @@ async function create(req, res) {
 
   const member = await prisma.member.findFirst({
     where: { id: memberId, gymId: req.user.gymId },
-    select: { id: true, balance: true },
+    select: { id: true, balance: true, firstName: true, lastName: true },
   });
   if (!member) return res.status(404).json({ error: 'Member not found' });
 
@@ -92,6 +92,16 @@ async function create(req, res) {
       console.error('Member balance update failed:', err.message);
     }
   }
+
+  const memberName = `${member.firstName || ''} ${member.lastName || ''}`.trim() || 'a member';
+  prisma.notification.create({
+    data: {
+      gymId: req.user.gymId,
+      title: 'Payment Received',
+      body: `${Number(payAmount).toLocaleString('fr-FR')} FCFA received from ${memberName}.`,
+      type: 'payment',
+    },
+  }).catch(() => {});
 
   // Re-fetch with staff included so the client gets recordedBy immediately
   try {

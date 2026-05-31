@@ -190,6 +190,15 @@ async function create(req, res) {
     },
     include: { package: { select: { id: true, name: true } } },
   });
+  prisma.notification.create({
+    data: {
+      gymId: req.user.gymId,
+      title: member.isVisitor ? 'New Visitor Registered' : 'New Member Joined',
+      body: `${member.firstName} ${member.lastName} has ${member.isVisitor ? 'been registered as a visitor' : 'joined the gym'}.`,
+      type: 'signup',
+    },
+  }).catch(() => {});
+
   res.status(201).json(member);
 }
 

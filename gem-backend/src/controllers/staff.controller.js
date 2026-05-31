@@ -102,6 +102,15 @@ async function create(req, res) {
     }
   }
 
+  prisma.notification.create({
+    data: {
+      gymId: req.user.gymId,
+      title: 'New Staff Member Added',
+      body: `${staff.firstName} ${staff.lastName} has been added as ${staff.role}.`,
+      type: 'system',
+    },
+  }).catch(() => {});
+
   res.status(201).json(staff);
 }
 
@@ -173,6 +182,17 @@ async function update(req, res) {
     } catch (rawErr) {
       console.error('Emergency contact raw update failed:', rawErr.message);
     }
+  }
+
+  if (isActive !== undefined && isActive !== existing.isActive) {
+    prisma.notification.create({
+      data: {
+        gymId: req.user.gymId,
+        title: isActive ? 'Staff Reactivated' : 'Staff Deactivated',
+        body: `${staff.firstName} ${staff.lastName}'s account has been ${isActive ? 'reactivated' : 'deactivated'}.`,
+        type: 'system',
+      },
+    }).catch(() => {});
   }
 
   res.json(staff);

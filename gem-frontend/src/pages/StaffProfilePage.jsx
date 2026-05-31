@@ -133,8 +133,9 @@ export default function StaffProfilePage() {
   const [msgForm, setMsgForm] = useState({ subject: '', body: '' });
   const [messageSent, setMessageSent] = useState(false);
 
-  // Deactivate
+  // Deactivate / Reactivate
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
+  const [showReactivateAuth, setShowReactivateAuth] = useState(false);
 
   // Schedule
   const [schedule, setSchedule] = useState(emptySchedule);
@@ -335,6 +336,11 @@ export default function StaffProfilePage() {
     setMemberData(prev => ({ ...prev, status: 'inactive', isActive: false }));
   };
 
+  const reactivate = async () => {
+    try { await updateStaff(id, { isActive: true }); } catch (err) { console.error('Reactivate failed:', err); }
+    setMemberData(prev => ({ ...prev, status: 'active', isActive: true }));
+  };
+
   const saveSchedule = async () => {
     try {
       await updateStaff(id, { schedule });
@@ -366,7 +372,7 @@ export default function StaffProfilePage() {
               <button style={dangerBtn} onClick={() => setShowDeactivateConfirm(true)}>Deactivate</button>
             )}
             {memberData.status === 'inactive' && (
-              <button style={{ ...secondaryBtn, color: 'var(--accent-green)', borderColor: 'var(--accent-green-dim)' }} onClick={() => setMemberData(prev => ({ ...prev, status: 'active' }))}>Reactivate</button>
+              <button style={{ ...secondaryBtn, color: 'var(--accent-green)', borderColor: 'var(--accent-green-dim)' }} onClick={() => setShowReactivateAuth(true)}>Reactivate</button>
             )}
           </div>
         </div>
@@ -1189,6 +1195,14 @@ export default function StaffProfilePage() {
         onConfirm={() => { deactivate(); setShowDeactivateConfirm(false); }}
         action={`Deactivate ${memberData.name}'s account`}
         danger
+      />
+
+      {/* ── Reactivate — requires manager PIN ───────────────────────────── */}
+      <ManagerAuthModal
+        open={showReactivateAuth}
+        onClose={() => setShowReactivateAuth(false)}
+        onConfirm={() => { reactivate(); setShowReactivateAuth(false); }}
+        action={`Reactivate ${memberData.name}'s account`}
       />
 
       {/* ── Add Note Modal ────────────────────────────────────────────────── */}
