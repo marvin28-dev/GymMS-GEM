@@ -235,8 +235,11 @@ async function checkIn(req, res) {
 }
 
 async function checkOut(req, res) {
+  // Looked up within the gym first: by id alone, one gym could close another's visit
+  const visit = await prisma.attendance.findFirst({ where: { id: String(req.params.id), gymId: req.user.gymId }, select: { id: true } });
+  if (!visit) return res.status(404).json({ error: 'Visit not found' });
   const record = await prisma.attendance.update({
-    where: { id: req.params.id },
+    where: { id: visit.id },
     data: { checkOut: new Date() },
   });
   res.json(record);

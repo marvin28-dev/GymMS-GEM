@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const { bestEffort } = require('../utils/bestEffort');
 
 const SEVERITY_TO_PRIORITY = { low: 'low', medium: 'medium', high: 'high', critical: 'high' };
 // Every task the system raises gets a due date - the more urgent the fault, the
@@ -31,7 +32,7 @@ async function raiseIssueTask(gymId, createdById, issue) {
       where: { gymId, isActive: true, role: { in: ['general_manager', 'manager'] } },
       select: { id: true },
     });
-    await Promise.all(managers.map(m => prisma.notification.create({
+    await Promise.all(managers.map(m => bestEffort(prisma.notification.create({
       data: {
         gymId, staffId: m.id,
         title: 'New maintenance task',
@@ -39,10 +40,38 @@ async function raiseIssueTask(gymId, createdById, issue) {
         type: 'task',
         link: '/tasks',
       },
-    }).catch(() => {})));
+    }), 'Maintenance notification')));
   } catch (err) {
     console.error('Failed to raise task for equipment issue:', err.message);
   }
+}
+
+const SEVERITIES = ['low', 'medium', 'high', 'critical'];
+const STATUSES = ['open', 'in_progress', 'resolved'];
+
+// What a report or an update may set, checked: { data } or { error, field }.
+// The gym and the issue's history are the server's to say: the request body
+// used to go to the database whole, so an update could move an issue into
+// another gym.
+function readIssue(body, creating) {
+  const data = {};
+  for (const key of ['equipment', 'location', 'description']) {
+    if (body[key] !== undefined) data[key] = body[key] === null ? '' : String(body[key]).trim();
+  }
+  if ((creating || 'equipment' in data) && !data.equipment) return { error: 'Name the equipment.', field: 'equipment' };
+  if ((creating || 'description' in data) && !data.description) return { error: 'Describe the problem.', field: 'description' };
+  if ('location' in data) data.location = data.location || null;
+  if (body.severity !== undefined) {
+    const severity = String(body.severity).toLowerCase();
+    if (!SEVERITIES.includes(severity)) return { error: 'Choose how serious it is.', field: 'severity' };
+    data.severity = severity;
+  }
+  // A new report is always open; only an update moves it on
+  if (!creating && body.status !== undefined) {
+    if (!STATUSES.includes(body.status)) return { error: 'That status does not exist.', field: 'status' };
+    data.status = body.status;
+  }
+  return { data };
 }
 
 async function getAll(req, res) {
@@ -54,8 +83,10 @@ async function getAll(req, res) {
 }
 
 async function create(req, res) {
+  const read = readIssue(req.body, true);
+  if (read.error) return res.status(400).json({ error: read.error, field: read.field });
   const issue = await prisma.equipmentIssue.create({
-    data: { ...req.body, gymId: req.user.gymId },
+    data: { ...read.data, gymId: req.user.gymId },
   });
   raiseIssueTask(req.user.gymId, req.user.id, issue);
   res.status(201).json(issue);
@@ -67,9 +98,16 @@ async function update(req, res) {
   });
   if (!existing) return res.status(404).json({ error: 'Issue not found' });
 
+  const read = readIssue(req.body, false);
+  if (read.error) return res.status(400).json({ error: read.error, field: read.field });
+  const data = read.data;
+  // When it was fixed is recorded here, so the end of day report can list it
+  if (data.status === 'resolved' && existing.status !== 'resolved') data.resolvedAt = new Date();
+  else if (data.status && data.status !== 'resolved') data.resolvedAt = null;
+
   const issue = await prisma.equipmentIssue.update({
-    where: { id: req.params.id },
-    data: req.body,
+    where: { id: existing.id },
+    data,
   });
   res.json(issue);
 }
