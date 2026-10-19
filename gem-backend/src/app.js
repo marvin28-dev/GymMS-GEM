@@ -34,18 +34,31 @@ const ALLOWED_ORIGINS = [
     : []),
 ];
 
+// A development server on this machine, matched on the host itself: a check for
+// "localhost" anywhere in the origin also let https://localhost.attacker.example in
+const isLocalDevOrigin = (origin) => {
+  try {
+    const { protocol, hostname } = new URL(origin);
+    return protocol === 'http:' && (hostname === 'localhost' || hostname === '127.0.0.1');
+  } catch {
+    return false;
+  }
+};
+
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (origin.includes('localhost') || ALLOWED_ORIGINS.includes(origin)) {
-      return callback(null, true);
-    }
-    callback(new Error('Not allowed by CORS'));
-  },
+  // Another site is simply not given the CORS headers, so the browser refuses it.
+  // Throwing here turned every such request into a 500 and a stack trace.
+  origin: (origin, callback) => callback(null, !origin || isLocalDevOrigin(origin) || ALLOWED_ORIGINS.includes(origin)),
   credentials: true,
 }));
 // Logos and photos are sent as base64 data URIs, which overflow the 100kb default
 app.use(express.json({ limit: '5mb' }));
+// Express 5 leaves req.body undefined when a request carries no JSON, and the
+// handlers read fields off it, which answered 500 instead of a proper refusal
+app.use((req, res, next) => {
+  if (req.body === undefined) req.body = {};
+  next();
+});
 app.use('/uploads', express.static('uploads'));
 
 app.use('/api', require('./utils/liveHub').announceWrites);
@@ -76,7 +89,20 @@ app.use('/api/coach', require('./routes/coach.routes'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
+app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
+
+const CLIENT_ERRORS = {
+  'entity.parse.failed': 'The request body is not valid JSON.',
+  'entity.too.large': 'The request is too large.',
+};
+
 app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  // A request the client got wrong keeps its own status: it is not a fault here
+  const status = Number(err.status || err.statusCode);
+  if (status >= 400 && status < 500) {
+    return res.status(status).json({ error: CLIENT_ERRORS[err.type] || (err.expose && err.message) || 'Bad request' });
+  }
   console.error(err.stack);
   res.status(500).json({ error: 'Internal server error' });
 });
