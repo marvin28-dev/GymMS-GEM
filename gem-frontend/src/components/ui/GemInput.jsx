@@ -1,6 +1,12 @@
 import { useState } from 'react';
+import TimeInput from './TimeInput';
 
-export default function GemInput({ label, error, ...rest }) {
+// A required field shows " *" after its label. Some labels already carry the
+// star in their translation, so it is never added twice.
+const withMark = (label, required) =>
+  required && !(typeof label === 'string' && /\*\s*$/.test(label)) ? <>{label} *</> : label;
+
+export default function GemInput({ label, error, required, ...rest }) {
   const [focused, setFocused] = useState(false);
 
   return (
@@ -16,9 +22,14 @@ export default function GemInput({ label, error, ...rest }) {
             fontWeight: 500,
           }}
         >
-          {label}
+          {withMark(label, required)}
         </label>
       )}
+      {rest.type === 'time' ? (
+        <TimeInput value={rest.value} onChange={rest.onChange} disabled={rest.disabled} id={rest.id} name={rest.name}
+          aria-label={typeof label === 'string' ? label.replace(/\s*\*\s*$/, '') : undefined}
+          style={{ ...(error ? { borderColor: 'var(--accent-red)' } : {}), ...rest.style }} />
+      ) : (
       <input
         {...rest}
         onFocus={e => {
@@ -44,8 +55,11 @@ export default function GemInput({ label, error, ...rest }) {
           ...rest.style,
         }}
       />
+      )}
       {error && (
         <span
+          role="alert"
+          data-field-error
           style={{
             fontSize: 11,
             color: 'var(--accent-red)',

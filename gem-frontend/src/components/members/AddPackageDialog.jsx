@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { getCurrencySymbol } from "../../utils/currency";
 import {
   Box,
   Button,
@@ -113,7 +114,7 @@ function AddPackageDialog({ open, mode = "create", initial, onClose, onSave }) {
               alignItems: "start",
             }}
           >
-            <FieldBlock title="Price (XAF)">
+            <FieldBlock title={`Price (${getCurrencySymbol()})`}>
               <GemTextField
                 type="number"
                 value={price}

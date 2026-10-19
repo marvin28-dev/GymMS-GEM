@@ -1,5 +1,7 @@
-// src/components/members/AddMemberVisitorPage.jsx
+﻿// src/components/members/AddMemberVisitorPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
+import { getCurrencySymbol } from '../../utils/currency';
+import { useLanguage } from '../../contexts/LanguageContext';
 import {
   Box,
   Button,
@@ -24,14 +26,14 @@ import GemCard from "../ui/GemCard";
 import GemTextField from "../ui/GemTextField";
 import { uploadPhoto } from "../../services/upload.service";
 
-function FieldBlock({ title, children }) {
+function FieldBlock({ title, required, children }) {
   return (
     <Box sx={{ display: "grid", gap: 0.75 }}>
       <Typography
         sx={{ fontWeight: 950, fontSize: 12.5, letterSpacing: 0.2 }}
         color="text.secondary"
       >
-        {title}
+        {title}{required ? ' *' : ''}
       </Typography>
       {children}
     </Box>
@@ -68,6 +70,7 @@ export default function AddMemberVisitorPage({
   onSave,
   onSaved,
 }) {
+  const { t } = useLanguage();
   const close = onCancel || onClose;
   const save = onSave || onSaved;
 
@@ -240,8 +243,8 @@ export default function AddMemberVisitorPage({
               "& .MuiRadio-root": { p: 0.6 },
             }}
           >
-            <FormControlLabel value="member" control={<Radio />} label="Member" />
-            <FormControlLabel value="visitor" control={<Radio />} label="Visitor" />
+            <FormControlLabel value="member" control={<Radio />} label={t('members.member')} />
+            <FormControlLabel value="visitor" control={<Radio />} label={t('members.visitor')} />
           </RadioGroup>
         </Box>
 
@@ -265,7 +268,7 @@ export default function AddMemberVisitorPage({
 
       <Box sx={{ display: "grid", gap: 2 }}>
         {/* Member Details */}
-        <Section title="Member Details">
+        <Section title={t('members.memberDetails')}>
           <Box
             sx={{
               display: "grid",
@@ -274,15 +277,15 @@ export default function AddMemberVisitorPage({
               alignItems: "start",
             }}
           >
-            <FieldBlock title="First Name">
+            <FieldBlock title={t('members.firstName')} required>
               <GemTextField value={firstName} onChange={(e) => setFirstName(e.target.value)} />
             </FieldBlock>
 
-            <FieldBlock title="Last Name">
+            <FieldBlock title={t('members.lastName')} required>
               <GemTextField value={lastName} onChange={(e) => setLastName(e.target.value)} />
             </FieldBlock>
 
-            <FieldBlock title="Gender">
+            <FieldBlock title={t('members.gender')}>
               <ToggleButtonGroup
                 exclusive
                 value={gender}
@@ -311,21 +314,21 @@ export default function AddMemberVisitorPage({
                   },
                 }}
               >
-                <ToggleButton value="Male">Male</ToggleButton>
-                <ToggleButton value="Female">Female</ToggleButton>
-                <ToggleButton value="Other">Other</ToggleButton>
+                <ToggleButton value="Male">{t('common.male')}</ToggleButton>
+                <ToggleButton value="Female">{t('common.female')}</ToggleButton>
+                <ToggleButton value="Other">{t('common.other')}</ToggleButton>
               </ToggleButtonGroup>
             </FieldBlock>
 
-            <FieldBlock title="Email">
+            <FieldBlock title={t('members.email') || t('common.email')}>
               <GemTextField value={email} onChange={(e) => setEmail(e.target.value)} />
             </FieldBlock>
 
-            <FieldBlock title="Phone">
+            <FieldBlock title={t('common.phone')} required>
               <GemTextField value={phone} onChange={(e) => setPhone(e.target.value)} />
             </FieldBlock>
 
-            <FieldBlock title="Date Of Birth">
+            <FieldBlock title={t('members.dob')}>
               <GemTextField type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
             </FieldBlock>
           </Box>
@@ -333,7 +336,7 @@ export default function AddMemberVisitorPage({
 
         {/* Address (member only) */}
         {!isVisitor && (
-          <Section title="Address">
+          <Section title={t('members.addressSection')}>
             <Box
               sx={{
                 display: "grid",
@@ -341,23 +344,23 @@ export default function AddMemberVisitorPage({
                 gap: 2,
               }}
             >
-              <FieldBlock title="Street Number">
+              <FieldBlock title={t('members.streetNumber')}>
                 <GemTextField value={streetNumber} onChange={(e) => setStreetNumber(e.target.value)} />
               </FieldBlock>
 
-              <FieldBlock title="Street Name">
+              <FieldBlock title={t('members.streetName')}>
                 <GemTextField value={streetName} onChange={(e) => setStreetName(e.target.value)} />
               </FieldBlock>
 
-              <FieldBlock title="City">
+              <FieldBlock title={t('common.city')}>
                 <GemTextField value={city} onChange={(e) => setCity(e.target.value)} />
               </FieldBlock>
 
-              <FieldBlock title="Postal Code">
+              <FieldBlock title={t('common.postalCode')}>
                 <GemTextField value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
               </FieldBlock>
 
-              <FieldBlock title="Country">
+              <FieldBlock title={t('common.country')}>
                 <GemTextField value={country} onChange={(e) => setCountry(e.target.value)} />
               </FieldBlock>
             </Box>
@@ -365,7 +368,7 @@ export default function AddMemberVisitorPage({
         )}
 
         {/* Emergency */}
-        <Section title="Emergency Contact">
+        <Section title={t('members.emergencySection')}>
           <Box
             sx={{
               display: "grid",
@@ -373,22 +376,22 @@ export default function AddMemberVisitorPage({
               gap: 2,
             }}
           >
-            <FieldBlock title="Contact Name">
+            <FieldBlock title={t('members.contactName')}>
               <GemTextField value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} />
             </FieldBlock>
 
-            <FieldBlock title="Phone Number">
+            <FieldBlock title={t('common.phoneNumber')}>
               <GemTextField value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} />
             </FieldBlock>
 
-            <FieldBlock title="Relation">
+            <FieldBlock title={t('members.emergencyRelation')}>
               <GemTextField value={emergencyRelation} onChange={(e) => setEmergencyRelation(e.target.value)} />
             </FieldBlock>
           </Box>
         </Section>
 
         {/* Membership */}
-        <Section title="Membership">
+        <Section title={t('members.membershipInfo')}>
           <Box
             sx={{
               display: "grid",
@@ -399,7 +402,7 @@ export default function AddMemberVisitorPage({
               alignItems: "start",
             }}
           >
-            <FieldBlock title="Option">
+            <FieldBlock title={t('members.option')}>
               <FormControl fullWidth size="small">
                 <Select
                   value={membershipOption}
@@ -414,7 +417,7 @@ export default function AddMemberVisitorPage({
             </FieldBlock>
 
             {isVisitor && (
-              <FieldBlock title="Session Qty">
+              <FieldBlock title={t('members.sessionQty')}>
                 <FormControl fullWidth size="small">
                   <Select
                     value={sessionQty}
@@ -430,7 +433,7 @@ export default function AddMemberVisitorPage({
               </FieldBlock>
             )}
 
-            <FieldBlock title="Price">
+            <FieldBlock title={t('members.price')}>
               <GemTextField
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
@@ -438,8 +441,7 @@ export default function AddMemberVisitorPage({
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <Typography sx={{ fontWeight: 950 }} color="text.secondary">
-                        FCFA
+                      <Typography sx={{ fontWeight: 950 }} color="text.secondary"> {getCurrencySymbol()}
                       </Typography>
                     </InputAdornment>
                   ),
@@ -451,8 +453,7 @@ export default function AddMemberVisitorPage({
 
         {/* Identification (member only) */}
         {!isVisitor && (
-          <Section title="Identification">
-            {/* ✅ joined buttons + single preview */}
+          <Section title={t('members.identification')}>
             <Box sx={{ display: "grid", gap: 1.25 }}>
               <Box
                 sx={{
@@ -464,7 +465,7 @@ export default function AddMemberVisitorPage({
                 }}
               >
                 <Typography sx={{ fontWeight: 950, fontSize: 13 }} color="text.secondary">
-                  Photo
+                  {t('members.photo')}
                 </Typography>
 
                 <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
@@ -474,7 +475,7 @@ export default function AddMemberVisitorPage({
                     startIcon={<CloudUploadOutlinedIcon />}
                     sx={{ fontWeight: 950 }}
                   >
-                    Choose Image
+                    {t('members.chooseImage')}
                     <input hidden type="file" accept="image/*" onChange={handleChooseImage} />
                   </Button>
 
@@ -484,7 +485,7 @@ export default function AddMemberVisitorPage({
                     startIcon={<PhotoCameraOutlinedIcon />}
                     sx={{ fontWeight: 950 }}
                   >
-                    Open Camera
+                    {t('members.openCamera')}
                     <input
                       hidden
                       type="file"
@@ -496,7 +497,7 @@ export default function AddMemberVisitorPage({
 
                   {photoPreview ? (
                     <Button variant="text" onClick={clearPhoto} sx={{ fontWeight: 950 }}>
-                      Remove
+                      {t('members.remove')}
                     </Button>
                   ) : null}
                 </Box>
@@ -524,22 +525,16 @@ export default function AddMemberVisitorPage({
                   />
                 ) : (
                   <Typography color="text.secondary" sx={{ fontWeight: 800 }}>
-                    No image selected
+                    {t('members.noImageSelected')}
                   </Typography>
                 )}
               </Box>
-
-              {photoPreview ? (
-                <Typography sx={{ fontWeight: 850, fontSize: 12.5 }} color="text.secondary">
-                  Source: {photoSource === "camera" ? "Camera" : "Upload"}
-                </Typography>
-              ) : null}
             </Box>
           </Section>
         )}
 
         {/* How did you hear */}
-        <Section title="How did you hear about us ?">
+        <Section title={t('members.howHeardQuestion')}>
           <Box
             sx={{
               display: "grid",
@@ -548,7 +543,7 @@ export default function AddMemberVisitorPage({
               alignItems: "start",
             }}
           >
-            <FieldBlock title="Option">
+            <FieldBlock title={t('members.option')}>
               <FormControl fullWidth size="small">
                 <Select
                   value={heardAboutUs}
@@ -564,7 +559,7 @@ export default function AddMemberVisitorPage({
               </FormControl>
             </FieldBlock>
 
-            <FieldBlock title="Say More">
+            <FieldBlock title={t('members.sayMore')}>
               <GemTextField
                 multiline
                 value={sayMore}
@@ -589,7 +584,7 @@ export default function AddMemberVisitorPage({
             disabled={!canSubmit}
             sx={{ fontWeight: 950, px: 4, py: 1.2, borderRadius: 999 }}
           >
-            Complete Signup
+            {t('members.completeSignup')}
           </Button>
         </Box>
       </Box>

@@ -1,13 +1,24 @@
+﻿import { useLiveTick } from '../hooks/useLiveRefresh';
 import { useState, useEffect } from 'react';
-import { Plus, Search, Printer, CheckCircle, Clock, XCircle, CreditCard, Banknote, ArrowLeftRight, Calendar } from 'lucide-react';
+import { getCurrencySymbol, formatMoney, getMoneyLocale } from '../utils/currency';
+import { digitsOnly } from '../utils/number';
+import { autoPaymentDescription } from '../utils/paymentDescription';
+import { Plus, Search, Printer, CheckCircle, Clock, XCircle, CreditCard, Banknote, ArrowLeftRight, Calendar, ChevronRight } from 'lucide-react';
+import { useIsMobile } from '../hooks/useIsMobile';
+import FAB from '../components/FAB';
 import { useLanguage } from '../contexts/LanguageContext';
 import Modal from '../components/ui/Modal';
 import Avatar from '../components/ui/Avatar';
 import { getAll as getPayments, create as createPayment } from '../services/payments.service';
 import { getAll as getMembers } from '../services/members.service';
 import { getAll as getStaff } from '../services/staff.service';
+import { fmtDate, getDateLocale } from '../utils/date';
+import { getGymInfo, gymContactFooterHtml, printReceiptDocument, escapeHtml } from '../utils/receipt';
+import { softAll } from '../utils/loadAll';
+import { useGymSettings } from '../hooks/useGymSettings';
+import { enabledMethods, PAYMENT_METHODS, canonicalMethod } from '../utils/paymentMethods';
+import { gymCache } from '../utils/gymCache';
 
-const formatMoney = (n) => `${Math.round(n || 0).toLocaleString('fr-FR')} FCFA`;
 const staffName = (s) => s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim();
 
 const cardStyle = { background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, boxShadow: 'var(--shadow-card)' };
@@ -19,22 +30,14 @@ const METHOD_STYLES = {
   card: { bg: 'var(--accent-blue-dim)', color: 'var(--accent-blue)' },
   cash: { bg: 'var(--accent-gold-dim)', color: 'var(--accent-gold)' },
   bank_transfer: { bg: 'var(--accent-purple-dim)', color: 'var(--accent-purple)' },
-  mobile_money: { bg: 'var(--accent-blue-dim)', color: 'var(--accent-blue)' },
+  mobile_money: { bg: 'var(--accent-green-dim)', color: 'var(--accent-green)' },
 };
 
-const METHOD_LABELS = {
-  cash: 'Cash', card: 'Card',
-  bank_transfer: 'Bank Transfer', mobile_money: 'Mobile Pay',
-};
-const formatMethod = (m) => METHOD_LABELS[m] || (m ? m.charAt(0).toUpperCase() + m.slice(1) : '—');
-
-// filter label → db values
-const METHOD_FILTER_MAP = {
-  Cash: ['cash'],
-  Card: ['card'],
-  Transfer: ['bank_transfer', 'transfer'],
-  'Mobile Pay': ['mobile_money', 'mobile_pay'],
-};
+// A payment is stored with a code (mobile_money); it is shown by the name
+// Settings uses, and styled by its code
+const methodOf = (m) => PAYMENT_METHODS.find(x => x.api === m || x.key === canonicalMethod(m));
+const methodName = (m, t) => { const pm = methodOf(m); return pm ? t(pm.labelKey) : (m || '-'); };
+const methodStyle = (m) => METHOD_STYLES[methodOf(m)?.api] || { bg: 'var(--bg-elevated)', color: 'var(--text-muted)' };
 
 const emptyForm = { memberId: '', date: '', amount: '', method: 'Cash', reference: '', description: '', receivedBy: '', packageFor: '', notes: '' };
 
@@ -50,47 +53,39 @@ export function TransactionModal({ payment, onClose }) {
   const { t } = useLanguage();
   if (!payment) return null;
   const m = payment.member;
-  const recordedBy = payment.staff ? staffName(payment.staff) : payment.recordedBy || '—';
-  const ms = METHOD_STYLES[payment.method] || METHOD_STYLES.cash;
+  const recordedBy = payment.staff ? staffName(payment.staff) : payment.recordedBy || '-';
+  const ms = methodStyle(payment.method);
   const sm = STATUS_META[payment.status] || STATUS_META.Completed;
   const StatusIcon = sm.icon;
-  const MethodIcon = METHOD_ICONS[payment.method] || CreditCard;
+  const MethodIcon = METHOD_ICONS[methodOf(payment.method)?.api] || CreditCard;
 
   const handlePrint = () => {
-    const win = window.open('', '_blank', 'width=480,height=640');
-    win.document.write(`
-      <html><head><title>Receipt ${payment.reference}</title>
-      <style>
-        body { font-family: 'Courier New', monospace; padding: 32px; color: #111; font-size: 13px; }
-        h2 { text-align: center; letter-spacing: 2px; font-size: 18px; margin-bottom: 4px; }
-        .sub { text-align: center; color: #666; margin-bottom: 24px; font-size: 11px; }
-        hr { border: none; border-top: 1px dashed #ccc; margin: 16px 0; }
-        .row { display: flex; justify-content: space-between; margin: 8px 0; }
-        .label { color: #666; }
-        .amount { font-size: 28px; font-weight: bold; text-align: center; margin: 20px 0; }
-        .status { text-align: center; font-size: 12px; color: ${payment.status === 'Completed' ? 'green' : payment.status === 'Failed' ? 'red' : 'orange'}; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
-        .footer { text-align: center; color: #999; font-size: 10px; margin-top: 32px; }
-      </style></head><body>
-      <h2>GEM FITNESS</h2>
-      <div class="sub">Payment Receipt</div>
-      <hr/>
-      <div class="row"><span class="label">Reference</span><span>${payment.reference}</span></div>
-      <div class="row"><span class="label">Date</span><span>${(payment.createdAt || payment.date || '').slice(0, 10)}</span></div>
-      <div class="row"><span class="label">Member</span><span>${m ? `${m.firstName} ${m.lastName}` : payment.memberId}</span></div>
-      <div class="row"><span class="label">Member ID</span><span>${payment.memberId}</span></div>
-      <hr/>
-      <div class="row"><span class="label">Description</span><span>${payment.note || payment.description || ''}</span></div>
-      <div class="row"><span class="label">Method</span><span>${METHOD_LABELS[payment.method] || payment.method || ''}</span></div>
-      <div class="row"><span class="label">Recorded By</span><span>${recordedBy}</span></div>
-      <hr/>
-      <div class="amount">${Math.round(payment.amount).toLocaleString('fr-FR')} FCFA</div>
-      <div class="status">${payment.status}</div>
-      <div class="footer">Thank you for your payment · GEM Gym Management</div>
-      </body></html>
-    `);
-    win.document.close();
-    win.focus();
-    win.print();
+    const gym = getGymInfo();
+    const statusColor = payment.status === 'Completed' ? 'green' : payment.status === 'Failed' ? 'red' : 'orange';
+    const row = (label, value) =>
+      `<div class="row"><span class="label">${escapeHtml(label)}</span><span>${escapeHtml(value ?? '')}</span></div>`;
+
+    printReceiptDocument({
+      title: `Receipt ${payment.reference}`,
+      bodyHtml: `
+        <h2>${escapeHtml(gym.name.toUpperCase())}</h2>
+        <div class="sub">${escapeHtml(t('payments.paymentReceiptTitle'))}</div>
+        <hr/>
+        ${row(t('payments.receiptReference'), payment.reference)}
+        ${row(t('payments.receiptDate'), fmtDate(payment.createdAt || payment.date))}
+        ${row(t('common.name'), m ? `${m.firstName} ${m.lastName}` : payment.memberId)}
+        ${row(t('payments.memberId'), payment.memberId)}
+        <hr/>
+        ${row(t('payments.receiptDescription'), payment.note || payment.description || '')}
+        ${row(t('payments.receiptMethod'), methodName(payment.method, t))}
+        ${row(t('payments.receiptRecordedBy'), recordedBy)}
+        <hr/>
+        <div class="amount">${escapeHtml(formatMoney(payment.amount))}</div>
+        <div class="status" style="color:${statusColor}">${escapeHtml(payment.status)}</div>
+        <div class="footer">${escapeHtml(t('payments.thankYouReceipt'))}</div>
+        ${gymContactFooterHtml()}
+      `,
+    });
   };
 
   const Row = ({ label, value }) => (
@@ -127,7 +122,7 @@ export function TransactionModal({ payment, onClose }) {
         {/* Details */}
         <Row label={t('payments.reference')} value={<span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{payment.reference}</span>} />
         <Row label={t('common.date')} value={(payment.createdAt || payment.date || '').slice(0, 10)} />
-        <Row label={t('attendance.member')} value={m ? `${m.firstName} ${m.lastName}` : '—'} />
+        <Row label={t('attendance.member')} value={m ? `${m.firstName} ${m.lastName}` : '-'} />
         <Row label={t('payments.memberId')} value={<span style={{ fontFamily: 'monospace', fontSize: 12 }}>{payment.memberId}</span>} />
         <Row label={t('payments.description')} value={payment.note || payment.description} />
         <Row
@@ -139,7 +134,7 @@ export function TransactionModal({ payment, onClose }) {
               borderRadius: 6, padding: '3px 10px', fontSize: 12, fontWeight: 500,
             }}>
               <MethodIcon size={11} strokeWidth={2} />
-              {formatMethod(payment.method)}
+              {methodName(payment.method, t)}
             </span>
           }
         />
@@ -169,12 +164,18 @@ const PAGE_SIZE = 20;
 
 export default function PaymentsPage() {
   const { t } = useLanguage();
-  const [payments, setPayments] = useState([]);
-  const [membersList, setMembersList] = useState([]);
-  const [staffList, setStaffList] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const isMobile = useIsMobile();
+  // Show the last payments at once and refresh quietly; a first-ever visit
+  // falls back to the skeleton. See utils/gymCache.js.
+  const cache = gymCache('payments');
+  const [payments, setPayments] = useState(() => cache.read('list', []));
+  const [membersList, setMembersList] = useState(() => cache.read('members', []));
+  const [staffList, setStaffList] = useState(() => cache.read('staff', []));
+  const [loading, setLoading] = useState(() => !cache.has('list'));
   const [search, setSearch] = useState('');
   const [methodFilter, setMethodFilter] = useState('All');
+  // The methods this gym takes, as chosen in Settings
+  const methods = enabledMethods(useGymSettings());
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -199,20 +200,28 @@ export default function PaymentsPage() {
   const [showModal, setShowModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  // The form always holds a method the gym takes, also right after a reset
+  useEffect(() => {
+    if (!methods.some(m => m.key === canonicalMethod(form.method))) setForm(f => ({ ...f, method: methods[0]?.key || 'Cash' }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.method, methods.map(m => m.key).join()]);
   const [errors, setErrors] = useState({});
   const [memberSearch, setMemberSearch] = useState('');
   const [selectedMember, setSelectedMember] = useState(null);
 
+  const liveTick = useLiveTick();
   useEffect(() => {
-    Promise.all([getPayments(), getMembers(), getStaff()])
+    softAll([getPayments(), getMembers(), getStaff()])
       .then(([pRes, mRes, sRes]) => {
-        setPayments(pRes.data || []);
-        setMembersList(mRes.data || []);
-        setStaffList(sRes.data || []);
+        const pay = pRes.data || [], mem = mRes.data || [], stf = sRes.data || [];
+        setPayments(pay); cache.write('list', pay);
+        setMembersList(mem); cache.write('members', mem);
+        setStaffList(stf); cache.write('staff', stf);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveTick]);
 
   const today = new Date().toISOString().slice(0, 10);
   const thisMonth = new Date().toISOString().slice(0, 7);
@@ -223,7 +232,7 @@ export default function PaymentsPage() {
     const name = p.member ? `${p.member.firstName} ${p.member.lastName}` : '';
     const pDate = (p.createdAt || '').slice(0, 10);
     const matchSearch = !search || name.toLowerCase().includes(search.toLowerCase()) || (p.reference || '').toLowerCase().includes(search.toLowerCase());
-    const matchMethod = methodFilter === 'All' || (METHOD_FILTER_MAP[methodFilter] || [methodFilter.toLowerCase()]).includes((p.method || '').toLowerCase());
+    const matchMethod = methodFilter === 'All' || methodOf(p.method)?.key === methodFilter;
     const matchFrom = !dateFrom || pDate >= dateFrom;
     const matchTo = !dateTo || pDate <= dateTo;
     return matchSearch && matchMethod && matchFrom && matchTo;
@@ -231,13 +240,13 @@ export default function PaymentsPage() {
 
   const filteredTotal = filtered.reduce((s, p) => s + (p.amount || 0), 0);
 
-  const fmtShort = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const fmtShort = (d) => fmtDate(d + 'T12:00:00', { month: 'short', day: 'numeric' });
   const dynamicLabel = (() => {
     if (datePreset === 'This Week') return t('payments.paymentsThisWeek');
     if (datePreset === 'This Month') return t('payments.paymentsThisMonth');
     if (datePreset === 'Today') return t('payments.paymentsToday');
     if (datePreset === 'Custom') {
-      if (dateFrom && dateTo) return `${fmtShort(dateFrom)} – ${fmtShort(dateTo)}`;
+      if (dateFrom && dateTo) return `${fmtShort(dateFrom)} - ${fmtShort(dateTo)}`;
       if (dateFrom) return `${t('common.from')} ${fmtShort(dateFrom)}`;
       if (dateTo) return `${t('common.until')} ${fmtShort(dateTo)}`;
     }
@@ -262,10 +271,15 @@ export default function PaymentsPage() {
   const matchingMembers = memberSearch ? membersList.filter(m => `${m.firstName} ${m.lastName} ${m.memberCode || m.id}`.toLowerCase().includes(memberSearch.toLowerCase())).slice(0, 5) : [];
 
   const validate = () => {
+    const req = t('common.required');
     const e = {};
-    if (!form.date) e.date = 'Required';
-    if (!form.amount) e.amount = 'Required';
-    if (!form.method) e.method = 'Required';
+    if (!form.date) e.date = req;
+    if (!form.amount) e.amount = req;
+    // This records a payment towards what the member owes, so it can never be more than that
+    else if (selectedMember && Number(form.amount) > Math.max(0, Number(selectedMember.balance) || 0)) {
+      e.amount = t('memberProfile.amountOverMax', { amount: formatMoney(Math.max(0, Number(selectedMember.balance) || 0)) });
+    }
+    if (!form.method) e.method = req;
     return e;
   };
 
@@ -280,14 +294,139 @@ export default function PaymentsPage() {
         reference: form.reference || undefined,
         description: form.description || undefined,
         notes: form.notes || undefined,
+        towardBalance: true,
       };
       const res = await createPayment(payload);
       setPayments(prev => [res.data, ...prev]);
       setShowModal(false);
     } catch (err) {
-      console.error(err);
+      setErrors({ amount: err?.response?.data?.error || t('payments.saveFailed') });
     }
   };
+
+  // ── Mobile layout ────────────────────────────────────────────────────────────
+  if (isMobile) {
+    const METHOD_CHIPS = [{ key: 'All', label: t('payments.allMethods') }, ...methods.map(m => ({ key: m.key, label: t(m.labelKey) }))];
+    return (
+      <div style={{ minHeight: '100%' }}>
+        {/* Header */}
+        <div style={{ padding: '16px 16px 10px' }}>
+          <h1 style={{ fontFamily: 'Manrope', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{t('payments.title')}</h1>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '3px 0 0', fontFamily: 'DM Sans' }}>
+            {formatMoney(totalThisMonth)} {t('common.thisMonth').toLowerCase()}
+          </p>
+        </div>
+
+        {/* KPI strip */}
+        <div style={{ padding: '0 16px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {[
+            { label: t('common.today'), value: formatMoney(totalToday) },
+            { label: t('common.thisMonth'), value: formatMoney(totalThisMonth) },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent-gold)', fontFamily: 'JetBrains Mono, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div style={{ padding: '0 16px 8px', position: 'relative' }}>
+          <Search size={14} style={{ position: 'absolute', left: 28, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={t('payments.searchPlaceholder')}
+            style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '9px 14px 9px 34px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        {/* Method chips */}
+        <div style={{ padding: '0 16px 10px', display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
+          {METHOD_CHIPS.map(({ key, label }) => (
+            <button key={key} onClick={() => setMethodFilter(key)} style={{ ...chipStyle(methodFilter === key), flexShrink: 0 }}>{label}</button>
+          ))}
+        </div>
+
+        {/* Payment list */}
+        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>{t('common.loading')}</div>
+          ) : paginatedPayments.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>{t('payments.noPaymentsYet')}</div>
+          ) : paginatedPayments.map(p => {
+            const name = p.member ? `${p.member.firstName} ${p.member.lastName}` : t('common.anonymous');
+            const date = (p.createdAt || '').slice(0, 10);
+            const pillStyle = methodStyle(p.method);
+            return (
+              <div key={p.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2, display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 20, background: pillStyle.bg, color: pillStyle.color }}>{methodName(p.method || 'cash', t)}</span>
+                    <span>{date}</span>
+                  </div>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent-gold)', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0 }}>
+                  {formatMoney(p.amount)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', marginTop: 4 }}>
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '7px 14px', fontSize: 12, color: currentPage === 1 ? 'var(--text-muted)' : 'var(--text-primary)', cursor: currentPage === 1 ? 'default' : 'pointer', fontFamily: 'DM Sans' }}>{t('common.previous')}</button>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans', alignSelf: 'center' }}>{currentPage} / {totalPages}</span>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '7px 14px', fontSize: 12, color: currentPage === totalPages ? 'var(--text-muted)' : 'var(--text-primary)', cursor: currentPage === totalPages ? 'default' : 'pointer', fontFamily: 'DM Sans' }}>{t('common.next')}</button>
+          </div>
+        )}
+
+        <FAB onClick={() => { setForm(emptyForm); setErrors({}); setMemberSearch(''); setSelectedMember(null); setShowModal(true); }} label={t('payments.addPayment')} />
+
+        {showModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end' }}>
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: '20px 20px 0 0', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '20px 20px 40px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'Manrope', color: 'var(--text-primary)' }}>{t('payments.addPayment')}</span>
+                <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><Plus size={18} style={{ transform: 'rotate(45deg)' }} /></button>
+              </div>
+              {/* Minimal form */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{t('common.amount')} *</label>
+                  <input type="text" inputMode="numeric" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: digitsOnly(e.target.value) }))} style={{ width: '100%', background: 'var(--bg-elevated)', border: `1px solid ${errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)'}`, borderRadius: 10, padding: '10px 14px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', boxSizing: 'border-box' }} placeholder="0" />
+                  {errors.amount && <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{errors.amount}</span>}
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{t('payments.paymentMethod')} *</label>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {methods.map(m => [m.key, t(m.labelKey)]).map(([val, label]) => (
+                      <button key={val} onClick={() => setForm(f => ({ ...f, method: val }))} style={{ ...chipStyle(form.method === val), fontSize: 12 }}>{label}</button>
+                    ))}
+                  </div>
+                  {errors.method && <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{errors.method}</span>}
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{t('payments.paymentDate')} *</label>
+                  <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} style={{ width: '100%', background: 'var(--bg-elevated)', border: `1px solid ${errors.date ? 'var(--accent-red)' : 'var(--border-subtle)'}`, borderRadius: 10, padding: '10px 14px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{t('common.notes')}</label>
+                  <input value={form.notes || ''} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 14px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', boxSizing: 'border-box' }} placeholder={t('common.optional')} />
+                </div>
+                <button onClick={handleSave} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 10, padding: '13px', fontSize: 14, fontWeight: 700, color: '#0a0a0f', cursor: 'pointer', fontFamily: 'DM Sans', marginTop: 4 }}>
+                  {t('payments.savePayment')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="page-fade">
@@ -305,7 +444,7 @@ export default function PaymentsPage() {
       </div>
 
       {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 24 }}>
         {[
           { label: t('payments.totalThisMonth'), value: formatMoney(totalThisMonth), color: 'var(--accent-blue)', dimColor: 'var(--accent-blue-dim)' },
           { label: dynamicLabel, value: formatMoney(dynamicValue), color: 'var(--accent-green)', dimColor: 'var(--accent-green-dim)' },
@@ -333,7 +472,7 @@ export default function PaymentsPage() {
           </div>
           {/* Method segmented control */}
           <div style={{ display: 'flex', background: 'var(--bg-elevated)', borderRadius: 8, padding: 3, border: '1px solid var(--border-subtle)', gap: 2 }}>
-            {[['All', t('payments.allMethods')], ['Cash', t('payments.cash')], ['Card', t('payments.card')], ['Transfer', t('payments.transfer')]].map(([key, label]) => (
+            {[['All', t('payments.allMethods')], ...methods.map(m => [m.key, t(m.labelKey)])].map(([key, label]) => (
               <button key={key} onClick={() => setMethodFilter(key)} style={{
                 padding: '5px 13px', borderRadius: 6, fontSize: 12, fontWeight: methodFilter === key ? 600 : 400,
                 background: methodFilter === key ? 'var(--accent-gold)' : 'transparent',
@@ -367,7 +506,7 @@ export default function PaymentsPage() {
             }}><Calendar size={11} />{t('common.custom')}</button>
           </div>
 
-          {/* Custom date range — shown inline when Custom is active */}
+          {/* Custom date range - shown inline when Custom is active */}
           {datePreset === 'Custom' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
@@ -415,7 +554,7 @@ export default function PaymentsPage() {
             <tbody>
               {paginatedPayments.map(p => {
                 const m = p.member;
-                const ms = METHOD_STYLES[p.method] || METHOD_STYLES.cash;
+                const ms = methodStyle(p.method);
                 return (
                   <tr key={p.id} style={{ borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer' }}
                     onClick={() => setSelectedPayment(p)}
@@ -430,15 +569,15 @@ export default function PaymentsPage() {
                             : <Avatar firstName={m.firstName} lastName={m.lastName} avatarColor={m.avatarColor} size={28}/>}
                           <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{m.firstName} {m.lastName}</span>
                         </div>
-                      ) : <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>—</span>}
+                      ) : <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>-</span>}
                     </td>
                     <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>{p.note || p.description}</td>
                     <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 600, color: 'var(--accent-green)', whiteSpace: 'nowrap' }}>{formatMoney(p.amount)}</td>
                     <td style={{ padding: '12px 20px' }}>
-                      <span style={{ ...ms, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 4 }}>{formatMethod(p.method)}</span>
+                      <span style={{ ...ms, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 4 }}>{methodName(p.method, t)}</span>
                     </td>
                     <td style={{ padding: '12px 20px', fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-muted)' }}>{p.reference}</td>
-                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>{p.staff ? staffName(p.staff) : p.recordedBy || '—'}</td>
+                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>{p.staff ? staffName(p.staff) : p.recordedBy || '-'}</td>
                   </tr>
                 );
               })}
@@ -447,7 +586,7 @@ export default function PaymentsPage() {
         </div>
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            {t('common.showing')} {filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} {t('common.of')} {filtered.length} {t('payments.paymentsLabel')}
+            {t('common.showing')} {filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, filtered.length)} {t('common.of')} {filtered.length} {t('payments.paymentsLabel')}
           </span>
           {totalPages > 1 && (
             <div style={{ display: 'flex', gap: 4 }}>
@@ -478,7 +617,7 @@ export default function PaymentsPage() {
           {!selectedMember && (
             <>
               <div>
-                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.searchMember')}</label>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.searchMember')} *</label>
                 <div style={{ position: 'relative' }}>
                   <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
                   <input
@@ -492,17 +631,17 @@ export default function PaymentsPage() {
                     <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, marginTop: 4, boxShadow: 'var(--shadow-elevated)', overflow: 'hidden' }}>
                       {matchingMembers.map(m => (
                         <div key={m.id}
-                          onClick={() => { setSelectedMember(m); setForm(f => ({ ...f, memberId: m.id })); setMemberSearch(''); }}
+                          onClick={() => { setSelectedMember(m); setForm(f => ({ ...f, memberId: m.id, description: f.description || autoPaymentDescription(m, 'membership') })); setMemberSearch(''); }}
                           style={{ padding: '10px 14px', fontSize: 13, cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                           onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-hover)'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                           <div>
                             <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{m.firstName} {m.lastName}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.memberCode} · {m.package?.name || '—'}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.memberCode} · {m.package?.name || '-'}</div>
                           </div>
                           {Number(m.balance) > 0 && (
                             <span style={{ fontSize: 11, color: '#f87171', fontWeight: 600, background: 'rgba(248,113,113,0.1)', borderRadius: 4, padding: '2px 8px', whiteSpace: 'nowrap' }}>
-                              owes {(Number(m.balance) || 0).toLocaleString('fr-FR')} FCFA
+                              {t('payments.owes')} {(Number(m.balance) || 0).toLocaleString(getMoneyLocale())} {getCurrencySymbol()}
                             </span>
                           )}
                         </div>
@@ -531,7 +670,7 @@ export default function PaymentsPage() {
                 <div style={{ fontSize: 38, marginBottom: 10 }}>✓</div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#34d399', marginBottom: 6 }}>{t('payments.noOutstandingBalance')}</div>
                 <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                  {selectedMember.firstName} {selectedMember.lastName} has no pending payments due.
+                  {t('payments.memberHasNoBalance', { firstName: selectedMember.firstName, lastName: selectedMember.lastName })}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -557,7 +696,7 @@ export default function PaymentsPage() {
               <div style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <div>
                   <div style={{ fontSize: 11, color: '#f87171', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 2 }}>{t('payments.outstandingBalance')}</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#f87171', fontFamily: 'Manrope, sans-serif' }}>{(Number(selectedMember.balance) || 0).toLocaleString('fr-FR')} FCFA</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#f87171', fontFamily: 'Manrope, sans-serif' }}>{(Number(selectedMember.balance) || 0).toLocaleString(getMoneyLocale())} {getCurrencySymbol()}</div>
                 </div>
                 <button type="button"
                   onClick={() => setForm(f => ({ ...f, amount: String(selectedMember.balance) }))}
@@ -565,7 +704,7 @@ export default function PaymentsPage() {
                 >{t('payments.payInFull')}</button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.paymentDate')} *</label>
                   <input type="date" style={{ ...inputStyle, borderColor: errors.date ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
@@ -573,17 +712,15 @@ export default function PaymentsPage() {
                 </div>
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.amount')} *</label>
-                  <input type="number" style={{ ...inputStyle, borderColor: errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
+                  <input type="text" inputMode="numeric" style={{ ...inputStyle, borderColor: errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: digitsOnly(e.target.value) }))} placeholder="0" />
                   {errors.amount && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.amount}</div>}
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.paymentMethod')} *</label>
                   <select style={inputStyle} value={form.method} onChange={e => setForm(f => ({ ...f, method: e.target.value }))}>
-                    <option value="Cash">{t('payments.cash')}</option>
-                    <option value="Card">{t('payments.card')}</option>
-                    <option value="Transfer">{t('payments.transfer')}</option>
+                    {methods.map(m => <option key={m.key} value={m.key}>{t(m.labelKey)}</option>)}
                   </select>
                 </div>
                 <div>
@@ -595,12 +732,12 @@ export default function PaymentsPage() {
                 <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.description')}</label>
                 <input style={inputStyle} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Premium 12M Renewal" />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.receivedBy')}</label>
                   <select style={inputStyle} value={form.receivedBy} onChange={e => setForm(f => ({ ...f, receivedBy: e.target.value }))}>
                     <option value="">{t('payments.selectStaff')}</option>
-                    {staffList.map(s => <option key={s.id} value={staffName(s)}>{staffName(s)}</option>)}
+                    {staffList.filter(s => s.isActive !== false || staffName(s) === form.receivedBy).map(s => <option key={s.id} value={staffName(s)}>{staffName(s)}</option>)}
                   </select>
                 </div>
                 <div>

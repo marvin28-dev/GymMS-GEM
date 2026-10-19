@@ -1,5 +1,6 @@
-// src/components/products/AddProductDialog.jsx
+﻿// src/components/products/AddProductDialog.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { getCurrencySymbol } from '../../utils/currency';
 import {
   Box,
   Button,
@@ -232,8 +233,7 @@ export default function AddProductDialog({
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <Typography sx={{ fontWeight: 950 }} color="text.secondary">
-                        FCFA
+                      <Typography sx={{ fontWeight: 950 }} color="text.secondary"> {getCurrencySymbol()}
                       </Typography>
                     </InputAdornment>
                   ),
@@ -282,7 +282,7 @@ export default function AddProductDialog({
                   ))}
                   {(!categories || categories.length === 0) && (
                     <MenuItem value="" disabled>
-                      No categories yet — add one first
+                      No categories yet. Add one first.
                     </MenuItem>
                   )}
                 </Select>

@@ -1,4 +1,4 @@
-// src/components/members/CreateCommunicationPanel.jsx
+﻿// src/components/members/CreateCommunicationPanel.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
     Box,
@@ -36,8 +36,8 @@ function isExpired(expiryIso) {
 
 function memberLabel(m) {
     const name = `${m.firstName || ""} ${m.lastName || ""}`.trim() || "Member";
-    const contact = m.email || m.phone || "—";
-    return `${name} — ${contact}`;
+    const contact = m.email || m.phone || "-";
+    return `${name} : ${contact}`;
 }
 
 export default function CreateCommunicationPanel({ members = [], onCancel, onSend }) {
@@ -169,7 +169,7 @@ export default function CreateCommunicationPanel({ members = [], onCancel, onSen
                         value={selected}
                         onChange={(_, v) => setSelected(v)}
                         isOptionEqualToValue={(a, b) => a.id === b.id}
-                        getOptionLabel={(o) => o.label || `${o.name} — ${o.phone}`}
+                        getOptionLabel={(o) => o.label || `${o.name} : ${o.phone}`}
                         filterSelectedOptions
 
                         // ✅ FIX: control chips layout + padding safely

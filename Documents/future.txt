@@ -1,0 +1,6 @@
+TESTING FOR LANGUAGE
+-Create a managers account, verify
+-Create All 3 categories of staff
+-Create products
+-Try to checkin members
+-Logout and login as different members

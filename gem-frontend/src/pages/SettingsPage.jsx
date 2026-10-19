@@ -1,58 +1,72 @@
-import { useState, useEffect, useRef } from 'react';
-import { CloudUpload, Save, Sun, Moon, Check, Palette, Plus, Trash2, Languages } from 'lucide-react';
+﻿import { useState, useEffect, useRef, useMemo } from 'react';
+import { CloudUpload, Save, Sun, Moon, Check, Palette, Plus, Trash2, Languages, Eye, EyeOff, User, ChevronRight, ChevronDown, ChevronLeft, X, RotateCcw } from 'lucide-react';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getMyGym, updateMyGym } from '../services/gym.service';
-import { ROLE_PROFILES as initialRoleProfiles, ALL_PAGES } from '../data/mockData';
+import { getAuth, updateSessionGym } from '../utils/auth';
+import { COUNTRIES, countryByName } from '../utils/countries';
+import { getCurrencySymbol, CURRENCY_SYMBOLS, getMoneyLocale, getCurrencyCode } from '../utils/currency';
+import { notifyDataChanged } from '../utils/events';
+import ManagerAuthModal from '../components/ui/ManagerAuthModal';
+import RowMenu from '../components/ui/RowMenu';
+import ActivityLog from './LogsPage';
+import { useSetupStatus, setSetupStatus } from '../hooks/useSetupStatus';
+import { confirmSetupSection } from '../services/gym.service';
+import TimeInput from '../components/ui/TimeInput';
 
 const cardStyle = { background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, boxShadow: 'var(--shadow-card)' };
 const primaryBtn = { background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', color: '#0a0a0f', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '8px 16px', cursor: 'pointer', fontFamily: 'DM Sans', display: 'inline-flex', alignItems: 'center', gap: 6 };
 const secondaryBtn = { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '8px 16px', cursor: 'pointer', fontFamily: 'DM Sans' };
+// The revert button: an icon and its label sit on one line (the plain
+// secondaryBtn has no flex, which stacked the icon on top of the word).
+const revertBtn = { ...secondaryBtn, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap' };
+const snap = (o) => JSON.stringify(o);
 const inputStyle = { width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '9px 14px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none' };
 
+// What a gym starts out accepting, until the owner says otherwise
+const DEFAULT_PAYMENT_SETTINGS = {
+  currency: getCurrencyCode(), taxRate: '0', lateFee: '5', paymentDueDays: '30',
+  methods: ['Cash', 'Credit/Debit Card', 'Bank Transfer'],
+};
+const DEFAULT_NOTIF_PREFS = {
+  expiryReminders: true, lowStockAlerts: true, taskOverdue: true, eodSummary: false, welcomeEmail: true,
+};
+
 const SECTIONS = [
-  { id: 'gym-profile', label: 'Gym Profile' },
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'language', label: 'Language' },
-  { id: 'payment', label: 'Payment Settings' },
-  { id: 'membership', label: 'Membership Defaults' },
-  { id: 'packages', label: 'Package Settings' },
-  { id: 'expenses', label: 'Expense Management' },
-  { id: 'notifications', label: 'Notification Preferences' },
-  { id: 'roles', label: 'Staff Roles' },
-  { id: 'security', label: 'Security' },
+  { id: 'gym-identity' },
+  { id: 'gym-profile' },
+  { id: 'appearance' },
+  { id: 'language' },
+  { id: 'payment' },
+  { id: 'membership' },
+  { id: 'packages' },
+  { id: 'notifications' },
+  // The gym's activity log. Settings is the owner's alone, like the log itself.
+  { id: 'logs' },
 ];
 
 export const DEFAULT_ACCESS_TYPES = ['Full Access', 'Gym Only', 'Classes Only', 'Full Access + Classes', 'Pool Access', 'Premium (All-Inclusive)'];
+
+const SETUP_VISITED_KEY = 'gem_settings_visited';
+// Sections that show a dot until visited/configured
+const SETUP_SECTIONS = new Set(['gym-profile', 'payment', 'membership', 'packages', 'notifications']);
 export const ACCESS_TYPES_KEY = 'gem_access_types';
+const REQUIRED_CONFIRMS = ['gym-profile', 'payment', 'membership', 'packages', 'notifications'];
 
 const THEMES = [
   {
     id: 'dark',
     name: 'Obsidian',
-    desc: 'Sleek dark — easy on the eyes',
+    desc: 'Sleek dark, easy on the eyes',
     bg: '#0a0a0f', card: '#16161f', text: '#f0ede6', accent: '#c9a96e',
     dots: ['#4ade80', '#60a5fa', '#f87171'],
   },
   {
     id: 'light',
     name: 'Ivory',
-    desc: 'Clean light mode for bright spaces',
-    bg: '#f2f2f7', card: '#ffffff', text: '#0a0a1a', accent: '#b08a40',
-    dots: ['#16a34a', '#2563eb', '#dc2626'],
-  },
-  {
-    id: 'midnight',
-    name: 'Midnight',
-    desc: 'Deep navy — focused and calm',
-    bg: '#060a18', card: '#0d1630', text: '#dce8ff', accent: '#e0b860',
-    dots: ['#34d399', '#818cf8', '#fb7185'],
-  },
-  {
-    id: 'forest',
-    name: 'Forest',
-    desc: 'Dark green — natural and grounded',
-    bg: '#060d08', card: '#0e1810', text: '#dcf0e0', accent: '#c8a84a',
-    dots: ['#4ade80', '#60a5fa', '#f87171'],
+    desc: 'Warm daylight for bright rooms',
+    bg: '#eae6dd', card: '#fbfaf7', text: '#1f1b14', accent: '#8a6a24',
+    dots: ['#15803d', '#1d4ed8', '#b91c1c'],
   },
 ];
 
@@ -130,8 +144,17 @@ function Label({ children }) {
 
 export default function SettingsPage() {
   const { lang, switchLang, t } = useLanguage();
-  const [activeSection, setActiveSection] = useState('gym-profile');
-  const [currentTheme, setCurrentTheme] = useState(() => localStorage.getItem('gem-theme') || 'dark');
+  const isMobile = useIsMobile();
+  const [activeSection, setActiveSection] = useState(() => {
+    const asked = new URLSearchParams(window.location.search).get('section');
+    return SECTIONS.some(s => s.id === asked) ? asked : 'gym-profile';
+  });
+  // Only the two themes remain. A browser still holding one of the old ones
+  // falls back rather than rendering with no palette at all.
+  const [currentTheme, setCurrentTheme] = useState(() => {
+    const saved = localStorage.getItem('gem-theme');
+    return saved === 'light' ? 'light' : 'dark';
+  });
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', currentTheme);
@@ -143,72 +166,153 @@ export default function SettingsPage() {
     localStorage.setItem('gem-theme', id);
   };
 
+  // ── My Account ───────────────────────────────────────────────────────────────
+  const [gymCode, setGymCode] = useState('');
+  const [showGymCode, setShowGymCode] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [showAccountAuth, setShowAccountAuth] = useState(false);
+
+  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const defaultSchedule = () => Object.fromEntries(DAYS.map(d => [d, { open: !['Sat','Sun'].includes(d), slots: [{ from: '06:00', to: '22:00' }] }]));
+
   const [gymProfile, setGymProfile] = useState({
     name: '', email: '', phone: '', altPhone: '', address: '',
     city: '', province: '', country: '', postal: '', website: '',
-    description: '', opening: '06:00', closing: '22:00',
-    facebook: '', instagram: '', twitter: '', notes: '',
+    description: '', facebook: '', instagram: '', twitter: '', notes: '',
   });
+  const [gymSchedule, setGymSchedule] = useState(defaultSchedule);
   const [gymSaving, setGymSaving] = useState(false);
   const [gymSaved, setGymSaved] = useState(false);
+  // The last-saved profile, so an edit can be reverted field-for-field.
+  const [pristineGym, setPristineGym] = useState(null);
+  const GYM_KEYS = ['name', 'email', 'phone', 'altPhone', 'address', 'city', 'province', 'country', 'postal', 'website', 'facebook', 'instagram', 'twitter'];
+  const gymDirty = pristineGym != null && (GYM_KEYS.some(k => (gymProfile[k] || '') !== (pristineGym[k] || ''))
+    || JSON.stringify(gymSchedule) !== pristineGym.schedule);
+  const revertGym = () => {
+    if (!pristineGym) return;
+    const { schedule, ...fields } = pristineGym;
+    setGymProfile(g => ({ ...g, ...fields }));
+    setGymSchedule(JSON.parse(schedule));
+  };
+  const snapshotGym = () => setPristineGym({ ...Object.fromEntries(GYM_KEYS.map(k => [k, gymProfile[k] || ''])), schedule: JSON.stringify(gymSchedule) });
+  // Every section with a Save button gets the same revert-on-edit treatment:
+  // a JSON snapshot of the last-saved values, a dirty check, and a one-click
+  // restore. Save stays disabled until something actually changed.
+  const [pristinePayment, setPristinePayment] = useState(null);
+  const [pristineRegFee, setPristineRegFee]   = useState(null);
+  const [pristineNotif, setPristineNotif]     = useState(null);
+  // The country on the record, so picking a different one can warn that the
+  // gym's money is about to change with it
+  const [savedCountry, setSavedCountry] = useState('');
+  const LOGO_KEY = 'gem_gym_logo';
   const [logoPreview, setLogoPreview] = useState(() => localStorage.getItem('gem_gym_logo') || null);
+  const [logoError, setLogoError] = useState('');
   const logoInputRef = useRef(null);
 
-  const GYM_EXTRA_KEY = 'gem_gym_extra';
-  const loadExtraFields = () => { try { return JSON.parse(localStorage.getItem(GYM_EXTRA_KEY) || '{}'); } catch { return {}; } };
-  const saveExtraFields = (profile) => {
-    const { altPhone, city, province, country, postal, website, description, opening, closing, facebook, instagram, twitter, notes } = profile;
-    localStorage.setItem(GYM_EXTRA_KEY, JSON.stringify({ altPhone, city, province, country, postal, website, description, opening, closing, facebook, instagram, twitter, notes }));
+  // localStorage caps out around 5MB, so a full-size photo stored as a base64
+  // data URI silently fails to write. Downscale to a thumbnail first.
+  const shrinkLogo = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('That file is not a valid image.'));
+      img.onload = () => {
+        const MAX = 256;
+        const scale = Math.min(MAX / img.width, MAX / img.height, 1);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        // PNG keeps transparency, which real logos usually need - but it bloats
+        // photographic images, so fall back to JPEG when the PNG comes out large.
+        const png = canvas.toDataURL('image/png');
+        if (png.length <= 200_000) return resolve(png);
+
+        const flat = document.createElement('canvas');
+        flat.width = canvas.width;
+        flat.height = canvas.height;
+        const fctx = flat.getContext('2d');
+        fctx.fillStyle = '#ffffff';
+        fctx.fillRect(0, 0, flat.width, flat.height);
+        fctx.drawImage(canvas, 0, 0);
+        resolve(flat.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  const handleLogoFile = async (file) => {
+    setLogoError('');
+    try {
+      const dataUrl = await shrinkLogo(file);
+      setLogoPreview(dataUrl);
+      // Persist to the gym record so it shows on the login screen and other devices
+      await updateMyGym({ logo: dataUrl });
+      try { localStorage.setItem(LOGO_KEY, dataUrl); } catch {}
+    } catch (err) {
+      if (err?.response?.status === 413) setLogoError('That image is too large. Try a smaller one.');
+      else setLogoError(err?.message || 'Could not save that logo.');
+    }
   };
 
-  useEffect(() => {
-    getMyGym()
-      .then(res => {
-        const g = res.data;
-        if (!g) return;
-        const extra = loadExtraFields();
-        setGymProfile(prev => ({
-          ...prev,
-          name: g.name || '',
-          email: g.email || '',
-          phone: g.phone || '',
-          address: g.location || '',
-          ...extra,
-        }));
-        setRegFeeSettings({
-          required: g.registrationFeeRequired ?? false,
-          amount: g.registrationFee ?? 0,
-          frequency: g.registrationFeeFrequency || 'yearly',
-          gracePeriod: g.registrationGracePeriodDays ?? 7,
-        });
-      })
-      .catch(console.error);
-  }, []);
+  const removeLogo = async () => {
+    setLogoError('');
+    setLogoPreview(null);
+    try { localStorage.removeItem(LOGO_KEY); } catch {}
+    if (logoInputRef.current) logoInputRef.current.value = '';
+    try {
+      await updateMyGym({ logo: null });
+    } catch {
+      setLogoError('Could not remove the logo. Please try again.');
+    }
+  };
+
 
   const saveGymProfile = async () => {
     setGymSaving(true);
     try {
-      await updateMyGym({
+      const res = await updateMyGym({
         name: gymProfile.name,
         email: gymProfile.email,
         phone: gymProfile.phone,
         location: gymProfile.address,
+        altPhone: gymProfile.altPhone,
+        city: gymProfile.city,
+        province: gymProfile.province,
+        country: gymProfile.country,
+        postal: gymProfile.postal,
+        website: gymProfile.website,
+        facebook: gymProfile.facebook,
+        instagram: gymProfile.instagram,
+        twitter: gymProfile.twitter,
+        schedule: gymSchedule,
       });
-      saveExtraFields(gymProfile);
+      // Moving the gym moves its currency, phone format and address examples.
+      // The session carries them, so it has to hear about it straight away.
+      updateSessionGym(res.data);
+      setSavedCountry(res.data?.country || '');
+      setPaymentSettings(p => ({ ...p, currency: res.data?.currency || p.currency }));
+      notifyDataChanged();
+      markConfirmed('gym-profile');
+      snapshotGym();
       setGymSaved(true);
       setTimeout(() => setGymSaved(false), 2500);
     } catch (err) { console.error(err); }
     setGymSaving(false);
   };
 
-  const [notifPrefs, setNotifPrefs] = useState({
-    expiryReminders: true, lowStockAlerts: true, taskOverdue: true, eodSummary: false, welcomeEmail: true,
-  });
-  const [password, setPassword] = useState({ current: '', newPw: '', confirm: '' });
-  const [twoFactor, setTwoFactor] = useState(false);
+  const [notifPrefs, setNotifPrefs] = useState(DEFAULT_NOTIF_PREFS);
+  const [autoRenew, setAutoRenew] = useState(() => localStorage.getItem('gem_auto_renew') === 'true');
   const [regFeeSettings, setRegFeeSettings] = useState({
     required: false, amount: 0, frequency: 'yearly', gracePeriod: 7,
   });
+  // Freeze fee: charged every N days a membership stays frozen.
+  const [freezeFee, setFreezeFee] = useState({ fee: 0, intervalDays: 30 });
+  const setFF = (k, v) => setFreezeFee(s => ({ ...s, [k]: v }));
   const [regFeeSaving, setRegFeeSaving] = useState(false);
   const [regFeeSaved, setRegFeeSaved] = useState(false);
   const setRegFee = (k, v) => setRegFeeSettings(s => ({ ...s, [k]: v }));
@@ -220,35 +324,158 @@ export default function SettingsPage() {
         registrationFee: Number(regFeeSettings.amount),
         registrationFeeFrequency: regFeeSettings.frequency,
         registrationGracePeriodDays: Number(regFeeSettings.gracePeriod),
+        settings: { freeze: { fee: Number(freezeFee.fee) || 0, intervalDays: Number(freezeFee.intervalDays) || 0 } },
       });
+      notifyDataChanged();
+      try { localStorage.setItem('gem_auto_renew', String(autoRenew)); } catch {}
+      markConfirmed('membership');
+      snapshotRegFee();
       setRegFeeSaved(true);
       setTimeout(() => setRegFeeSaved(false), 2500);
     } catch (err) { console.error(err); }
     setRegFeeSaving(false);
   };
 
-  const [expenseLimit, setExpenseLimit] = useState(() => parseFloat(localStorage.getItem('gem_expense_limit') || '50000'));
-  const [expenseLimitInput, setExpenseLimitInput] = useState(() => localStorage.getItem('gem_expense_limit') || '50000');
-  const [expenseLimitSaved, setExpenseLimitSaved] = useState(false);
-  const [expenseFilter, setExpenseFilter] = useState('all');
-  const [expenses, setExpenses] = useState(() => { try { return JSON.parse(localStorage.getItem('gem_expenses') || '[]'); } catch { return []; } });
-
-  const saveExpenseLimit = () => {
-    const val = parseFloat(expenseLimitInput);
-    if (!val || val <= 0) return;
-    localStorage.setItem('gem_expense_limit', String(val));
-    setExpenseLimit(val);
-    setExpenseLimitSaved(true);
-    setTimeout(() => setExpenseLimitSaved(false), 2000);
+  const [paymentSettings, setPaymentSettings] = useState(DEFAULT_PAYMENT_SETTINGS);
+  const [expenseLimitInput, setExpenseLimitInput] = useState('50000');
+  const [paymentSaving, setPaymentSaving] = useState(false);
+  const [paymentSaved, setPaymentSaved] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const setPS = (k, v) => setPaymentSettings(p => ({ ...p, [k]: v }));
+  // At least one way to take money has to stay switched on
+  const toggleMethod = (m) => setPaymentSettings(p => {
+    const on = p.methods.includes(m);
+    if (on && p.methods.length === 1) return p;
+    return { ...p, methods: on ? p.methods.filter(x => x !== m) : [...p.methods, m] };
+  });
+  const savePaymentSettings = async () => {
+    setPaymentSaving(true);
+    setPaymentError('');
+    try {
+      const limitVal = parseFloat(expenseLimitInput);
+      const res = await updateMyGym({
+        currency: paymentSettings.currency,
+        settings: {
+          payment: {
+            taxRate: paymentSettings.taxRate,
+            lateFee: paymentSettings.lateFee,
+            paymentDueDays: paymentSettings.paymentDueDays,
+            methods: paymentSettings.methods,
+          },
+          expenseLimit: limitVal > 0 ? limitVal : undefined,
+        },
+      });
+      // The currency may have just changed, so the session carries the new one
+      updateSessionGym(res.data);
+      notifyDataChanged();
+      markConfirmed('payment');
+      snapshotPayment();
+      setPaymentSaved(true);
+      setTimeout(() => setPaymentSaved(false), 2500);
+    } catch (err) {
+      setPaymentError(err.response?.data?.error || t('settings.saveFailed'));
+    }
+    setPaymentSaving(false);
   };
 
-  const updateExpenseStatus = (id, status) => {
-    const updated = expenses.map(e => e.id === id ? { ...e, status } : e);
-    setExpenses(updated);
-    localStorage.setItem('gem_expenses', JSON.stringify(updated));
+  const [notifSaving, setNotifSaving] = useState(false);
+  const [notifSaved, setNotifSaved] = useState(false);
+  const [notifError, setNotifError] = useState('');
+
+  const saveNotifPrefs = async () => {
+    setNotifSaving(true);
+    setNotifError('');
+    try {
+      await updateMyGym({ settings: { notifications: notifPrefs } });
+      notifyDataChanged();
+      markConfirmed('notifications');
+      snapshotNotif();
+      setNotifSaved(true);
+      setTimeout(() => setNotifSaved(false), 2500);
+    } catch (err) {
+      setNotifError(err.response?.data?.error || t('settings.saveFailed'));
+    }
+    setNotifSaving(false);
   };
 
-  const fmtMoney = (n) => 'XAF ' + Number(n).toLocaleString('fr-CM');
+  // Per-section revert-on-edit (payment / registration fee / notifications).
+  const paymentCurrent = snap({ settings: paymentSettings, expenseLimit: expenseLimitInput });
+  const paymentDirty   = pristinePayment != null && paymentCurrent !== pristinePayment;
+  const revertPayment  = () => { if (!pristinePayment) return; const p = JSON.parse(pristinePayment); setPaymentSettings(p.settings); setExpenseLimitInput(p.expenseLimit); setPaymentError(''); };
+  const snapshotPayment = () => setPristinePayment(snap({ settings: paymentSettings, expenseLimit: expenseLimitInput }));
+
+  // The membership-defaults section owns both the auto-renew toggle and the
+  // registration-fee fields, so the dirty check must cover both or Save/Revert
+  // never light up when only auto-renew changes.
+  const regFeeDirty    = pristineRegFee != null && snap({ fee: regFeeSettings, autoRenew, freeze: freezeFee }) !== pristineRegFee;
+  const revertRegFee   = () => { if (pristineRegFee) { const p = JSON.parse(pristineRegFee); setRegFeeSettings(p.fee); setAutoRenew(p.autoRenew); if (p.freeze) setFreezeFee(p.freeze); } };
+  const snapshotRegFee = () => setPristineRegFee(snap({ fee: regFeeSettings, autoRenew, freeze: freezeFee }));
+
+  const notifDirty     = pristineNotif != null && snap(notifPrefs) !== pristineNotif;
+  const revertNotif    = () => { if (pristineNotif) setNotifPrefs(JSON.parse(pristineNotif)); setNotifError(''); };
+  const snapshotNotif  = () => setPristineNotif(snap(notifPrefs));
+
+  useEffect(() => {
+    getMyGym()
+      .then(res => {
+        const g = res.data;
+        if (!g) return;
+        setGymCode(g.code || '');
+        // The gym record is the source of truth for the whole profile
+        setLogoPreview(g.logo || null);
+        try {
+          if (g.logo) localStorage.setItem(LOGO_KEY, g.logo);
+          else localStorage.removeItem(LOGO_KEY);
+        } catch {}
+        const loaded = {
+          name: g.name || '',
+          email: g.email || '',
+          phone: g.phone || '',
+          address: g.location || '',
+          altPhone: g.altPhone || '',
+          city: g.city || '',
+          province: g.province || '',
+          country: g.country || '',
+          postal: g.postal || '',
+          website: g.website || '',
+          facebook: g.facebook || '',
+          instagram: g.instagram || '',
+          twitter: g.twitter || '',
+        };
+        setGymProfile(prev => ({ ...prev, ...loaded }));
+        const loadedSchedule = g.schedule || defaultSchedule();
+        setGymSchedule(loadedSchedule);
+        setPristineGym({ ...loaded, schedule: JSON.stringify(loadedSchedule) });
+        setSavedCountry(g.country || '');
+        // Payment and notification settings live on the gym, so every employee
+        // on every device reads the same ones
+        const s = g.settings || {};
+        const loadedPayment = {
+          ...DEFAULT_PAYMENT_SETTINGS,
+          ...(s.payment || {}),
+          currency: g.currency || DEFAULT_PAYMENT_SETTINGS.currency,
+          methods: (s.payment?.methods?.length ? s.payment.methods : DEFAULT_PAYMENT_SETTINGS.methods),
+        };
+        const loadedNotif = { ...DEFAULT_NOTIF_PREFS, ...(s.notifications || {}) };
+        const loadedExpenseLimit = s.expenseLimit > 0 ? String(s.expenseLimit) : '50000';
+        const loadedRegFee = {
+          required: g.registrationFeeRequired ?? false,
+          amount: g.registrationFee ?? 0,
+          frequency: g.registrationFeeFrequency || 'yearly',
+          gracePeriod: g.registrationGracePeriodDays ?? 7,
+        };
+        setPaymentSettings(loadedPayment);
+        setNotifPrefs(loadedNotif);
+        setExpenseLimitInput(loadedExpenseLimit);
+        setRegFeeSettings(loadedRegFee);
+        const loadedFreeze = { fee: Number(s.freeze?.fee) || 0, intervalDays: Number(s.freeze?.intervalDays) || 30 };
+        setFreezeFee(loadedFreeze);
+        setPristinePayment(snap({ settings: loadedPayment, expenseLimit: loadedExpenseLimit }));
+        setPristineNotif(snap(loadedNotif));
+        setPristineRegFee(snap({ fee: loadedRegFee, autoRenew: localStorage.getItem('gem_auto_renew') === 'true', freeze: loadedFreeze }));
+      })
+      .catch(console.error);
+  }, []);
 
   const [accessTypes, setAccessTypes] = useState(() => {
     try { return JSON.parse(localStorage.getItem(ACCESS_TYPES_KEY) || 'null') || DEFAULT_ACCESS_TYPES; } catch { return DEFAULT_ACCESS_TYPES; }
@@ -266,56 +493,226 @@ export default function SettingsPage() {
   };
   const removeAccessType = (type) => saveAccessTypes(accessTypes.filter(t => t !== type));
 
-  const [roleProfiles, setRoleProfiles] = useState(initialRoleProfiles.map(r => ({ ...r })));
-  const [selectedRoleId, setSelectedRoleId] = useState(initialRoleProfiles[0]?.id || '');
-  const [newRoleName, setNewRoleName] = useState('');
 
-  const selectedRole = roleProfiles.find(r => r.id === selectedRoleId);
-  const togglePage = (roleId, page) => {
-    setRoleProfiles(prev => prev.map(r => r.id === roleId ? { ...r, pages: r.pages.includes(page) ? r.pages.filter(p => p !== page) : [...r.pages, page] } : r));
-  };
-  const addRoleProfile = () => {
-    if (!newRoleName.trim()) return;
-    const id = newRoleName.toLowerCase().replace(/\s+/g,'_');
-    setRoleProfiles(prev => [...prev, { id, name: newRoleName.trim(), color: '#a78bfa', pages: ['dashboard'] }]);
-    setSelectedRoleId(id);
-    setNewRoleName('');
-  };
-  const deleteRoleProfile = (id) => {
-    setRoleProfiles(prev => prev.filter(r => r.id !== id));
-    setSelectedRoleId(roleProfiles[0]?.id || '');
+  // ── Setup indicators ─────────────────────────────────────────────────────────
+  const [visitedSections, setVisitedSections] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(SETUP_VISITED_KEY) || '[]')); }
+    catch { return new Set(); }
+  });
+
+  // Which sections the owner has confirmed. Held on the server, so a section
+  // confirmed on one device shows as done on every other.
+  const setup = useSetupStatus();
+  const setupOpen = !!setup && !setup.complete;
+  const confirmedSections = useMemo(() => new Set(setup?.confirmedSections || []), [setup]);
+
+  // Which section is mid-save, and which just saved - so a confirm/reconfirm
+  // button visibly reacts even when the section was already confirmed and the
+  // returned status is unchanged (which read as the button doing nothing).
+  const [confirmingSection, setConfirmingSection] = useState(null);
+  const [justConfirmed, setJustConfirmed] = useState(null);
+  const markConfirmed = (id) => {
+    if (confirmingSection) return;
+    setConfirmingSection(id);
+    confirmSetupSection(id)
+      .then(res => { setSetupStatus(res.data); setJustConfirmed(id); setTimeout(() => setJustConfirmed(c => (c === id ? null : c)), 2000); })
+      .catch(() => {})
+      .finally(() => setConfirmingSection(c => (c === id ? null : c)));
   };
 
-  const PAGE_LABELS = { dashboard:'Dashboard', members:'Members', attendance:'Attendance', calendar:'Calendar', 'front-desk':'Front Desk', tasks:'Tasks', sales:'Sales & Products', operations:'Operations', payments:'Payments', accounting:'Reports', packages:'Packages', communication:'Communication', staff:'Staff', settings:'Settings' };
+  const markVisited = (id) => {
+    if (!SETUP_SECTIONS.has(id) || visitedSections.has(id)) return;
+    const next = new Set(visitedSections);
+    next.add(id);
+    setVisitedSections(next);
+    localStorage.setItem(SETUP_VISITED_KEY, JSON.stringify([...next]));
+  };
+
+  const handleSectionClick = (id) => {
+    setActiveSection(id);
+    markVisited(id);
+    // A section opens at its top. On a phone the Log replaces the page, so
+    // the page starts from the top; on a computer only if scrolled past it.
+    if (isMobile) {
+      if (id === 'logs') window.scrollTo({ top: 0 });
+    } else {
+      // Clear of the app's fixed top bar (64px) with a little room to spare
+      const CLEAR = 80;
+      const layout = document.querySelector('.gem-settings-layout');
+      const top = layout ? layout.getBoundingClientRect().top : CLEAR;
+      if (top < CLEAR) window.scrollTo({ top: window.scrollY + top - CLEAR });
+    }
+  };
+
+  const incompleteMap = useMemo(() => {
+    if (!setupOpen) return {};
+    return {
+      'gym-profile':   !confirmedSections.has('gym-profile'),
+      'payment':       !confirmedSections.has('payment'),
+      'membership':    !confirmedSections.has('membership'),
+      'packages':      !confirmedSections.has('packages'),
+      'notifications': !confirmedSections.has('notifications'),
+    };
+  }, [confirmedSections, setupOpen]);
+
+  const sectionLabels = {
+    'gym-identity': t('settings.gymIdentity'),
+    'gym-profile': t('settings.gymProfile'),
+    appearance: t('settings.appearance'),
+    language: t('settings.language'),
+    payment: t('settings.paymentSettings'),
+    membership: t('settings.membershipDefaults'),
+    packages: t('settings.packageSettings'),
+    notifications: t('settings.notificationPreferences'),
+    logs: t('settings.activityLog'),
+  };
 
   const navItemStyle = (active) => ({
     padding: '10px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontFamily: 'DM Sans', border: 'none',
     background: active ? 'var(--accent-gold-dim)' : 'transparent',
     color: active ? 'var(--accent-gold)' : 'var(--text-secondary)',
-    fontWeight: active ? 600 : 400, textAlign: 'left', width: '100%', display: 'block',
+    fontWeight: active ? 600 : 400, textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   });
+
+  // The log is long, so on a phone it opens on a screen of its own with a way
+  // back, rather than underneath the whole list of sections
+  if (isMobile && activeSection === 'logs') {
+    return (
+      <div style={{ padding: '16px 16px 0' }}>
+        <button type="button" onClick={() => { setActiveSection(''); window.scrollTo({ top: 0 }); }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: '4px 0', marginBottom: 12, cursor: 'pointer', color: 'var(--accent-gold)', fontSize: 13, fontWeight: 600, fontFamily: 'DM Sans' }}>
+          <ChevronLeft size={16} /> {t('settings.title')}
+        </button>
+        <ActivityLog />
+      </div>
+    );
+  }
+
+  if (isMobile) {
+    return (
+      <div style={{ padding: '16px 16px 0' }}>
+        <div style={{ marginBottom: 16 }}>
+          <h1 style={{ fontFamily: 'Manrope', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{t('settings.title')}</h1>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3, fontFamily: 'DM Sans' }}>{t('settings.settingsSubtitle')}</p>
+        </div>
+
+        {/* Section list - tap to open */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {SECTIONS.map(sec => {
+            const isOpen = activeSection === sec.id;
+            return (
+              <button
+                key={sec.id}
+                onClick={() => { handleSectionClick(sec.id); if (isOpen) setActiveSection(''); }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: isOpen ? 'var(--accent-gold-dim)' : 'var(--bg-card)', border: `1px solid ${isOpen ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, borderRadius: 12, cursor: 'pointer', color: isOpen ? 'var(--accent-gold)' : 'var(--text-primary)', fontFamily: 'DM Sans', fontSize: 14, fontWeight: isOpen ? 600 : 400, textAlign: 'left', width: '100%' }}
+              >
+                {sectionLabels[sec.id]}
+                <ChevronRight size={16} strokeWidth={2} color={isOpen ? 'var(--accent-gold)' : 'var(--text-muted)'} />
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Active section content rendered below the list */}
+        {activeSection && (
+          <div style={{ marginTop: 16, marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--accent-gold)', marginBottom: 10, fontFamily: 'DM Sans' }}>
+              {sectionLabels[activeSection]}
+            </div>
+            {/* Render the same content panels as desktop */}
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14 }}>
+              <div style={{ padding: 16 }}>
+                {(() => {
+                  const sec = activeSection;
+                  if (sec === 'appearance') return (
+                    <div>
+                      <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 14 }}>{t('settings.chooseThemeMobile')}</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {THEMES.map(th => (
+                          <button key={th.id} onClick={() => applyTheme(th.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, border: `2px solid ${currentTheme === th.id ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, background: currentTheme === th.id ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                            <div style={{ width: 32, height: 32, borderRadius: 8, background: th.bg, border: '2px solid rgba(255,255,255,0.1)', flexShrink: 0 }} />
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: currentTheme === th.id ? 'var(--accent-gold)' : 'var(--text-primary)', fontFamily: 'DM Sans' }}>{th.name}</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{th.desc}</div>
+                            </div>
+                            {currentTheme === th.id && <Check size={14} color="var(--accent-gold)" strokeWidth={2.5} style={{ marginLeft: 'auto' }} />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                  if (sec === 'language') return (
+                    <div>
+                      <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 14 }}>{t('settings.interfaceLanguage')}</p>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {[['en', 'English'], ['fr', 'Français']].map(([code, label]) => (
+                          <button key={code} onClick={() => switchLang(code)} style={{ flex: 1, padding: '11px', borderRadius: 10, border: `2px solid ${lang === code ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, background: lang === code ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', cursor: 'pointer', fontSize: 13, fontWeight: lang === code ? 600 : 400, color: lang === code ? 'var(--accent-gold)' : 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                  return <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('settings.openOnDesktop', { section: sectionLabels[sec] || sec })}</p>;
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="page-fade">
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>Settings</h1>
-        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>Manage your gym profile and system preferences</p>
+        <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>{t('settings.title')}</h1>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{t('settings.manageSubtitle')}</p>
       </div>
 
-      <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+      {setupOpen && (() => {
+        const confirmedCount = REQUIRED_CONFIRMS.filter(s => confirmedSections.has(s)).length;
+        const totalCount = REQUIRED_CONFIRMS.length;
+        const allConfirmed = confirmedCount === totalCount;
+        const pct = Math.round((confirmedCount / totalCount) * 100);
+        return (
+          <div style={{ background: allConfirmed ? 'rgba(52,211,153,0.08)' : 'rgba(201,169,110,0.07)', border: `1px solid ${allConfirmed ? 'rgba(52,211,153,0.3)' : 'rgba(201,169,110,0.3)'}`, borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: allConfirmed ? '#34d399' : 'var(--accent-gold)', fontFamily: 'Manrope, sans-serif' }}>
+                {allConfirmed ? `✓ ${t('settings.allSettingsConfirmed')}` : t('settings.finishSetup')}
+              </div>
+              <span style={{ fontSize: 12, color: allConfirmed ? '#34d399' : 'var(--accent-gold)', fontWeight: 600 }}>{t('settings.settingsConfirmedCount', { done: confirmedCount, total: totalCount })}</span>
+            </div>
+            {!allConfirmed && (
+              <>
+                <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 10px', lineHeight: 1.6 }}>
+                  {t('settings.setupBannerDesc')}
+                </p>
+                <div style={{ background: 'var(--bg-elevated)', borderRadius: 6, height: 6, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, #c9a96e, #b08d4a)', borderRadius: 6, transition: 'width 0.4s ease' }} />
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })()}
+
+      <div className="gem-settings-layout" style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
         {/* Side nav */}
-        <div style={{ ...cardStyle, width: 220, flexShrink: 0, padding: 8 }}>
+        <div className="gem-settings-nav" style={{ ...cardStyle, width: 220, flexShrink: 0, padding: 8 }}>
           {SECTIONS.map(s => {
-            const labelMap = {
-              'gym-profile': t('settings.gymProfile'), appearance: t('settings.appearance'),
-              language: t('settings.language'), payment: t('settings.paymentSettings'),
-              membership: t('settings.membershipDefaults'), packages: t('settings.packageSettings'),
-              expenses: t('settings.expenseManagement'), notifications: t('settings.notificationPreferences'),
-              roles: t('settings.staffRoles'), security: t('settings.security'),
-            };
+            const incomplete = incompleteMap[s.id];
             return (
-              <button key={s.id} style={navItemStyle(activeSection === s.id)} onClick={() => setActiveSection(s.id)}>
-                {labelMap[s.id] || s.label}
+              <button key={s.id} style={navItemStyle(activeSection === s.id)} onClick={() => handleSectionClick(s.id)}>
+                <span>{sectionLabels[s.id]}</span>
+                {incomplete && (
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                    background: 'var(--accent-gold)',
+                    animation: 'gem-dot-pulse 1.8s ease-in-out infinite',
+                    boxShadow: '0 0 0 0 rgba(201,169,110,0.6)',
+                  }} />
+                )}
               </button>
             );
           })}
@@ -323,62 +720,246 @@ export default function SettingsPage() {
 
         {/* Content */}
         <div style={{ flex: 1 }}>
+
+          {/* ── Gym Identity ──────────────────────────────────────────────── */}
+          {activeSection === 'gym-identity' && (() => {
+            const authUser = getAuth()?.user || {};
+            const displayCode = gymCode || authUser.gymCode || '-';
+            const displayName = gymProfile.name || authUser.gymName || '-';
+            return (
+              <div style={cardStyle}>
+                <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.gymIdentity')}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.gymIdentityDesc')}</div>
+                </div>
+                <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 28 }}>
+
+                  {/* Gym Name */}
+                  <div>
+                    <Label>{t('settings.gymNameLabel')}</Label>
+                    <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '12px 16px', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Manrope, sans-serif', letterSpacing: '-0.2px' }}>
+                      {displayName}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5, fontFamily: 'DM Sans' }}>{t('settings.gymNameHint')}</div>
+                  </div>
+
+                  {/* Gym Code */}
+                  <div>
+                    <Label>{t('settings.gymCodeLabel')}</Label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div style={{ background: 'var(--bg-elevated)', border: `1px solid ${showGymCode ? 'rgba(201,169,110,0.4)' : 'var(--border-subtle)'}`, borderRadius: 10, padding: '12px 16px', flex: 1, fontFamily: 'JetBrains Mono, monospace', fontSize: 18, fontWeight: 700, letterSpacing: '0.12em', color: showGymCode ? 'var(--accent-gold)' : 'var(--text-muted)', transition: 'all 0.2s' }}>
+                        {showGymCode ? displayCode : '•'.repeat(displayCode.length || 8)}
+                      </div>
+                      {showGymCode && (
+                        <button
+                          onClick={async () => {
+                            try { await navigator.clipboard?.writeText(displayCode); } catch {}
+                            setCodeCopied(true);
+                            setTimeout(() => setCodeCopied(false), 1600);
+                          }}
+                          style={{
+                            ...secondaryBtn, flexShrink: 0, padding: '0 16px',
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                            minWidth: 96, transition: 'all 0.18s',
+                            color: codeCopied ? '#22c55e' : 'var(--text-primary)',
+                            borderColor: codeCopied ? 'rgba(34,197,94,0.45)' : 'var(--border)',
+                            background: codeCopied ? 'rgba(34,197,94,0.1)' : 'var(--bg-card)',
+                          }}
+                        >
+                          {codeCopied
+                            ? <><Check size={14} strokeWidth={3} /> {t('settings.copied')}</>
+                            : t('settings.copy')}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => { if (showGymCode) { setShowGymCode(false); return; } setShowAccountAuth(true); }}
+                        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '0 16px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontFamily: 'DM Sans', fontWeight: 600, flexShrink: 0 }}
+                      >
+                        {showGymCode ? <><EyeOff size={14} /> {t('settings.hide')}</> : <><Eye size={14} /> {t('settings.reveal')}</>}
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5, fontFamily: 'DM Sans' }}>
+                      {showGymCode ? t('settings.gymCodeHintVisible') : t('settings.gymCodeHintHidden')}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Gym Profile ────────────────────────────────────────────────── */}
           {activeSection === 'gym-profile' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {!confirmedSections.has('gym-profile') && setupOpen && (
+                <div style={{ background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <span style={{ fontSize: 18, flexShrink: 0 }}>🏢</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'Manrope, sans-serif', marginBottom: 3 }}>{t('settings.completeProfileTitle')}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                      {t('settings.completeProfileDesc')}
+                    </div>
+                  </div>
+                </div>
+              )}
             <div style={cardStyle}>
               <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Gym Profile</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.gymProfile')}</span>
               </div>
               <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   {[
-                    { label: 'Gym Name *', key: 'name' }, { label: 'Email *', key: 'email' },
-                    { label: 'Phone *', key: 'phone' }, { label: 'Alt Phone', key: 'altPhone' },
-                    { label: 'Address', key: 'address' }, { label: 'City', key: 'city' },
-                    { label: 'Province', key: 'province' }, { label: 'Country', key: 'country' },
-                    { label: 'Postal Code', key: 'postal' }, { label: 'Website', key: 'website' },
-                    { label: 'Opening Time', key: 'opening', type: 'time' }, { label: 'Closing Time', key: 'closing', type: 'time' },
+                    { label: t('settings.fieldGymName'), key: 'name' }, { label: t('settings.fieldEmail'), key: 'email' },
+                    { label: t('settings.fieldPhone'), key: 'phone' }, { label: t('settings.fieldAltPhone'), key: 'altPhone' },
+                    { label: t('settings.fieldAddress'), key: 'address' },
+                    { label: t('settings.fieldProvince'), key: 'province' },
+                    { label: t('settings.fieldPostal'), key: 'postal' }, { label: t('settings.fieldWebsite'), key: 'website' },
                   ].map(f => (
                     <div key={f.key}>
                       <Label>{f.label}</Label>
-                      <input type={f.type || 'text'} style={inputStyle} value={gymProfile[f.key]} onChange={e => setGymProfile(g => ({ ...g, [f.key]: e.target.value }))} />
+                      <input
+                        type={f.key === 'email' ? 'email' : 'text'}
+                        inputMode={['phone', 'altPhone'].includes(f.key) ? 'tel' : undefined}
+                        style={inputStyle}
+                        value={gymProfile[f.key]}
+                        onChange={e => setGymProfile(g => ({
+                          ...g,
+                          [f.key]: ['phone', 'altPhone'].includes(f.key)
+                            ? e.target.value.replace(/[^\d\s+\-()]/g, '')
+                            : e.target.value,
+                        }))}
+                      />
                     </div>
                   ))}
+                  {/* The country decides the currency, the phone format and the
+                      address the forms suggest, so it is picked, never typed. */}
+                  <div>
+                    <Label>{t('settings.fieldCountry')}</Label>
+                    <select
+                      style={inputStyle}
+                      value={gymProfile.country}
+                      onChange={e => setGymProfile(g => ({ ...g, country: e.target.value, city: '' }))}
+                    >
+                      <option value="">{t('settings.choose')}</option>
+                      {COUNTRIES.map(c => <option key={c.code} value={c.name}>{c.flag} {c.name}</option>)}
+                    </select>
+                    {gymProfile.country !== savedCountry && countryByName(gymProfile.country) && (
+                      <div style={{ fontSize: 11, color: 'var(--accent-gold)', marginTop: 5 }}>
+                        {t('settings.countryChangeHint', { currency: countryByName(gymProfile.country).currency })}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Label>{t('settings.fieldCity')}</Label>
+                    <select
+                      style={inputStyle}
+                      value={gymProfile.city}
+                      onChange={e => setGymProfile(g => ({ ...g, city: e.target.value }))}
+                      disabled={!countryByName(gymProfile.country)}
+                    >
+                      <option value="">{countryByName(gymProfile.country) ? t('settings.choose') : t('settings.chooseCountryFirst')}</option>
+                      {(countryByName(gymProfile.country)?.cities || []).map(c => <option key={c} value={c}>{c}</option>)}
+                      {/* a city already on the record that is not in the list stays selectable */}
+                      {gymProfile.city && !(countryByName(gymProfile.country)?.cities || []).includes(gymProfile.city) && (
+                        <option value={gymProfile.city}>{gymProfile.city}</option>
+                      )}
+                    </select>
+                  </div>
                 </div>
                 <div>
-                  <Label>Description</Label>
-                  <textarea style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }} value={gymProfile.description} onChange={e => setGymProfile(g => ({ ...g, description: e.target.value }))} />
+                  <Label>{t('settings.openingHours')}</Label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                    {DAYS.map(day => {
+                      const dayData = gymSchedule[day];
+                      const updateSlot = (i, field, val) => setGymSchedule(s => ({
+                        ...s,
+                        [day]: { ...s[day], slots: s[day].slots.map((sl, idx) => idx === i ? { ...sl, [field]: val } : sl) },
+                      }));
+                      const addSlot = () => setGymSchedule(s => ({
+                        ...s,
+                        [day]: { ...s[day], slots: [...s[day].slots, { from: '12:00', to: '18:00' }] },
+                      }));
+                      const removeSlot = (i) => setGymSchedule(s => ({
+                        ...s,
+                        [day]: { ...s[day], slots: s[day].slots.filter((_, idx) => idx !== i) },
+                      }));
+                      return (
+                        <div key={day} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, width: 52, cursor: 'pointer', flexShrink: 0, paddingTop: 7 }}>
+                            <input
+                              type="checkbox"
+                              checked={dayData.open}
+                              onChange={e => setGymSchedule(s => ({ ...s, [day]: { ...s[day], open: e.target.checked } }))}
+                              style={{ width: 14, height: 14, accentColor: 'var(--accent-gold)', cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: 12, fontWeight: 600, color: dayData.open ? 'var(--text-primary)' : 'var(--text-muted)', fontFamily: 'DM Sans' }}>{day}</span>
+                          </label>
+                          {dayData.open ? (
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                              {dayData.slots.map((slot, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <TimeInput value={slot.from} onChange={e => updateSlot(i, 'from', e.target.value)} style={{ ...inputStyle, width: 112, padding: '5px 8px', fontSize: 12 }} />
+                                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('settings.timeTo')}</span>
+                                  <TimeInput value={slot.to} onChange={e => updateSlot(i, 'to', e.target.value)} style={{ ...inputStyle, width: 112, padding: '5px 8px', fontSize: 12 }} />
+                                  {dayData.slots.length > 1 && (
+                                    <button onClick={() => removeSlot(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px 4px', borderRadius: 4, fontSize: 16, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                                      onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-red)'}
+                                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>×</button>
+                                  )}
+                                  {i === dayData.slots.length - 1 && dayData.slots.length < 3 && (
+                                    <button onClick={addSlot} title={t('settings.addTimeSlot')} style={{ background: 'var(--accent-gold-dim)', border: '1px solid var(--accent-gold)', color: 'var(--accent-gold)', borderRadius: 6, width: 22, height: 22, cursor: 'pointer', fontSize: 16, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flexShrink: 0 }}>+</button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', fontFamily: 'DM Sans', paddingTop: 7 }}>{t('settings.closed')}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
+
                 <div>
-                  <Label>Logo</Label>
+                  <Label>{t('settings.logoLabel')}</Label>
                   <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={e => {
                     const file = e.target.files?.[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = ev => {
-                      setLogoPreview(ev.target.result);
-                      localStorage.setItem('gem_gym_logo', ev.target.result);
-                    };
-                    reader.readAsDataURL(file);
+                    // Clear the value so picking the same file again still fires onChange
+                    e.target.value = '';
+                    if (file) handleLogoFile(file);
                   }} />
-                  <div style={{ border: '2px dashed var(--border)', borderRadius: 10, padding: '24px 20px', textAlign: 'center', cursor: 'pointer' }}
+                  <div style={{ position: 'relative', border: '2px dashed var(--border)', borderRadius: 10, padding: '24px 20px', textAlign: 'center', cursor: 'pointer' }}
                     onClick={() => logoInputRef.current?.click()}
                     onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-gold)'}
                     onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
                     {logoPreview ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                        <img src={logoPreview} alt="Gym logo" style={{ maxHeight: 80, maxWidth: 200, objectFit: 'contain', borderRadius: 8 }} />
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Click to change logo</div>
-                      </div>
+                      <>
+                        <button type="button" title="Remove logo" aria-label="Remove logo"
+                          onClick={e => { e.stopPropagation(); removeLogo(); }}
+                          style={{ position: 'absolute', top: 8, right: 8, width: 24, height: 24, padding: 0, borderRadius: '50%', border: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 0 }}
+                          onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent-red)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}>
+                          <X size={13} />
+                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                          <img src={logoPreview} alt="Gym logo" style={{ maxHeight: 80, maxWidth: 200, objectFit: 'contain', borderRadius: 8 }} />
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('settings.clickToChangeLogo')}</div>
+                        </div>
+                      </>
                     ) : (
                       <>
                         <CloudUpload size={24} color="var(--text-muted)" style={{ marginBottom: 8 }} />
-                        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Click to upload logo</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>PNG, JPG up to 2MB</div>
+                        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{t('settings.clickToUploadLogo')}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{t('settings.logoHint')}</div>
                       </>
                     )}
                   </div>
+                  {logoError && (
+                    <div style={{ fontSize: 12, color: 'var(--accent-red)', marginTop: 8 }}>{logoError}</div>
+                  )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
                   {[{ label: 'Facebook', key: 'facebook' }, { label: 'Instagram', key: 'instagram' }, { label: 'Twitter', key: 'twitter' }].map(f => (
                     <div key={f.key}>
                       <Label>{f.label}</Label>
@@ -389,13 +970,14 @@ export default function SettingsPage() {
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
                   {gymSaved && (
                     <span style={{ fontSize: 12, color: 'var(--accent-green)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      ✓ Saved successfully
+                      ✓ {t('settings.savedSuccessfully')}
                     </span>
                   )}
-                  <button style={secondaryBtn}>Cancel</button>
-                  <button style={primaryBtn} onClick={saveGymProfile} disabled={gymSaving}><Save size={13} />{gymSaving ? 'Saving…' : 'Save Changes'}</button>
+                  {gymDirty && <button style={revertBtn} onClick={revertGym}><RotateCcw size={13} /> {t('settings.revertChanges')}</button>}
+                  <button style={primaryBtn} onClick={saveGymProfile} disabled={gymSaving || !gymDirty}><Save size={13} />{gymSaving ? t('common.saving') : t('common.saveChanges')}</button>
                 </div>
               </div>
+            </div>
             </div>
           )}
 
@@ -408,12 +990,12 @@ export default function SettingsPage() {
                     <Palette size={15} color="var(--accent-gold)" />
                   </div>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Color Theme</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Choose a look and feel for the interface</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.colorTheme')}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{t('settings.colorThemeDesc')}</div>
                   </div>
                 </div>
                 <div style={{ padding: 24 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                  <div className="gem-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
                     {THEMES.map(t => (
                       <ThemeCard key={t.id} theme={t} selected={currentTheme === t.id} onSelect={() => applyTheme(t.id)} />
                     ))}
@@ -421,7 +1003,7 @@ export default function SettingsPage() {
                   <div style={{ marginTop: 16, padding: '12px 16px', borderRadius: 10, background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-gold)', flexShrink: 0 }} />
                     <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                      Currently using <strong style={{ color: 'var(--text-primary)' }}>{THEMES.find(t => t.id === currentTheme)?.name}</strong> — changes apply instantly and are saved automatically.
+                      {t('settings.currentlyUsing', { name: THEMES.find(th => th.id === currentTheme)?.name })}
                     </span>
                   </div>
                 </div>
@@ -430,8 +1012,8 @@ export default function SettingsPage() {
               {/* Quick dark/light toggle card */}
               <div style={cardStyle}>
                 <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Quick Toggle</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Instantly switch between dark and light mode</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.quickToggle')}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{t('settings.quickToggleDesc')}</div>
                 </div>
                 <div style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -443,10 +1025,10 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
-                        {currentTheme === 'light' ? 'Light Mode Active' : 'Dark Mode Active'}
+                        {currentTheme === 'light' ? t('settings.lightModeActive') : t('settings.darkModeActive')}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                        {currentTheme === 'light' ? 'Switch to a dark theme' : 'Switch to a light theme'}
+                        {currentTheme === 'light' ? t('settings.switchToDark') : t('settings.switchToLight')}
                       </div>
                     </div>
                   </div>
@@ -495,7 +1077,7 @@ export default function SettingsPage() {
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{t('settings.languageDesc')}</div>
                 </div>
               </div>
-              <div style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="gem-two-col" style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 {[
                   { code: 'en', flag: '🇬🇧', name: t('settings.english'), desc: t('settings.englishDesc') },
                   { code: 'fr', flag: '🇫🇷', name: t('settings.french'),  desc: t('settings.frenchDesc')  },
@@ -529,9 +1111,7 @@ export default function SettingsPage() {
               <div style={{ padding: '0 24px 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#818cf8', flexShrink: 0 }} />
                 <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                  {lang === 'fr'
-                    ? 'Langue actuelle : Français — les changements s\'appliquent instantanément.'
-                    : 'Current language: English — changes apply instantly across the entire system.'}
+                  {t('settings.currentLangHint')}
                 </span>
               </div>
             </div>
@@ -540,28 +1120,68 @@ export default function SettingsPage() {
           {activeSection === 'payment' && (
             <div style={cardStyle}>
               <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Payment Settings</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.paymentSettings')}</span>
               </div>
               <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div><Label>Currency</Label><select style={inputStyle}><option>FCFA (XAF)</option><option>EUR</option><option>USD</option></select></div>
-                  <div><Label>Tax Rate (%)</Label><input type="number" style={inputStyle} defaultValue="15" /></div>
-                  <div><Label>Late Fee (%)</Label><input type="number" style={inputStyle} defaultValue="5" /></div>
-                  <div><Label>Payment Due Days</Label><input type="number" style={inputStyle} defaultValue="30" /></div>
+                <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <Label>{t('settings.currency')}</Label>
+                    <select style={inputStyle} value={paymentSettings.currency} onChange={e => setPS('currency', e.target.value)}>
+                      {Object.entries(CURRENCY_SYMBOLS).map(([code, symbol]) => (
+                        <option key={code} value={code}>{code} - {symbol}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>{t('settings.taxRate')}</Label>
+                    <input type="number" data-decimal style={inputStyle} value={paymentSettings.taxRate} onChange={e => setPS('taxRate', e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t('settings.lateFee')}</Label>
+                    <input type="number" style={inputStyle} value={paymentSettings.lateFee} onChange={e => setPS('lateFee', e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t('settings.paymentDueDays')}</Label>
+                    <input type="number" style={inputStyle} value={paymentSettings.paymentDueDays} onChange={e => setPS('paymentDueDays', e.target.value)} />
+                  </div>
                 </div>
                 <div>
-                  <Label>Accepted Payment Methods</Label>
+                  <Label>{t('settings.acceptedMethods')}</Label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {['Cash', 'Credit/Debit Card', 'Bank Transfer'].map(m => (
-                      <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                        <input type="checkbox" defaultChecked style={{ width: 16, height: 16 }} />
-                        <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{m}</span>
+                    {[
+                      ['Cash', t('settings.methodCash')],
+                      ['Credit/Debit Card', t('settings.methodCard')],
+                      ['Bank Transfer', t('settings.methodTransfer')],
+                      ['Mobile Money', t('settings.methodMobile')],
+                    ].map(([val, label]) => (
+                      <label key={val} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={paymentSettings.methods.includes(val)} onChange={() => toggleMethod(val)} style={{ width: 16, height: 16, accentColor: 'var(--accent-gold)' }} />
+                        <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{label}</span>
                       </label>
                     ))}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <button style={primaryBtn}><Save size={13} />Save Changes</button>
+                <div>
+                  <Label>{t('settings.expenseLimit', { currency: getCurrencySymbol() })}</Label>
+                  <input
+                    type="number"
+                    min="0"
+                    style={inputStyle}
+                    value={expenseLimitInput}
+                    onChange={e => setExpenseLimitInput(e.target.value)}
+                    placeholder="e.g. 50000"
+                  />
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>
+                    {t('settings.expenseLimitHint')}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+                  {paymentSaved && <span style={{ fontSize: 12, color: '#22c55e', fontFamily: 'DM Sans' }}>✓ {t('settings.saved')}</span>}
+                  {paymentError && <span style={{ fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{paymentError}</span>}
+                  {paymentDirty && <button style={revertBtn} onClick={revertPayment}><RotateCcw size={13} /> {t('settings.revertChanges')}</button>}
+                  <button style={{ ...primaryBtn, opacity: (paymentSaving || (!paymentDirty && !setupOpen)) ? 0.6 : 1 }} onClick={savePaymentSettings} disabled={paymentSaving || (!paymentDirty && !setupOpen)}>
+                    <Save size={13} />{paymentSaving ? t('common.saving') : t('common.saveChanges')}
+                  </button>
                 </div>
               </div>
             </div>
@@ -570,55 +1190,50 @@ export default function SettingsPage() {
           {activeSection === 'membership' && (
             <div style={cardStyle}>
               <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Membership Defaults</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.membershipDefaults')}</span>
               </div>
               <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div><Label>Default Package</Label><select style={inputStyle}><option>Basic Monthly</option><option>Standard 6M</option><option>Premium 12M</option></select></div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div><Label>Grace Period (days)</Label><input type="number" style={inputStyle} defaultValue="3" /></div>
-                  <div><Label>Max Freeze Days / Year</Label><input type="number" style={inputStyle} defaultValue="60" /></div>
+                <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div><Label>{t('settings.gracePeriodDays')}</Label><input type="number" style={inputStyle} defaultValue="3" /></div>
+                  <div><Label>{t('settings.maxFreezeDays')}</Label><input type="number" style={inputStyle} defaultValue="60" /></div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid var(--border-subtle)' }}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>Auto-Renew by Default</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Automatically renew memberships upon expiry</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{t('settings.autoRenew')}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.autoRenewDesc')}</div>
                   </div>
-                  <Toggle value={true} onChange={() => {}} />
+                  <Toggle value={autoRenew} onChange={v => setAutoRenew(v)} />
                 </div>
 
                 {/* ── Registration Fee ── */}
-                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 20 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Registration Fee</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-                    Charged once per member at the time of enrolment. For yearly frequency it renews on the member's anniversary date.
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden', marginTop: 4 }}>
+                  <div style={{ padding: '12px 16px', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>Require Registration Fee</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>If off, no registration fee will be charged during enrolment</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.registrationFeeTitle')}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.registrationFeeDesc')}</div>
                     </div>
                     <Toggle value={regFeeSettings.required} onChange={v => setRegFee('required', v)} />
                   </div>
                   {regFeeSettings.required && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div className="gem-two-col" style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                       <div>
-                        <Label>Amount (FCFA)</Label>
+                        <Label>{t('common.amount')} ({getCurrencySymbol()})</Label>
                         <input type="number" style={inputStyle} value={regFeeSettings.amount} onChange={e => setRegFee('amount', e.target.value)} />
                       </div>
                       <div>
-                        <Label>Frequency</Label>
+                        <Label>{t('settings.frequencyLabel')}</Label>
                         <select style={inputStyle} value={regFeeSettings.frequency} onChange={e => setRegFee('frequency', e.target.value)}>
-                          <option value="yearly">Yearly (renews annually)</option>
-                          <option value="one-time">One-time (never repeats)</option>
+                          <option value="yearly">{t('settings.frequencyYearly')}</option>
+                          <option value="one-time">{t('settings.frequencyOneTime')}</option>
                         </select>
                       </div>
                       {regFeeSettings.frequency === 'yearly' && (
                         <div style={{ gridColumn: '1 / -1' }}>
-                          <Label>Grace Period (days before suspension)</Label>
+                          <Label>{t('settings.gracePeriodSuspension')}</Label>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <input type="number" style={{ ...inputStyle, width: 100 }} value={regFeeSettings.gracePeriod} onChange={e => setRegFee('gracePeriod', e.target.value)} min={0} max={90} />
                             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                              Members get {regFeeSettings.gracePeriod} day{regFeeSettings.gracePeriod !== 1 ? 's' : ''} after their reg fee renewal date before their account is suspended.
+                              {t('settings.gracePeriodMemberHint', { days: regFeeSettings.gracePeriod })}
                             </span>
                           </div>
                         </div>
@@ -627,14 +1242,41 @@ export default function SettingsPage() {
                   )}
                 </div>
 
+                {/* Freeze fee */}
+                <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden', marginTop: 4 }}>
+                  <div style={{ padding: '12px 16px', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.freezeFeeTitle')}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.freezeFeeDesc')}</div>
+                  </div>
+                  <div className="gem-two-col" style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div>
+                      <Label>{t('settings.freezeFeeAmount')} ({getCurrencySymbol()})</Label>
+                      <input type="text" inputMode="numeric" style={inputStyle} value={freezeFee.fee} onChange={e => setFF('fee', e.target.value.replace(/[^\d]/g, ''))} placeholder="0" />
+                    </div>
+                    <div>
+                      <Label>{t('settings.freezeFeeInterval')}</Label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <input type="text" inputMode="numeric" style={{ ...inputStyle, width: 100 }} value={freezeFee.intervalDays} onChange={e => setFF('intervalDays', e.target.value.replace(/[^\d]/g, ''))} placeholder="30" />
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('settings.freezeFeeIntervalHint')}</span>
+                      </div>
+                    </div>
+                    <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--text-muted)' }}>
+                      {Number(freezeFee.fee) > 0
+                        ? t('settings.freezeFeeSummary', { amount: `${Number(freezeFee.fee).toLocaleString(getMoneyLocale())} ${getCurrencySymbol()}`, days: freezeFee.intervalDays || 0 })
+                        : t('settings.freezeFeeOff')}
+                    </div>
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
                   {regFeeSaved && (
                     <span style={{ fontSize: 12, color: 'var(--accent-green)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      ✓ Saved successfully
+                      ✓ {t('settings.savedSuccessfully')}
                     </span>
                   )}
-                  <button style={primaryBtn} onClick={saveRegFee} disabled={regFeeSaving}>
-                    <Save size={13} />{regFeeSaving ? 'Saving…' : 'Save Changes'}
+                  {regFeeDirty && <button style={revertBtn} onClick={revertRegFee}><RotateCcw size={13} /> {t('settings.revertChanges')}</button>}
+                  <button style={{ ...primaryBtn, opacity: (regFeeSaving || (!regFeeDirty && !setupOpen)) ? 0.6 : 1 }} onClick={saveRegFee} disabled={regFeeSaving || (!regFeeDirty && !setupOpen)}>
+                    <Save size={13} />{regFeeSaving ? t('common.saving') : t('common.saveChanges')}
                   </button>
                 </div>
               </div>
@@ -644,15 +1286,15 @@ export default function SettingsPage() {
           {activeSection === 'notifications' && (
             <div style={cardStyle}>
               <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Notification Preferences</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.notificationPreferences')}</span>
               </div>
               <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 0 }}>
                 {[
-                  { key: 'expiryReminders', label: 'Membership expiry reminders', desc: 'Notify 7 days before expiry' },
-                  { key: 'lowStockAlerts', label: 'Low stock alerts', desc: 'Alert when product is below reorder level' },
-                  { key: 'taskOverdue', label: 'Task overdue alerts', desc: 'Notify when a task passes its due date' },
-                  { key: 'eodSummary', label: 'Daily EOD summary email', desc: 'Receive end-of-day report by email' },
-                  { key: 'welcomeEmail', label: 'New member welcome email', desc: 'Auto-send welcome email on registration' },
+                  { key: 'expiryReminders', label: t('settings.notifExpiryLabel'), desc: t('settings.notifExpiryDesc') },
+                  { key: 'lowStockAlerts', label: t('settings.notifStockLabel'), desc: t('settings.notifStockDesc') },
+                  { key: 'taskOverdue', label: t('settings.notifTaskLabel'), desc: t('settings.notifTaskDesc') },
+                  { key: 'eodSummary', label: t('settings.notifEodLabel'), desc: t('settings.notifEodDesc') },
+                  { key: 'welcomeEmail', label: t('settings.notifWelcomeLabel'), desc: t('settings.notifWelcomeDesc') },
                 ].map((p, i) => (
                   <div key={p.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: i < 4 ? '1px solid var(--border-subtle)' : 'none' }}>
                     <div>
@@ -662,95 +1304,41 @@ export default function SettingsPage() {
                     <Toggle value={notifPrefs[p.key]} onChange={v => setNotifPrefs(n => ({ ...n, [p.key]: v }))} />
                   </div>
                 ))}
-                <div style={{ paddingTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
-                  <button style={primaryBtn}><Save size={13} />Save Changes</button>
+                <div style={{ paddingTop: 16, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
+                  {notifSaved && <span style={{ fontSize: 12, color: '#34d399', display: 'flex', alignItems: 'center', gap: 4 }}><Check size={12} /> {t('settings.saved')}</span>}
+                  {notifError && <span style={{ fontSize: 12, color: 'var(--accent-red)' }}>{notifError}</span>}
+                  {setupOpen && confirmedSections.has('notifications') && !notifSaved && <span style={{ fontSize: 12, color: '#34d399' }}>✓ {t('settings.saved')}</span>}
+                  {notifDirty && <button style={revertBtn} onClick={revertNotif}><RotateCcw size={13} /> {t('settings.revertChanges')}</button>}
+                  <button style={{ ...primaryBtn, opacity: (notifSaving || (!notifDirty && !setupOpen)) ? 0.6 : 1 }} onClick={saveNotifPrefs} disabled={notifSaving || (!notifDirty && !setupOpen)}>
+                    <Save size={13} />{notifSaving ? t('common.saving') : t('common.saveChanges')}
+                  </button>
                 </div>
               </div>
-            </div>
-          )}
-
-          {activeSection === 'roles' && (
-            <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-              {/* Role list */}
-              <div style={{ ...cardStyle, width: 220, flexShrink: 0 }}>
-                <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)', fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Role Profiles</div>
-                <div style={{ padding: 8 }}>
-                  {roleProfiles.map(r => (
-                    <button key={r.id} onClick={() => setSelectedRoleId(r.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 10px', borderRadius: 7, border: 'none', cursor: 'pointer', background: selectedRoleId === r.id ? 'var(--accent-gold-dim)' : 'transparent', color: selectedRoleId === r.id ? 'var(--accent-gold)' : 'var(--text-secondary)', fontWeight: selectedRoleId === r.id ? 600 : 400, fontSize: 13, fontFamily: 'DM Sans', textAlign: 'left' }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.color, flexShrink: 0 }}/>
-                      {r.name}
-                    </button>
-                  ))}
-                  <div style={{ marginTop: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 10, display: 'flex', gap: 6 }}>
-                    <input value={newRoleName} onChange={e => setNewRoleName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addRoleProfile()} placeholder="New role..." style={{ ...inputStyle, fontSize: 12, padding: '6px 10px' }}/>
-                    <button onClick={addRoleProfile} style={{ ...primaryBtn, padding: '6px 10px', flexShrink: 0 }}><Plus size={13}/></button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Permissions editor */}
-              {selectedRole && (
-                <div style={{ ...cardStyle, flex: 1 }}>
-                  <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Manrope' }}>{selectedRole.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2 }}>{selectedRole.pages.length} of {ALL_PAGES.length} pages accessible</div>
-                    </div>
-                    {!['general_manager','manager'].includes(selectedRole.id) && (
-                      <button onClick={() => deleteRoleProfile(selectedRole.id)} style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <Trash2 size={12}/> Delete Role
-                      </button>
-                    )}
-                  </div>
-                  <div style={{ padding: 20 }}>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans', marginBottom: 14 }}>Toggle which pages staff with this profile can access:</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      {ALL_PAGES.map(page => {
-                        const allowed = selectedRole.pages.includes(page);
-                        return (
-                          <label key={page} onClick={() => !['general_manager','manager'].includes(selectedRole.id) && togglePage(selectedRole.id, page)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 9, border: `1px solid ${allowed ? 'rgba(201,169,110,0.35)' : 'var(--border-subtle)'}`, background: allowed ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', cursor: ['general_manager','manager'].includes(selectedRole.id) ? 'default' : 'pointer', transition: 'all 0.15s' }}>
-                            <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${allowed ? 'var(--accent-gold)' : 'var(--border)'}`, background: allowed ? 'var(--accent-gold)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              {allowed && <Check size={10} color="#0a0a0f" strokeWidth={3}/>}
-                            </div>
-                            <span style={{ fontSize: 13, color: allowed ? 'var(--accent-gold)' : 'var(--text-secondary)', fontFamily: 'DM Sans', fontWeight: allowed ? 600 : 400 }}>{PAGE_LABELS[page] || page}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                    {['general_manager','manager'].includes(selectedRole.id) && (
-                      <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans', background: 'var(--bg-elevated)', padding: '10px 14px', borderRadius: 8 }}>
-                        Manager and General Manager roles always have full access and cannot be restricted.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
           {activeSection === 'packages' && (
+            <>
             <div style={cardStyle}>
               <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Package Settings</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Define the access types that can be assigned to membership packages.</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.packageSettings')}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.packageSettingsDesc')}</div>
               </div>
               <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
                 <div>
-                  <Label>Access Types</Label>
+                  <Label>{t('settings.accessTypes')}</Label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
                     {accessTypes.map(type => (
                       <div key={type} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-elevated)', borderRadius: 10, padding: '10px 14px', border: '1px solid var(--border-subtle)' }}>
                         <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{type}</span>
-                        <button onClick={() => removeAccessType(type)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }}
-                          onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-red)'}
-                          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
-                          <Trash2 size={14} />
-                        </button>
+                        <RowMenu title={t('common.actions')} items={[
+                          { label: t('common.delete'), icon: <Trash2 size={15} />, onClick: () => removeAccessType(type), danger: true },
+                        ]} />
                       </div>
                     ))}
                     {accessTypes.length === 0 && (
                       <div style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans', padding: '12px 0', textAlign: 'center' }}>
-                        No access types yet. Add one below.
+                        {t('settings.noAccessTypes')}
                       </div>
                     )}
                   </div>
@@ -760,138 +1348,42 @@ export default function SettingsPage() {
                       value={newAccessType}
                       onChange={e => setNewAccessType(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && addAccessType()}
-                      placeholder="e.g. Cardio Zone Only"
+                      placeholder={t('settings.accessTypePlaceholder')}
                     />
-                    <button style={primaryBtn} onClick={addAccessType}><Plus size={13} />Add</button>
+                    <button style={primaryBtn} onClick={addAccessType}><Plus size={13} />{t('common.add')}</button>
                   </div>
                   <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>
-                    These appear as options in the Access Type dropdown when creating or editing packages.
+                    {t('settings.accessTypesHint')}
                   </div>
                 </div>
               </div>
             </div>
-          )}
-
-          {activeSection === 'expenses' && (() => {
-            const statusColors = { pending: { bg:'rgba(251,191,36,0.1)', color:'#f59e0b', label:'Pending' }, approved: { bg:'rgba(52,211,153,0.1)', color:'#34d399', label:'Approved' }, rejected: { bg:'rgba(239,68,68,0.1)', color:'#ef4444', label:'Rejected' } };
-            const filtered = expenseFilter === 'all' ? expenses : expenses.filter(e => e.status === expenseFilter);
-            const totalAmt = filtered.reduce((s,e)=>s+e.amount,0);
-            return (
-              <div style={cardStyle}>
-                <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-subtle)' }}>
-                  <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Expense Management</h2>
-                  <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0', fontFamily: 'DM Sans' }}>Set the front desk expense limit and review submitted expenses.</p>
-                </div>
-
-                {/* Expense limit setting */}
-                <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-subtle)' }}>
-                  <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>Quick Expense Limit</h3>
-                  <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 14px', fontFamily: 'DM Sans' }}>Front desk staff can log expenses up to this amount without prior approval. Anything above will be flagged for your review.</p>
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', maxWidth: 360 }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Limit (XAF)</label>
-                      <input type="number" min="0" style={inputStyle} value={expenseLimitInput} onChange={e => setExpenseLimitInput(e.target.value)} placeholder="e.g. 50000"/>
-                    </div>
-                    <button style={primaryBtn} onClick={saveExpenseLimit}>
-                      {expenseLimitSaved ? <><Check size={13}/> Saved</> : <><Save size={13}/> Save</>}
-                    </button>
-                  </div>
-                  <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>
-                    Current limit: <strong style={{ color: 'var(--accent-gold)' }}>XAF {expenseLimit.toLocaleString('fr-CM')}</strong>
-                  </div>
-                </div>
-
-                {/* Expense review */}
-                <div style={{ padding: '20px 24px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                    <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Expense Review</h3>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      {[['all','All'], ['pending','Pending'], ['approved','Approved'], ['rejected','Rejected']].map(([v,l]) => (
-                        <button key={v} onClick={() => setExpenseFilter(v)} style={{ background: expenseFilter===v ? 'var(--accent-gold)' : 'var(--bg-elevated)', color: expenseFilter===v ? '#0a0a0f' : 'var(--text-muted)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans' }}>{l}</button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {filtered.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13, fontFamily: 'DM Sans' }}>No expenses found.</div>
-                  ) : (
-                    <>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {filtered.map(e => {
-                          const sc = statusColors[e.status] || statusColors.pending;
-                          return (
-                            <div key={e.id} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{e.description}</span>
-                                  {e.exceedsLimit && <span style={{ fontSize: 10, background: 'rgba(248,113,113,0.12)', color: '#f87171', borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>Over Limit</span>}
-                                </div>
-                                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', display: 'flex', gap: 10 }}>
-                                  <span>{e.category}</span>
-                                  <span>·</span>
-                                  <span>{e.paymentMethod}</span>
-                                  <span>·</span>
-                                  <span>{e.submittedBy}</span>
-                                  <span>·</span>
-                                  <span>{e.time}</span>
-                                </div>
-                              </div>
-                              <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text-primary)', fontFamily: 'Manrope', flexShrink: 0 }}>{fmtMoney(e.amount)}</div>
-                              <div style={{ background: sc.bg, color: sc.color, borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700, flexShrink: 0, minWidth: 72, textAlign: 'center' }}>{sc.label}</div>
-                              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                                {e.status !== 'approved' && (
-                                  <button onClick={() => updateExpenseStatus(e.id, 'approved')} style={{ background: 'rgba(52,211,153,0.1)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans' }}>Approve</button>
-                                )}
-                                {e.status !== 'rejected' && (
-                                  <button onClick={() => updateExpenseStatus(e.id, 'rejected')} style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans' }}>Reject</button>
-                                )}
-                                {e.status !== 'pending' && (
-                                  <button onClick={() => updateExpenseStatus(e.id, 'pending')} style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer', fontFamily: 'DM Sans' }}>Reset</button>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end', fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Manrope' }}>
-                        Total shown: <span style={{ color: 'var(--accent-gold)', marginLeft: 8 }}>{fmtMoney(totalAmt)}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-
-          {activeSection === 'security' && (
-            <div style={cardStyle}>
-              <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Security</span>
-              </div>
-              <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div>
-                  <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>Change Password</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div><Label>Current Password</Label><input type="password" style={inputStyle} value={password.current} onChange={e => setPassword(p => ({ ...p, current: e.target.value }))} /></div>
-                    <div><Label>New Password</Label><input type="password" style={inputStyle} value={password.newPw} onChange={e => setPassword(p => ({ ...p, newPw: e.target.value }))} /></div>
-                    <div><Label>Confirm New Password</Label><input type="password" style={inputStyle} value={password.confirm} onChange={e => setPassword(p => ({ ...p, confirm: e.target.value }))} /></div>
-                  </div>
-                  <button style={{ ...primaryBtn, marginTop: 12 }}>Change Password</button>
-                </div>
-                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 20 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>Two-Factor Authentication</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Add an extra layer of security to your account</div>
-                    </div>
-                    <Toggle value={twoFactor} onChange={setTwoFactor} />
-                  </div>
-                </div>
-              </div>
+            <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
+              {justConfirmed === 'packages'
+                ? <span style={{ fontSize: 12, color: '#34d399', display: 'flex', alignItems: 'center', gap: 5 }}><Check size={12} /> {t('common.saved')}</span>
+                : setupOpen && confirmedSections.has('packages') && <span style={{ fontSize: 12, color: '#34d399', display: 'flex', alignItems: 'center', gap: 5 }}><Check size={12} /> {t('settings.packageSettingsConfirmed')}</span>}
+              <button style={{ ...primaryBtn, opacity: confirmingSection === 'packages' ? 0.6 : 1 }} disabled={confirmingSection === 'packages'} onClick={() => markConfirmed('packages')}>
+                <Save size={13} /> {confirmingSection === 'packages' ? t('common.saving') : !setupOpen ? t('common.saveChanges') : confirmedSections.has('packages') ? t('settings.reconfirm') : t('settings.confirmPackageSettings')}
+              </button>
             </div>
+            </>
           )}
+
+          {activeSection === 'logs' && <ActivityLog />}
+
         </div>
       </div>
+
+      <ManagerAuthModal
+        open={showAccountAuth}
+        onClose={() => setShowAccountAuth(false)}
+        action={t('settings.revealGymCode')}
+        onConfirm={() => {
+          setShowAccountAuth(false);
+          setShowGymCode(true);
+          setTimeout(() => setShowGymCode(false), 30000);
+        }}
+      />
     </div>
   );
 }

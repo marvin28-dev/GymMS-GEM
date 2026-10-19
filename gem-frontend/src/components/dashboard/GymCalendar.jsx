@@ -17,6 +17,7 @@ import {
   Divider,
 } from "@mui/material";
 import { getAll as getStaff } from "../../services/staff.service";
+import { useLanguage } from "../../contexts/LanguageContext";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import AddIcon from "@mui/icons-material/Add";
@@ -41,6 +42,16 @@ const locales = { "en-US": enUS };
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
 
 const LS_KEY = "gem_calendar_events";
+
+const ROLE_KEYS = {
+  general_manager: 'generalManager', 'General Manager': 'generalManager',
+  manager: 'manager', 'Manager': 'manager',
+  trainer: 'trainer', 'Trainer': 'trainer',
+  instructor: 'instructor', 'Instructor': 'instructor',
+  front_desk: 'frontDesk', 'Front Desk': 'frontDesk',
+  coach: 'coach', 'Coach': 'coach',
+  other: 'roleOther', 'Other': 'roleOther',
+};
 
 /**
  * A small palette of mature colors that fit the indigo theme.
@@ -204,6 +215,8 @@ function repeatLabel(evt) {
 }
 
 export default function GymCalendar() {
+  const { t } = useLanguage();
+  const translateRole = (role) => { const k = ROLE_KEYS[role]; return k ? t(`staff.${k}`) : (role || ''); };
   const [allStaff, setAllStaff] = useState([]);
   const [date, setDate] = useState(new Date());
 
@@ -443,7 +456,7 @@ export default function GymCalendar() {
             </Box>
           )}
 
-          <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: "1fr 1fr" }}>
+          <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
             <input
               type="time"
               value={form.startTime}
@@ -542,7 +555,7 @@ export default function GymCalendar() {
                     label={
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>{s.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">{s.role}</Typography>
+                        <Typography variant="caption" color="text.secondary">{translateRole(s.role)}</Typography>
                       </Box>
                     }
                   />
@@ -612,7 +625,7 @@ export default function GymCalendar() {
                       {selectedEvent.assignedStaff.map((id) => {
                         const s = allStaff.find((m) => m.id === id);
                         return s ? (
-                          <Chip key={id} label={`${s.name} · ${s.role}`} size="small" sx={{ fontSize: 11 }} />
+                          <Chip key={id} label={`${s.name} · ${translateRole(s.role)}`} size="small" sx={{ fontSize: 11 }} />
                         ) : null;
                       })}
                     </Box>

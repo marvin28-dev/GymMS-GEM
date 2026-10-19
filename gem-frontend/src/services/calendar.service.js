@@ -11,3 +11,7 @@ export const update = (id, data) =>
 
 export const remove = (id, { series = false } = {}) =>
   api.delete(`/calendar/${id}`, { params: series ? { series: 'true' } : {} });
+
+// What these people already have on at a time: { staffIds:[], date, start?, end?, excludeId? }
+export const busy = ({ staffIds = [], ...rest }) =>
+  api.get('/calendar/busy', { params: { staffIds: staffIds.join(','), ...rest } });

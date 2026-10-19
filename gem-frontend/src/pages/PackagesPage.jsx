@@ -1,53 +1,86 @@
+﻿import { useLiveTick } from '../hooks/useLiveRefresh';
 import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, Eye, Users } from 'lucide-react';
+import { getCurrencySymbol, formatMoney, getMoneyLocale } from '../utils/currency';
+import { Plus, Pencil, Trash2, Eye, Users, X } from 'lucide-react';
+import { useIsMobile } from '../hooks/useIsMobile';
+import FAB from '../components/FAB';
 import { useLanguage } from '../contexts/LanguageContext';
 import Modal from '../components/ui/Modal';
 import { ACCESS_TYPES_KEY, DEFAULT_ACCESS_TYPES } from './SettingsPage';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import StatusBadge from '../components/ui/StatusBadge';
+import RowMenu from '../components/ui/RowMenu';
 import { getAll as getPackages, create as createPackage, update as updatePackage, remove as removePackage } from '../services/packages.service';
 import { getAll as getMembers } from '../services/members.service';
+import { getRole, getAuth } from '../utils/auth';
+import { useSetupStatus } from '../hooks/useSetupStatus';
+import { softAll } from '../utils/loadAll';
+import { SkeletonCards, SkeletonTableRows } from '../components/Skeleton';
 
-const formatMoney = (n) => `${Math.round(n || 0).toLocaleString('fr-FR')} FCFA`;
 
 const cardStyle = { background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, boxShadow: 'var(--shadow-card)' };
 const primaryBtn = { background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', color: '#0a0a0f', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '8px 16px', cursor: 'pointer', fontFamily: 'DM Sans', display: 'inline-flex', alignItems: 'center', gap: 6 };
 const secondaryBtn = { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '8px 16px', cursor: 'pointer', fontFamily: 'DM Sans' };
 const inputStyle = { width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '9px 14px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none' };
 
-const emptyForm = { name: '', code: '', description: '', price: '', durationType: 'Months', durationValue: '', sessionLimit: 'Unlimited', accessType: [], status: 'active', notes: '' };
+const emptyForm = { name: '', code: '', description: '', price: '', dayPassPrice: '', durationType: 'Months', durationValue: '', sessionLimit: 'Unlimited', accessType: [], status: 'active', notes: '' };
 const emptyVisitorForm = { label: '', sessions: '', pricePerSession: '', durationDays: '', status: 'active' };
 
 export default function PackagesPage() {
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
+  const setup = useSetupStatus();
+  // Only the owner prices the gym. Everyone else reads.
+  const canPrice = getRole() === 'general_manager';
   const [accessTypeOptions, setAccessTypeOptions] = useState(() => {
     try { return JSON.parse(localStorage.getItem(ACCESS_TYPES_KEY) || 'null') || DEFAULT_ACCESS_TYPES; } catch { return DEFAULT_ACCESS_TYPES; }
   });
 
+  // Cache the last packages this account saw, scoped per gym so accounts never
+  // share. A page that has been open before shows those at once and refreshes
+  // them quietly; only a first-ever visit falls back to a skeleton. This is
+  // what stops the skeleton-then-shorter-real-list jump that read as flicker.
+  const gymId = getAuth()?.user?.gymId || 'default';
+  const cacheKey = (k) => `gem_pkg_${gymId}_${k}`;
+  const readCache = (k, fb) => { try { const v = JSON.parse(localStorage.getItem(cacheKey(k)) || 'null'); if (v == null) return fb; if (Array.isArray(fb) && !Array.isArray(v)) return fb; return v; } catch { return fb; } };
+
   const [tab, setTab] = useState('member'); // 'member' | 'visitor'
-  const [packages, setPackages] = useState([]);
-  const [membersList, setMembersList] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [packages, setPackages] = useState(() => readCache('packages', []));
+  const [membersList, setMembersList] = useState(() => readCache('members', []));
+  const [loading, setLoading] = useState(() => readCache('packages', null) === null);
   const [showModal, setShowModal] = useState(false);
   const [editingPkg, setEditingPkg] = useState(null);
+  const [showEditAuth, setShowEditAuth] = useState(false);
+  const [pendingSave, setPendingSave] = useState(null);
   const [deletePkg, setDeletePkg] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [profilePkg, setProfilePkg] = useState(null);
   const [showDeleteAuth, setShowDeleteAuth] = useState(false);
 
+  const liveTick = useLiveTick();
   useEffect(() => {
-    Promise.all([getPackages(), getMembers()])
+    softAll([getPackages(), getMembers()])
       .then(([pkgsRes, membersRes]) => {
         setPackages(pkgsRes.data || []);
-        setMembersList(membersRes.data || []);
+        const mem = membersRes.data || [];
+        setMembersList(mem);
+        try { localStorage.setItem(cacheKey('members'), JSON.stringify(mem)); } catch {}
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveTick]);
 
-  // Visitor session packages — stored in backend with isVisitor: true
+  // Keep the cache in step with the list, so creating, editing or deleting a
+  // package is reflected the next time the page opens, not just the fetch.
+  useEffect(() => {
+    try { localStorage.setItem(cacheKey('packages'), JSON.stringify(packages)); } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [packages]);
+
+  // Visitor session packages - stored in backend with isVisitor: true
   const vPkgs = packages
     .filter(p => p.isVisitor)
     .map(p => ({
@@ -73,12 +106,12 @@ export default function PackagesPage() {
   };
   const validateV = () => {
     const e = {};
-    if (!vForm.label.trim()) e.label = 'Required';
-    if (!vForm.sessions || Number(vForm.sessions) < 1) e.sessions = 'Required';
-    if (!vForm.pricePerSession || Number(vForm.pricePerSession) < 1) e.pricePerSession = 'Required';
+    if (!vForm.label.trim()) e.label = t('common.required');
+    if (!vForm.sessions || Number(vForm.sessions) < 1) e.sessions = t('common.required');
+    if (!vForm.pricePerSession || Number(vForm.pricePerSession) < 1) e.pricePerSession = t('common.required');
     const nameLower = vForm.label.trim().toLowerCase();
     const duplicate = packages.find(p => p.name.toLowerCase() === nameLower && p.id !== editingVPkg?.id);
-    if (duplicate) e.label = 'A package with this name already exists';
+    if (duplicate) e.label = t('packages.duplicateName');
     return e;
   };
   const handleSaveV = async () => {
@@ -114,7 +147,7 @@ export default function PackagesPage() {
   const openEdit = (pkg) => {
     const durationParts = pkg.duration ? pkg.duration.split(' ') : [];
     const existingAccess = pkg.access ? pkg.access.split(',').map(s => s.trim()).filter(Boolean) : [];
-    setForm({ name: pkg.name, code: pkg.code || '', description: pkg.description || '', price: String(pkg.price), durationType: durationParts[1] || 'Days', durationValue: durationParts[0] || '', sessionLimit: pkg.sessions, accessType: existingAccess, status: pkg.status, notes: '' });
+    setForm({ name: pkg.name, code: pkg.code || '', description: pkg.description || '', price: String(pkg.price), dayPassPrice: pkg.dayPassPrice != null ? String(pkg.dayPassPrice) : '', durationType: durationParts[1] || 'Days', durationValue: durationParts[0] || '', sessionLimit: pkg.sessions, accessType: existingAccess, status: pkg.status, notes: '' });
     setEditingPkg(pkg);
     setErrors({});
     setShowModal(true);
@@ -122,33 +155,18 @@ export default function PackagesPage() {
 
   const validate = () => {
     const e = {};
-    if (!form.name) e.name = 'Required';
-    if (!form.price) e.price = 'Required';
+    if (!form.name) e.name = t('common.required');
+    if (!form.price) e.price = t('common.required');
+    if (!form.dayPassPrice) e.dayPassPrice = t('common.required');
     const nameLower = form.name.trim().toLowerCase();
     const duplicate = packages.find(p => p.name.toLowerCase() === nameLower && p.id !== editingPkg?.id);
-    if (duplicate) e.name = 'A package with this name already exists';
+    if (duplicate) e.name = t('packages.duplicateName');
     return e;
   };
 
-  const handleSave = async (another = false) => {
-    const e = validate();
-    if (Object.keys(e).length) { setErrors(e); return; }
-    const daysMap = { Days: 1, Weeks: 7, Months: 30, Year: 365 };
-    const durationDays = form.durationValue
-      ? Number(form.durationValue) * (daysMap[form.durationType] || 30)
-      : undefined;
-    const payload = {
-      name: form.name,
-      code: form.code || undefined,
-      description: form.description || undefined,
-      price: Number(form.price),
-      duration: form.durationValue ? `${form.durationValue} ${form.durationType}` : undefined,
-      durationDays: durationDays || undefined,
-      sessions: form.sessionLimit || 'Unlimited',
-      access: form.accessType.length > 0 ? form.accessType.join(', ') : undefined,
-      status: form.status,
-      notes: form.notes || undefined,
-    };
+  // The actual write, run once a create is submitted or an edit is confirmed
+  // with the manager's code.
+  const doSave = async (payload, another) => {
     try {
       if (editingPkg) {
         const res = await updatePackage(editingPkg.id, payload);
@@ -165,6 +183,33 @@ export default function PackagesPage() {
     }
   };
 
+  const handleSave = async (another = false) => {
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+    const daysMap = { Days: 1, Weeks: 7, Months: 30, Year: 365 };
+    const durationDays = form.durationValue
+      ? Number(form.durationValue) * (daysMap[form.durationType] || 30)
+      : undefined;
+    const payload = {
+      name: form.name,
+      code: form.code || undefined,
+      description: form.description || undefined,
+      price: Number(form.price),
+      dayPassPrice: form.dayPassPrice !== '' ? Number(form.dayPassPrice) : undefined,
+      duration: form.durationValue ? `${form.durationValue} ${form.durationType}` : undefined,
+      durationDays: durationDays || undefined,
+      sessions: form.sessionLimit || 'Unlimited',
+      access: form.accessType.length > 0 ? form.accessType.join(', ') : undefined,
+      status: form.status,
+      notes: form.notes || undefined,
+    };
+    // Changing an existing package (its price especially) is a management
+    // action, so it is held behind the manager's 4-digit code. Creating a new
+    // one is not gated.
+    if (editingPkg) { setPendingSave({ payload, another }); setShowEditAuth(true); }
+    else { doSave(payload, another); }
+  };
+
   const iconBtn = (hoverColor) => ({
     background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4,
     onMouseEnter: e => (e.currentTarget.style.color = hoverColor),
@@ -173,6 +218,106 @@ export default function PackagesPage() {
   const th = { padding: '10px 20px', textAlign: 'left', fontSize: 10, textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' };
   const td = { padding: '14px 20px' };
 
+  // ── Mobile layout ────────────────────────────────────────────────────────────
+  if (isMobile) {
+    const memberPkgs = packages.filter(p => !p.isVisitor && p.status !== 'archived');
+    const visitorPkgs = packages.filter(p => p.isVisitor && p.status !== 'archived');
+    const shownPkgs = tab === 'member' ? memberPkgs : visitorPkgs;
+    return (
+      <div style={{ minHeight: '100%' }}>
+        <div style={{ padding: '16px 16px 10px' }}>
+          <h1 style={{ fontFamily: 'Manrope', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{t('packages.title')}</h1>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '3px 0 0', fontFamily: 'DM Sans' }}>
+            {memberPkgs.length} {t('nav.members').toLowerCase()} · {visitorPkgs.length} {t('members.visitor').toLowerCase()}
+          </p>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', padding: '0 16px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 12 }}>
+          {[['member', t('packages.memberPackages')], ['visitor', t('packages.visitorBundles')]].map(([key, label]) => (
+            <button key={key} onClick={() => setTab(key)} style={{ padding: '10px 14px', fontSize: 13, cursor: 'pointer', background: 'none', border: 'none', borderBottom: `2px solid ${tab === key ? 'var(--accent-gold)' : 'transparent'}`, color: tab === key ? 'var(--accent-gold)' : 'var(--text-muted)', fontFamily: 'DM Sans', fontWeight: tab === key ? 600 : 400 }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {loading ? (
+            <SkeletonCards count={3} />
+          ) : shownPkgs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>{t('packages.noPackages')}</div>
+          ) : shownPkgs.map(pkg => {
+            const memberCount = membersList.filter(m => m.package?.id === pkg.id || m.packageId === pkg.id).length;
+            return (
+              <div key={pkg.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, padding: '14px 16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Manrope', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {pkg.name}
+                    </div>
+                    {pkg.description && (
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {pkg.description}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ flexShrink: 0, marginLeft: 8 }}>
+                    <RowMenu title={t('common.actions')} items={[
+                      { label: t('common.view'), icon: <Eye size={15} />, onClick: () => setProfilePkg(pkg) },
+                      { label: t('common.edit'), icon: <Pencil size={15} />, onClick: () => openEdit(pkg), hidden: !canPrice },
+                      { label: t('common.delete'), icon: <Trash2 size={15} />, onClick: () => setDeletePkg(pkg), hidden: !canPrice, danger: true },
+                    ]} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent-gold)', fontFamily: 'JetBrains Mono, monospace' }}>
+                    {formatMoney(pkg.price)}
+                  </span>
+                  {pkg.duration && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{pkg.duration}</span>}
+                  {pkg.sessions && pkg.sessions !== 'Unlimited' && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{pkg.sessions} {t('members.visitorSessions')}</span>}
+                  <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Users size={11} strokeWidth={2} />{memberCount}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {canPrice && <FAB onClick={tab === 'member' ? openAdd : () => { setVForm(emptyVisitorForm); setEditingVPkg(null); setVErrors({}); setShowVModal(true); }} label={tab === 'member' ? t('packages.addPackage') : t('packages.addBundle')} />}
+
+        {showModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end' }}>
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: '20px 20px 0 0', width: '100%', maxHeight: '88vh', overflowY: 'auto', padding: '20px 20px 40px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'Manrope', color: 'var(--text-primary)' }}>{editingPkg ? t('packages.editPackage') : t('packages.addPackage')}</span>
+                <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[
+                  { label: `${t('packages.packageName')} *`, key: 'name', type: 'text', error: errors.name },
+                  { label: `${t('packages.price')} *`, key: 'price', type: 'number', error: errors.price },
+                  { label: `${t('packages.dayPassPrice')} *`, key: 'dayPassPrice', type: 'number', error: errors.dayPassPrice },
+                  { label: t('packages.durationDays'), key: 'durationValue', type: 'number' },
+                  { label: t('common.description'), key: 'description', type: 'text' },
+                ].map(({ label, key, type, error }) => (
+                  <div key={key}>
+                    <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{label}</label>
+                    <input type={type} value={form[key] || ''} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} style={{ width: '100%', background: 'var(--bg-elevated)', border: `1px solid ${error ? 'var(--accent-red)' : 'var(--border-subtle)'}`, borderRadius: 10, padding: '10px 14px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', boxSizing: 'border-box' }} />
+                    {error && <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{error}</span>}
+                  </div>
+                ))}
+                <button onClick={() => handleSave(false)} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 10, padding: '13px', fontSize: 14, fontWeight: 700, color: '#0a0a0f', cursor: 'pointer', fontFamily: 'DM Sans', marginTop: 4 }}>
+                  {editingPkg ? t('common.saveChanges') : t('packages.addPackage')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="page-fade">
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -180,11 +325,24 @@ export default function PackagesPage() {
           <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>{t('packages.title')}</h1>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{t('packages.memberPackages')} & {t('packages.visitorBundles')}</p>
         </div>
-        {tab === 'member'
+        {canPrice && (tab === 'member'
           ? <button style={primaryBtn} onClick={openAdd}><Plus size={13} />{t('packages.addPackage')}</button>
           : <button style={primaryBtn} onClick={openAddV}><Plus size={13} />{t('packages.addBundle')}</button>
-        }
+        )}
       </div>
+
+      {/* Setup banner */}
+      {packages.length === 0 && !loading && setup && !setup.complete && (
+        <div style={{ background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: 12, padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <span style={{ fontSize: 18, flexShrink: 0 }}>📦</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'Manrope, sans-serif', marginBottom: 3 }}>{t('packages.createFirstPackage')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              {t('packages.createFirstPackageDesc')}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, background: 'var(--bg-elevated)', padding: 4, borderRadius: 10, marginBottom: 20, width: 'fit-content' }}>
@@ -204,9 +362,9 @@ export default function PackagesPage() {
       {tab === 'member' && (
         <div style={cardStyle}>
           <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('packages.memberPackages')} ({packages.filter(p => !p.isVisitor).length})</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('packages.memberPackages')}{!loading && ` (${packages.filter(p => !p.isVisitor).length})`}</span>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="gem-table-scroll"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.01)' }}>
                 {[t('packages.packageName'), 'Code', t('packages.duration'), t('packages.price'), t('packages.sessions'), t('packages.access'), t('common.status'), t('common.actions')].map(h => (
@@ -215,7 +373,7 @@ export default function PackagesPage() {
               </tr>
             </thead>
             <tbody>
-              {packages.filter(p => !p.isVisitor).map(pkg => (
+              {loading ? <SkeletonTableRows rows={3} cols={8} /> : packages.filter(p => !p.isVisitor).map(pkg => (
                 <tr key={pkg.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
@@ -227,15 +385,16 @@ export default function PackagesPage() {
                   <td style={{ ...td, fontSize: 12, color: 'var(--text-secondary)' }}>{pkg.access}</td>
                   <td style={td}><StatusBadge status={pkg.status} /></td>
                   <td style={td}>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <button title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }} onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-gold)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'} onClick={() => openEdit(pkg)}><Pencil size={14} /></button>
-                      <button title="View Profile" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }} onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-blue)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'} onClick={() => setProfilePkg(pkg)}><Eye size={14} /></button>
-                    </div>
+                    <RowMenu title={t('common.actions')} items={[
+                      { label: t('common.view'), icon: <Eye size={15} />, onClick: () => setProfilePkg(pkg) },
+                      { label: t('common.edit'), icon: <Pencil size={15} />, onClick: () => openEdit(pkg), hidden: !canPrice },
+                      { label: t('common.delete'), icon: <Trash2 size={15} />, onClick: () => setDeletePkg(pkg), hidden: !canPrice, danger: true },
+                    ]} />
                   </td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
 
@@ -243,19 +402,19 @@ export default function PackagesPage() {
       {tab === 'visitor' && (
         <div style={cardStyle}>
           <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('packages.visitorBundles')} ({vPkgs.length})</span>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Cheaper per session as quantity increases</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('packages.visitorBundles')}{!loading && ` (${vPkgs.length})`}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('packages.cheaperPerSession')}</span>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="gem-table-scroll"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.01)' }}>
-                {['Bundle','Sessions','Price / Session','Total Price','Status','Actions'].map(h => (
+                {[t('packages.bundle'), t('packages.sessions'), t('packages.pricePerSessionHeader'), t('packages.totalPrice'), t('common.status'), t('common.actions')].map(h => (
                   <th key={h} style={th}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {vPkgs.sort((a, b) => a.sessions - b.sessions).map(pkg => (
+              {loading ? <SkeletonTableRows rows={3} cols={6} /> : vPkgs.sort((a, b) => a.sessions - b.sessions).map(pkg => (
                 <tr key={pkg.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
@@ -269,58 +428,66 @@ export default function PackagesPage() {
                   <td style={{ ...td, fontSize: 14, fontWeight: 700, fontFamily: 'Manrope, sans-serif', color: 'var(--accent-gold)' }}>{formatMoney(pkg.totalPrice)}</td>
                   <td style={td}><StatusBadge status={pkg.status} /></td>
                   <td style={td}>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <button title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }} onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-gold)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'} onClick={() => openEditV(pkg)}><Pencil size={14} /></button>
-                      <button title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }} onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-red)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'} onClick={() => setDeleteVPkg(pkg)}><Trash2 size={14} /></button>
-                    </div>
+                    <RowMenu title={t('common.actions')} items={[
+                      { label: t('common.view'), icon: <Eye size={15} />, onClick: () => setProfilePkg(packages.find(p => p.id === pkg.id) || pkg) },
+                      { label: t('common.edit'), icon: <Pencil size={15} />, onClick: () => openEditV(pkg), hidden: !canPrice },
+                      { label: t('common.delete'), icon: <Trash2 size={15} />, onClick: () => setDeleteVPkg(pkg), hidden: !canPrice, danger: true },
+                    ]} />
                   </td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
 
       <Modal open={showModal} onClose={() => setShowModal(false)} title={editingPkg ? t('packages.editPackage') : t('packages.addPackage')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Package Name *</label>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.packageName')} *</label>
               <input style={{ ...inputStyle, borderColor: errors.name ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Premium 12M" />
               {errors.name && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.name}</div>}
             </div>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Code</label>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.code')}</label>
               <input style={inputStyle} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="e.g. PKG-P12" />
             </div>
           </div>
           <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Description</label>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.description')}</label>
             <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
           </div>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Price *</label>
-            <input type="number" style={{ ...inputStyle, borderColor: errors.price ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00" />
-            {errors.price && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.price}</div>}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Duration Type</label>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.price')} *</label>
+              <input type="number" min="0" style={{ ...inputStyle, borderColor: errors.price ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00" />
+              {errors.price && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.price}</div>}
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.dayPassPrice')} *</label>
+              <input type="number" min="0" style={{ ...inputStyle, borderColor: errors.dayPassPrice ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.dayPassPrice} onChange={e => setForm(f => ({ ...f, dayPassPrice: e.target.value }))} placeholder="0.00" />
+              {errors.dayPassPrice && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.dayPassPrice}</div>}
+            </div>
+          </div>
+          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.durationType')}</label>
               <select style={inputStyle} value={form.durationType} onChange={e => setForm(f => ({ ...f, durationType: e.target.value }))}>
-                {['Days','Weeks','Months','Year'].map(d => <option key={d}>{d}</option>)}
+                {[['Days', t('packages.durationDayOpt')],['Weeks', t('packages.durationWeekOpt')],['Months', t('packages.durationMonthOpt')],['Year', t('packages.durationYearOpt')]].map(([val,label]) => <option key={val} value={val}>{label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Duration Value</label>
-              <input type="number" style={inputStyle} value={form.durationValue} onChange={e => setForm(f => ({ ...f, durationValue: e.target.value }))} placeholder="e.g. 12" />
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.durationValue')}</label>
+              <input type="number" min="0" style={inputStyle} value={form.durationValue} onChange={e => setForm(f => ({ ...f, durationValue: e.target.value }))} placeholder="e.g. 12" />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Session Limit</label>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.sessionLimit')}</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {form.sessionLimit === 'Unlimited' ? (
-                  <div style={{ ...inputStyle, color: 'var(--text-muted)', fontStyle: 'italic', cursor: 'default', userSelect: 'none' }}>Unlimited</div>
+                  <div style={{ ...inputStyle, color: 'var(--text-muted)', fontStyle: 'italic', cursor: 'default', userSelect: 'none' }}>{t('packages.unlimited')}</div>
                 ) : (
                   <input type="number" min="1" style={inputStyle} value={form.sessionLimit} onChange={e => setForm(f => ({ ...f, sessionLimit: e.target.value }))} placeholder="e.g. 20" />
                 )}
@@ -331,12 +498,12 @@ export default function PackagesPage() {
                     onChange={e => setForm(f => ({ ...f, sessionLimit: e.target.checked ? 'Unlimited' : '' }))}
                     style={{ accentColor: 'var(--accent-gold)', width: 14, height: 14 }}
                   />
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>Unlimited sessions</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{t('packages.unlimitedSessions')}</span>
                 </label>
               </div>
             </div>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Access Type</label>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.access')}</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 12px' }}>
                 {accessTypeOptions.map(opt => {
                   const checked = form.accessType.includes(opt);
@@ -361,16 +528,16 @@ export default function PackagesPage() {
             </div>
           </div>
           <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Status</label>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.status')}</label>
             <select style={inputStyle} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
+              <option value="active">{t('packages.active')}</option>
+              <option value="inactive">{t('packages.inactive')}</option>
             </select>
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
             <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
             {!editingPkg && <button style={secondaryBtn} onClick={() => handleSave(true)}>{t('tasks.saveAndAddAnother')}</button>}
-            <button style={primaryBtn} onClick={() => handleSave(false)}>{t('packages.addPackage')}</button>
+            <button style={primaryBtn} onClick={() => handleSave(false)}>{editingPkg ? t('common.saveChanges') : t('packages.addPackage')}</button>
           </div>
         </div>
       </Modal>
@@ -379,7 +546,7 @@ export default function PackagesPage() {
       {profilePkg && (() => {
         const subscriberCount = membersList.filter(m => m.packageId === profilePkg.id).length;
         return (
-          <Modal open={!!profilePkg} onClose={() => setProfilePkg(null)} title="Package Profile" maxWidth={500}>
+          <Modal open={!!profilePkg} onClose={() => setProfilePkg(null)} title={t('packages.packageProfile')} maxWidth={500}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
@@ -388,12 +555,13 @@ export default function PackagesPage() {
                 </div>
                 <StatusBadge status={profilePkg.status} />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 {[
-                  { label: 'Price', value: formatMoney(profilePkg.price) },
-                  { label: 'Duration', value: profilePkg.duration },
-                  { label: 'Sessions', value: profilePkg.sessions },
-                  { label: 'Access Level', value: profilePkg.access },
+                  { label: t('packages.price'), value: formatMoney(profilePkg.price) },
+                  ...(!profilePkg.isVisitor ? [{ label: t('packages.dayPassPrice'), value: profilePkg.dayPassPrice != null ? formatMoney(profilePkg.dayPassPrice) : '-' }] : []),
+                  { label: t('packages.duration'), value: profilePkg.duration },
+                  { label: t('packages.sessions'), value: profilePkg.sessions },
+                  { label: t('packages.accessLevel'), value: profilePkg.access },
                 ].map(r => (
                   <div key={r.label} style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '12px 14px' }}>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 4 }}>{r.label}</div>
@@ -407,16 +575,28 @@ export default function PackagesPage() {
                   <strong style={{ color: 'var(--text-primary)' }}>{subscriberCount}</strong> active subscriber{subscriberCount !== 1 ? 's' : ''} on this package
                 </span>
               </div>
-              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>Deleting requires manager authorization.</div>
-                <button onClick={() => setShowDeleteAuth(true)} style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', border: '1px solid var(--accent-red)', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Trash2 size={13} /> Delete Package
-                </button>
-              </div>
+              {canPrice && (
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('packages.deletingRequiresManager')}</div>
+                  <button onClick={() => setShowDeleteAuth(true)} style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', border: '1px solid var(--accent-red)', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Trash2 size={13} /> {t('packages.deletePackage')}
+                  </button>
+                </div>
+              )}
             </div>
           </Modal>
         );
       })()}
+
+      <ManagerAuthModal
+        open={showEditAuth}
+        onClose={() => { setShowEditAuth(false); setPendingSave(null); }}
+        action={`edit the package "${editingPkg?.name || ''}"`}
+        onConfirm={async () => {
+          if (pendingSave) await doSave(pendingSave.payload, pendingSave.another);
+          setShowEditAuth(false); setPendingSave(null);
+        }}
+      />
 
       <ManagerAuthModal
         open={showDeleteAuth}
@@ -441,28 +621,28 @@ export default function PackagesPage() {
             setDeletePkg(null);
           } catch (err) { console.error(err); }
         }}
-        title="Delete Package" message={`Are you sure you want to delete "${deletePkg?.name}"? This action cannot be undone.`} confirmLabel="Delete" />
+        title={t('packages.deletePackage')} message={deletePkg ? t('packages.deletePackageConfirm', { name: deletePkg.name }) : ''} confirmLabel={t('common.delete')} />
 
       {/* ── Add / Edit Visitor Session Bundle Modal ── */}
-      <Modal open={showVModal} onClose={() => setShowVModal(false)} title={editingVPkg ? 'Edit Session Bundle' : 'Add Session Bundle'} maxWidth={460}>
+      <Modal open={showVModal} onClose={() => setShowVModal(false)} title={editingVPkg ? t('packages.editBundle') : t('packages.addSessionBundle')} maxWidth={460}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Bundle Label *</label>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.bundleLabel')} *</label>
             <input style={{ ...inputStyle, borderColor: vErrors.label ? 'var(--accent-red)' : 'var(--border-subtle)' }}
               value={vForm.label} onChange={e => setVForm(f => ({ ...f, label: e.target.value }))}
               placeholder="e.g. 10 Sessions" autoComplete="off" />
             {vErrors.label && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{vErrors.label}</div>}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Number of Sessions *</label>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.numSessions')} *</label>
               <input type="number" min="1" style={{ ...inputStyle, borderColor: vErrors.sessions ? 'var(--accent-red)' : 'var(--border-subtle)' }}
                 value={vForm.sessions} onChange={e => setVForm(f => ({ ...f, sessions: e.target.value }))}
                 placeholder="e.g. 10" autoComplete="off" />
               {vErrors.sessions && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{vErrors.sessions}</div>}
             </div>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Price Per Session (FCFA) *</label>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.pricePerSessionField')} ({getCurrencySymbol()}) *</label>
               <input type="number" min="1" style={{ ...inputStyle, borderColor: vErrors.pricePerSession ? 'var(--accent-red)' : 'var(--border-subtle)' }}
                 value={vForm.pricePerSession} onChange={e => setVForm(f => ({ ...f, pricePerSession: e.target.value }))}
                 placeholder="e.g. 2500" autoComplete="off" />
@@ -470,7 +650,7 @@ export default function PackagesPage() {
             </div>
           </div>
           <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Duration (Days) <span style={{ color: 'var(--text-muted)' }}>— how long the bundle is valid</span></label>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.durationDays')} <span style={{ color: 'var(--text-muted)' }}>({t('packages.durationDaysHint')})</span></label>
             <input type="number" min="1" style={inputStyle}
               value={vForm.durationDays} onChange={e => setVForm(f => ({ ...f, durationDays: e.target.value }))}
               placeholder="e.g. 30" autoComplete="off" />
@@ -478,17 +658,17 @@ export default function PackagesPage() {
           {/* Live total preview */}
           {vForm.sessions && vForm.pricePerSession && (
             <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Total Price</span>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t('packages.totalPrice')}</span>
               <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent-gold)', fontFamily: 'Manrope' }}>
-                {(Number(vForm.sessions) * Number(vForm.pricePerSession)).toLocaleString('fr-FR')} FCFA
+                {(Number(vForm.sessions) * Number(vForm.pricePerSession)).toLocaleString(getMoneyLocale())} {getCurrencySymbol()}
               </span>
             </div>
           )}
           <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Status</label>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.status')}</label>
             <select style={inputStyle} value={vForm.status} onChange={e => setVForm(f => ({ ...f, status: e.target.value }))}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
+              <option value="active">{t('packages.active')}</option>
+              <option value="inactive">{t('packages.inactive')}</option>
             </select>
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>

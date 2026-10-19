@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem \"c:\\\\Users\\\\efuet\\\\Project\\\\Marvin_DOC\\\\GymMS\\\\GEM\\\\gem-backend\\\\src\\\\controllers\")",
+      "Bash(Select-Object Name)",
+      "Bash(grep -E \"\\\\.jsx$\")"
+    ]
+  }
+}

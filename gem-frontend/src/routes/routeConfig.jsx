@@ -15,6 +15,7 @@ import StaffPage from "../pages/StaffPage";
 import StaffProfilePage from "../pages/StaffProfilePage";
 import NotificationsPage from "../pages/NotificationsPage";
 import SettingsPage from "../pages/SettingsPage";
+import { Navigate } from "react-router-dom";
 
 export const appRoutes = [
   { path: "/dashboard", element: <DashboardPage /> },
@@ -33,6 +34,9 @@ export const appRoutes = [
   { path: "/communication", element: <CommunicationPage /> },
   { path: "/staff", element: <StaffPage /> },
   { path: "/staff/:id", element: <StaffProfilePage /> },
+  { path: "/my-profile", element: <StaffProfilePage /> },
   { path: "/notifications", element: <NotificationsPage /> },
   { path: "/settings", element: <SettingsPage /> },
+  // The log now lives in Settings; an old link still gets there
+  { path: "/logs", element: <Navigate to="/settings?section=logs" replace /> },
 ];

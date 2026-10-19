@@ -1,199 +1,327 @@
 import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { Dumbbell, ArrowRight, Search, Sparkles, Users, CreditCard, Monitor, BarChart3, ChevronRight } from 'lucide-react';
+import { Dumbbell, ArrowRight, Search, Check, Users, CreditCard, Monitor, BarChart3 } from 'lucide-react';
 import { getGymByCode } from '../services/gym.service';
 import { isAuthed } from '../utils/auth';
+import LangToggle from '../components/LangToggle';
+import { useLanguage } from '../contexts/LanguageContext';
+import { useIsMobile } from '../utils/useIsMobile';
+
+const PERK_ICONS = [Users, CreditCard, Monitor, BarChart3];
 
 export default function GymCodePage() {
   const nav = useNavigate();
+  const { lang, switchLang, t } = useLanguage();
+  const isMobile = useIsMobile(800);
 
-  if (isAuthed()) return <Navigate to="/dashboard" replace />;
-  const [code, setCode] = useState('');
-  const [error, setError] = useState('');
+  const PERKS = [
+    { icon: PERK_ICONS[0], text: t('auth.perk1') },
+    { icon: PERK_ICONS[1], text: t('auth.perk2') },
+    { icon: PERK_ICONS[2], text: t('auth.perk3') },
+    { icon: PERK_ICONS[3], text: t('auth.perk4') },
+  ];
+
+  const [code,    setCode]    = useState('');
+  const [error,   setError]   = useState('');
   const [focused, setFocused] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  if (isAuthed()) return <Navigate to="/dashboard" replace />;
 
   const handleSubmit = async (e) => {
     e?.preventDefault();
     const trimmed = code.trim().toLowerCase().replace(/\s+/g, '-');
-    if (!trimmed) { setError('Please enter your gym code to continue.'); return; }
+    if (!trimmed) { setError(t('auth.codeErrorEmpty')); return; }
     setLoading(true);
     setError('');
     try {
-      await getGymByCode(trimmed);
-      nav(`/${trimmed}/login`);
-    } catch {
-      setError('Gym not found. Check your code and try again.');
+      const res = await getGymByCode(trimmed);
+      // Navigate with the code as the server stored it, not as it was typed
+      nav(`/${res.data?.code || trimmed}/login`);
+    } catch (err) {
+      if (err?.response?.status === 404) setError(t('auth.codeErrorNotFound'));
+      else if (err?.response) setError(t('auth.codeErrorServer'));
+      else setError(t('auth.codeErrorNetwork'));
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', fontFamily: 'DM Sans, sans-serif' }}>
-
-      {/* Top bar */}
-      <div style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)', padding: '0 24px' }}>
-        <div style={{ maxWidth: 900, margin: '0 auto', height: 58, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }} onClick={() => nav('/')}>
-            <div style={{ width: 30, height: 30, borderRadius: 7, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+  if (isMobile) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', fontFamily: 'DM Sans, sans-serif' }}>
+        <div style={{ padding: '20px 20px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div onClick={() => nav('/')} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Dumbbell size={15} color="#0a0a0f" strokeWidth={2.5} />
             </div>
-            <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 800, fontSize: 15, color: 'var(--text-primary)' }}>GEM</span>
+            <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 800, fontSize: 16, color: 'var(--text-primary)' }}>GEM</span>
           </div>
-          <button onClick={() => nav('/signup')} style={{ background: 'none', border: 'none', fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'DM Sans' }}>
-            New gym? <span style={{ color: 'var(--accent-gold)', fontWeight: 600 }}>Request access →</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <LangToggle lang={lang} switchLang={switchLang} />
+            <button onClick={() => nav('/signup')} style={{ background: 'none', border: 'none', fontSize: 13, color: 'var(--accent-gold)', fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans' }}>{t('auth.signUp')}</button>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 20px 60px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
+            <div style={{ width: 60, height: 60, borderRadius: 16, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(201,169,110,0.3)' }}>
+              <Dumbbell size={28} color="#0a0a0f" strokeWidth={2} />
+            </div>
+          </div>
+          <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 28, fontWeight: 800, color: 'var(--text-primary)', textAlign: 'center', marginBottom: 8, letterSpacing: '-0.4px' }}>
+            {t('auth.codeTitle')}
+          </h1>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.5, marginBottom: 36 }}>
+            {t('auth.codeSub')}
+          </p>
+
+          <div style={{ position: 'relative', marginBottom: error ? 8 : 14 }}>
+            <Search size={16} color={focused ? '#c9a96e' : 'var(--text-muted)'} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', transition: 'color 0.2s' }} />
+            <input
+              autoFocus
+              value={code}
+              onChange={e => { setCode(e.target.value); setError(''); }}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              placeholder={t('auth.codePlaceholder')}
+              style={{ width: '100%', background: 'var(--bg-card)', border: `1.5px solid ${error ? 'var(--accent-red)' : focused ? '#c9a96e' : 'var(--border-subtle)'}`, borderRadius: 12, padding: '15px 14px 15px 46px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
+            />
+          </div>
+
+          {error && <div style={{ fontSize: 13, color: 'var(--accent-red)', marginBottom: 12 }}>&#9888; {error}</div>}
+
+          <button onClick={handleSubmit} disabled={loading} style={{ width: '100%', background: loading ? 'var(--bg-elevated)' : 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', color: loading ? 'var(--text-muted)' : '#0a0a0f', borderRadius: 12, padding: '15px', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: loading ? 'none' : '0 4px 16px rgba(201,169,110,0.3)' }}>
+            {loading ? t('auth.codeChecking') : <><ArrowRight size={16} strokeWidth={2.5} /> {t('auth.codeContinue')}</>}
           </button>
+
+          <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            {t('auth.codeNoAccount')}{' '}
+            <span onClick={() => nav('/signup')} style={{ color: '#c9a96e', fontWeight: 600, cursor: 'pointer' }}>{t('auth.codeStartTrial')}</span>
+            {t('auth.code7daysFree')}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: 'DM Sans, sans-serif' }}>
+
+      {/* ── LEFT: Branded panel ─────────────────────────────────────── */}
+      <div className="gem-login-left" style={{
+        width: 420, flexShrink: 0,
+        background: 'var(--bg-secondary)',
+        borderRight: '1px solid var(--border-subtle)',
+        display: 'flex', flexDirection: 'column',
+        padding: '40px 48px',
+        position: 'relative', overflow: 'hidden',
+      }}>
+
+        {/* Decorative gold glows */}
+        <div style={{
+          position: 'absolute', top: -100, right: -100,
+          width: 360, height: 360, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(201,169,110,0.13) 0%, transparent 68%)',
+          pointerEvents: 'none',
+        }} />
+        <div style={{
+          position: 'absolute', bottom: -80, left: -80,
+          width: 260, height: 260, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(201,169,110,0.08) 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }} />
+
+        {/* Logo */}
+        <div onClick={() => nav('/')} style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 'auto', position: 'relative', zIndex: 1, cursor: 'pointer' }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Dumbbell size={16} color="#0a0a0f" strokeWidth={2.5} />
+          </div>
+          <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 800, fontSize: 16, color: 'var(--text-primary)' }}>GEM</span>
+        </div>
+
+        {/* Centre content */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative', zIndex: 1, padding: '48px 0' }}>
+          <h2 style={{
+            fontFamily: 'Manrope, sans-serif',
+            fontSize: 30, fontWeight: 800,
+            color: 'var(--text-primary)',
+            lineHeight: 1.2, letterSpacing: '-0.5px',
+            marginBottom: 14,
+          }}>
+            {t('auth.codePanelTitle1')}<br />
+            <span style={{ color: '#c9a96e' }}>{t('auth.codePanelTitle2')}</span>
+          </h2>
+
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 32, maxWidth: 300 }}>
+            {t('auth.codePanelSub')}
+          </p>
+
+          {/* Feature list */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {PERKS.map(({ icon: Icon, text }) => (
+              <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                  background: 'rgba(201,169,110,0.12)',
+                  border: '1px solid rgba(201,169,110,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Icon size={12} color="#c9a96e" strokeWidth={2} />
+                </div>
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>{text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom - signup prompt */}
+        <div style={{ position: 'relative', zIndex: 1, borderTop: '1px solid var(--border-subtle)', paddingTop: 20 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
+            {t('auth.codePanelNew')}{' '}
+            <span
+              onClick={() => nav('/signup')}
+              style={{ color: '#c9a96e', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              {t('auth.codePanelTrial')}
+            </span>
+          </p>
         </div>
       </div>
 
-      {/* Main */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
-        <div style={{ width: '100%', maxWidth: 860, display: 'grid', gridTemplateColumns: '1fr 1px 1fr', gap: 0, alignItems: 'start' }}>
+      {/* ── RIGHT: Login form ───────────────────────────────────────── */}
+      <div className="gem-login-form-panel" style={{
+        flex: 1,
+        background: 'var(--bg-primary)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '40px 32px',
+        position: 'relative',
+      }}>
+        <div style={{ position: 'absolute', top: 20, right: 24 }}>
+          <LangToggle lang={lang} switchLang={switchLang} />
+        </div>
+        <div style={{ width: '100%', maxWidth: 400 }}>
 
-          {/* ── Left: gym code login ───────────────────────────────── */}
-          <div style={{ padding: '0 48px 0 0' }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 24 }}>
-              <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(201,169,110,0.3)' }}>
-                <Dumbbell size={26} color="#0a0a0f" strokeWidth={2} />
-              </div>
+          {/* Icon */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: 14,
+              background: 'linear-gradient(135deg, #c9a96e, #b08d4a)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 6px 24px rgba(201,169,110,0.3)',
+            }}>
+              <Dumbbell size={24} color="#0a0a0f" strokeWidth={2} />
             </div>
-
-            <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8, letterSpacing: '-0.4px' }}>
-              Welcome back
-            </h1>
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 28 }}>
-              Enter your gym code to access your management workspace.
-            </p>
-
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 18, padding: 24, boxShadow: 'var(--shadow-card)' }}>
-              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '1px' }}>
-                Gym Code
-              </label>
-              <div style={{ position: 'relative', marginBottom: error ? 6 : 16 }}>
-                <Search size={16} color={focused ? 'var(--accent-gold)' : 'var(--text-muted)'} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', transition: 'color 0.2s' }} />
-                <input
-                  autoFocus
-                  value={code}
-                  onChange={e => { setCode(e.target.value); setError(''); }}
-                  onFocus={() => setFocused(true)}
-                  onBlur={() => setFocused(false)}
-                  onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                  placeholder="e.g. elite-fitness"
-                  style={{
-                    width: '100%', background: 'var(--bg-elevated)',
-                    border: `1.5px solid ${error ? 'var(--accent-red)' : focused ? 'var(--accent-gold)' : 'var(--border-subtle)'}`,
-                    borderRadius: 10, padding: '13px 14px 13px 42px',
-                    fontSize: 15, color: 'var(--text-primary)', fontFamily: 'DM Sans',
-                    outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s',
-                  }}
-                />
-              </div>
-              {error && <div style={{ fontSize: 12, color: 'var(--accent-red)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 5 }}>⚠ {error}</div>}
-
-              <button
-                onClick={handleSubmit}
-                disabled={loading}
-                style={{ width: '100%', background: loading ? 'var(--bg-elevated)' : 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', color: loading ? 'var(--text-muted)' : '#0a0a0f', borderRadius: 10, padding: '13px', fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 2px 12px rgba(201,169,110,0.25)' }}
-              >
-                {loading ? 'Checking...' : <> Continue <ArrowRight size={16} strokeWidth={2.5} /> </>}
-              </button>
-            </div>
-
-            <p style={{ marginTop: 20, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-              No gym code?{' '}
-              <span style={{ color: 'var(--accent-gold)', cursor: 'pointer', fontWeight: 600 }} onClick={() => nav('/signup')}>
-                Request access
-              </span>{' '}
-              and our team will set you up.
-            </p>
           </div>
 
-          {/* Divider */}
-          <div style={{ background: 'var(--border-subtle)', alignSelf: 'stretch' }} />
+          <h1 style={{
+            fontFamily: 'Manrope, sans-serif',
+            fontSize: 24, fontWeight: 800,
+            color: 'var(--text-primary)',
+            marginBottom: 6, letterSpacing: '-0.4px',
+            textAlign: 'center',
+          }}>
+            {t('auth.codeTitle')}
+          </h1>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 32, textAlign: 'center' }}>
+            {t('auth.codeSub')}
+          </p>
 
-          {/* ── Right: demo section ────────────────────────────────── */}
-          <div style={{ padding: '0 0 0 48px' }}>
-            {/* Header */}
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(201,169,110,0.1)', border: '1px solid rgba(201,169,110,0.25)', borderRadius: 20, padding: '5px 13px', marginBottom: 20 }}>
-              <Sparkles size={12} color="#c9a96e" />
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#c9a96e', letterSpacing: '0.5px' }}>Free Demo</span>
+          {/* Form card */}
+          <div className="gem-login-form-card" style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 18, padding: 24,
+            boxShadow: 'var(--shadow-card)',
+          }}>
+            <label style={{
+              fontSize: 11, fontWeight: 700,
+              color: 'var(--text-muted)', display: 'block',
+              marginBottom: 8, textTransform: 'uppercase', letterSpacing: '1px',
+            }}>
+              {t('auth.codeLabel')} *
+            </label>
+
+            <div style={{ position: 'relative', marginBottom: error ? 6 : 16 }}>
+              <Search
+                size={16}
+                color={focused ? 'var(--accent-gold)' : 'var(--text-muted)'}
+                style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', transition: 'color 0.2s' }}
+              />
+              <input
+                autoFocus
+                value={code}
+                onChange={e => { setCode(e.target.value); setError(''); }}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                placeholder={t('auth.codePlaceholder')}
+                style={{
+                  width: '100%',
+                  background: 'var(--bg-elevated)',
+                  border: `1.5px solid ${error ? 'var(--accent-red)' : focused ? 'var(--accent-gold)' : 'var(--border-subtle)'}`,
+                  borderRadius: 10, padding: '13px 14px 13px 42px',
+                  fontSize: 15, color: 'var(--text-primary)', fontFamily: 'DM Sans',
+                  outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s',
+                }}
+              />
             </div>
 
-            <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8, letterSpacing: '-0.3px', lineHeight: 1.3 }}>
-              Try the system<br />before you commit
-            </h2>
-            <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 20 }}>
-              Explore a fully populated demo gym — real members, payments, staff, and more. No setup, no credit card.
-            </p>
+            {error && (
+              <div style={{ fontSize: 12, color: 'var(--accent-red)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
+                ⚠ {error}
+              </div>
+            )}
 
-            {/* Feature list */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
-              {[
-                { icon: Users,      text: 'Manage members & memberships' },
-                { icon: CreditCard, text: 'Track payments & balances' },
-                { icon: Monitor,    text: 'Front desk check-in mode' },
-                { icon: BarChart3,  text: 'Reports & analytics' },
-              ].map(f => {
-                const Icon = f.icon;
-                return (
-                  <div key={f.text} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 7, background: 'rgba(201,169,110,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Icon size={13} color="#c9a96e" />
-                    </div>
-                    <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{f.text}</span>
-                  </div>
-                );
-              })}
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              style={{
+                width: '100%',
+                background: loading ? 'var(--bg-elevated)' : 'linear-gradient(135deg, #c9a96e, #b08d4a)',
+                border: 'none',
+                color: loading ? 'var(--text-muted)' : '#0a0a0f',
+                borderRadius: 10, padding: '13px',
+                fontSize: 14, fontWeight: 700,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontFamily: 'DM Sans',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: loading ? 'none' : '0 2px 12px rgba(201,169,110,0.25)',
+              }}
+            >
+              {loading ? t('auth.codeChecking') : <>{t('auth.codeContinue')} <ArrowRight size={16} strokeWidth={2.5} /></>}
+            </button>
+          </div>
+
+          <p style={{ marginTop: 20, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6, textAlign: 'center' }}>
+            {t('auth.codeDontHave')}{' '}
+            <span
+              style={{ color: 'var(--accent-gold)', cursor: 'pointer', fontWeight: 600 }}
+              onClick={() => nav('/signup')}
+            >
+              {t('auth.codeStartTrial')}
+            </span>
+            {'. '}{t('auth.codeDays')}
+          </p>
+
+          {/* Contact */}
+          <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--border-subtle)', textAlign: 'center' }}>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '0 0 12px', letterSpacing: '0.2px' }}>
+              {t('auth.codeSupport')}
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <a href="mailto:hello@gymgem.io" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#c9a96e', fontWeight: 600, textDecoration: 'none', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.2)', borderRadius: 8, padding: '6px 12px' }}>
+                ✉ hello@gymgem.io
+              </a>
+              <a href="https://wa.me/237600000000" target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#22c55e', fontWeight: 600, textDecoration: 'none', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)', borderRadius: 8, padding: '6px 12px' }}>
+                💬 WhatsApp
+              </a>
             </div>
-
-            {/* Demo gym card */}
-            <DemoCard onSelect={() => nav('/elite/login')} />
-
-            <p style={{ marginTop: 12, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, textAlign: 'center' }}>
-              A guided tour will walk you through the system after you sign in.
-            </p>
           </div>
 
         </div>
       </div>
     </div>
-  );
-}
-
-function DemoCard({ onSelect }) {
-  const [hov, setHov] = useState(false);
-  return (
-    <button
-      onClick={onSelect}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        width: '100%',
-        background: hov ? 'rgba(201,169,110,0.08)' : 'var(--bg-card)',
-        border: `2px solid ${hov ? '#c9a96e' : 'rgba(201,169,110,0.3)'}`,
-        borderRadius: 14, padding: '16px 18px', cursor: 'pointer',
-        fontFamily: 'DM Sans', display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', transition: 'all 0.2s',
-        boxShadow: hov ? '0 4px 20px rgba(201,169,110,0.15)' : 'none',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left' }}>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Dumbbell size={20} color="#0a0a0f" strokeWidth={2} />
-        </div>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>Elite Fitness Club</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Yaoundé, Cameroon · 8 members · 5 staff</div>
-          <div style={{ fontSize: 11, color: '#c9a96e', fontWeight: 600 }}>
-            ✦ Includes guided tour after sign-in
-          </div>
-        </div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: hov ? '#c9a96e' : 'rgba(201,169,110,0.12)', borderRadius: 8, padding: '7px 12px', transition: 'all 0.2s', flexShrink: 0 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: hov ? '#0a0a0f' : '#c9a96e' }}>Try Demo</span>
-        <ChevronRight size={14} color={hov ? '#0a0a0f' : '#c9a96e'} />
-      </div>
-    </button>
   );
 }

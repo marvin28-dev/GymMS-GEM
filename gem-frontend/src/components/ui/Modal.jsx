@@ -1,14 +1,18 @@
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
-export default function Modal({ open, onClose, title, children, maxWidth = 560 }) {
+export default function Modal({ open, onClose, title, children, maxWidth = 560, hideClose = false }) {
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; });
+  const hideCloseRef = useRef(hideClose);
+  useEffect(() => { hideCloseRef.current = hideClose; });
 
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onCloseRef.current();
+      // When close is hidden (money has been collected and must be refunded to
+      // back out), Escape must not be a silent escape hatch either.
+      if (e.key === 'Escape' && !hideCloseRef.current) onCloseRef.current();
     };
     document.addEventListener('keydown', handleKeyDown);
     document.body.style.overflow = 'hidden';
@@ -35,10 +39,13 @@ export default function Modal({ open, onClose, title, children, maxWidth = 560 }
         justifyContent: 'center',
         padding: 20,
       }}
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onCloseRef.current(); }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget && !hideCloseRef.current) onCloseRef.current(); }}
     >
       <div
         className="modal-content-enter"
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === 'string' ? title : undefined}
         style={{
           background: 'var(--bg-card)',
           border: '1px solid var(--border)',
@@ -73,8 +80,10 @@ export default function Modal({ open, onClose, title, children, maxWidth = 560 }
           >
             {title}
           </span>
+          {!hideClose && (
           <button
             onClick={onClose}
+            aria-label="Close"
             style={{
               background: 'none',
               border: 'none',
@@ -92,6 +101,7 @@ export default function Modal({ open, onClose, title, children, maxWidth = 560 }
           >
             <X size={16} strokeWidth={2} />
           </button>
+          )}
         </div>
 
         {/* Body */}

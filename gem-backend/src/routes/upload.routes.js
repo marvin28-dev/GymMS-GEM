@@ -6,7 +6,7 @@ const { uploadImage } = require('../controllers/upload.controller');
 const router = express.Router();
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
 });
 
 router.post('/', authenticate, upload.single('file'), uploadImage);

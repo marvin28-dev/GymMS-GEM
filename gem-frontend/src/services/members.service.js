@@ -14,3 +14,6 @@ export const update = (id, data) =>
 
 export const remove = (id) =>
   api.delete(`/members/${id}`);
+
+export const sendCode = (id) =>
+  api.post(`/members/${id}/send-code`);

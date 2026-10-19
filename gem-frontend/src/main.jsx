@@ -4,9 +4,14 @@ import { BrowserRouter } from "react-router-dom";
 import "./index.css";
 import App from "./App";
 import { LanguageProvider } from "./contexts/LanguageContext";
+import { installNumberGuard } from "./utils/numberGuard";
 
-// Apply saved theme before first render to avoid flash
-const savedTheme = localStorage.getItem('gem-theme') || 'dark';
+installNumberGuard();
+
+// Apply saved theme before first render to avoid flash. There are two themes;
+// a browser still holding one of the ones we dropped falls back to dark rather
+// than rendering against a palette that no longer exists.
+const savedTheme = localStorage.getItem('gem-theme') === 'light' ? 'light' : 'dark';
 document.documentElement.setAttribute('data-theme', savedTheme);
 
 class ErrorBoundary extends React.Component {

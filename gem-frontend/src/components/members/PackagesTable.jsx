@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { formatMoney } from "../../utils/currency";
 import {
   Box,
   Chip,
@@ -19,10 +20,6 @@ function formatAccess(access = []) {
   return access.join(" / ");
 }
 
-function formatMoneyXaf(n) {
-  const v = Number(n || 0);
-  return v.toLocaleString("fr-FR");
-}
 function PackagesTable({ rows, onEdit, onDelete }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const [activeRow, setActiveRow] = useState(null);
@@ -102,7 +99,7 @@ function PackagesTable({ rows, onEdit, onDelete }) {
                 </TableCell>
 
                 <TableCell sx={{ fontWeight: 900 }}>
-                  {formatMoneyXaf(r.price)} <span style={{ fontWeight: 800, opacity: 0.7 }}>XAF</span>
+                  {formatMoney(r.price)}
                 </TableCell>
 
                 <TableCell sx={{ fontWeight: 900 }}>{Number(r.enrolledCount || 0)}</TableCell>

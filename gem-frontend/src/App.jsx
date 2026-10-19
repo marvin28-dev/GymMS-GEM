@@ -1,9 +1,82 @@
+import { startLive } from './utils/live';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock } from 'lucide-react';
+import { useLanguage } from './contexts/LanguageContext';
 import AppRoutes from './routes/AppRoutes';
-import DemoTour, { useDemoTour, DemoTourButton } from './components/DemoTour';
-import { isAuthed, isDemoMode, clearAuth, touchActivity, isInactive } from './utils/auth';
+import { isAuthed, isDemoMode, clearAuth, touchActivity, isInactive, getHomeRoute, getAuth, updateSessionGym } from './utils/auth';
+import { setSessionPhoto } from './utils/sessionPhoto';
+import api from './services/api';
+
+/* Sign-in is kept per browser, not per tab. Signing in as someone else in one
+   tab used to leave the other tabs showing the old person while acting as the
+   new one, so a screen showing a manager could approve things with the owner's
+   code. When the stored account changes, every other tab follows at once. */
+const accountOf = (raw) => {
+  try {
+    const a = JSON.parse(raw || 'null');
+    return a?.user ? { key: `${a.user.gymId}:${a.user.id}`, gymCode: a.user.gymCode } : null;
+  } catch { return null; }
+};
+function useOneAccountPerBrowser() {
+  useEffect(() => {
+    let shown = accountOf(localStorage.getItem('gem_auth'));
+    const onStorage = (e) => {
+      if (e.key !== 'gem_auth' && e.key !== null) return;
+      const now = accountOf(localStorage.getItem('gem_auth'));
+      if ((now?.key || null) === (shown?.key || null)) return;
+      const signedOutOf = shown;
+      shown = now;
+      if (now) window.location.replace(getHomeRoute());
+      else window.location.replace(signedOutOf?.gymCode ? `/${signedOutOf.gymCode}/login` : '/login');
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+}
+
+// How often an open screen confirms the account is still active
+const SESSION_CHECK_MS = 15_000;
+
+/* A screen left open makes no requests, so it would never hear that its
+   account was deactivated. This asks every few seconds, and straight away when
+   the tab comes back into view. A deactivated answer signs out through the
+   api client. */
+function useSessionCheck() {
+  useEffect(() => {
+    const check = () => {
+      if (!isAuthed() || document.hidden) return;
+      api.get('/auth/me')
+        .then(res => {
+          // The same answer keeps the gym's details fresh. The owner can move
+          // the gym to another currency while a manager has a screen open in
+          // another browser; without this it would keep pricing everything in
+          // the old one until they signed in again.
+          const me = res.data || {};
+          const auth = getAuth();
+          const changed = auth?.user && (
+            (me.gymCurrency || null) !== (auth.user.gymCurrency || null) ||
+            (me.gymCountry || null) !== (auth.user.gymCountry || null)
+          );
+          updateSessionGym({ country: me.gymCountry, city: me.gymCity, currency: me.gymCurrency, name: me.gymName });
+          setSessionPhoto(me.photo || null);
+          // Money is printed all over every screen from this one value, so the
+          // only honest way to change it under an open page is to draw it again.
+          if (changed) window.location.reload();
+        })
+        .catch(() => {});
+    };
+    check();
+    const timer = setInterval(check, SESSION_CHECK_MS);
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('focus', check);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('focus', check);
+    };
+  }, []);
+}
 
 // Seconds the user has to respond before being force-logged-out
 const WARNING_SECONDS = 30;
@@ -26,7 +99,7 @@ function useInactivityLogout() {
   const [countdown, setCountdown] = useState(WARNING_SECONDS);
   const warningActive = useRef(false);
 
-  // Register activity listeners — paused while warning is showing
+  // Register activity listeners - paused while warning is showing
   useEffect(() => {
     const EVENTS = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
     const onActivity = () => {
@@ -38,7 +111,7 @@ function useInactivityLogout() {
     return () => EVENTS.forEach(e => window.removeEventListener(e, onActivity));
   }, []);
 
-  // Poll for inactivity — fires warning when threshold exceeded
+  // Poll for inactivity - fires warning when threshold exceeded
   useEffect(() => {
     const interval = setInterval(() => {
       if (isAuthed() && !isDemoMode() && isInactive() && !warningActive.current) {
@@ -50,11 +123,11 @@ function useInactivityLogout() {
     return () => clearInterval(interval);
   }, []);
 
-  // Countdown tick — runs only while warning is visible
+  // Countdown tick - runs only while warning is visible
   useEffect(() => {
     if (!showWarning) return;
     if (countdown <= 0) {
-      // Time's up — log out
+      // Time's up - log out
       warningActive.current = false;
       setShowWarning(false);
       setCountdown(WARNING_SECONDS);
@@ -88,6 +161,7 @@ function useInactivityLogout() {
    Warning modal
    ───────────────────────────────────────────────────────────────── */
 function InactivityWarning({ countdown, onStay, onLogout }) {
+  const { t } = useLanguage();
   const pct = `${(countdown / WARNING_SECONDS) * 100}%`;
   const urgent = countdown <= 10;
 
@@ -129,11 +203,11 @@ function InactivityWarning({ countdown, onStay, onLogout }) {
           fontFamily: 'Manrope, sans-serif', fontSize: 21, fontWeight: 800,
           color: 'var(--text-primary)', marginBottom: 10,
         }}>
-          Are you still there?
+          {t('idle.title')}
         </div>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.75, marginBottom: 28 }}>
-          You've been inactive for a while.<br />
-          For your security, you'll be logged out automatically.
+          {t('idle.body1')}<br />
+          {t('idle.body2')}
         </div>
 
         {/* Countdown number */}
@@ -149,7 +223,7 @@ function InactivityWarning({ countdown, onStay, onLogout }) {
           fontSize: 11, fontWeight: 700, letterSpacing: '1.5px',
           textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 24,
         }}>
-          seconds remaining
+          {t('idle.secondsLeft')}
         </div>
 
         {/* Progress bar */}
@@ -176,7 +250,7 @@ function InactivityWarning({ countdown, onStay, onLogout }) {
               color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'DM Sans',
             }}
           >
-            Log out
+            {t('idle.logOut')}
           </button>
           <button
             onClick={onStay}
@@ -194,7 +268,7 @@ function InactivityWarning({ countdown, onStay, onLogout }) {
               transition: 'all 0.3s',
             }}
           >
-            Yes, I'm still here
+            {t('idle.stay')}
           </button>
         </div>
       </div>
@@ -206,13 +280,14 @@ function InactivityWarning({ countdown, onStay, onLogout }) {
    App root
    ───────────────────────────────────────────────────────────────── */
 export default function App() {
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   const { showWarning, countdown, stayLoggedIn, logoutNow } = useInactivityLogout();
-  const { show, open, close } = useDemoTour();
+  useSessionCheck();
+  useOneAccountPerBrowser();
+  useEffect(() => startLive(), []);
   return (
     <>
       <AppRoutes />
-      {show && <DemoTour onClose={close} />}
-      {!show && <DemoTourButton onClick={open} />}
       {showWarning && (
         <InactivityWarning
           countdown={countdown}

@@ -2,8 +2,20 @@
   color-scheme: light;
 }
 
-html, body {
+html {
   height: 100%;
+}
+
+body {
+  height: 100%;
+  max-width: 100%;
+  position: relative;
+}
+
+#root {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
 }
 
 body {
@@ -22,4 +34,283 @@ body {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* ── Global overflow safety ───────────────────────────────────── */
+select {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Catch-all truncation utility */
+.gem-truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+@keyframes gem-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.3; transform: scale(1.8); }
+}
+
+@keyframes gem-dot-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201,169,110,0.6); }
+  50%       { box-shadow: 0 0 0 5px rgba(201,169,110,0); }
+}
+
+/* ── Mobile layout overrides ──────────────────────────────────── */
+@media (max-width: 768px) {
+  .gem-app-shell {
+    margin-left: 0 !important;
+  }
+  .gem-sidebar {
+    z-index: 220;
+  }
+  .gem-sidebar-overlay {
+    display: block !important;
+  }
+  .gem-page-main {
+    padding: 16px !important;
+  }
+  .gem-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+  .gem-landing-nav-links {
+    display: none !important;
+  }
+  .gem-landing-mobile-menu {
+    display: flex !important;
+  }
+  .gem-two-col {
+    grid-template-columns: 1fr !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .gem-hide-mobile {
+    display: none !important;
+  }
+  .gem-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .gem-hamburger {
+    display: flex !important;
+  }
+  .gem-sidebar-close {
+    display: flex !important;
+  }
+  .gem-login-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .gem-login-left {
+    display: none !important;
+  }
+  .gem-welcome-step {
+    flex-direction: column !important;
+    gap: 32px !important;
+  }
+  .gem-welcome-step > div:first-child {
+    width: 100% !important;
+  }
+  /* Sign-up body: tighter padding on mobile */
+  .gem-signup-body {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    padding-top: 28px !important;
+    padding-bottom: 40px !important;
+  }
+  /* Settings: stack side-nav above content */
+  .gem-settings-layout {
+    flex-direction: column !important;
+  }
+  .gem-settings-nav {
+    width: 100% !important;
+    flex-shrink: 1 !important;
+  }
+  /* Signup header: hide verbose text, keep just Sign In */
+  .gem-signup-header-cta span:first-child {
+    display: none !important;
+  }
+  /* ── Landing page public pages (/, /signup, /login) ── */
+
+  /* Prevent horizontal overflow caused by absolute glow blobs */
+  .gem-landing-page {
+    overflow-x: hidden;
+  }
+
+  /* Navbar: tighter padding */
+  .gem-landing-nav-inner {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  /* Hero badge: smaller text, constrained width */
+  .gem-hero-badge {
+    padding: 5px 12px !important;
+    gap: 5px !important;
+    max-width: calc(100vw - 32px);
+  }
+  .gem-hero-badge span {
+    font-size: 10px !important;
+  }
+
+  /* Hero section: reduce padding */
+  .gem-hero-section {
+    padding-top: 44px !important;
+    padding-bottom: 28px !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    overflow: hidden;
+  }
+  .gem-hero-body {
+    font-size: 15px !important;
+    margin-bottom: 28px !important;
+  }
+
+  /* Hero CTA buttons: full-width, stacked column */
+  .gem-landing-cta-btns {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    margin-bottom: 28px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .gem-landing-cta-btns button {
+    width: 100% !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Trust badges: stack as a clean column on mobile */
+  .gem-hero-trust {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  /* Stats bar: clean 2-col layout with row divider */
+  .gem-stat-item {
+    border-right: none !important;
+    padding-top: 20px !important;
+    padding-bottom: 20px !important;
+  }
+  .gem-stat-item:nth-child(-n+2) {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  /* Video section: tighter padding */
+  .gem-landing-video {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    padding-bottom: 44px !important;
+  }
+
+  /* All interior sections: reduce vertical padding */
+  .gem-landing-section {
+    padding-top: 44px !important;
+    padding-bottom: 44px !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+  .gem-landing-testimonials {
+    padding-top: 44px !important;
+    padding-bottom: 44px !important;
+  }
+
+  /* CTA card: reduce horizontal padding so it doesn't feel squished */
+  .gem-cta-card {
+    padding: 32px 20px !important;
+    border-radius: 16px !important;
+  }
+
+  /* Contact cards: full-width stacked column */
+  .gem-landing-contact-cards {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 12px !important;
+  }
+  .gem-landing-contact-cards > a {
+    display: block !important;
+  }
+  .gem-landing-contact-cards > a > div {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Section inner header spacing */
+  .gem-section-header-mb {
+    margin-bottom: 28px !important;
+  }
+
+  /* Auth form panel: top-aligned, generous padding */
+  .gem-login-form-panel {
+    padding: 32px 20px 48px !important;
+    align-items: flex-start !important;
+  }
+
+  /* Auth form card: reduce inner padding so fields have room */
+  .gem-login-form-card {
+    padding: 20px 16px !important;
+    border-radius: 14px !important;
+  }
+
+  /* Demo login: show login card BEFORE marketing content on mobile */
+  .gem-demo-info { order: 2; }
+  .gem-demo-form { order: 1; }
+  .gem-demo-content { padding: 20px 16px !important; align-items: flex-start !important; }
+
+  /* Demo login: hide the feature grid on mobile, keep it simple */
+  .gem-demo-features { display: none !important; }
+  /* Also hide the tip box below the feature grid */
+  .gem-demo-tip { display: none !important; }
+
+  /* Signup step card: edge-to-edge on mobile */
+  .gem-signup-step-card {
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    margin-left: -20px !important;
+    margin-right: -20px !important;
+  }
+
+  /* Signup body: remove side padding so card goes edge-to-edge */
+  .gem-signup-body {
+    max-width: 100% !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+    padding-top: 24px !important;
+    padding-bottom: 40px !important;
+  }
+
+  /* Signup form card: reduce inner padding from 28px → 16px on mobile */
+  .gem-signup-card-top {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+  .gem-signup-card-inner {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+  .gem-signup-card-footer {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  /* SignUp welcome step: make CTA full-width */
+  .gem-welcome-cta {
+    width: 100% !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Signup step indicator: compact on mobile */
+  .gem-step-indicator {
+    margin-bottom: 24px !important;
+  }
 }

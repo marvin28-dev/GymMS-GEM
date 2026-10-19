@@ -1,28 +1,73 @@
+﻿import RevenueSplit from '../components/ui/RevenueSplit';
+import { useLiveTick } from '../hooks/useLiveRefresh';
 import { useState, useEffect } from 'react';
-import { Plus, Download, TrendingUp, TrendingDown, AlertCircle, Banknote, Pencil, Trash2, FileText, ChevronDown, Eye, BarChart2 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { getCurrencySymbol, formatMoney } from '../utils/currency';
+import { digitsOnly } from '../utils/number';
+import { Plus, Download, TrendingUp, TrendingDown, AlertCircle, Banknote, Pencil, Trash2, FileText, ChevronDown, Eye, BarChart2, Save, X, CheckCircle } from 'lucide-react';
+import RowMenu from '../components/ui/RowMenu';
+import { useIsMobile } from '../hooks/useIsMobile';
+import FAB from '../components/FAB';
 import { useLanguage } from '../contexts/LanguageContext';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Modal from '../components/ui/Modal';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import ManagerAuthModal from '../components/ui/ManagerAuthModal';
-import { getAll as getExpenses, create as createExpense, update as updateExpense, remove as removeExpense } from '../services/expenses.service';
+import { getAll as getExpenses, create as createExpense, update as updateExpense, remove as removeExpense, getPending as getPendingExpenses, approve as approveExpenseApi } from '../services/expenses.service';
+import { getRole } from '../utils/auth';
 import { getAll as getStaff } from '../services/staff.service';
 import { getAll as getPayments } from '../services/payments.service';
 import { getAll as getMembers } from '../services/members.service';
+import { getAll as getPayRecords, setStatus as setPayStatus, create as createPayRecord } from '../services/payroll.service';
+import { previewMonth as previewPay } from '../services/payAdjustments.service';
+import { fmtDate, capFirst, getDateLocale, dayStr, todayStr } from '../utils/date';
+import { revenueOf } from '../utils/revenue';
+import { getAll as getSales } from '../services/sales.service';
+import { useGymSettings } from '../hooks/useGymSettings';
+import { enabledMethods, canonicalMethod, PAYMENT_METHODS } from '../utils/paymentMethods';
+import { notifyDataChanged } from '../utils/events';
+import { softAll } from '../utils/loadAll';
+import { gymCache } from '../utils/gymCache';
+import { SkeletonCards } from '../components/Skeleton';
 
-const formatMoney = (n) => `${Math.round(n || 0).toLocaleString('fr-FR')} FCFA`;
 const staffName = (s) => s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim();
 
 const cardStyle = { background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, boxShadow: 'var(--shadow-card)' };
 const primaryBtn = { background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', color: '#0a0a0f', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '8px 16px', cursor: 'pointer', fontFamily: 'DM Sans', display: 'inline-flex', alignItems: 'center', gap: 6 };
 const secondaryBtn = { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '8px 16px', cursor: 'pointer', fontFamily: 'DM Sans', display: 'inline-flex', alignItems: 'center', gap: 6 };
 const inputStyle = { width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '9px 14px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none' };
+// Header controls sit beside Export PDF, so they take the same treatment as
+// secondaryBtn rather than the form-field styling used inside modals.
+const toolbarControl = {
+  background: 'var(--bg-card)',
+  border: '1px solid var(--border)',
+  color: 'var(--text-primary)',
+  borderRadius: 6,
+  fontSize: 12,
+  fontWeight: 600,
+  padding: '8px 16px',
+  fontFamily: 'DM Sans',
+  outline: 'none',
+  cursor: 'pointer',
+  width: 160,
+};
 
-const emptyForm = { title: '', category: 'Utilities', amount: '', date: '', paidTo: '', method: 'Cash', reference: '', recordedBy: '', notes: '' };
+const emptyForm = { title: '', category: 'Utilities', amount: '', date: '', paidTo: '', method: 'Cash', reference: '', recordedBy: '', notes: '', staffId: '', payMonth: '' };
+
+// Pay periods are stored as "Sep 2026", generated the same way everywhere so a
+// period always matches the records and adjustments tagged with it.
+const payMonthLabel = (d) => d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+function payMonthOptions(forward = 12) {
+  const now = new Date();
+  return Array.from({ length: forward + 1 }, (_, i) =>
+    payMonthLabel(new Date(now.getFullYear(), now.getMonth() + i, 1)));
+}
 
 function getPeriodDateRanges() {
   const now = new Date();
-  const fmt = (d) => d.toISOString().slice(0, 10);
+  // Local days: toISOString() would start "This Month" on the last day of the
+  // month before, anywhere east of GMT
+  const fmt = (d) => dayStr(d);
   const [y, m] = [now.getFullYear(), now.getMonth()];
   const dayOfWeek = now.getDay() || 7;
   const monday = new Date(now); monday.setDate(now.getDate() - dayOfWeek + 1);
@@ -37,21 +82,15 @@ function getPeriodDateRanges() {
 }
 const PERIOD_DATE_RANGES = getPeriodDateRanges();
 
-const getRevenueCategory = (description) => {
-  const d = (description || '').toLowerCase();
-  if (d.includes('personal training') || d.includes('coaching') || d.includes('pt session')) return 'Personal Training';
-  if (d.includes('protein') || d.includes('shake') || d.includes('supplement') || d.includes('merchandise') || d.includes('product')) return 'Product Sales';
-  if (d.includes('renewal') || d.includes('package') || d.includes('monthly') || d.includes('membership') || d.includes('basic') || d.includes('standard') || d.includes('premium') || d.includes('visitor')) return 'Memberships';
-  return 'Other';
-};
-
-function buildChartData(paymentsList, expenses, monthsBack) {
+function buildChartData(paymentsList, salesList, expenses, monthsBack) {
   const now = new Date();
   return Array.from({ length: monthsBack }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (monthsBack - 1 - i), 1);
-    const prefix = d.toISOString().slice(0, 7); // 'YYYY-MM'
-    const month = d.toLocaleDateString('en-GB', { month: 'short' });
-    const revenue = paymentsList.filter(p => (p.createdAt || '').slice(0, 7) === prefix).reduce((s, p) => s + (p.amount || 0), 0);
+    // The gym's own month: toISOString() would give the previous month for
+    // the 1st just after midnight anywhere east of GMT
+    const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const month = fmtDate(d, { month: 'short' });
+    const revenue = revenueOf(paymentsList, salesList, day => day.slice(0, 7) === prefix).total;
     const exp = expenses.filter(e => (e.date || '').slice(0, 7) === prefix).reduce((s, e) => s + Number(e.amount || 0), 0);
     return { month, revenue, expenses: exp };
   });
@@ -75,42 +114,53 @@ function generateLastNMonths(n) {
   const now = new Date();
   return Array.from({ length: n }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    return d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+    return fmtDate(d, { month: 'short', year: 'numeric' });
   });
 }
 const PAYSTUB_MONTHS = generateLastNMonths(6);
 
 // converts 'YYYY-MM' → 'Mar 2026' for matching paystub records
+// Must match how pay periods are stored ("Sep 2026"). A locale-aware format
+// would give "Sept 2026" in en-GB or "sept. 2026" in French and never match.
 const fmtMonth = (ym) => {
   if (!ym) return '';
   const [y, m] = ym.split('-');
-  return new Date(Number(y), Number(m) - 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+  return payMonthLabel(new Date(Number(y), Number(m) - 1));
 };
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const ymOf = (label) => {
+  const m = /^([A-Za-z]{3})\s+(\d{4})$/.exec(String(label || '').trim());
+  const idx = m ? MONTH_ABBR.indexOf(m[1]) : -1;
+  return idx < 0 ? '' : `${m[2]}-${String(idx + 1).padStart(2, '0')}`;
+};
+const thisMonthYm = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+const isYm = (v) => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(v || ''));
 
-function buildPaystubs(staffArr) {
-  return staffArr.map(s => {
-    const basic = s.salary || PAY_RATES[s.role] || PAY_RATES.Other;
-    return PAYSTUB_MONTHS.map((month, i) => ({
-      id: `${s.id}-${i}`,
-      staffId: s.id,
-      staffName: staffName(s),
-      role: s.role || 'Other',
-      month,
-      basicPay: basic,
-      allowances: 0,
-      deductions: 0,
-      netPay: basic,
-      status: i === 0 ? 'issued' : 'paid',
-    }));
-  }).flat();
-}
-
-const PAYSTUB_PAID_KEY = 'gem_paystub_paid';
-function loadPaidIds() {
-  try { return new Set(JSON.parse(localStorage.getItem(PAYSTUB_PAID_KEY) || '[]')); } catch { return new Set(); }
-}
-function savePaidIds(ids) {
-  try { localStorage.setItem(PAYSTUB_PAID_KEY, JSON.stringify([...ids])); } catch {}
+// Maps a PayRecord from the API onto the shape this page renders.
+function toPaystub(r) {
+  const bd = r.breakdown || null;
+  return {
+    id: r.id,
+    staffId: r.staff?.id,
+    staffName: `${r.staff?.firstName || ''} ${r.staff?.lastName || ''}`.trim(),
+    role: r.staff?.role || '',
+    month: r.month,
+    basicPay: r.basePay ?? r.amount,
+    allowances: bd?.totalBonuses || 0,
+    deductions: r.deductions ?? bd?.totalDeductions ?? 0,
+    // The pay as the books record it: basic plus bonuses
+    grossPay: r.amount,
+    // What changes hands: the pay less what is withheld for deductions
+    netPay: r.netAmount ?? Math.max(0, r.amount - (r.deductions ?? bd?.totalDeductions ?? 0)),
+    breakdown: bd,
+    note: r.note || '',
+    issuedAt: r.issuedAt,
+    paidAt: r.paidAt,
+    status: r.status || 'issued',
+  };
 }
 
 const PAYSTUB_EXPENSE_MAP_KEY = 'gem_paystub_expense_map';
@@ -130,11 +180,24 @@ function loadFrontDeskExpenses() {
   } catch { return []; }
 }
 
+// Front-desk expenses live on the gym record now, not in this browser. A desk
+// expense from the API is shaped for the Front Desk Expenses tab, which still
+// reads description/submittedBy/status.
+function normFdExpense(e) {
+  return { ...e, description: e.title, submittedBy: e.recordedBy || e.createdByName || '', status: e.approvalStatus === 'pending' ? 'pending' : 'approved' };
+}
+
 function saveFrontDeskExpenses(list) {
   try { localStorage.setItem('gem_expenses', JSON.stringify(list)); } catch { /* ignore */ }
 }
 
-const StatusPill = ({ status }) => {
+// Bonuses and deductions are read as two separate ledgers, never one mixed list.
+const PAY_KINDS = [
+  { key: 'bonuses', title: 'Bonuses', sign: '+', color: 'var(--accent-green)' },
+  { key: 'deductions', title: 'Deductions', sign: '-', color: 'var(--accent-red)' },
+];
+
+const StatusPill = ({ status, label }) => {
   const map = {
     pending:  { bg: 'rgba(234,179,8,0.15)',  color: '#eab308' },
     approved: { bg: 'rgba(34,197,94,0.15)',  color: '#22c55e' },
@@ -145,31 +208,85 @@ const StatusPill = ({ status }) => {
   };
   const s = map[status] || map.pending;
   return (
-    <span style={{ background: s.bg, color: s.color, fontSize: 11, padding: '3px 8px', borderRadius: 4, fontWeight: 600, textTransform: 'capitalize' }}>
-      {status || 'pending'}
+    <span style={{ background: s.bg, color: s.color, fontSize: 11, padding: '3px 8px', borderRadius: 4, fontWeight: 600, textTransform: label ? 'none' : 'capitalize' }}>
+      {label || status || 'pending'}
     </span>
   );
 };
 
 export default function AccountingPage() {
   const { t } = useLanguage();
-  const [expenses, setExpenses] = useState([]);
-  const [staffList, setStaffList] = useState([]);
-  const [paymentsList, setPaymentsList] = useState([]);
-  const [membersList, setMembersList] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const isMobile = useIsMobile();
+  const role = getRole();
+  const canEditPayroll = role !== 'manager';
+  // Changing a figure in the books, or taking one out, is the owner's alone.
+  // Everybody else reads them.
+  const gymSettings = useGymSettings();
+  const canEditExpenses = role === 'general_manager';
+  // Payroll per person is the owner's. A manager sees what it cost the gym,
+  // rolled into the books, so there is no paystub tab for them.
+  const mainTabs = [
+    ['overview', t('reports.overview')],
+    ...(canEditPayroll ? [['paystubs', t('reports.paystubs')]] : []),
+    ['marketing', t('reports.marketing')],
+  ];
+  // Show the last figures at once and refresh quietly; a first-ever visit
+  // falls back to the skeleton. See utils/gymCache.js.
+  const cache = gymCache('accounting');
+  const [expenses, setExpenses] = useState(() => cache.read('expenses', []));
+  const [pendingApprovals, setPendingApprovals] = useState([]);
+  const [staffList, setStaffList] = useState(() => cache.read('staff', []));
+  const [paymentsList, setPaymentsList] = useState(() => cache.read('payments', []));
+  const [salesList, setSalesList] = useState(() => cache.read('sales', []));
+  const [membersList, setMembersList] = useState(() => cache.read('members', []));
+  const [loading, setLoading] = useState(() => !cache.has('expenses'));
   const [showModal, setShowModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [deleteExpense, setDeleteExpense] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [salaryPreview, setSalaryPreview] = useState(null);
+  // Issuing pay is a different action from booking an expense, so the form
+  // swaps its fields rather than pretending salaries are an ordinary expense.
+  const isSalaryEntry = !editingExpense && form.category === 'Salaries';
+  const [showUnpaidAuth, setShowUnpaidAuth] = useState(false);
+  const [pendingUnpaidId, setPendingUnpaidId] = useState(null);
+
+  // Picking a staff member and month works out what they are owed, including
+  // their bonuses and deductions for that period.
+  const loadSalaryPreview = async (staffId, month) => {
+    if (!staffId || !month) { setSalaryPreview(null); return; }
+    try {
+      const res = await previewPay(staffId, month);
+      setSalaryPreview(res.data);
+      setForm(f => ({ ...f, amount: String(res.data.net) }));
+    } catch {
+      setSalaryPreview(null);
+    }
+  };
   const [errors, setErrors] = useState({});
   const [period, setPeriod] = useState('This Month');
   const [activeTab, setActiveTab] = useState('All Expenses');
-  const [fdStatusFilter, setFdStatusFilter] = useState('pending');
-  const [frontDeskExpenses, setFrontDeskExpenses] = useState(loadFrontDeskExpenses);
-  const [mainTab, setMainTab] = useState('overview');
+  const [fdStatusFilter, setFdStatusFilter] = useState('all');
+  const [frontDeskExpenses, setFrontDeskExpenses] = useState([]);
+  const expenseLimit = gymSettings.expenseLimit;
+  // Notifications and other deep links land here with ?tab=paystubs, so the
+  // page opens on the tab the link was about rather than the default.
+  const [searchParams] = useSearchParams();
+  const [mainTab, setMainTab] = useState(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'paystubs' && getRole() === 'manager') return 'overview';
+    return ['overview', 'paystubs', 'marketing'].includes(tab) ? tab : 'overview';
+  });
   const [paystubs, setPaystubs] = useState([]);
-  const [paystubMonth, setPaystubMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [paystubMonth, setPaystubMonth] = useState(() => (isYm(searchParams.get('month')) ? searchParams.get('month') : thisMonthYm()));
+  const [marketingRange, setMarketingRange] = useState('all'); // 7d | 30d | 90d | 365d | all
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'paystubs' && role === 'manager') setMainTab('overview');
+    else if (['overview', 'paystubs', 'marketing'].includes(tab)) setMainTab(tab);
+    const month = searchParams.get('month');
+    if (isYm(month)) setPaystubMonth(month);
+  }, [searchParams]);
   const [showPaystubModal, setShowPaystubModal] = useState(false);
   const [editingPaystub, setEditingPaystub] = useState(null);
   const [payForm, setPayForm] = useState({});
@@ -178,6 +295,7 @@ export default function AccountingPage() {
   const [showAddDedLine, setShowAddDedLine] = useState(false);
   const [expenseImagePreview, setExpenseImagePreview] = useState(null);
   const [viewingExpense, setViewingExpense] = useState(null);
+  const [viewingPaystub, setViewingPaystub] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('All Categories');
   const [showPaystubAuthModal, setShowPaystubAuthModal] = useState(false);
   const [showExpenseAuthModal, setShowExpenseAuthModal] = useState(false);
@@ -189,44 +307,101 @@ export default function AccountingPage() {
   const saveReceipt = (id, dataUrl) => { try { if (dataUrl) localStorage.setItem(getReceiptKey(id), dataUrl); else localStorage.removeItem(getReceiptKey(id)); } catch {} };
 
   useEffect(() => {
-    const onVisible = () => { if (!document.hidden) setFrontDeskExpenses(loadFrontDeskExpenses()); };
+    const onVisible = () => {
+      if (document.hidden) return;
+      getExpenses({ source: 'frontdesk', status: 'all' }).then(r => setFrontDeskExpenses((r.data || []).map(normFdExpense))).catch(() => {});
+      // Pay may have been issued from a staff profile in the meantime
+      getPayRecords().then(r => setPaystubs((r.data || []).map(toPaystub))).catch(() => {});
+    };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
+  // Re-read payroll whenever the Paystubs tab is opened
   useEffect(() => {
-    setFrontDeskExpenses(loadFrontDeskExpenses());
-    Promise.all([getExpenses(), getStaff(), getPayments(), getMembers()])
-      .then(([eRes, sRes, pRes, mRes]) => {
-        setExpenses(eRes.data || []);
-        setMembersList(mRes.data || []);
-        const loaded = sRes.data || [];
-        setStaffList(loaded);
-        setPaymentsList(pRes.data || []);
-        const paidIds = loadPaidIds();
-        const stubs = buildPaystubs(loaded).map(p => paidIds.has(p.id) ? { ...p, status: 'paid' } : p);
-        setPaystubs(stubs);
-        const initDed = {};
-        stubs.forEach(p => {
-          initDed[p.id] = [
-            { id: 1, label: 'Health Insurance', amount: 10000, note: 'Monthly premium deduction' },
-            { id: 2, label: 'Pension Fund', amount: 5000, note: 'Pension contribution' },
-          ];
-        });
-        setPaystubDeductionLines(initDed);
+    if (mainTab !== 'paystubs') return;
+    getPayRecords().then(r => setPaystubs((r.data || []).map(toPaystub))).catch(() => {});
+  }, [mainTab]);
+
+  const liveTick = useLiveTick();
+  useEffect(() => {
+    // Each of these is allowed to fail on its own. Payroll is the owner's, so
+    // it comes back 403 for a manager - and with Promise.all that one refusal
+    // threw away the expenses, payments and members too, leaving the manager
+    // an accounting page with nothing on it at all.
+    // Shop sales count as revenue too; a year back covers every period and the chart
+    const yearAgo = new Date(); yearAgo.setMonth(yearAgo.getMonth() - 11, 1);
+    softAll([getExpenses(), getStaff(), getPayments(), getMembers(), getPayRecords(), getPendingExpenses(), getExpenses({ source: 'frontdesk', status: 'all' }), getSales({ from: dayStr(yearAgo), to: todayStr() })])
+      .then(([eRes, sRes, pRes, mRes, payRes, pendRes, fdRes, salesRes]) => {
+        const exp = eRes.data || [], stf = sRes.data || [], pay = pRes.data || [], mem = mRes.data || [];
+        setExpenses(exp); cache.write('expenses', exp);
+        setMembersList(mem); cache.write('members', mem);
+        setStaffList(stf); cache.write('staff', stf);
+        setPaymentsList(pay); cache.write('payments', pay);
+        if (salesRes) { const sl = salesRes.data || []; setSalesList(sl); cache.write('sales', sl); }
+        // Real issued payroll, not invented rows
+        setPaystubs((payRes.data || []).map(toPaystub));
+        setPendingApprovals(pendRes?.data || []);
+        setFrontDeskExpenses((fdRes?.data || []).map(normFdExpense));
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveTick]);
 
-  const chartData = buildChartData(paymentsList, expenses, PERIOD_MONTHS_BACK[period] || 1).map(d => ({ ...d, net: d.revenue - d.expenses }));
+  // A desk expense over the limit waits here for a manager. Approving it moves
+  // it into the books (it then shows up in the normal expense list and totals).
+  const canApproveExpenses = ['general_manager', 'manager'].includes(role);
+  const [approvingId, setApprovingId] = useState(null);
+  const approvePendingExpense = async (id) => {
+    setApprovingId(id);
+    try {
+      await approveExpenseApi(id);
+      const [eRes, pendRes, fdRes] = await Promise.all([getExpenses(), getPendingExpenses(), getExpenses({ source: 'frontdesk', status: 'all' })]);
+      setExpenses(eRes.data || []); cache.write('expenses', eRes.data || []);
+      setPendingApprovals(pendRes.data || []);
+      setFrontDeskExpenses((fdRes.data || []).map(normFdExpense));
+      notifyDataChanged();
+    } catch (err) {
+      console.error('Failed to approve expense:', err);
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const pendingPanel = (canApproveExpenses && pendingApprovals.length > 0) ? (
+    <div style={{ ...cardStyle, marginBottom: 24, border: '1px solid rgba(201,169,110,0.4)' }}>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <AlertCircle size={16} color="var(--accent-gold)" />
+        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Manrope' }}>{t('reports.pendingApprovalTitle')}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: 'var(--accent-gold)', background: 'var(--accent-gold-dim)', borderRadius: 10, padding: '2px 8px' }}>{pendingApprovals.length}</span>
+      </div>
+      <div>
+        {pendingApprovals.map(e => (
+          <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--border-subtle)', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{e.title}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{[e.category, e.paidTo && `→ ${e.paidTo}`, e.createdByName, String(e.date).slice(0, 10)].filter(Boolean).join(' · ')}</div>
+            </div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{formatMoney(e.amount)}</div>
+            <RowMenu title={t('common.actions')} items={[
+              { label: t('reports.view'), icon: <Eye size={15} />, onClick: () => openView(e) },
+              { label: approvingId === e.id ? t('common.loading') : t('reports.markReviewed'), icon: <CheckCircle size={15} />,
+                onClick: () => { if (approvingId !== e.id) approvePendingExpense(e.id); } },
+            ]} />
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
+  const chartData = buildChartData(paymentsList, salesList, expenses, PERIOD_MONTHS_BACK[period] || 1).map(d => ({ ...d, net: d.revenue - d.expenses }));
 
   const periodRange = PERIOD_DATE_RANGES[period] || PERIOD_DATE_RANGES['This Month'];
 
-  const periodRevenue = paymentsList.filter(p => {
-    const d = (p.createdAt || '').slice(0, 10);
-    return d >= periodRange.from && d <= periodRange.to;
-  }).reduce((s, p) => s + (p.amount || 0), 0);
+  // Money in for the period: what members paid plus what the shop sold
+  const periodRev = revenueOf(paymentsList, salesList, d => d >= periodRange.from && d <= periodRange.to);
+  const periodRevenue = periodRev.total;
 
   const periodExpensesAmt = expenses.filter(e => {
     const d = e.date ? String(e.date).slice(0, 10) : '';
@@ -244,14 +419,19 @@ export default function AccountingPage() {
     return d >= periodRange.from && d <= periodRange.to;
   });
 
+  // Split by what the money was for, from each payment's recorded type (the
+  // old version guessed from a description payments do not have, so it put
+  // everything under Other) plus the shop's own sales
   const paymentCategoryBreakdown = (() => {
-    const filtered = paymentsList.filter(p => { const d = (p.createdAt || '').slice(0, 10); return d >= periodRange.from && d <= periodRange.to; });
-    const totals = { Memberships: 0, 'Personal Training': 0, 'Product Sales': 0, Other: 0 };
-    filtered.forEach(p => { totals[getRevenueCategory(p.description)] += p.amount; });
-    const total = Object.values(totals).reduce((s, v) => s + v, 0);
+    const total = periodRev.total;
     if (total === 0) return [];
-    return Object.entries(totals)
-      .filter(([, v]) => v > 0)
+    return [
+      [t('reports.revMemberships'), periodRev.memberships],
+      [t('reports.revRegistration'), periodRev.registration],
+      [t('reports.revPasses'), periodRev.passes],
+      [t('reports.revShop'), periodRev.shop],
+      [t('reports.revOther'), periodRev.other],
+    ].filter(([, v]) => v > 0)
       .map(([label, amount]) => ({ label, amount, pct: Math.round((amount / total) * 100) }));
   })();
 
@@ -277,13 +457,50 @@ export default function AccountingPage() {
 
   const validate = () => {
     const e = {};
-    if (!form.title) e.title = 'Required';
-    if (!form.amount) e.amount = 'Required';
-    if (!form.date) e.date = 'Required';
+    if (isSalaryEntry) {
+      if (!form.staffId) e.staffId = t('common.required');
+      if (!form.payMonth) e.payMonth = t('common.required');
+      // 0 is a real pay (no hours, or deductions that exactly cancel it)
+      if (String(form.amount ?? '').trim() === '' || !(Number(form.amount) >= 0)) e.amount = t('common.required');
+      const short = salaryPreview?.month === form.payMonth ? (salaryPreview.shortfall || 0) : 0;
+      if (short > 0) e._api = `Deductions for ${form.payMonth} are ${formatMoney(short)} more than the pay. Reduce or remove a deduction, then issue the pay.`;
+      return e;
+    }
+    if (!form.title) e.title = t('common.required');
+    if (!form.amount) e.amount = t('common.required');
+    if (!form.date) e.date = t('common.required');
+    // Who the money went to is required so an entry is always traceable.
+    if (!form.paidTo || !form.paidTo.trim()) e.paidTo = t('common.required');
     return e;
   };
 
+  // Salaries are not booked as an expense here. Issuing pay creates a pay
+  // record in the "issued" state; the expense is booked when it is settled.
+  const commitPayrollSave = async (another = false) => {
+    try {
+      const res = await createPayRecord({
+        staffId: form.staffId,
+        month: form.payMonth,
+        amount: Number(form.amount),
+        note: form.notes || undefined,
+      });
+      setPaystubs(prev => [toPaystub(res.data), ...prev]);
+      if (another) {
+        setForm(f => ({ ...emptyForm, category: 'Salaries', payMonth: f.payMonth }));
+        setErrors({});
+        setSalaryPreview(null);
+      } else {
+        setShowModal(false);
+        setMainTab('paystubs');
+        if (ymOf(form.payMonth)) setPaystubMonth(ymOf(form.payMonth));
+      }
+    } catch (err) {
+      setErrors({ _api: err.response?.data?.error || t('reports.failedToSave') });
+    }
+  };
+
   const commitExpenseSave = async (another = false) => {
+    if (!editingExpense && form.category === 'Salaries') return commitPayrollSave(another);
     try {
       if (editingExpense) {
         const res = await updateExpense(editingExpense.id, form);
@@ -296,7 +513,7 @@ export default function AccountingPage() {
       }
       if (another) { setForm(emptyForm); setErrors({}); setExpenseImagePreview(null); } else { setShowModal(false); }
     } catch (err) {
-      setErrors({ _api: err.response?.data?.error || 'Failed to save expense. Please try again.' });
+      setErrors({ _api: err.response?.data?.error || t('reports.failedToSave') });
     }
   };
 
@@ -311,16 +528,28 @@ export default function AccountingPage() {
     }
   };
 
-  const handleFrontDeskAction = (id, action) => {
-    const updated = frontDeskExpenses.map(e => e.id === id ? { ...e, status: action } : e);
-    setFrontDeskExpenses(updated);
-    saveFrontDeskExpenses(updated);
+  // Reviewing a desk expense moves it into the books. (There is no "reject" -
+  // the money is already spent; the manager is confirming the entry.)
+  const handleFrontDeskAction = async (id) => {
+    setApprovingId(id);
+    try {
+      await approveExpenseApi(id);
+      const [eRes, pendRes, fdRes] = await Promise.all([getExpenses(), getPendingExpenses(), getExpenses({ source: 'frontdesk', status: 'all' })]);
+      setExpenses(eRes.data || []); cache.write('expenses', eRes.data || []);
+      setPendingApprovals(pendRes.data || []);
+      setFrontDeskExpenses((fdRes.data || []).map(normFdExpense));
+      notifyDataChanged();
+    } catch (err) {
+      console.error('Failed to review expense:', err);
+    } finally {
+      setApprovingId(null);
+    }
   };
 
-  const allExpenses = [
-    ...periodFilteredExpenses.map(e => ({ ...e, _source: 'operations' })),
-    ...periodFilteredFdExpenses.map(e => ({ ...e, title: e.description, _source: 'frontdesk' })),
-  ];
+  // Approved front-desk expenses already arrive inside `expenses` (the books),
+  // so the combined list is just that - adding the front-desk set again would
+  // double-count them.
+  const allExpenses = periodFilteredExpenses.map(e => ({ ...e, _source: e.source || 'operations' }));
   const tabExpensesRaw =
     activeTab === 'All Expenses' ? allExpenses :
     activeTab === 'Operations Expenses' ? periodFilteredExpenses.map(e => ({ ...e, _source: 'operations' })) :
@@ -341,17 +570,44 @@ export default function AccountingPage() {
   const tabTotal = tabExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
 
   const summaryCards = [
-    { label: 'Total Revenue', value: formatMoney(periodRevenue), icon: TrendingUp, color: 'var(--accent-blue)', dim: 'var(--accent-blue-dim)' },
-    { label: 'Total Expenditures', value: formatMoney(periodExpensesAmt), icon: TrendingDown, color: 'var(--accent-red)', dim: 'var(--accent-red-dim)' },
-    { label: 'Net Income', value: formatMoney(periodNet), icon: Banknote, color: 'var(--accent-green)', dim: 'var(--accent-green-dim)' },
-    { label: 'Outstanding', value: formatMoney(periodOutstanding), icon: AlertCircle, color: 'var(--accent-yellow)', dim: 'var(--accent-yellow-dim)' },
+    { label: t('reports.totalRevenue'), value: formatMoney(periodRevenue), sub: <RevenueSplit members={periodRev.members} shop={periodRev.shop} />, icon: TrendingUp, color: 'var(--accent-blue)', dim: 'var(--accent-blue-dim)' },
+    { label: t('reports.totalExpenditures'), value: formatMoney(periodExpensesAmt), icon: TrendingDown, color: 'var(--accent-red)', dim: 'var(--accent-red-dim)' },
+    // A gym that spent more than it took in should not read as good news
+    { label: t('reports.netIncome'), value: formatMoney(periodNet), icon: periodNet < 0 ? TrendingDown : Banknote,
+      color: periodNet < 0 ? 'var(--accent-red)' : 'var(--accent-green)',
+      dim: periodNet < 0 ? 'var(--accent-red-dim)' : 'var(--accent-green-dim)' },
+    { label: t('reports.outstanding'), value: formatMoney(periodOutstanding), icon: AlertCircle, color: 'var(--accent-yellow)', dim: 'var(--accent-yellow-dim)' },
   ];
 
   const tabs = ['All Expenses', 'Operations Expenses', 'Front Desk Expenses'];
   const tabLabels = { 'All Expenses': t('reports.allExpenses'), 'Operations Expenses': t('reports.operationsExpenses'), 'Front Desk Expenses': t('reports.frontDeskExpenses') };
 
   const monthPaystubs = paystubs.filter(p => p.month === fmtMonth(paystubMonth));
-  const totalPayroll = monthPaystubs.reduce((s, p) => s + p.netPay, 0);
+  // Only one month is on screen, so pay still owed in another month would
+  // otherwise be invisible here.
+  const otherMonthsDue = Object.entries(
+    paystubs
+      .filter(p => p.status !== 'paid' && p.month !== fmtMonth(paystubMonth) && ymOf(p.month))
+      .reduce((acc, p) => ({ ...acc, [p.month]: (acc[p.month] || 0) + 1 }), {}),
+  ).map(([month, count]) => ({ month, count, ym: ymOf(month) }))
+    .sort((a, b) => a.ym.localeCompare(b.ym));
+  const otherMonthsNotice = otherMonthsDue.length > 0 && (
+    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: 12.5, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
+      <span>{t('reports.awaitingOtherMonths')}</span>
+      {otherMonthsDue.map(o => (
+        <button key={o.ym} type="button" onClick={() => setPaystubMonth(o.ym)}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--accent-yellow-dim)', border: '1px solid rgba(234,179,8,0.35)', color: 'var(--text-primary)', borderRadius: 999, padding: '4px 11px', fontSize: 12, fontWeight: 600, fontFamily: 'DM Sans', cursor: 'pointer' }}>
+          {o.month}
+          <span style={{ fontFamily: 'JetBrains Mono, monospace', color: 'var(--accent-yellow)' }}>{o.count}</span>
+        </button>
+      ))}
+    </div>
+  );
+  // Total is the month's full payroll obligation and stays fixed; paid and
+  // outstanding are what actually move as paystubs are marked paid or unpaid.
+  const totalPayroll = monthPaystubs.reduce((s, p) => s + p.grossPay, 0);
+  const paidPayroll = monthPaystubs.filter(p => p.status === 'paid').reduce((s, p) => s + p.grossPay, 0);
+  const outstandingPayroll = totalPayroll - paidPayroll;
 
   const openEditPaystub = (p) => {
     setEditingPaystub(p);
@@ -368,9 +624,10 @@ export default function AccountingPage() {
     const allowances = Number(payForm.allowances) || 0;
     const basicPay = editingPaystub.basicPay;
     const newNet = basicPay + allowances - totalDed;
+    const newGross = basicPay + allowances;
     setPaystubs(prev => prev.map(p =>
       p.id === editingPaystub.id
-        ? { ...p, allowances, deductions: totalDed, netPay: newNet }
+        ? { ...p, allowances, deductions: totalDed, netPay: newNet, grossPay: newGross }
         : p
     ));
     if (editingPaystub.status === 'paid') {
@@ -379,9 +636,9 @@ export default function AccountingPage() {
       if (expenseId) {
         try {
           const res = await updateExpense(expenseId, {
-            title: `Salary — ${editingPaystub.staffName}`,
+            title: `Salary : ${editingPaystub.staffName}`,
             category: 'Salaries',
-            amount: newNet,
+            amount: newGross,
             date: new Date().toISOString().slice(0, 10),
             paidTo: editingPaystub.staffName,
             method: 'cash',
@@ -410,41 +667,60 @@ export default function AccountingPage() {
     }
   };
 
+  // Settling a paystub is what records the money actually leaving: the pay
+  // record is flipped to paid and a matching expense is booked.
+  const [confirmPaid, setConfirmPaid] = useState(null);
+  const requestMarkPaid = (id) => {
+    const stub = paystubs.find(p => p.id === id);
+    if (stub) setConfirmPaid(stub);
+  };
+
   const markPaid = async (id) => {
     const stub = paystubs.find(p => p.id === id);
     if (!stub) return;
-    setPaystubs(prev => prev.map(p => p.id === id ? { ...p, status: 'paid' } : p));
-    const paidIds = loadPaidIds();
-    paidIds.add(id);
-    savePaidIds(paidIds);
     try {
-      const lines = paystubDeductionLines[id] || [];
-      const totalDed = lines.reduce((s, d) => s + d.amount, 0);
-      const net = stub.netPay || (stub.basicPay + (stub.allowances || 0) - totalDed);
-      const res = await createExpense({
-        title: `Salary — ${stub.staffName}`,
+      const res = await setPayStatus(id, 'paid');
+      setPaystubs(prev => prev.map(p => (p.id === id ? toPaystub(res.data) : p)));
+    } catch (err) {
+      console.error('Failed to settle paystub:', err);
+      return;
+    }
+    try {
+      const expense = await createExpense({
+        title: `Salary : ${stub.staffName}`,
         category: 'Salaries',
-        amount: net,
+        amount: stub.grossPay,
         date: new Date().toISOString().slice(0, 10),
         paidTo: stub.staffName,
         method: 'cash',
-        note: `Paystub for ${stub.month}`,
+        note: stub.deductions > 0
+          ? t('reports.salaryExpenseNote', { month: stub.month, handOver: formatMoney(stub.netPay), withheld: formatMoney(stub.deductions) })
+          : `Payroll for ${stub.month}`,
         recordedBy: '',
       });
       const map = loadPaystubExpenseMap();
-      map[id] = res.data.id;
+      map[id] = expense.data.id;
       savePaystubExpenseMap(map);
-      setExpenses(prev => [res.data, ...prev]);
+      setExpenses(prev => [expense.data, ...prev]);
     } catch (err) {
       console.error('Failed to auto-create salary expense:', err);
     }
   };
 
+  // Reversing a settled payment moves money back, so it takes a manager PIN.
+  const requestUnpaid = (id) => {
+    setPendingUnpaidId(id);
+    setShowUnpaidAuth(true);
+  };
+
   const markUnpaid = async (id) => {
-    setPaystubs(prev => prev.map(p => p.id === id ? { ...p, status: 'issued' } : p));
-    const paidIds = loadPaidIds();
-    paidIds.delete(id);
-    savePaidIds(paidIds);
+    try {
+      const res = await setPayStatus(id, 'issued');
+      setPaystubs(prev => prev.map(p => (p.id === id ? toPaystub(res.data) : p)));
+    } catch (err) {
+      console.error('Failed to reopen paystub:', err);
+      return;
+    }
     const map = loadPaystubExpenseMap();
     const expenseId = map[id];
     if (expenseId) {
@@ -468,7 +744,7 @@ export default function AccountingPage() {
 
   const handleExportOverview = () => {
     const win = window.open('', '_blank', 'width=820,height=1000');
-    win.document.write(`<html><head><title>Financial Overview — ${period}</title><style>
+    win.document.write(`<html><head><title>Financial Overview : ${period}</title><style>
       body{font-family:Arial,sans-serif;padding:40px;color:#111;font-size:13px}
       h1{font-size:22px;margin-bottom:4px}
       .sub{color:#666;font-size:12px;margin-bottom:28px}
@@ -484,27 +760,27 @@ export default function AccountingPage() {
       .pct{font-size:11px;color:#999;margin-top:2px}
       .footer{margin-top:40px;font-size:11px;color:#bbb;text-align:center;border-top:1px solid #eee;padding-top:12px}
     </style></head><body>
-    <h1>GEM Fitness — Financial Overview</h1>
-    <div class="sub">Period: <strong>${period}</strong> &nbsp;·&nbsp; Generated ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+    <h1>GEM Fitness. ${t('reports.financialOverview')}</h1>
+    <div class="sub">${t('reports.periodLabel')}: <strong>${period}</strong> &nbsp;·&nbsp; ${t('reports.generatedLabel')} ${fmtDate(new Date(), { day: '2-digit', month: 'short', year: 'numeric' })}</div>
     <div class="cards">
-      <div class="card"><div class="card-label">Total Revenue</div><div class="card-value" style="color:#2563eb">${formatMoney(periodRevenue)}</div></div>
-      <div class="card"><div class="card-label">Total Expenditures</div><div class="card-value" style="color:#ef4444">${formatMoney(periodExpensesAmt)}</div></div>
-      <div class="card"><div class="card-label">Net Income</div><div class="card-value" style="color:#16a34a">${formatMoney(periodNet)}</div></div>
-      <div class="card"><div class="card-label">Outstanding</div><div class="card-value" style="color:#ca8a04">${formatMoney(periodOutstanding)}</div></div>
+      <div class="card"><div class="card-label">${t('reports.totalRevenue')}</div><div class="card-value" style="color:#2563eb">${formatMoney(periodRevenue)}</div></div>
+      <div class="card"><div class="card-label">${t('reports.totalExpenditures')}</div><div class="card-value" style="color:#ef4444">${formatMoney(periodExpensesAmt)}</div></div>
+      <div class="card"><div class="card-label">${t('reports.netIncome')}</div><div class="card-value" style="color:${periodNet < 0 ? '#ef4444' : '#16a34a'}">${formatMoney(periodNet)}</div></div>
+      <div class="card"><div class="card-label">${t('reports.outstanding')}</div><div class="card-value" style="color:#ca8a04">${formatMoney(periodOutstanding)}</div></div>
     </div>
-    <h2>Revenue Breakdown</h2>
-    ${paymentCategoryBreakdown.length === 0 ? '<p style="color:#999">No payment data for this period.</p>' : paymentCategoryBreakdown.map(r => `
+    <h2>${t('reports.revenueBreakdown')}</h2>
+    ${paymentCategoryBreakdown.length === 0 ? `<p style="color:#999">${t('reports.noPaymentData')}</p>` : paymentCategoryBreakdown.map(r => `
       <div class="row">
         <div class="row-header"><span>${r.label}</span><span><strong>${formatMoney(r.amount)}</strong></span></div>
         <div class="bar-bg"><div class="bar-fill" style="width:${r.pct}%;background:#c9a96e"></div></div>
-        <div class="pct">${r.pct}% of total revenue</div>
+        <div class="pct">${r.pct}${t('reports.ofTotalRevenue')}</div>
       </div>`).join('')}
-    <h2>Expenses Breakdown</h2>
-    ${expenseCategoryBreakdown.length === 0 ? '<p style="color:#999">No expense data for this period.</p>' : expenseCategoryBreakdown.map(r => `
+    <h2>${t('reports.expensesBreakdown')}</h2>
+    ${expenseCategoryBreakdown.length === 0 ? `<p style="color:#999">${t('reports.noExpenseData')}</p>` : expenseCategoryBreakdown.map(r => `
       <div class="row">
         <div class="row-header"><span>${r.label}</span><span><strong>${formatMoney(r.amount)}</strong></span></div>
         <div class="bar-bg"><div class="bar-fill" style="width:${r.pct}%;background:#ef4444"></div></div>
-        <div class="pct">${r.pct}% of total expenses</div>
+        <div class="pct">${r.pct}${t('reports.ofTotalExpenses')}</div>
       </div>`).join('')}
     <div class="footer">GEM Fitness Management System</div>
     </body></html>`);
@@ -515,7 +791,7 @@ export default function AccountingPage() {
 
   const handleExportPaystubs = () => {
     const win = window.open('', '_blank', 'width=900,height=700');
-    win.document.write(`<html><head><title>Payroll — ${fmtMonth(paystubMonth)}</title><style>
+    win.document.write(`<html><head><title>Payroll : ${fmtMonth(paystubMonth)}</title><style>
       body{font-family:Arial,sans-serif;padding:40px;color:#111;font-size:13px}
       h1{font-size:22px;margin-bottom:4px}
       .sub{color:#666;font-size:12px;margin-bottom:24px}
@@ -525,10 +801,10 @@ export default function AccountingPage() {
       .total td{font-weight:700;background:#fafafa;border-top:2px solid #ddd}
       .footer{margin-top:32px;font-size:11px;color:#bbb;text-align:center;border-top:1px solid #eee;padding-top:12px}
     </style></head><body>
-    <h1>GEM Fitness — Payroll</h1>
-    <div class="sub">Month: <strong>${paystubMonth}</strong> &nbsp;·&nbsp; Generated ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+    <h1>GEM Fitness. ${t('reports.paystubs')}</h1>
+    <div class="sub">${t('reports.monthLabel')}: <strong>${paystubMonth}</strong> &nbsp;·&nbsp; ${t('reports.generatedLabel')} ${fmtDate(new Date(), { day: '2-digit', month: 'short', year: 'numeric' })}</div>
     <table>
-      <thead><tr><th>Staff</th><th>Role</th><th>Basic Pay</th><th>Allowances</th><th>Deductions</th><th>Net Pay</th><th>Status</th></tr></thead>
+      <thead><tr><th>${t('common.name')}</th><th>${t('staff.role')}</th><th>${t('reports.basicPay')}</th><th>${t('reports.allowances')}</th><th>${t('reports.deductions')}</th><th>${t('reports.netPay')}</th><th>${t('common.status')}</th></tr></thead>
       <tbody>
         ${monthPaystubs.map(p => `<tr>
           <td><strong>${p.staffName}</strong></td><td>${p.role}</td>
@@ -539,7 +815,7 @@ export default function AccountingPage() {
           <td style="text-transform:capitalize">${p.status}</td>
         </tr>`).join('')}
         <tr class="total">
-          <td colspan="5" style="text-align:right;padding-right:12px">Total Payroll</td>
+          <td colspan="5" style="text-align:right;padding-right:12px">${t('reports.totalPayrollLabel')}</td>
           <td colspan="2">${formatMoney(totalPayroll)}</td>
         </tr>
       </tbody>
@@ -551,6 +827,335 @@ export default function AccountingPage() {
     setTimeout(() => win.print(), 400);
   };
 
+  // ── Mobile layout ────────────────────────────────────────────────────────────
+  if (isMobile) {
+    const EXPENSE_CATS = { Utilities: '#60a5fa', Salaries: '#a78bfa', Equipment: '#f97316', Marketing: '#4ade80', Rent: '#fbbf24', Other: '#9ca3af' };
+    const SOURCES = [
+      { key: 'Social Media', label: 'Social Media', color: '#818cf8' },
+      { key: 'Friend',       label: 'Referral',     color: '#34d399' },
+      { key: 'Google',       label: 'Google',       color: '#60a5fa' },
+      { key: 'Flyer',        label: 'Flyer',        color: '#f59e0b' },
+      { key: 'Walk-in',      label: 'Walk-in',      color: '#fb7185' },
+      { key: 'Other',        label: 'Other',        color: '#a78bfa' },
+    ];
+    const withSource = membersList.filter(m => m.howHeard);
+    const srcCounts = Object.fromEntries(SOURCES.map(s => [s.key, 0]));
+    withSource.forEach(m => { if (srcCounts[m.howHeard] !== undefined) srcCounts[m.howHeard]++; });
+    const srcTotal = withSource.length || 1;
+
+    const chip = (label, active, onClick) => (
+      <button key={label} onClick={onClick} style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 20, border: `1px solid ${active ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, background: active ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', color: active ? 'var(--accent-gold)' : 'var(--text-muted)', fontSize: 12, fontWeight: active ? 600 : 400, cursor: 'pointer', fontFamily: 'DM Sans', WebkitTapHighlightColor: 'transparent' }}>
+        {label}
+      </button>
+    );
+
+    return (
+      <div style={{ minHeight: '100%', paddingBottom: 16 }}>
+
+        {/* Header */}
+        <div style={{ padding: '16px 16px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h1 style={{ fontFamily: 'Manrope', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{t('nav.accounting')}</h1>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '3px 0 0', fontFamily: 'DM Sans' }}>
+              {mainTab === 'overview' ? period : mainTab === 'paystubs' ? fmtMonth(paystubMonth) : t('reports.marketingInsights')}
+            </p>
+          </div>
+        </div>
+
+        {/* Main tabs */}
+        <div style={{ display: 'flex', overflowX: 'auto', scrollbarWidth: 'none', borderBottom: '1px solid var(--border-subtle)', padding: '0 16px', marginBottom: 14 }}>
+          {mainTabs.map(([key, label]) => (
+            <button key={key} onClick={() => setMainTab(key)} style={{ flexShrink: 0, padding: '10px 16px', fontSize: 13, cursor: 'pointer', background: 'none', border: 'none', borderBottom: `2px solid ${mainTab === key ? 'var(--accent-gold)' : 'transparent'}`, color: mainTab === key ? 'var(--accent-gold)' : 'var(--text-muted)', fontFamily: 'DM Sans', fontWeight: mainTab === key ? 600 : 400 }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── OVERVIEW ── */}
+        {mainTab === 'overview' && (
+          <div>
+            {pendingPanel && <div style={{ padding: '0 16px 12px' }}>{pendingPanel}</div>}
+            {/* Period chips */}
+            <div style={{ padding: '0 16px 12px', display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
+              {PERIOD_OPTIONS.map(p => chip(p, period === p, () => setPeriod(p)))}
+            </div>
+
+            {/* KPI 2x2 */}
+            <div style={{ padding: '0 16px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {summaryCards.map(({ label, value, color, sub }) => (
+                <div key={label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color, fontFamily: 'JetBrains Mono, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+                  {sub && <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 3, lineHeight: 1.35 }}>{sub}</div>}
+                </div>
+              ))}
+            </div>
+
+            {/* Financial Health chart */}
+            <div style={{ margin: '0 16px 14px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px 14px 8px' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans', marginBottom: 10 }}>{t('reports.financialHealth')}</div>
+              <div style={{ height: 180 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} barCategoryGap="30%" barGap={3}>
+                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={42} />
+                    <Tooltip formatter={(v, n) => [formatMoney(v), n]} contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontSize: 11 }} labelStyle={{ color: 'var(--text-primary)', fontWeight: 600 }} />
+                    <Bar dataKey="revenue" name={t('reports.revenue')} fill="#c9a96e" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="expenses" name={t('reports.expenses')} fill="#ef4444" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="net" name={t('reports.net')} fill="#22c55e" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Revenue Breakdown */}
+            <div style={{ margin: '0 16px 14px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans', marginBottom: 12 }}>{t('reports.revenueBreakdown')}</div>
+              {paymentCategoryBreakdown.length === 0
+                ? <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '8px 0' }}>{t('reports.noPeriodData')}</div>
+                : paymentCategoryBreakdown.map(r => (
+                  <div key={r.label} style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{r.label}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{formatMoney(r.amount)}</span>
+                    </div>
+                    <div style={{ height: 6, background: 'var(--bg-elevated)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${r.pct}%`, background: 'linear-gradient(90deg, #c9a96e, #b08d4a)', borderRadius: 3 }} />
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{r.pct}%</div>
+                  </div>
+                ))
+              }
+            </div>
+
+            {/* Expenses Breakdown */}
+            <div style={{ margin: '0 16px 14px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans', marginBottom: 12 }}>{t('reports.expensesBreakdown')}</div>
+              {loading ? <SkeletonCards count={3} height={44} /> : expenseCategoryBreakdown.length === 0
+                ? <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '8px 0' }}>{t('reports.noExpenseData')}</div>
+                : expenseCategoryBreakdown.map(r => (
+                  <div key={r.label} style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{r.label}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{formatMoney(r.amount)}</span>
+                    </div>
+                    <div style={{ height: 6, background: 'var(--bg-elevated)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${r.pct}%`, background: 'linear-gradient(90deg, #ef4444, #dc2626)', borderRadius: 3 }} />
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{r.pct}%</div>
+                  </div>
+                ))
+              }
+            </div>
+
+            {/* Expense sub-tabs */}
+            <div style={{ padding: '0 16px 10px', display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
+              {tabs.map(t => chip(
+                t === 'Front Desk Expenses' && pendingCount > 0 ? `${tabLabels[t]} (${pendingCount})` : tabLabels[t],
+                activeTab === t,
+                () => setActiveTab(t)
+              ))}
+            </div>
+
+            {/* Category filter (non-FD tabs) */}
+            {activeTab !== 'Front Desk Expenses' && (
+              <div style={{ padding: '0 16px 10px', display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
+                {['All Categories', 'Utilities', 'Rent', 'Maintenance', 'Salaries', 'Supplies', 'Other'].map(c =>
+                  chip(c, categoryFilter === c, () => setCategoryFilter(c))
+                )}
+              </div>
+            )}
+
+            {/* FD status filter */}
+            {activeTab === 'Front Desk Expenses' && (
+              <div style={{ padding: '0 16px 10px', display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
+                {['all', 'pending', 'approved'].map(f =>
+                  chip(f === 'all' ? t('common.all') : f === 'approved' ? t('reports.reviewed') : t('reports.awaitingReview'), fdStatusFilter === f, () => setFdStatusFilter(f))
+                )}
+              </div>
+            )}
+
+            {/* Expenses list */}
+            <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {tabExpenses.length === 0
+                ? <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13, fontFamily: 'DM Sans' }}>{t('reports.noExpenses')}</div>
+                : tabExpenses.map(exp => {
+                  const catColor = EXPENSE_CATS[exp.category] || '#9ca3af';
+                  return (
+                    <div key={exp.id + '_' + exp._source} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '12px 14px', borderLeft: `3px solid ${catColor}` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans', flex: 1, marginRight: 8 }}>{exp.title}</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-red)', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0 }}>-{formatMoney(exp.amount)}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: exp._source === 'operations' ? 8 : 0 }}>
+                        <span style={{ fontSize: 10, background: 'var(--bg-elevated)', color: 'var(--text-muted)', borderRadius: 4, padding: '2px 6px', fontFamily: 'DM Sans' }}>{exp.category}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>{String(exp.date || '').slice(0, 10)}</span>
+                        {exp.status && <StatusPill status={exp.status} label={exp.status === 'approved' ? t('reports.reviewed') : t('reports.awaitingReview')} />}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <RowMenu title={t('common.actions')} items={[
+                          { label: t('reports.view'), icon: <Eye size={15} />, onClick: () => openView(exp) },
+                          { label: approvingId === exp.id ? t('common.loading') : t('reports.markReviewed'), icon: <CheckCircle size={15} />,
+                            onClick: () => { if (approvingId !== exp.id) handleFrontDeskAction(exp.id); },
+                            hidden: !(exp._source !== 'operations' && exp.status === 'pending' && canApproveExpenses) },
+                        ]} />
+                      </div>
+                    </div>
+                  );
+                })
+              }
+            </div>
+
+            <FAB onClick={openAdd} label={t('reports.addExpense')} />
+          </div>
+        )}
+
+        {/* ── PAYSTUBS ── */}
+        {mainTab === 'paystubs' && (
+          <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Month picker */}
+            <input type="month" value={paystubMonth} onChange={e => setPaystubMonth(e.target.value)} style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 14px', fontSize: 14, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', boxSizing: 'border-box' }} />
+            {otherMonthsNotice}
+
+            {/* KPI 2x2 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {[
+                { label: t('reports.totalPayroll'), value: formatMoney(totalPayroll), color: 'var(--accent-blue)' },
+                { label: t('reports.staffCount'), value: String(monthPaystubs.length), color: 'var(--accent-gold)' },
+                { label: t('reports.paidLabel'), value: formatMoney(paidPayroll), color: 'var(--accent-green)' },
+                { label: t('reports.outstanding'), value: formatMoney(outstandingPayroll), color: 'var(--accent-yellow)' },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color, fontFamily: 'JetBrains Mono, monospace' }}>{value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Paystub cards */}
+            {monthPaystubs.length === 0
+              ? <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>{t('reports.noPaystubs')}</div>
+              : monthPaystubs.map(p => (
+                <div key={p.id} onClick={() => setViewingPaystub(p)} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '13px 14px', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{p.staffName}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2 }}>{p.role}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>{formatMoney(p.grossPay)}</div>
+                      {p.netPay !== p.grossPay && <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'DM Sans', marginBottom: 3 }}>{t('staff.handOverShort', { amount: formatMoney(p.netPay) })}</div>}
+                      <StatusPill status={p.status} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 16, marginBottom: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('reports.basicLabel')}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'JetBrains Mono, monospace' }}>{formatMoney(p.basicPay)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('reports.allowances')}</div>
+                      <div style={{ fontSize: 12, color: 'var(--accent-green)', fontFamily: 'JetBrains Mono, monospace' }}>+{formatMoney(p.allowances)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('reports.deductions')}</div>
+                      <div style={{ fontSize: 12, color: 'var(--accent-red)', fontFamily: 'JetBrains Mono, monospace' }}>-{formatMoney(p.deductions)}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                    <RowMenu title={t('common.actions')} items={[
+                      { label: t('reports.view'), icon: <Eye size={15} />, onClick: () => setViewingPaystub(p) },
+                      { label: t('reports.editPay'), icon: <Pencil size={15} />, onClick: () => openEditPaystub(p), hidden: !canEditPayroll },
+                      { label: t('reports.markPaid'), icon: <CheckCircle size={15} />, onClick: () => requestMarkPaid(p.id), hidden: !canEditPayroll || p.status === 'paid' },
+                    ]} />
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        )}
+
+        {/* ── MARKETING ── */}
+        {mainTab === 'marketing' && (
+          <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* KPI 2x2 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {[
+                { label: t('reports.totalMembers'), value: String(membersList.length), color: 'var(--accent-gold)' },
+                { label: t('reports.sourceRecorded'), value: String(withSource.length), color: '#818cf8' },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color, fontFamily: 'JetBrains Mono, monospace' }}>{value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Source breakdown */}
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans', marginBottom: 4 }}>{t('reports.sourceBreakdown')}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 14 }}>{t('reports.basedOnMembers', { count: withSource.length })}</div>
+              {SOURCES.map(s => {
+                const count = srcCounts[s.key];
+                const pct = withSource.length > 0 ? Math.round(count / srcTotal * 100) : 0;
+                return (
+                  <div key={s.key} style={{ marginBottom: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{s.label}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: s.color, fontFamily: 'DM Sans' }}>{count} ({pct}%)</span>
+                    </div>
+                    <div style={{ height: 8, background: 'var(--bg-elevated)', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: s.color, borderRadius: 4, transition: 'width 0.5s ease' }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Add expense modal (slide-up sheet) */}
+        {showModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end' }}>
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: '20px 20px 0 0', width: '100%', maxHeight: '88vh', overflowY: 'auto', padding: '20px 20px 40px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'Manrope', color: 'var(--text-primary)' }}>{editingExpense ? t('reports.editExpense') : t('reports.addExpense')}</span>
+                <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[
+                  { label: t('tasks.titleLabel'), key: 'title', type: 'text', error: errors.title },
+                  { label: `${t('common.amount')} *`, key: 'amount', type: 'number', error: errors.amount },
+                  { label: `${t('common.date')} *`, key: 'date', type: 'date', error: errors.date },
+                  { label: t('common.notes'), key: 'notes', type: 'text' },
+                ].map(({ label, key, type, error }) => (
+                  <div key={key}>
+                    <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{label}</label>
+                    <input type={type} value={form[key] || ''} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} style={{ width: '100%', background: 'var(--bg-elevated)', border: `1px solid ${error ? 'var(--accent-red)' : 'var(--border-subtle)'}`, borderRadius: 10, padding: '10px 14px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', boxSizing: 'border-box' }} />
+                    {error && <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{error}</span>}
+                  </div>
+                ))}
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{t('reports.category')}</label>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {Object.keys(EXPENSE_CATS).map(c => (
+                      <button key={c} onClick={() => setForm(f => ({ ...f, category: c }))} style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: form.category === c ? 600 : 400, cursor: 'pointer', fontFamily: 'DM Sans', border: `1px solid ${form.category === c ? EXPENSE_CATS[c] : 'var(--border-subtle)'}`, background: form.category === c ? `${EXPENSE_CATS[c]}22` : 'transparent', color: form.category === c ? EXPENSE_CATS[c] : 'var(--text-secondary)' }}>
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button onClick={() => handleSave()} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 10, padding: '13px', fontSize: 14, fontWeight: 700, color: '#0a0a0f', cursor: 'pointer', fontFamily: 'DM Sans', marginTop: 4 }}>
+                  {t('reports.saveExpense')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="page-fade">
       {/* Header */}
@@ -558,17 +1163,17 @@ export default function AccountingPage() {
         <div>
           <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>{t('reports.title')}</h1>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-            {mainTab === 'overview' ? `${t('reports.financialOverview')} — ${period}` : mainTab === 'paystubs' ? t('reports.payroll') : t('reports.marketingInsights')}
+            {mainTab === 'overview' ? `${t('reports.financialOverview')} : ${period}` : mainTab === 'paystubs' ? t('reports.payroll') : t('reports.marketingInsights')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {mainTab === 'overview' && (
-            <select value={period} onChange={e => setPeriod(e.target.value)} style={{ ...inputStyle, width: 160 }}>
-              {PERIOD_OPTIONS.map(o => <option key={o}>{o}</option>)}
+            <select value={period} onChange={e => setPeriod(e.target.value)} style={toolbarControl}>
+              {PERIOD_OPTIONS.map(o => <option key={o} style={{ color: 'var(--text-primary)', background: 'var(--bg-card)' }}>{o}</option>)}
             </select>
           )}
           {mainTab === 'paystubs' && (
-            <input type="month" value={paystubMonth} onChange={e => setPaystubMonth(e.target.value)} style={{ ...inputStyle, width: 160 }} />
+            <input type="month" value={paystubMonth} onChange={e => setPaystubMonth(e.target.value)} style={toolbarControl} />
           )}
           {mainTab !== 'marketing' && <button style={secondaryBtn} onClick={mainTab === 'overview' ? handleExportOverview : handleExportPaystubs}><Download size={13} />{t('reports.exportPdf')}</button>}
           {mainTab !== 'marketing' && <button style={primaryBtn} onClick={openAdd}><Plus size={13} />{t('reports.addExpense')}</button>}
@@ -577,7 +1182,7 @@ export default function AccountingPage() {
 
       {/* Main tab nav */}
       <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border-subtle)', marginBottom: 24 }}>
-        {[['overview', t('reports.overview')], ['paystubs', t('reports.paystubs')], ['marketing', t('reports.marketing')]].map(([key, label]) => (
+        {mainTabs.map(([key, label]) => (
           <button key={key} onClick={() => setMainTab(key)} style={{ background: 'none', border: 'none', borderBottom: mainTab === key ? '2px solid #c9a96e' : '2px solid transparent', color: mainTab === key ? '#c9a96e' : 'var(--text-muted)', fontSize: 14, fontWeight: mainTab === key ? 600 : 400, padding: '10px 20px', cursor: 'pointer', fontFamily: 'DM Sans', marginBottom: -1 }}>
             {label}
           </button>
@@ -586,8 +1191,9 @@ export default function AccountingPage() {
 
       {mainTab === 'overview' && (
         <>
+          {pendingPanel}
           {/* Summary cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+          <div className="gem-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
             {summaryCards.map(c => (
               <div key={c.label} style={{ ...cardStyle, padding: 20, position: 'relative', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: c.color, filter: 'blur(40px)', opacity: 0.12 }} />
@@ -598,6 +1204,7 @@ export default function AccountingPage() {
                   </div>
                 </div>
                 <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginTop: 12 }}>{c.value}</div>
+                {c.sub && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 4 }}>{c.sub}</div>}
               </div>
             ))}
           </div>
@@ -606,7 +1213,7 @@ export default function AccountingPage() {
           <div style={{ ...cardStyle, marginBottom: 24 }}>
             <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Financial Health Overview</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('reports.financialHealthOverview')}</span>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 10 }}>{period}</span>
               </div>
             </div>
@@ -617,9 +1224,9 @@ export default function AccountingPage() {
                   <YAxis tickFormatter={formatYAxis} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={48} />
                   <Tooltip formatter={(value, name) => [formatMoney(value), name]} contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: 'var(--text-primary)', fontWeight: 600 }} />
                   <Legend wrapperStyle={{ fontSize: 12, color: 'var(--text-secondary)' }} />
-                  <Bar dataKey="revenue" name="Revenue" fill="#c9a96e" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="net" name="Net Income" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="revenue" name={t('reports.revenue')} fill="#c9a96e" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="expenses" name={t('reports.expenses')} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="net" name={t('reports.netIncome')} fill="#22c55e" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -628,12 +1235,12 @@ export default function AccountingPage() {
           {/* Revenue breakdown */}
           <div style={{ ...cardStyle, marginBottom: 24 }}>
             <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Revenue Breakdown</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('reports.revenueBreakdown')}</span>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{period}</span>
             </div>
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {paymentCategoryBreakdown.length === 0 ? (
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: 16 }}>No payment data for this period.</div>
+              {loading ? <SkeletonCards count={3} height={44} /> : paymentCategoryBreakdown.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: 16 }}>{t('reports.noPaymentData')}</div>
               ) : paymentCategoryBreakdown.map(r => (
                 <div key={r.label}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -643,21 +1250,24 @@ export default function AccountingPage() {
                   <div style={{ height: 8, background: 'var(--bg-elevated)', borderRadius: 4, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${r.pct}%`, background: 'linear-gradient(90deg, #c9a96e, #b08d4a)', borderRadius: 4, transition: 'width 0.6s ease' }} />
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{r.pct}% of total revenue</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{r.pct}{t('reports.ofTotalRevenue')}</div>
                 </div>
               ))}
+              {!loading && periodRev.shopMissing > 0 && (
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{t('sales.profitMissing', { n: periodRev.shopMissing })}</div>
+              )}
             </div>
           </div>
 
           {/* Expenses breakdown */}
           <div style={{ ...cardStyle, marginBottom: 24 }}>
             <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Expenses Breakdown</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('reports.expensesBreakdown')}</span>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{period}</span>
             </div>
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {expenseCategoryBreakdown.length === 0 ? (
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: 16 }}>No expense data available.</div>
+              {loading ? <SkeletonCards count={3} height={44} /> : expenseCategoryBreakdown.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: 16 }}>{t('reports.noExpenseData')}</div>
               ) : expenseCategoryBreakdown.map(r => (
                 <div key={r.label}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -667,7 +1277,7 @@ export default function AccountingPage() {
                   <div style={{ height: 8, background: 'var(--bg-elevated)', borderRadius: 4, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${r.pct}%`, background: 'linear-gradient(90deg, #ef4444, #dc2626)', borderRadius: 4, transition: 'width 0.6s ease' }} />
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{r.pct}% of total expenses</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{r.pct}{t('reports.ofTotalExpenses')}</div>
                 </div>
               ))}
             </div>
@@ -687,25 +1297,25 @@ export default function AccountingPage() {
               <div style={{ flex: 1 }} />
               {activeTab === 'Front Desk Expenses' ? (
                 <div style={{ display: 'flex', gap: 6, margin: '8px 0' }}>
-                  {['all', 'pending', 'approved', 'rejected'].map(f => (
-                    <button key={f} onClick={() => setFdStatusFilter(f)} style={{ background: fdStatusFilter === f ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', color: fdStatusFilter === f ? 'var(--accent-gold)' : 'var(--text-muted)', border: '1px solid var(--border-subtle)', borderRadius: 20, fontSize: 11, padding: '4px 12px', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: fdStatusFilter === f ? 600 : 400, textTransform: 'capitalize' }}>
-                      {f === 'all' ? 'All' : f}{f === 'pending' && pendingCount > 0 ? ` (${pendingCount})` : ''}
+                  {['all', 'pending', 'approved'].map(f => (
+                    <button key={f} onClick={() => setFdStatusFilter(f)} style={{ background: fdStatusFilter === f ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', color: fdStatusFilter === f ? 'var(--accent-gold)' : 'var(--text-muted)', border: '1px solid var(--border-subtle)', borderRadius: 20, fontSize: 11, padding: '4px 12px', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: fdStatusFilter === f ? 600 : 400 }}>
+                      {f === 'all' ? t('common.all') : f === 'approved' ? t('reports.reviewed') : t('reports.awaitingReview')}{f === 'pending' && pendingCount > 0 ? ` (${pendingCount})` : ''}
                     </button>
                   ))}
                 </div>
               ) : (
                 <select style={{ ...inputStyle, width: 160, margin: '8px 0' }} value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
-                  <option value="All Categories">All Categories</option>
+                  <option value="All Categories">{t('reports.allCategories')}</option>
                   {['Utilities', 'Rent', 'Maintenance', 'Salaries', 'Supplies', 'Other'].map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               )}
             </div>
 
             {activeTab !== 'Front Desk Expenses' && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="gem-table-scroll"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    {['Date', 'Title', 'Category', 'Amount', 'Paid To', 'Method', 'Actions'].map(h => (
+                    {[t('common.date'), t('common.title'), t('reports.category'), t('common.amount'), t('reports.paidTo'), t('reports.method'), t('common.actions')].map(h => (
                       <th key={h} style={{ padding: '10px 20px', textAlign: 'left', fontSize: 10, textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -715,42 +1325,36 @@ export default function AccountingPage() {
                     <tr key={exp.id + '_' + exp._source} style={{ borderBottom: '1px solid var(--border-subtle)' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-hover)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      <td style={{ padding: '12px 20px', fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-secondary)' }}>{exp.date ? String(exp.date).slice(0, 10) : '—'}</td>
+                      <td style={{ padding: '12px 20px', fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-secondary)' }}>{exp.date ? String(exp.date).slice(0, 10) : '-'}</td>
                       <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{exp.title}</td>
                       <td style={{ padding: '12px 20px' }}>
                         <span style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', fontSize: 11, padding: '3px 8px', borderRadius: 4 }}>{exp.category}</span>
                       </td>
                       <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 600, color: 'var(--accent-red)' }}>{formatMoney(Number(exp.amount))}</td>
-                      <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>{exp.paidTo || exp.submittedBy || '—'}</td>
-                      <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-muted)' }}>{exp.method || exp.paymentMethod || '—'}</td>
+                      <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>{exp.paidTo || exp.submittedBy || '-'}</td>
+                      <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-muted)' }}>{exp.method || exp.paymentMethod || '-'}</td>
                       <td style={{ padding: '12px 20px' }}>
-                        {exp._source === 'operations' ? (
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }} title="View" onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-blue)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'} onClick={() => openView(exp)}><Eye size={14} /></button>
-                            <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }} title="Edit" onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-gold)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'} onClick={() => openEdit(exp)}><Pencil size={14} /></button>
-                            <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }} title="Delete" onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-red)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'} onClick={() => { setDeleteExpense(exp); setShowDeleteAuthModal(true); }}><Trash2 size={14} /></button>
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <button style={{ ...primaryBtn, fontSize: 11, padding: '4px 10px', opacity: exp.status === 'approved' ? 0.5 : 1 }} disabled={exp.status === 'approved'} onClick={() => handleFrontDeskAction(exp.id, 'approved')}>Approve</button>
-                            <button style={{ ...secondaryBtn, fontSize: 11, padding: '4px 10px', color: '#ef4444', borderColor: '#ef4444', opacity: exp.status === 'rejected' ? 0.5 : 1 }} disabled={exp.status === 'rejected'} onClick={() => handleFrontDeskAction(exp.id, 'rejected')}>Reject</button>
-                          </div>
-                        )}
+                        {/* Everything in All/Operations is already in the books -
+                            reviewing happens on the Front Desk Expenses tab, so
+                            here it is view-only. */}
+                        <RowMenu title={t('common.actions')} items={[
+                          { label: t('reports.view'), icon: <Eye size={15} />, onClick: () => openView(exp) },
+                        ]} />
                       </td>
                     </tr>
                   ))}
                   {tabExpenses.length === 0 && (
-                    <tr><td colSpan={7} style={{ padding: '32px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>No expenses found.</td></tr>
+                    <tr><td colSpan={7} style={{ padding: '32px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>{t('reports.noExpenses')}</td></tr>
                   )}
                 </tbody>
-              </table>
+              </table></div>
             )}
 
             {activeTab === 'Front Desk Expenses' && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="gem-table-scroll"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    {['Date', 'Description', 'Category', 'Amount', 'Submitted By', 'Status', 'Actions'].map(h => (
+                    {[t('common.date'), t('common.description'), t('reports.category'), t('common.amount'), t('reports.submittedBy'), t('common.status'), t('common.actions')].map(h => (
                       <th key={h} style={{ padding: '10px 20px', textAlign: 'left', fontSize: 10, textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -760,31 +1364,33 @@ export default function AccountingPage() {
                     <tr key={exp.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-hover)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      <td style={{ padding: '12px 20px', fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-secondary)' }}>{exp.date ? String(exp.date).slice(0, 10) : '—'}</td>
+                      <td style={{ padding: '12px 20px', fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-secondary)' }}>{exp.date ? String(exp.date).slice(0, 10) : '-'}</td>
                       <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{exp.description}</td>
                       <td style={{ padding: '12px 20px' }}>
-                        <span style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', fontSize: 11, padding: '3px 8px', borderRadius: 4 }}>{exp.category || '—'}</span>
+                        <span style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', fontSize: 11, padding: '3px 8px', borderRadius: 4 }}>{exp.category || '-'}</span>
                       </td>
                       <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 600, color: 'var(--accent-red)' }}>{formatMoney(Number(exp.amount))}</td>
-                      <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>{exp.submittedBy || '—'}</td>
-                      <td style={{ padding: '12px 20px' }}><StatusPill status={exp.status} /></td>
+                      <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>{exp.submittedBy || '-'}</td>
+                      <td style={{ padding: '12px 20px' }}><StatusPill status={exp.status} label={exp.status === 'approved' ? t('reports.reviewed') : t('reports.awaitingReview')} /></td>
                       <td style={{ padding: '12px 20px' }}>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button style={{ ...primaryBtn, fontSize: 11, padding: '4px 10px', opacity: exp.status === 'approved' ? 0.5 : 1 }} disabled={exp.status === 'approved'} onClick={() => handleFrontDeskAction(exp.id, 'approved')}>Approve</button>
-                          <button style={{ ...secondaryBtn, fontSize: 11, padding: '4px 10px', color: '#ef4444', borderColor: '#ef4444', opacity: exp.status === 'rejected' ? 0.5 : 1 }} disabled={exp.status === 'rejected'} onClick={() => handleFrontDeskAction(exp.id, 'rejected')}>Reject</button>
-                        </div>
+                        <RowMenu title={t('common.actions')} items={[
+                          { label: t('reports.view'), icon: <Eye size={15} />, onClick: () => openView(exp) },
+                          { label: approvingId === exp.id ? t('common.loading') : t('reports.markReviewed'), icon: <CheckCircle size={15} />,
+                            onClick: () => { if (approvingId !== exp.id) handleFrontDeskAction(exp.id); },
+                            hidden: !(exp.status === 'pending' && canApproveExpenses) },
+                        ]} />
                       </td>
                     </tr>
                   ))}
                   {filteredFdExpenses.length === 0 && (
-                    <tr><td colSpan={7} style={{ padding: '32px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>No expenses match this filter.</td></tr>
+                    <tr><td colSpan={7} style={{ padding: '32px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>{t('reports.noExpensesFilter')}</td></tr>
                   )}
                 </tbody>
-              </table>
+              </table></div>
             )}
 
             <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Total ({activeTab}):</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('reports.totalExpensesLabel')} ({activeTab}):</span>
               <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-red)', fontFamily: 'Manrope, sans-serif' }}>{formatMoney(tabTotal)}</span>
             </div>
           </div>
@@ -795,11 +1401,12 @@ export default function AccountingPage() {
         <div>
 
           {/* Payroll summary cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+          <div className="gem-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
             {[
               { label: t('reports.totalPayroll'), value: formatMoney(totalPayroll), color: 'var(--accent-blue)', dim: 'var(--accent-blue-dim)', icon: Banknote },
               { label: t('reports.staffCount'), value: String(monthPaystubs.length), color: 'var(--accent-gold)', dim: 'var(--accent-gold-dim)', icon: FileText },
-              { label: t('reports.avgNetPay'), value: formatMoney(Math.round(totalPayroll / (monthPaystubs.length || 1))), color: 'var(--accent-green)', dim: 'var(--accent-green-dim)', icon: TrendingUp },
+              { label: t('reports.paidLabel'), value: formatMoney(paidPayroll), color: 'var(--accent-green)', dim: 'var(--accent-green-dim)', icon: TrendingUp },
+              { label: t('reports.outstanding'), value: formatMoney(outstandingPayroll), color: 'var(--accent-yellow)', dim: 'var(--accent-yellow-dim)', icon: AlertCircle },
             ].map(c => (
               <div key={c.label} style={{ ...cardStyle, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: c.dim, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -813,23 +1420,26 @@ export default function AccountingPage() {
             ))}
           </div>
 
+          {otherMonthsNotice && <div style={{ marginBottom: 16 }}>{otherMonthsNotice}</div>}
+
           {/* Paystubs table */}
           <div style={cardStyle}>
             <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Paystubs — {fmtMonth(paystubMonth)}</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('reports.paystubsMonth')} : {fmtMonth(paystubMonth)}</span>
             </div>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="gem-table-scroll" style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    {['Staff', 'Role', 'Basic Pay', 'Allowances', 'Deductions', 'Net Pay', 'Status', 'Actions'].map(h => (
+                    {[t('common.name'), t('staff.role'), t('reports.basicPay'), t('reports.allowances'), t('reports.deductions'), t('reports.netPay'), t('common.status'), t('common.actions')].map(h => (
                       <th key={h} style={{ padding: '10px 20px', textAlign: 'left', fontSize: 10, textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {monthPaystubs.map(p => (
-                    <tr key={p.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}
+                    <tr key={p.id} style={{ borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer' }}
+                      onClick={() => setViewingPaystub(p)}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-hover)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{p.staffName}</td>
@@ -839,26 +1449,75 @@ export default function AccountingPage() {
                       <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--accent-red)' }}>-{formatMoney(p.deductions)}</td>
                       <td style={{ padding: '12px 20px', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Manrope, sans-serif' }}>{formatMoney(p.netPay)}</td>
                       <td style={{ padding: '12px 20px' }}><StatusPill status={p.status} /></td>
-                      <td style={{ padding: '12px 20px' }}>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }} title="Edit pay" onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-gold)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'} onClick={() => openEditPaystub(p)}><Pencil size={14} /></button>
-                          {p.status !== 'paid' && (
-                            <button style={{ ...primaryBtn, fontSize: 11, padding: '4px 10px' }} onClick={() => markPaid(p.id)}>Mark Paid</button>
-                          )}
-                        </div>
+                      <td style={{ padding: '12px 20px' }} onClick={e => e.stopPropagation()}>
+                        <RowMenu title={t('common.actions')} items={[
+                          { label: t('reports.view'), icon: <Eye size={15} />, onClick: () => setViewingPaystub(p) },
+                          { label: t('reports.editPay'), icon: <Pencil size={15} />, onClick: () => openEditPaystub(p), hidden: !canEditPayroll },
+                          { label: t('reports.markPaid'), icon: <CheckCircle size={15} />, onClick: () => requestMarkPaid(p.id), hidden: !canEditPayroll || p.status === 'paid' },
+                        ]} />
                       </td>
                     </tr>
                   ))}
                   {monthPaystubs.length === 0 && (
-                    <tr><td colSpan={8} style={{ padding: '32px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>No paystubs for this month.</td></tr>
+                    <tr><td colSpan={8} style={{ padding: '32px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>{t('reports.noPaystubs')}</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Total Payroll ({fmtMonth(paystubMonth)}):</span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Manrope, sans-serif' }}>{formatMoney(totalPayroll)}</span>
-            </div>
+
+            {/* Settlement summary: how much of this month's payroll has left the business */}
+            {monthPaystubs.length > 0 && (() => {
+              const pct = totalPayroll > 0 ? Math.round((paidPayroll / totalPayroll) * 100) : 0;
+              const settled = outstandingPayroll <= 0;
+              return (
+                <div style={{ borderTop: '1px solid var(--border-subtle)', padding: '18px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        {t('reports.totalPayrollLabel')} · {fmtMonth(paystubMonth)}
+                      </div>
+                      <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px', fontVariantNumeric: 'tabular-nums', marginTop: 4 }}>
+                        {formatMoney(totalPayroll)}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 28 }}>
+                      {[
+                        { label: t('reports.paidLabel'), value: paidPayroll, color: 'var(--accent-green)' },
+                        { label: t('reports.outstanding'), value: outstandingPayroll, color: settled ? 'var(--text-muted)' : 'var(--accent-yellow)' },
+                      ].map(s => (
+                        <div key={s.label} style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.label}</span>
+                          </div>
+                          <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 700, color: s.color, fontVariantNumeric: 'tabular-nums', marginTop: 3 }}>
+                            {formatMoney(s.value)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ height: 6, borderRadius: 999, background: 'var(--bg-elevated)', overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${pct}%`, height: '100%', borderRadius: 999,
+                        background: settled
+                          ? 'linear-gradient(90deg, #4ade80, #22c55e)'
+                          : 'linear-gradient(90deg, #c9a96e, #b08d4a)',
+                        transition: 'width 0.3s ease',
+                      }} />
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 7 }}>
+                      {settled
+                        ? `All ${monthPaystubs.length} ${monthPaystubs.length === 1 ? 'payment' : 'payments'} settled`
+                        : `${pct}% settled · ${monthPaystubs.filter(p => p.status !== 'paid').length} still to pay`}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -873,21 +1532,55 @@ export default function AccountingPage() {
           { key: 'Walk-in',      label: 'Walk-in',                              color: '#fb7185' },
           { key: 'Other',        label: 'Other',                                color: '#a78bfa' },
         ];
-        const withSource = membersList.filter(m => m.howHeard);
-        const total = membersList.length;
+        const RANGE_DAYS = { '7d': 7, '30d': 30, '90d': 90, '365d': 365, all: null };
+        const RANGE_OPTS = [
+          { key: '7d', label: t('reports.last7Days') },
+          { key: '30d', label: t('reports.last30Days') },
+          { key: '90d', label: t('reports.last90Days') },
+          { key: '365d', label: t('reports.lastYear') },
+          { key: 'all', label: t('reports.allTime') },
+        ];
+        const days = RANGE_DAYS[marketingRange];
+        const cutoff = days == null ? null : Date.now() - days * 86400000;
+        const inRange = (m) => {
+          if (cutoff == null) return true;
+          const raw = m.createdAt || m.startDate;
+          const ts = raw ? new Date(raw).getTime() : NaN;
+          return Number.isNaN(ts) ? false : ts >= cutoff;
+        };
+        const scopedMembers = membersList.filter(inRange);
+
+        const withSource = scopedMembers.filter(m => m.howHeard);
+        const total = scopedMembers.length;
         const withSourceCount = withSource.length;
         const counts = Object.fromEntries(SOURCES.map(s => [s.key, 0]));
         withSource.forEach(m => { if (counts[m.howHeard] !== undefined) counts[m.howHeard]++; });
         const sorted = [...SOURCES].sort((a, b) => counts[b.key] - counts[a.key]);
+        const detailMembers = scopedMembers.filter(m => m.howHeard || m.notes);
 
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Time range filter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('reports.showMembersWhoJoined')}</span>
+              {RANGE_OPTS.map(o => {
+                const active = marketingRange === o.key;
+                return (
+                  <button key={o.key} onClick={() => setMarketingRange(o.key)} style={{
+                    padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans',
+                    background: active ? 'var(--accent-gold)' : 'var(--bg-elevated)',
+                    color: active ? '#0a0a0f' : 'var(--text-secondary)',
+                    border: `1px solid ${active ? 'transparent' : 'var(--border-subtle)'}`,
+                  }}>{o.label}</button>
+                );
+              })}
+            </div>
             {/* Summary cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+            <div className="gem-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
               {[
                 { label: t('reports.totalMembers'), value: total, color: 'var(--accent-gold)', dim: 'rgba(201,169,110,0.12)', icon: FileText },
                 { label: t('reports.sourceRecorded'), value: withSourceCount, color: '#818cf8', dim: 'rgba(129,140,248,0.12)', icon: BarChart2 },
-                { label: t('reports.topSource'), value: sorted[0] && counts[sorted[0].key] > 0 ? sorted[0].label.split(' ')[0] : '—', color: sorted[0] ? sorted[0].color : 'var(--text-muted)', dim: sorted[0] ? `${sorted[0].color}1a` : 'var(--bg-elevated)', icon: TrendingUp },
+                { label: t('reports.topSource'), value: sorted[0] && counts[sorted[0].key] > 0 ? sorted[0].label.split(' ')[0] : '-', color: sorted[0] ? sorted[0].color : 'var(--text-muted)', dim: sorted[0] ? `${sorted[0].color}1a` : 'var(--bg-elevated)', icon: TrendingUp },
               ].map(c => (
                 <div key={c.label} style={{ ...cardStyle, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 10, background: c.dim, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -903,9 +1596,9 @@ export default function AccountingPage() {
 
             {/* Breakdown bars */}
             <div style={{ ...cardStyle, padding: 24 }}>
-              <div style={{ fontFamily: 'Manrope', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Source Breakdown</div>
+              <div style={{ fontFamily: 'Manrope', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>{t('reports.sourceBreakdown')}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20 }}>
-                Based on {withSourceCount} member{withSourceCount !== 1 ? 's' : ''} with recorded source data
+                {t('reports.basedOnMembers', { count: withSourceCount })}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {sorted.map(src => {
@@ -919,7 +1612,7 @@ export default function AccountingPage() {
                           <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{src.label}</span>
                         </div>
                         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{count} {count === 1 ? 'member' : 'members'}</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('reports.memberCount', { count })}</span>
                           <span style={{ fontSize: 13, fontWeight: 700, color: count > 0 ? src.color : 'var(--text-muted)', fontFamily: 'Manrope', minWidth: 40, textAlign: 'right' }}>{pct}%</span>
                         </div>
                       </div>
@@ -935,25 +1628,25 @@ export default function AccountingPage() {
             {/* Individual member table */}
             <div style={cardStyle}>
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontFamily: 'Manrope', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>Member Details</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Individual source and referral notes per member</div>
+                <div style={{ fontFamily: 'Manrope', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{t('reports.memberDetails')}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{t('reports.memberDetailsDesc')}</div>
               </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="gem-table-scroll"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    {['Member', 'Source', 'Notes'].map(h => (
+                    {[t('members.member'), t('reports.source'), t('common.notes')].map(h => (
                       <th key={h} style={{ padding: '10px 20px', textAlign: 'left', fontSize: 10, textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--text-muted)', fontWeight: 500, borderBottom: '1px solid var(--border-subtle)', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {membersList.filter(m => m.howHeard || m.notes).length === 0 ? (
+                  {detailMembers.length === 0 ? (
                     <tr>
                       <td colSpan={3} style={{ padding: '40px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
-                        No marketing data recorded yet. Source data is collected when adding new members.
+                        {t('reports.noMarketingData')}
                       </td>
                     </tr>
-                  ) : membersList.filter(m => m.howHeard || m.notes).map(m => {
+                  ) : detailMembers.map(m => {
                     const src = SOURCES.find(s => s.key === m.howHeard);
                     return (
                       <tr key={m.id}>
@@ -966,74 +1659,154 @@ export default function AccountingPage() {
                             <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 20, background: `${src.color}1a`, color: src.color }}>
                               {m.howHeard}
                             </span>
-                          ) : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>—</span>}
+                          ) : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>-</span>}
                         </td>
                         <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)', maxWidth: 340 }}>
-                          {m.notes || '—'}
+                          {m.notes || '-'}
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
-              </table>
+              </table></div>
             </div>
           </div>
         );
       })()}
 
       {/* Add / Edit Expense Modal */}
-      <Modal open={showModal} onClose={() => setShowModal(false)} title={editingExpense ? 'Edit Expense' : 'Add Expense'}>
+      <Modal open={showModal} onClose={() => setShowModal(false)}
+        title={editingExpense ? t('reports.editExpense') : (isSalaryEntry ? 'Issue Staff Pay' : t('reports.addExpense'))}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Title *</label>
-            <input style={{ ...inputStyle, borderColor: errors.title ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Electricity Bill" />
-            {errors.title && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.title}</div>}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: isSalaryEntry ? '1fr' : '1fr 1fr', gap: 12 }}>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Category</label>
-              <select style={inputStyle} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.category')}</label>
+              <select style={inputStyle} value={form.category} disabled={!!editingExpense}
+                onChange={e => {
+                  const category = e.target.value;
+                  setSalaryPreview(null);
+                  setErrors({});
+                  setForm(f => ({
+                    ...f, category,
+                    // Salary entries start clean: the amount is worked out, not typed
+                    ...(category === 'Salaries'
+                      ? { amount: '', staffId: '', payMonth: payMonthLabel(new Date()), title: '', paidTo: '' }
+                      : { staffId: '', payMonth: '' }),
+                  }));
+                }}>
                 {['Utilities', 'Rent', 'Maintenance', 'Salaries', 'Supplies', 'Other'].map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Amount *</label>
-              <input type="number" style={{ ...inputStyle, borderColor: errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
-              {errors.amount && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.amount}</div>}
-            </div>
+            {!isSalaryEntry && (
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.amount')} *</label>
+                <input type="text" inputMode="numeric" style={{ ...inputStyle, borderColor: errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: digitsOnly(e.target.value) }))} placeholder="0" />
+                {errors.amount && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.amount}</div>}
+              </div>
+            )}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Date *</label>
-              <input type="date" style={{ ...inputStyle, borderColor: errors.date ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
-              {errors.date && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.date}</div>}
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Paid To</label>
-              <input style={inputStyle} value={form.paidTo} onChange={e => setForm(f => ({ ...f, paidTo: e.target.value }))} placeholder="Vendor name" />
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Payment Method</label>
-              <select style={inputStyle} value={form.method} onChange={e => setForm(f => ({ ...f, method: e.target.value }))}>
-                {['Cash', 'Card', 'Bank Transfer'].map(m => <option key={m}>{m}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Recorded By</label>
-              <select style={inputStyle} value={form.recordedBy} onChange={e => setForm(f => ({ ...f, recordedBy: e.target.value }))}>
-                <option value="">Select staff...</option>
-                {staffList.map(s => <option key={s.id} value={staffName(s)}>{staffName(s)}</option>)}
-              </select>
-            </div>
-          </div>
+
+          {isSalaryEntry ? (
+            <>
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Staff member *</label>
+                  <select style={{ ...inputStyle, borderColor: errors.staffId ? 'var(--accent-red)' : 'var(--border-subtle)' }}
+                    value={form.staffId}
+                    onChange={e => { const staffId = e.target.value; setForm(f => ({ ...f, staffId })); loadSalaryPreview(staffId, form.payMonth); }}>
+                    <option value="">{t('tasks.selectStaff')}</option>
+                    {staffList.filter(s => s.isActive !== false).map(s => (
+                      <option key={s.id} value={s.id}>{staffName(s)}</option>
+                    ))}
+                  </select>
+                  {errors.staffId && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.staffId}</div>}
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Pay period *</label>
+                  <select style={{ ...inputStyle, borderColor: errors.payMonth ? 'var(--accent-red)' : 'var(--border-subtle)' }}
+                    value={form.payMonth}
+                    onChange={e => { const payMonth = e.target.value; setForm(f => ({ ...f, payMonth })); loadSalaryPreview(form.staffId, payMonth); }}>
+                    {payMonthOptions().map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  {errors.payMonth && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.payMonth}</div>}
+                </div>
+              </div>
+
+              {salaryPreview && (
+                <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '12px 14px', fontSize: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: 4 }}>
+                    <span>Base salary</span><span>{formatMoney(salaryPreview.basePay)}</span>
+                  </div>
+                  {salaryPreview.bonuses.map((b, i) => (
+                    <div key={`b${i}`} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-green)', marginBottom: 3 }}>
+                      <span>{b.label}{b.recurring ? '' : ' (one time)'}</span><span>+{formatMoney(b.amount)}</span>
+                    </div>
+                  ))}
+                  {salaryPreview.deductions.map((d, i) => (
+                    <div key={`d${i}`} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-red)', marginBottom: 3 }}>
+                      <span>{d.label}{d.recurring ? '' : ' (one time)'}</span><span>-{formatMoney(d.amount)}</span>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-subtle)', marginTop: 6, paddingTop: 6, fontWeight: 700, color: 'var(--text-primary)' }}>
+                    <span>Net</span><span>{formatMoney(salaryPreview.net)}</span>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.amount')} *</label>
+                <input type="text" inputMode="numeric" style={{ ...inputStyle, borderColor: errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)' }}
+                  value={form.amount} onChange={e => setForm(f => ({ ...f, amount: digitsOnly(e.target.value) }))} placeholder="0" />
+                {errors.amount && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.amount}</div>}
+              </div>
+
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--accent-gold-dim)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: 8, padding: '9px 12px', lineHeight: 1.5 }}>
+                This records the pay as issued. It appears under Paystubs, where marking it paid books the salary expense.
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('tasks.titleLabel')}</label>
+                <input style={{ ...inputStyle, borderColor: errors.title ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder={t('reports.expenseTitlePh')} />
+                {errors.title && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.title}</div>}
+              </div>
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.date')} *</label>
+                  <input type="date" style={{ ...inputStyle, borderColor: errors.date ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+                  {errors.date && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.date}</div>}
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.paidTo')} *</label>
+                  <input style={{ ...inputStyle, borderColor: errors.paidTo ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.paidTo} onChange={e => setForm(f => ({ ...f, paidTo: e.target.value }))} placeholder={t('reports.vendorName')} />
+                  {errors.paidTo && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.paidTo}</div>}
+                </div>
+              </div>
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('sales.paymentMethod')}</label>
+                  {/* stored as a code (mobile_money); the list shows the gym's own methods by name */}
+                  <select style={inputStyle} value={PAYMENT_METHODS.find(x => x.api === form.method || x.key === canonicalMethod(form.method))?.key || enabledMethods(gymSettings)[0]?.key} onChange={e => setForm(f => ({ ...f, method: e.target.value }))}>
+                    {enabledMethods(gymSettings).map(m => <option key={m.key} value={m.key}>{t(m.labelKey)}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.recordedBy')}</label>
+                  <select style={inputStyle} value={form.recordedBy} onChange={e => setForm(f => ({ ...f, recordedBy: e.target.value }))}>
+                    <option value="">{t('tasks.selectStaff')}</option>
+                    {staffList.filter(s => s.isActive !== false || staffName(s) === form.recordedBy).map(s => <option key={s.id} value={staffName(s)}>{staffName(s)}</option>)}
+                  </select>
+                </div>
+              </div>
+            </>
+          )}
           <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Notes</label>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.notes')}</label>
             <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
           </div>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Attach Receipt / Photo</label>
+          <div style={{ display: isSalaryEntry ? 'none' : 'block' }}>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.attachReceipt')}</label>
             <input type="file" accept="image/*" onChange={e => {
               const file = e.target.files[0];
               if (file) {
@@ -1051,26 +1824,30 @@ export default function AccountingPage() {
           </div>
           {errors._api && <div style={{ fontSize: 12, color: 'var(--accent-red)', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '8px 12px' }}>⚠ {errors._api}</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
-            <button style={secondaryBtn} onClick={() => setShowModal(false)}>Cancel</button>
-            {!editingExpense && <button style={secondaryBtn} onClick={() => handleSave(true)}>Save & Add Another</button>}
-            <button style={primaryBtn} onClick={() => handleSave(false)}>Save Expense</button>
+            <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
+            {!editingExpense && <button style={secondaryBtn} onClick={() => handleSave(true)}>{t('tasks.saveAndAddAnother')}</button>}
+            <button style={primaryBtn} onClick={() => handleSave(false)}>{isSalaryEntry ? 'Issue Pay' : t('reports.saveExpense')}</button>
           </div>
         </div>
       </Modal>
 
       {/* Expense Detail Modal */}
       {viewingExpense && (
-        <Modal open={!!viewingExpense} onClose={() => setViewingExpense(null)} title="Expense Details" maxWidth={500}>
+        <Modal open={!!viewingExpense} onClose={() => setViewingExpense(null)} title={t('reports.expenseRecord')} maxWidth={500}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               {[
-                ['Title', viewingExpense.title],
-                ['Category', viewingExpense.category],
-                ['Amount', formatMoney(Number(viewingExpense.amount))],
-                ['Date', viewingExpense.date ? new Date(viewingExpense.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'],
-                ['Paid To', viewingExpense.paidTo || '—'],
-                ['Method', viewingExpense.method || '—'],
-                ['Recorded By', viewingExpense.recordedBy || '—'],
+                [t('common.title'), viewingExpense.title],
+                [t('reports.category'), viewingExpense.category],
+                [t('common.amount'), formatMoney(Number(viewingExpense.amount))],
+                [t('common.date'), viewingExpense.date ? fmtDate(viewingExpense.date) : '-'],
+                [t('reports.paidTo'), viewingExpense.paidTo || '-'],
+                [t('reports.method'), viewingExpense.method || '-'],
+                [t('reports.recordedBy'), viewingExpense.recordedBy || '-'],
+                // Who put it in GEM, and when: taken from whoever was signed in
+                [t('reports.createdBy'), viewingExpense.createdByName
+                  ? `${viewingExpense.createdByName} · ${fmtDate(viewingExpense.createdAt)}`
+                  : '-'],
               ].map(([label, value]) => (
                 <div key={label} style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>{label}</div>
@@ -1078,24 +1855,41 @@ export default function AccountingPage() {
                 </div>
               ))}
             </div>
+            {viewingExpense.editedByName && (
+              <div style={{ background: 'var(--accent-yellow-dim)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
+                {t('reports.editedStamp', { name: viewingExpense.editedByName, date: fmtDate(viewingExpense.editedAt) })}
+              </div>
+            )}
             {(viewingExpense.note || viewingExpense.notes) && (
               <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>Notes</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>{t('common.notes')}</div>
                 <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{viewingExpense.note || viewingExpense.notes}</div>
               </div>
             )}
             {viewingExpense.receipt && (
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 8 }}>Receipt / Photo</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 8 }}>{t('reports.receiptPhoto')}</div>
                 <img src={viewingExpense.receipt} alt="Receipt" style={{ width: '100%', borderRadius: 8, border: '1px solid var(--border-subtle)', maxHeight: 300, objectFit: 'contain', background: 'var(--bg-elevated)' }} />
               </div>
             )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
-              <button style={secondaryBtn} onClick={() => { setViewingExpense(null); openEdit(viewingExpense); }}><Pencil size={13} /> Edit</button>
+              {/* Changing the books happens here, with the entry open in front
+                  of you, and each action is confirmed with the owner's code */}
+              {canEditExpenses && (
+                <button style={secondaryBtn} onClick={() => { setViewingExpense(null); openEdit(viewingExpense); }}><Pencil size={13} /> {t('common.edit')}</button>
+              )}
+              {canEditExpenses && (
+                <button
+                  style={{ ...secondaryBtn, color: 'var(--accent-red)', borderColor: 'var(--accent-red)' }}
+                  onClick={() => { const exp = viewingExpense; setViewingExpense(null); setDeleteExpense(exp); setShowDeleteAuthModal(true); }}
+                >
+                  <Trash2 size={13} /> {t('common.delete')}
+                </button>
+              )}
               <button style={primaryBtn} onClick={() => {
                 const exp = viewingExpense;
                 const receipt = exp.receipt;
-                const html = `<!DOCTYPE html><html><head><title>Expense — ${exp.title}</title><style>
+                const html = `<!DOCTYPE html><html><head><title>Expense : ${exp.title}</title><style>
                   body{font-family:Arial,sans-serif;margin:40px;color:#111;max-width:600px}
                   h1{font-size:20px;margin-bottom:4px}
                   .sub{font-size:12px;color:#666;margin-bottom:24px}
@@ -1106,19 +1900,19 @@ export default function AccountingPage() {
                   img{max-width:100%;border-radius:6px;border:1px solid #ddd;margin-top:8px}
                   .footer{margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:12px}
                 </style></head><body>
-                  <h1>Expense Record</h1>
-                  <div class="sub">Generated ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+                  <h1>${t('reports.expenseRecord')}</h1>
+                  <div class="sub">${t('reports.generatedLabel')} ${fmtDate(new Date(), { day: '2-digit', month: 'long', year: 'numeric' })}</div>
                   <div class="grid">
-                    <div class="field"><label>Title</label><span>${exp.title || '—'}</span></div>
-                    <div class="field"><label>Category</label><span>${exp.category || '—'}</span></div>
-                    <div class="field"><label>Amount</label><span style="color:#dc2626">${formatMoney(Number(exp.amount))}</span></div>
-                    <div class="field"><label>Date</label><span>${exp.date ? new Date(exp.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span></div>
-                    <div class="field"><label>Paid To</label><span>${exp.paidTo || '—'}</span></div>
-                    <div class="field"><label>Payment Method</label><span>${exp.method || '—'}</span></div>
-                    <div class="field"><label>Recorded By</label><span>${exp.recordedBy || '—'}</span></div>
+                    <div class="field"><label>${t('common.title')}</label><span>${exp.title || '-'}</span></div>
+                    <div class="field"><label>${t('reports.category')}</label><span>${exp.category || '-'}</span></div>
+                    <div class="field"><label>${t('common.amount')}</label><span style="color:#dc2626">${formatMoney(Number(exp.amount))}</span></div>
+                    <div class="field"><label>${t('common.date')}</label><span>${fmtDate(exp.date)}</span></div>
+                    <div class="field"><label>${t('reports.paidTo')}</label><span>${exp.paidTo || '-'}</span></div>
+                    <div class="field"><label>${t('sales.paymentMethod')}</label><span>${exp.method || '-'}</span></div>
+                    <div class="field"><label>${t('reports.recordedBy')}</label><span>${exp.recordedBy || '-'}</span></div>
                   </div>
-                  ${(exp.note || exp.notes) ? `<div class="notes-box"><strong>Notes:</strong> ${exp.note || exp.notes}</div>` : ''}
-                  ${receipt ? `<div><strong style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888">Receipt</strong><br/><img src="${receipt}" /></div>` : ''}
+                  ${(exp.note || exp.notes) ? `<div class="notes-box"><strong>${t('common.notes')}:</strong> ${exp.note || exp.notes}</div>` : ''}
+                  ${receipt ? `<div><strong style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888">${t('reports.receipt')}</strong><br/><img src="${receipt}" /></div>` : ''}
                   <div class="footer">GEM Gym Management · Expense ID: ${exp.id}</div>
                 </body></html>`;
                 const w = window.open('', '_blank', 'width=700,height=900');
@@ -1126,14 +1920,99 @@ export default function AccountingPage() {
                 w.document.close();
                 w.focus();
                 setTimeout(() => w.print(), 400);
-              }}><Download size={13} /> Download PDF</button>
+              }}><Download size={13} /> {t('reports.downloadPdf')}</button>
             </div>
           </div>
         </Modal>
       )}
 
+      {/* Paystub detail - read-only view of what this pay was made of */}
+      {viewingPaystub && (() => {
+        const p = viewingPaystub;
+        const bd = p.breakdown || null;
+        const basePay = bd?.basePay ?? p.basicPay;
+        const lists = { bonuses: bd?.bonuses || [], deductions: bd?.deductions || [] };
+        const totals = { bonuses: bd?.totalBonuses ?? p.allowances, deductions: bd?.totalDeductions ?? p.deductions };
+        const meta = [
+          [t('reports.payPeriod'), p.month],
+          [t('reports.issuedLabel'), p.issuedAt ? fmtDate(p.issuedAt) : '-'],
+          [t('reports.paidLabel'), p.paidAt ? fmtDate(p.paidAt) : '-'],
+        ];
+        return (
+          <Modal open onClose={() => setViewingPaystub(null)} title={p.staffName} maxWidth={520}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{String(p.role || '').replace(/_/g, ' ')}</span>
+                <StatusPill status={p.status} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                {meta.map(([label, value]) => (
+                  <div key={label} style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '9px 12px' }}>
+                    <div style={{ fontSize: 9.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 3 }}>{label}</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)' }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '14px 16px', fontSize: 12.5 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: 'var(--text-secondary)' }}>
+                  <span>{t('reports.basicPay')}</span>
+                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(basePay)}</span>
+                </div>
+                {PAY_KINDS.map(g => {
+                  const items = lists[g.key];
+                  const total = totals[g.key];
+                  if (!items.length && !total) return null;
+                  return (
+                    <div key={g.key} style={{ marginTop: 12 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, color: g.color }}>
+                        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase' }}>{g.title}</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{g.sign}{formatMoney(total)}</span>
+                      </div>
+                      {items.length === 0 ? (
+                        <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4, paddingLeft: 10 }}>{t('reports.notItemised')}</div>
+                      ) : items.map((x, i) => (
+                        <div key={`${g.key}${i}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: 'var(--text-muted)', marginTop: 4, paddingLeft: 10 }}>
+                          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.label}{x.recurring ? '' : ' · one time'}</span>
+                          <span style={{ fontFamily: 'JetBrains Mono, monospace', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{formatMoney(x.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, borderTop: '1px solid var(--border-subtle)', marginTop: 12, paddingTop: 10, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  <span>{t('staff.payRecorded')}</span>
+                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(p.grossPay)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginTop: 6, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  <span>{t('staff.toHandOver')}</span>
+                  <span style={{ fontSize: 15, fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums', color: 'var(--accent-gold)' }}>{formatMoney(p.netPay)}</span>
+                </div>
+              </div>
+
+              {p.note && (
+                <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ fontSize: 9.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>{t('common.notes')}</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{p.note}</div>
+                </div>
+              )}
+
+              {canEditPayroll && (
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
+                  <button style={secondaryBtn} onClick={() => { setViewingPaystub(null); openEditPaystub(p); }}><Pencil size={13} /> {t('reports.editPay')}</button>
+                  {p.status !== 'paid' && (
+                    <button style={primaryBtn} onClick={() => { setViewingPaystub(null); requestMarkPaid(p.id); }}>{t('reports.markPaid')}</button>
+                  )}
+                </div>
+              )}
+            </div>
+          </Modal>
+        );
+      })()}
+
       {/* View / Edit Paystub Modal */}
-      <Modal open={showPaystubModal} onClose={() => { setShowPaystubModal(false); setShowAddDedLine(false); }} title={`Paystub — ${editingPaystub?.staffName}`} maxWidth={560}>
+      <Modal open={showPaystubModal} onClose={() => { setShowPaystubModal(false); setShowAddDedLine(false); }} title={`${t('reports.paystubs')} : ${editingPaystub?.staffName}`} maxWidth={560}>
         {editingPaystub && (() => {
           const lines = paystubDeductionLines[editingPaystub.id] || [];
           const totalDed = lines.reduce((s, d) => s + d.amount, 0);
@@ -1151,13 +2030,13 @@ export default function AccountingPage() {
                   </div>
                   <StatusPill status={editingPaystub.status} />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Basic Pay</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{t('reports.basicPay')}</div>
                     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '9px 12px', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', opacity: 0.7 }}>{formatMoney(editingPaystub.basicPay)}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Allowances</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{t('reports.allowances')}</div>
                     <input type="number" value={payForm.allowances ?? editingPaystub.allowances} onChange={e => setPayForm(f => ({ ...f, allowances: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', fontSize: 14, fontWeight: 700 }} />
                   </div>
                 </div>
@@ -1166,20 +2045,20 @@ export default function AccountingPage() {
               {/* Deductions */}
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Deductions</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>{t('reports.deductions')}</span>
                   <button style={{ ...secondaryBtn, padding: '4px 10px', fontSize: 11 }} onClick={() => setShowAddDedLine(v => !v)}>
-                    <Plus size={11} />{showAddDedLine ? 'Cancel' : 'Add Deduction'}
+                    <Plus size={11} />{showAddDedLine ? t('common.cancel') : t('staff.addDeduction')}
                   </button>
                 </div>
                 <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, overflow: 'hidden' }}>
                   {lines.length === 0 && !showAddDedLine && (
-                    <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>No deductions for this period</div>
+                    <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>{t('staff.noDeductions')}</div>
                   )}
                   {lines.map(d => (
                     <div key={d.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{d.label}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Note: {d.note}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('common.notePrefixColon')} {d.note}</div>
                       </div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-red)' }}>-{formatMoney(d.amount)}</span>
@@ -1190,11 +2069,11 @@ export default function AccountingPage() {
                   {showAddDedLine && (
                     <div style={{ padding: '12px 16px', borderTop: lines.length > 0 ? '1px solid var(--border-subtle)' : 'none', background: 'rgba(201,169,110,0.04)' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: 8, marginBottom: 8 }}>
-                        <input placeholder="Deduction label *" value={newDedLine.label} onChange={e => setNewDedLine(f => ({ ...f, label: e.target.value }))} style={{ ...inputStyle, padding: '7px 10px', fontSize: 12 }} />
-                        <input placeholder="Amount *" type="number" value={newDedLine.amount} onChange={e => setNewDedLine(f => ({ ...f, amount: e.target.value }))} style={{ ...inputStyle, padding: '7px 10px', fontSize: 12 }} />
+                        <input placeholder={t('staff.deductionLabelPh')} value={newDedLine.label} onChange={e => setNewDedLine(f => ({ ...f, label: e.target.value }))} style={{ ...inputStyle, padding: '7px 10px', fontSize: 12 }} />
+                        <input placeholder={t('staff.amountPh')} type="text" inputMode="numeric" value={newDedLine.amount} onChange={e => setNewDedLine(f => ({ ...f, amount: digitsOnly(e.target.value) }))} style={{ ...inputStyle, padding: '7px 10px', fontSize: 12 }} />
                       </div>
                       <div style={{ marginBottom: 8 }}>
-                        <input placeholder="Reason / note (required) *" value={newDedLine.note} onChange={e => setNewDedLine(f => ({ ...f, note: e.target.value }))} style={{ ...inputStyle, padding: '7px 10px', fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
+                        <input placeholder={t('staff.deductionNotePh')} value={newDedLine.note} onChange={e => setNewDedLine(f => ({ ...f, note: e.target.value }))} style={{ ...inputStyle, padding: '7px 10px', fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
                       </div>
                       <button style={{ ...primaryBtn, padding: '5px 14px', fontSize: 11 }} onClick={() => {
                         if (!newDedLine.label || !newDedLine.amount || !newDedLine.note) return;
@@ -1204,7 +2083,7 @@ export default function AccountingPage() {
                         }));
                         setNewDedLine({ label: '', amount: '', note: '' });
                         setShowAddDedLine(false);
-                      }}>Save Deduction</button>
+                      }}>{t('staff.saveDeduction')}</button>
                     </div>
                   )}
                 </div>
@@ -1213,24 +2092,24 @@ export default function AccountingPage() {
               {/* Net pay summary */}
               <div style={{ background: 'linear-gradient(135deg, rgba(201,169,110,0.12), rgba(201,169,110,0.04))', border: '1px solid var(--accent-gold-dim)', borderRadius: 10, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>Calculated Net Pay</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>{t('reports.calcNetPay')}</div>
                   <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'Manrope, sans-serif', color: 'var(--accent-gold)' }}>{formatMoney(netPay)}</div>
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'right' }}>
-                  <div>{formatMoney(basicPay + allowances)} gross</div>
-                  <div>− {formatMoney(totalDed)} deductions</div>
+                  <div>{formatMoney(basicPay + allowances)} {t('reports.gross')}</div>
+                  <div>− {formatMoney(totalDed)} {t('reports.deductions').toLowerCase()}</div>
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   {editingPaystub.status === 'paid' && (
-                    <button style={{ ...secondaryBtn, color: 'var(--accent-red)', borderColor: 'var(--accent-red)' }} onClick={() => { markUnpaid(editingPaystub.id); setShowPaystubModal(false); }}>Mark Unpaid</button>
+                    <button style={{ ...secondaryBtn, color: 'var(--accent-red)', borderColor: 'var(--accent-red)' }} onClick={() => { requestUnpaid(editingPaystub.id); setShowPaystubModal(false); }}>{t('reports.markUnpaid')}</button>
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button style={secondaryBtn} onClick={() => { setShowPaystubModal(false); setShowAddDedLine(false); }}>Cancel</button>
-                  <button style={primaryBtn} onClick={handleSavePaystub}>Save Changes</button>
+                  <button style={secondaryBtn} onClick={() => { setShowPaystubModal(false); setShowAddDedLine(false); }}>{t('common.cancel')}</button>
+                  <button style={primaryBtn} onClick={handleSavePaystub}>{t('common.saveChanges')}</button>
                 </div>
               </div>
             </div>
@@ -1238,18 +2117,67 @@ export default function AccountingPage() {
         })()}
       </Modal>
 
+      {/* Settling pay: the figure to hand over is the one that stands out, so
+          nobody hands over the full pay when deductions have been withheld */}
+      <Modal open={!!confirmPaid} onClose={() => setConfirmPaid(null)} title={confirmPaid ? t('reports.settleTitle', { name: confirmPaid.staffName, month: confirmPaid.month }) : ''} maxWidth={420}>
+        {confirmPaid && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ background: 'var(--accent-gold-glow)', border: '1px solid var(--accent-gold-dim)', borderRadius: 12, padding: '16px 18px', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('staff.toHandOver')}</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent-gold)', fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums', marginTop: 4 }}>{formatMoney(confirmPaid.netPay)}</div>
+            </div>
+            <div style={{ fontSize: 12.5, fontFamily: 'DM Sans', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                <span>{t('staff.payRecorded')}</span>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(confirmPaid.grossPay)}</span>
+              </div>
+              {confirmPaid.deductions > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-red)' }}>
+                  <span>{t('staff.withheldDeductions')}</span>
+                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>−{formatMoney(confirmPaid.deductions)}</span>
+                </div>
+              )}
+            </div>
+            {confirmPaid.deductions > 0 && (
+              <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
+                {t('staff.handOverExplain', { gross: formatMoney(confirmPaid.grossPay), withheld: formatMoney(confirmPaid.deductions), handOver: formatMoney(confirmPaid.netPay) })}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button style={secondaryBtn} onClick={() => setConfirmPaid(null)}>{t('common.cancel')}</button>
+              <button style={primaryBtn} onClick={() => { const id = confirmPaid.id; setConfirmPaid(null); markPaid(id); }}>
+                {t('reports.confirmHandedOver', { amount: formatMoney(confirmPaid.netPay) })}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <ManagerAuthModal
+        open={showUnpaidAuth}
+        onClose={() => { setShowUnpaidAuth(false); setPendingUnpaidId(null); }}
+        onConfirm={() => {
+          const id = pendingUnpaidId;
+          setShowUnpaidAuth(false);
+          setPendingUnpaidId(null);
+          if (id) markUnpaid(id);
+        }}
+        action="Reverse a settled salary payment"
+        danger
+      />
+
       <ManagerAuthModal
         open={showPaystubAuthModal}
         onClose={() => setShowPaystubAuthModal(false)}
         onConfirm={() => { setShowPaystubAuthModal(false); commitSavePaystub(); }}
-        action={`edit paystub for ${editingPaystub?.staffName}`}
+        action={t('reports.actionEditPaystub', { name: editingPaystub?.staffName })}
       />
 
       <ManagerAuthModal
         open={showExpenseAuthModal}
         onClose={() => setShowExpenseAuthModal(false)}
         onConfirm={() => { setShowExpenseAuthModal(false); commitExpenseSave(pendingExpenseSave); }}
-        action={`edit expense "${editingExpense?.title}"`}
+        action={t('reports.actionEditExpense', { title: editingExpense?.title })}
       />
 
       <ManagerAuthModal
@@ -1263,7 +2191,7 @@ export default function AccountingPage() {
           } catch (err) { console.error(err); }
           setDeleteExpense(null);
         }}
-        action={`delete expense "${deleteExpense?.title}"`}
+        action={t('reports.actionDeleteExpense', { title: deleteExpense?.title })}
         danger
       />
     </div>

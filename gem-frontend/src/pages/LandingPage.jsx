@@ -1,196 +1,203 @@
 import { useNavigate } from 'react-router-dom';
-import { Dumbbell, Users, BarChart2, Calendar, ChevronRight, CheckCircle2, ArrowRight, Zap, Shield, Star, Menu, X } from 'lucide-react';
+import { Dumbbell, Users, BarChart2, Calendar, ChevronRight, CheckCircle2, ArrowRight, Zap, Shield, Star, Mail, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
-
-const FEATURES = [
-  {
-    icon: Users,
-    title: 'Member Management',
-    desc: 'Track check-ins, memberships, packages, and member profiles — all in one clean interface.',
-    color: 'var(--accent-blue)',
-    dim: 'var(--accent-blue-dim)',
-  },
-  {
-    icon: BarChart2,
-    title: 'Financial Insights',
-    desc: 'Payments, accounting, and real-time revenue breakdowns with full FCFA support.',
-    color: 'var(--accent-gold)',
-    dim: 'var(--accent-gold-dim)',
-  },
-  {
-    icon: Calendar,
-    title: 'Operations Hub',
-    desc: 'Daily tasks, staff scheduling, class calendar — keep your gym running like clockwork.',
-    color: 'var(--accent-green)',
-    dim: 'var(--accent-green-dim)',
-  },
-  {
-    icon: Shield,
-    title: 'Multi-Role Access',
-    desc: 'Admin, manager, trainer, front desk — each role sees exactly what they need.',
-    color: 'var(--accent-purple)',
-    dim: 'var(--accent-purple-dim)',
-  },
-];
-
-const STATS = [
-  { value: '500+', label: 'Gyms Onboarded' },
-  { value: '120k+', label: 'Members Managed' },
-  { value: '99.9%', label: 'Uptime' },
-  { value: '24/7', label: 'Support' },
-];
-
-const TESTIMONIALS = [
-  {
-    text: 'GEM transformed how we manage our 400+ members. Payments, attendance, packages — everything in one place.',
-    name: 'Marvin Ekokobe',
-    role: 'Owner, Elite Fitness Club · Yaoundé',
-    initials: 'ME',
-    color: '#c9a96e',
-  },
-  {
-    text: 'The financial reporting alone is worth it. We finally have a clear picture of our gym\'s revenue every month.',
-    name: 'Sophie Ngono',
-    role: 'Manager, PowerGym · Douala',
-    initials: 'SN',
-    color: '#60a5fa',
-  },
-  {
-    text: 'Setup took less than a day. Our staff loves the front desk mode — check-ins are so much faster now.',
-    name: 'Marcel Fonkoua',
-    role: 'Director, Iron Body Club · Bamenda',
-    initials: 'MF',
-    color: '#4ade80',
-  },
-];
+import { useLanguage } from '../contexts/LanguageContext';
+import LangToggle from '../components/LangToggle';
+import { useIsMobile } from '../utils/useIsMobile';
 
 export default function LandingPage() {
   const nav = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const { lang, switchLang, t } = useLanguage();
+  const isMobile = useIsMobile();
+
+  const px = isMobile ? '0 20px' : '0 24px';
+
+  const FEATURES = [
+    { icon: Users,    title: t('landing.feat1Title'), desc: t('landing.feat1Desc'), color: 'var(--accent-blue)',   dim: 'var(--accent-blue-dim)'   },
+    { icon: BarChart2,title: t('landing.feat2Title'), desc: t('landing.feat2Desc'), color: 'var(--accent-gold)',   dim: 'var(--accent-gold-dim)'   },
+    { icon: Calendar, title: t('landing.feat3Title'), desc: t('landing.feat3Desc'), color: 'var(--accent-green)',  dim: 'var(--accent-green-dim)'  },
+    { icon: Shield,   title: t('landing.feat4Title'), desc: t('landing.feat4Desc'), color: 'var(--accent-purple)', dim: 'var(--accent-purple-dim)' },
+  ];
+
+  const STATS = [
+    { value: '500+',  label: t('landing.stat1') },
+    { value: '120k+', label: t('landing.stat2') },
+    { value: '99.9%', label: t('landing.stat3') },
+    { value: '24/7',  label: t('landing.stat4') },
+  ];
+
+  const TESTIMONIALS = [
+    { text: t('landing.t1'), name: 'Marvin Ekokobe', role: t('landing.t1role'), initials: 'ME', color: '#c9a96e' },
+    { text: t('landing.t2'), name: 'Sophie Ngono',   role: t('landing.t2role'), initials: 'SN', color: '#60a5fa' },
+    { text: t('landing.t3'), name: 'Marcel Fonkoua', role: t('landing.t3role'), initials: 'MF', color: '#4ade80' },
+  ];
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontFamily: 'DM Sans, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontFamily: 'DM Sans, sans-serif', overflowX: 'hidden' }}>
 
-      {/* ── Navbar ──────────────────────────────────────────────────── */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)', backdropFilter: 'blur(20px)' }}>
-        <div style={{ maxWidth: 1160, margin: '0 auto', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {/* Logo */}
+      {/* ── Navbar ── */}
+      <nav style={{ position: 'sticky', top: 0, zIndex: 100, borderBottom: '1px solid var(--border-subtle)', background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(20px)' }}>
+        <div style={{ maxWidth: 1160, margin: '0 auto', padding: px, height: isMobile ? 56 : 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => nav('/')}>
-            <div style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 12px rgba(201,169,110,0.3)' }}>
-              <Dumbbell size={18} color="#0a0a0f" strokeWidth={2.5} />
+            <div style={{ width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, borderRadius: 9, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 12px rgba(201,169,110,0.3)' }}>
+              <Dumbbell size={isMobile ? 14 : 18} color="#0a0a0f" strokeWidth={2.5} />
             </div>
             <div>
-              <div style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 800, fontSize: 17, color: 'var(--text-primary)', lineHeight: 1.1 }}>GEM</div>
-              <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.5px', lineHeight: 1 }}>GymElite Manager</div>
+              <div style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 800, fontSize: isMobile ? 15 : 17, color: 'var(--text-primary)', lineHeight: 1.1 }}>GEM</div>
+              {!isMobile && <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.5px', lineHeight: 1 }}>GymElite Manager</div>}
             </div>
           </div>
-
-          {/* Desktop nav */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <NavLink onClick={() => nav('/login')}>Sign In</NavLink>
-            <GoldBtn onClick={() => nav('/signup')}>Get Started <ArrowRight size={14} strokeWidth={2.5} /></GoldBtn>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10 }}>
+            <LangToggle lang={lang} switchLang={switchLang} />
+            {!isMobile && <NavLink onClick={() => nav('/login')}>{t('landing.signIn')}</NavLink>}
+            <GoldBtn onClick={() => nav('/signup')} small={isMobile}>
+              {isMobile ? t('landing.getStarted') : <><span>{t('landing.getStarted')}</span> <ArrowRight size={14} strokeWidth={2.5} /></>}
+            </GoldBtn>
+            {isMobile && (
+              <button onClick={() => nav('/login')} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'DM Sans' }}>
+                {t('landing.signIn')}
+              </button>
+            )}
           </div>
         </div>
       </nav>
 
-      {/* ── Hero ────────────────────────────────────────────────────── */}
-      <section style={{ maxWidth: 1160, margin: '0 auto', padding: '96px 24px 72px', textAlign: 'center', position: 'relative' }}>
-        {/* Glow blob */}
-        <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 600, height: 300, background: 'radial-gradient(ellipse at center, rgba(201,169,110,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
+      {/* ── Hero ── */}
+      <section style={{ maxWidth: 1160, margin: '0 auto', padding: isMobile ? '48px 20px 36px' : '96px 24px 72px', textAlign: 'center', position: 'relative' }}>
+        <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: isMobile ? 300 : 600, height: isMobile ? 180 : 300, background: 'radial-gradient(ellipse at center, rgba(201,169,110,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-        {/* Badge */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'var(--accent-gold-dim)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: 999, padding: '6px 16px', marginBottom: 32 }}>
-          <Zap size={12} color="var(--accent-gold)" />
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-gold)', letterSpacing: '0.3px' }}>
-            The #1 Gym Management Platform in Central Africa
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'var(--accent-gold-dim)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: 999, padding: isMobile ? '5px 12px' : '6px 16px', marginBottom: isMobile ? 22 : 32 }}>
+          <Zap size={11} color="var(--accent-gold)" />
+          <span style={{ fontSize: isMobile ? 10 : 12, fontWeight: 600, color: 'var(--accent-gold)', letterSpacing: '0.3px' }}>
+            {isMobile ? t('landing.badgeMobile') : t('landing.badge')}
           </span>
         </div>
 
-        <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 'clamp(40px, 7vw, 78px)', fontWeight: 800, lineHeight: 1.08, marginBottom: 22, letterSpacing: '-2px' }}>
-          Run Your Gym<br />
+        <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: isMobile ? 36 : 'clamp(40px, 7vw, 78px)', fontWeight: 800, lineHeight: 1.1, marginBottom: isMobile ? 16 : 22, letterSpacing: isMobile ? '-1px' : '-2px' }}>
+          {t('landing.heroTitle1')}<br />
           <span style={{ background: 'linear-gradient(125deg, #c9a96e 10%, #f0d090 50%, #b08d4a 90%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-            Like a Pro.
+            {t('landing.heroTitle2')}
           </span>
         </h1>
 
-        <p style={{ fontSize: 18, color: 'var(--text-secondary)', maxWidth: 580, margin: '0 auto 40px', lineHeight: 1.75 }}>
-          GEM brings your members, payments, staff, and classes into one powerful system — so you can focus on what matters: growing your gym.
+        <p style={{ fontSize: isMobile ? 15 : 18, color: 'var(--text-secondary)', maxWidth: 580, margin: '0 auto', marginBottom: isMobile ? 28 : 40, lineHeight: 1.7 }}>
+          {isMobile ? t('landing.heroSubMobile') : t('landing.heroSub')}
         </p>
 
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 36 }}>
-          <GoldBtn large onClick={() => nav('/signup')}>
-            Request Free Access <ArrowRight size={16} strokeWidth={2.5} />
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 10, justifyContent: 'center', alignItems: 'center', marginBottom: isMobile ? 24 : 36, padding: isMobile ? '0 8px' : 0 }}>
+          <GoldBtn large={!isMobile} fullWidth={isMobile} onClick={() => nav('/signup')}>
+            {t('landing.requestAccess')} <ArrowRight size={isMobile ? 14 : 16} strokeWidth={2.5} />
           </GoldBtn>
-          <OutlineBtn large onClick={() => nav('/login')}>
-            Sign In to Your Gym <ChevronRight size={16} />
+          <OutlineBtn large={!isMobile} fullWidth={isMobile} onClick={() => nav('/login')}>
+            {t('landing.signInGym')} <ChevronRight size={isMobile ? 14 : 16} />
           </OutlineBtn>
         </div>
 
-        <div style={{ display: 'flex', gap: 24, justifyContent: 'center', flexWrap: 'wrap' }}>
-          {['No credit card required', 'Free 30-day trial', '5-minute setup'].map(t => (
-            <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <CheckCircle2 size={14} color="var(--accent-green)" />
-              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t}</span>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 24, alignItems: 'center', justifyContent: 'center' }}>
+          {[t('landing.trustNoCard'), t('landing.trustTrial'), t('landing.trustSetup')].map(text => (
+            <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <CheckCircle2 size={13} color="var(--accent-green)" />
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{text}</span>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── Stats bar ───────────────────────────────────────────────── */}
+      {/* ── Product Video ── */}
+      <section style={{ maxWidth: 900, margin: '0 auto', padding: isMobile ? '0 16px 56px' : '0 24px 88px' }}>
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? 20 : 32 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-gold)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: 10 }}>{t('landing.videoLabel')}</div>
+          <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: isMobile ? 20 : 'clamp(22px, 3.5vw, 34px)', fontWeight: 800, letterSpacing: '-0.4px', margin: '0 0 10px' }}>
+            {t('landing.videoTitle')}
+          </h2>
+          {!isMobile && (
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)', maxWidth: 460, margin: '0 auto', lineHeight: 1.7 }}>
+              {t('landing.videoSub')}
+            </p>
+          )}
+        </div>
+        <div style={{ borderRadius: isMobile ? 12 : 16, overflow: 'hidden', border: '1.5px solid rgba(201,169,110,0.25)', boxShadow: '0 12px 48px rgba(0,0,0,0.35)' }}>
+          {!isMobile && (
+            <div style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[0,1,2].map(i => <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: 'rgba(255,255,255,0.12)' }} />)}
+              </div>
+              <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 6, padding: '4px 12px', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
+                GEM · Full Platform Walkthrough
+              </div>
+            </div>
+          )}
+          <div style={{ position: 'relative', paddingBottom: '56.25%', background: '#050508' }}>
+            <iframe
+              src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+              title={t('landing.platformOverview')}
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ── Stats bar ── */}
       <div style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border-subtle)', borderBottom: '1px solid var(--border-subtle)' }}>
-        <div style={{ maxWidth: 1160, margin: '0 auto', padding: '0 24px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        <div style={{ maxWidth: 1160, margin: '0 auto', padding: px, display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)' }}>
           {STATS.map((s, i) => (
-            <div key={s.label} style={{ padding: '26px 0', textAlign: 'center', borderRight: i < 3 ? '1px solid var(--border-subtle)' : 'none' }}>
-              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 30, fontWeight: 800, background: 'linear-gradient(135deg, #c9a96e, #e8c87a)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>{s.value}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3, fontWeight: 500 }}>{s.label}</div>
+            <div key={s.label} style={{
+              padding: isMobile ? '20px 0' : '26px 0',
+              textAlign: 'center',
+              borderRight: isMobile
+                ? (i % 2 === 0 ? '1px solid var(--border-subtle)' : 'none')
+                : (i < 3 ? '1px solid var(--border-subtle)' : 'none'),
+              borderBottom: isMobile && i < 2 ? '1px solid var(--border-subtle)' : 'none',
+            }}>
+              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: isMobile ? 24 : 30, fontWeight: 800, background: 'linear-gradient(135deg, #c9a96e, #e8c87a)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>{s.value}</div>
+              <div style={{ fontSize: isMobile ? 11 : 12, color: 'var(--text-muted)', marginTop: 3, fontWeight: 500 }}>{s.label}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── Features ────────────────────────────────────────────────── */}
-      <section style={{ maxWidth: 1160, margin: '0 auto', padding: '88px 24px' }}>
-        <div style={{ textAlign: 'center', marginBottom: 56 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-gold)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: 14 }}>
-            Platform Features
-          </div>
-          <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 'clamp(26px, 4vw, 42px)', fontWeight: 800, letterSpacing: '-0.5px', marginBottom: 14 }}>
-            One platform. Every tool.
+      {/* ── Features ── */}
+      <section style={{ maxWidth: 1160, margin: '0 auto', padding: isMobile ? '48px 20px' : '88px 24px' }}>
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? 32 : 56 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-gold)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: 12 }}>{t('landing.featuresLabel')}</div>
+          <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: isMobile ? 24 : 'clamp(26px, 4vw, 42px)', fontWeight: 800, letterSpacing: '-0.5px', marginBottom: 12 }}>
+            {t('landing.featuresTitle')}
           </h2>
-          <p style={{ fontSize: 15, color: 'var(--text-secondary)', maxWidth: 500, margin: '0 auto', lineHeight: 1.7 }}>
-            Replace spreadsheets, paper logs, and disconnected apps with a single, beautiful system.
+          <p style={{ fontSize: isMobile ? 13 : 15, color: 'var(--text-secondary)', maxWidth: 500, margin: '0 auto', lineHeight: 1.7 }}>
+            {t('landing.featuresSub')}
           </p>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
-          {FEATURES.map(f => (
-            <FeatureCard key={f.title} feature={f} />
-          ))}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(250px, 1fr))', gap: isMobile ? 12 : 16 }}>
+          {FEATURES.map(f => <FeatureCard key={f.title} feature={f} isMobile={isMobile} />)}
         </div>
       </section>
 
-      {/* ── Testimonials ────────────────────────────────────────────── */}
-      <div style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border-subtle)', borderBottom: '1px solid var(--border-subtle)', padding: '80px 0' }}>
-        <div style={{ maxWidth: 1160, margin: '0 auto', padding: '0 24px' }}>
-          <div style={{ textAlign: 'center', marginBottom: 48 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-gold)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: 14 }}>Testimonials</div>
-            <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 'clamp(22px, 3.5vw, 36px)', fontWeight: 800, letterSpacing: '-0.5px' }}>
-              Loved by gym owners across Africa
+      {/* ── Testimonials ── */}
+      <div style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border-subtle)', borderBottom: '1px solid var(--border-subtle)', padding: isMobile ? '48px 0' : '80px 0' }}>
+        <div style={{ maxWidth: 1160, margin: '0 auto', padding: px }}>
+          <div style={{ textAlign: 'center', marginBottom: isMobile ? 28 : 48 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-gold)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: 12 }}>{t('landing.testimonialsLabel')}</div>
+            <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: isMobile ? 22 : 'clamp(22px, 3.5vw, 36px)', fontWeight: 800, letterSpacing: '-0.5px' }}>
+              {t('landing.testimonialsTitle')}
             </h2>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-            {TESTIMONIALS.map(t => (
-              <div key={t.name} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 16, padding: 24 }}>
-                <div style={{ display: 'flex', gap: 2, marginBottom: 14 }}>
-                  {[...Array(5)].map((_, i) => <Star key={i} size={13} color="var(--accent-gold)" fill="var(--accent-gold)" />)}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))', gap: isMobile ? 12 : 16 }}>
+            {TESTIMONIALS.map(tm => (
+              <div key={tm.name} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: isMobile ? 12 : 16, padding: isMobile ? 16 : 24 }}>
+                <div style={{ display: 'flex', gap: 2, marginBottom: 12 }}>
+                  {[...Array(5)].map((_, i) => <Star key={i} size={12} color="var(--accent-gold)" fill="var(--accent-gold)" />)}
                 </div>
-                <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 18, fontStyle: 'italic' }}>
-                  "{t.text}"
+                <p style={{ fontSize: isMobile ? 13 : 14, color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 14, fontStyle: 'italic' }}>
+                  "{tm.text}"
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: `${t.color}22`, border: `1px solid ${t.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: t.color }}>{t.initials}</div>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: `${tm.color}22`, border: `1px solid ${tm.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: tm.color, flexShrink: 0 }}>{tm.initials}</div>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.role}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{tm.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{tm.role}</div>
                   </div>
                 </div>
               </div>
@@ -199,49 +206,89 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* ── CTA Banner ──────────────────────────────────────────────── */}
-      <section style={{ maxWidth: 1160, margin: '0 auto', padding: '88px 24px' }}>
-        <div style={{ background: 'linear-gradient(135deg, rgba(201,169,110,0.1) 0%, rgba(201,169,110,0.03) 100%)', border: '1px solid rgba(201,169,110,0.22)', borderRadius: 24, padding: '64px 40px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+      {/* ── CTA Banner ── */}
+      <section style={{ maxWidth: 1160, margin: '0 auto', padding: isMobile ? '40px 20px' : '88px 24px' }}>
+        <div style={{ background: 'linear-gradient(135deg, rgba(201,169,110,0.1) 0%, rgba(201,169,110,0.03) 100%)', border: '1px solid rgba(201,169,110,0.22)', borderRadius: isMobile ? 16 : 24, padding: isMobile ? '36px 20px' : '64px 40px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: -80, right: -80, width: 280, height: 280, borderRadius: '50%', background: 'var(--accent-gold)', filter: 'blur(100px)', opacity: 0.07, pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', bottom: -60, left: -60, width: 200, height: 200, borderRadius: '50%', background: 'var(--accent-blue)', filter: 'blur(80px)', opacity: 0.05, pointerEvents: 'none' }} />
           <div style={{ position: 'relative' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-gold)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: 16 }}>Get Started Today</div>
-            <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 'clamp(24px, 4vw, 40px)', fontWeight: 800, letterSpacing: '-0.5px', marginBottom: 16 }}>
-              Ready to transform your gym?
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-gold)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: 14 }}>{t('landing.ctaLabel')}</div>
+            <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: isMobile ? 22 : 'clamp(24px, 4vw, 40px)', fontWeight: 800, letterSpacing: '-0.5px', marginBottom: 12 }}>
+              {t('landing.ctaTitle')}
             </h2>
-            <p style={{ fontSize: 15, color: 'var(--text-secondary)', marginBottom: 36, maxWidth: 460, margin: '0 auto 36px', lineHeight: 1.7 }}>
-              Join hundreds of gyms across Africa already using GEM for smarter, faster, more profitable operations.
+            <p style={{ fontSize: isMobile ? 13 : 15, color: 'var(--text-secondary)', marginBottom: 28, maxWidth: 460, margin: '0 auto 28px', lineHeight: 1.7 }}>
+              {isMobile ? t('landing.ctaSubMobile') : t('landing.ctaSub')}
             </p>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <GoldBtn large onClick={() => nav('/signup')}>
-                Request Free Access <ArrowRight size={16} strokeWidth={2.5} />
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 10, justifyContent: 'center', padding: isMobile ? '0 8px' : 0 }}>
+              <GoldBtn large={!isMobile} fullWidth={isMobile} onClick={() => nav('/signup')}>
+                {t('landing.requestAccess')} <ArrowRight size={isMobile ? 14 : 16} strokeWidth={2.5} />
               </GoldBtn>
-              <OutlineBtn large onClick={() => nav('/login')}>
-                Sign In <ChevronRight size={16} />
+              <OutlineBtn large={!isMobile} fullWidth={isMobile} onClick={() => nav('/login')}>
+                {t('landing.signIn')} <ChevronRight size={isMobile ? 14 : 16} />
               </OutlineBtn>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── Footer ──────────────────────────────────────────────────── */}
-      <footer style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-subtle)', padding: '28px 24px' }}>
-        <div style={{ maxWidth: 1160, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={() => nav('/')}>
-            <div style={{ width: 26, height: 26, borderRadius: 6, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Dumbbell size={13} color="#0a0a0f" strokeWidth={2.5} />
-            </div>
-            <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: 14 }}>GEM</span>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· GymElite Manager</span>
+      {/* ── Contact ── */}
+      <section style={{ borderTop: '1px solid var(--border-subtle)', padding: isMobile ? '40px 20px' : '72px 24px' }}>
+        <div style={{ maxWidth: 1160, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: isMobile ? 24 : 40 }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-gold)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: 10 }}>{t('landing.contactLabel')}</div>
+            <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: isMobile ? 22 : 'clamp(22px, 3vw, 32px)', fontWeight: 800, letterSpacing: '-0.4px', margin: '0 0 10px' }}>
+              {t('landing.contactTitle')}
+            </h2>
+            <p style={{ fontSize: isMobile ? 13 : 14, color: 'var(--text-secondary)', lineHeight: 1.7, maxWidth: 420, margin: '0 auto' }}>
+              {isMobile ? t('landing.contactSubMobile') : t('landing.contactSub')}
+            </p>
           </div>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>© 2026 GEM. All rights reserved.</span>
+
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 14, width: isMobile ? '100%' : 'auto' }}>
+            <a href="mailto:hello@gymgem.io" style={{ textDecoration: 'none', width: isMobile ? '100%' : 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, padding: isMobile ? '14px 20px' : '18px 24px', cursor: 'pointer', width: isMobile ? '100%' : 'auto', boxSizing: 'border-box' }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(201,169,110,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Mail size={17} color="#c9a96e" />
+                </div>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 2 }}>Email</div>
+                  <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 600 }}>hello@gymgem.io</div>
+                </div>
+              </div>
+            </a>
+
+            <a href="https://wa.me/237600000000" target="_blank" rel="noreferrer" style={{ textDecoration: 'none', width: isMobile ? '100%' : 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, padding: isMobile ? '14px 20px' : '18px 24px', cursor: 'pointer', width: isMobile ? '100%' : 'auto', boxSizing: 'border-box' }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(34,197,94,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <MessageCircle size={17} color="#22c55e" />
+                </div>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 2 }}>WhatsApp</div>
+                  <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 600 }}>+237 6XX XXX XXX</div>
+                </div>
+              </div>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <footer style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-subtle)', padding: isMobile ? '20px' : '28px 24px' }}>
+        <div style={{ maxWidth: 1160, margin: '0 auto', display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, textAlign: isMobile ? 'center' : 'left' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={() => nav('/')}>
+            <div style={{ width: 24, height: 24, borderRadius: 6, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Dumbbell size={11} color="#0a0a0f" strokeWidth={2.5} />
+            </div>
+            <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: 13 }}>GEM</span>
+            {!isMobile && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· GymElite Manager</span>}
+          </div>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('landing.footerRights')}</span>
         </div>
       </footer>
     </div>
   );
 }
 
-/* ── Reusable micro-components ──────────────────────────────────── */
+/* ── Reusable micro-components ── */
 function NavLink({ onClick, children }) {
   const [hov, setHov] = useState(false);
   return (
@@ -256,7 +303,7 @@ function NavLink({ onClick, children }) {
   );
 }
 
-function GoldBtn({ onClick, children, large }) {
+function GoldBtn({ onClick, children, large, small, fullWidth }) {
   const [hov, setHov] = useState(false);
   return (
     <button
@@ -266,11 +313,13 @@ function GoldBtn({ onClick, children, large }) {
       style={{
         background: hov ? 'linear-gradient(135deg, #d4b47a, #c9a96e)' : 'linear-gradient(135deg, #c9a96e, #b08d4a)',
         border: 'none', color: '#0a0a0f', borderRadius: 10,
-        padding: large ? '13px 28px' : '8px 18px',
-        fontSize: large ? 15 : 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'DM Sans',
+        padding: large ? '13px 28px' : small ? '8px 14px' : '8px 18px',
+        fontSize: large ? 15 : small ? 12 : 13,
+        fontWeight: 700, cursor: 'pointer', fontFamily: 'DM Sans',
         display: 'inline-flex', alignItems: 'center', gap: 8,
-        boxShadow: hov ? '0 4px 20px rgba(201,169,110,0.4)' : '0 2px 10px rgba(201,169,110,0.2)',
-        transition: 'all 0.2s', transform: hov ? 'translateY(-1px)' : 'none',
+        transition: 'all 0.2s',
+        width: fullWidth ? '100%' : 'auto',
+        justifyContent: fullWidth ? 'center' : 'flex-start',
       }}
     >
       {children}
@@ -278,7 +327,7 @@ function GoldBtn({ onClick, children, large }) {
   );
 }
 
-function OutlineBtn({ onClick, children, large }) {
+function OutlineBtn({ onClick, children, large, fullWidth }) {
   const [hov, setHov] = useState(false);
   return (
     <button
@@ -286,12 +335,17 @@ function OutlineBtn({ onClick, children, large }) {
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        background: hov ? 'var(--bg-elevated)' : 'var(--bg-card)',
-        border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 10,
+        background: hov ? 'var(--bg-elevated)' : 'transparent',
+        border: `1px solid ${hov ? 'var(--accent-gold)' : 'var(--border-subtle)'}`,
+        color: hov ? 'var(--accent-gold)' : 'var(--text-secondary)',
+        borderRadius: 10,
         padding: large ? '13px 28px' : '8px 18px',
-        fontSize: large ? 15 : 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans',
+        fontSize: large ? 15 : 13,
+        fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans',
         display: 'inline-flex', alignItems: 'center', gap: 8,
         transition: 'all 0.2s',
+        width: fullWidth ? '100%' : 'auto',
+        justifyContent: fullWidth ? 'center' : 'flex-start',
       }}
     >
       {children}
@@ -299,25 +353,27 @@ function OutlineBtn({ onClick, children, large }) {
   );
 }
 
-function FeatureCard({ feature: f }) {
+function FeatureCard({ feature, isMobile }) {
   const [hov, setHov] = useState(false);
+  const { icon: Icon, title, desc, color, dim } = feature;
   return (
     <div
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        background: 'var(--bg-card)', border: `1px solid ${hov ? f.color : 'var(--border-subtle)'}`,
-        borderRadius: 18, padding: '28px 24px',
-        transition: 'all 0.25s',
-        transform: hov ? 'translateY(-3px)' : 'none',
-        boxShadow: hov ? `0 8px 28px rgba(0,0,0,0.25)` : 'none',
+        background: hov ? 'var(--bg-elevated)' : 'var(--bg-card)',
+        border: `1px solid ${hov ? color : 'var(--border-subtle)'}`,
+        borderRadius: isMobile ? 12 : 16,
+        padding: isMobile ? 16 : 24,
+        transition: 'all 0.2s',
+        cursor: 'default',
       }}
     >
-      <div style={{ width: 48, height: 48, borderRadius: 13, background: f.dim, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18 }}>
-        <f.icon size={24} color={f.color} strokeWidth={1.8} />
+      <div style={{ width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: 10, background: dim, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: isMobile ? 12 : 16 }}>
+        <Icon size={isMobile ? 17 : 20} color={color} strokeWidth={1.8} />
       </div>
-      <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 700, marginBottom: 10, color: 'var(--text-primary)' }}>{f.title}</div>
-      <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.65 }}>{f.desc}</div>
+      <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: isMobile ? 13 : 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: isMobile ? 6 : 8 }}>{title}</div>
+      <p style={{ fontSize: isMobile ? 12 : 13, color: 'var(--text-secondary)', lineHeight: 1.65, margin: 0 }}>{desc}</p>
     </div>
   );
 }

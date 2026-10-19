@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Gem,
@@ -9,19 +9,22 @@ import {
   Monitor,
   ClipboardList,
   ShoppingBag,
-  Flag,
+  Activity,
   CreditCard,
   BarChart3,
   Package,
   MessageSquare,
   Users2,
   Settings,
+  X,
 } from 'lucide-react';
 import { getAuth } from '../utils/auth';
-import { ROLE_PROFILES } from '../data/mockData';
+import { pagesFor } from '../utils/rolePages';
 import { getAll as getMembers } from '../services/members.service';
 import { getAll as getTasks } from '../services/tasks.service';
+import { countMembersNeedingAttention, countTasksNeedingAttention } from '../utils/attention';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useSetupStatus } from '../hooks/useSetupStatus';
 
 const PATH_TO_NAV_KEY = {
   '/dashboard':    'dashboard',
@@ -33,7 +36,7 @@ const PATH_TO_NAV_KEY = {
   '/sales':        'sales',
   '/operations':   'operations',
   '/payments':     'payments',
-  '/accounting':   'reports',
+  '/accounting':   'accounting',
   '/packages':     'packages',
   '/communication':'communication',
   '/staff':        'staff',
@@ -45,39 +48,45 @@ const NAV_SECTIONS = [
     title: 'MAIN',
     items: [
       { label: 'Dashboard', icon: LayoutGrid, path: '/dashboard' },
-      { label: 'Members', icon: Users, path: '/members', badgeKey: 'members' },
-      { label: 'Attendance', icon: CheckSquare, path: '/attendance' },
       { label: 'Calendar', icon: Calendar, path: '/calendar' },
+    ],
+  },
+  {
+    title: 'MEMBERS',
+    items: [
+      { label: 'Members', icon: Users, path: '/members', badgeKey: 'members' },
+      { label: 'Packages', icon: Package, path: '/packages' },
+      { label: 'Communication', icon: MessageSquare, path: '/communication' },
     ],
   },
   {
     title: 'OPERATIONS',
     items: [
       { label: 'Front Desk', icon: Monitor, path: '/front-desk' },
+      { label: 'Attendance', icon: CheckSquare, path: '/attendance' },
+      { label: 'Daily Overview', icon: Activity, path: '/operations' },
       { label: 'Tasks', icon: ClipboardList, path: '/tasks', badgeKey: 'tasks' },
       { label: 'Sales & Products', icon: ShoppingBag, path: '/sales' },
-      { label: 'Operations', icon: Flag, path: '/operations' },
     ],
   },
   {
     title: 'FINANCE',
     items: [
       { label: 'Payments', icon: CreditCard, path: '/payments' },
-      { label: 'Reports', icon: BarChart3, path: '/accounting' },
-      { label: 'Packages', icon: Package, path: '/packages' },
+      { label: 'Accounting', icon: BarChart3, path: '/accounting' },
     ],
   },
   {
-    title: 'SYSTEM',
+    title: 'ADMIN',
     items: [
-      { label: 'Communication', icon: MessageSquare, path: '/communication' },
       { label: 'Staff', icon: Users2, path: '/staff' },
       { label: 'Settings', icon: Settings, path: '/settings' },
     ],
   },
 ];
 
-function NavItem({ item, isActive, onClick }) {
+function NavItem({ item, isActive, onClick, hasWarning }) {
+  const { t } = useLanguage();
   const { label, icon: Icon, badge } = item;
 
   return (
@@ -128,40 +137,85 @@ function NavItem({ item, isActive, onClick }) {
       )}
       <Icon size={16} strokeWidth={1.8} />
       <span style={{ flex: 1 }}>{label}</span>
-      {badge && (
+      {badge > 0 && (
         <span
+          title={t('common.needsAttention')}
           style={{
-            background: 'var(--accent-gold-dim)',
-            color: 'var(--accent-gold)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            background: 'var(--accent-yellow-dim)',
+            color: 'var(--accent-yellow)',
             fontSize: 10,
-            padding: '2px 6px',
+            padding: '2px 7px',
             borderRadius: 10,
             marginLeft: 'auto',
-            fontWeight: 600,
+            fontWeight: 700,
           }}
         >
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent-yellow)' }} />
           {badge}
         </span>
+      )}
+      {hasWarning && (
+        <span
+          title={t('settings.setupRequired')}
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: 'var(--accent-gold)',
+            flexShrink: 0,
+            animation: 'gem-dot-pulse 1.5s ease-in-out infinite',
+          }}
+        />
       )}
     </div>
   );
 }
 
-export default function Sidebar() {
+// A dot sits on each setup step still to be done, and goes once it is done.
+function setupWarningsFrom(setup) {
+  if (!setup || setup.complete) return [];
+  return [
+    !setup.items.settings && '/settings',
+    !setup.items.packages && '/packages',
+    !setup.items.staff && '/staff',
+  ].filter(Boolean);
+}
+
+export default function Sidebar({ open, onClose, isMobile }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useLanguage();
   const [badges, setBadges] = useState({ members: null, tasks: null });
+  const setupWarnings = setupWarningsFrom(useSetupStatus());
+
+  // The sidebar stays mounted for the whole session, so the counts have to be
+  // refreshed on navigation and whenever a page reports a change. Fetching once
+  // on mount leaves a deleted task showing in the badge indefinitely.
+  // The badge is a count of what NEEDS ATTENTION, not a total - members lapsing
+  // or owing, tasks waiting or overdue - so a number by a nav item always means
+  // "there is something here to deal with", and is hidden when there is nothing.
+  const refreshBadges = useCallback(() => {
+    getMembers().then(res => setBadges(b => ({ ...b, members: countMembersNeedingAttention(res.data || []) }))).catch(() => {});
+    getTasks().then(res => setBadges(b => ({ ...b, tasks: countTasksNeedingAttention(res.data || []) }))).catch(() => {});
+  }, []);
+
+  useEffect(() => { refreshBadges(); }, [location.pathname, refreshBadges]);
 
   useEffect(() => {
-    getMembers().then(res => setBadges(b => ({ ...b, members: (res.data || []).length }))).catch(() => {});
-    getTasks().then(res => setBadges(b => ({ ...b, tasks: (res.data || []).filter(t => t.status !== 'done').length }))).catch(() => {});
-  }, []);
+    const onChanged = () => refreshBadges();
+    window.addEventListener('gem:data-changed', onChanged);
+    return () => window.removeEventListener('gem:data-changed', onChanged);
+  }, [refreshBadges]);
 
   const auth = getAuth();
   const authUser = auth?.user || {};
   const userRole = authUser.role || 'general_manager';
-  const roleProfile = ROLE_PROFILES.find(r => r.id === userRole);
+  const roleProfile = pagesFor(userRole);
+  const ROLE_KEYS = { general_manager: 'generalManager', manager: 'manager', trainer: 'trainer', instructor: 'instructor', front_desk: 'frontDesk', coach: 'coach', other: 'roleOther', accountant: 'accountant' };
+  const roleLabel = ROLE_KEYS[userRole] ? t(`staff.${ROLE_KEYS[userRole]}`) : (roleProfile?.name || 'Manager');
   const allowedPages = roleProfile ? roleProfile.pages : null; // null = all access
 
   const canSee = (path) => {
@@ -184,7 +238,9 @@ export default function Sidebar() {
         overflowY: 'auto',
         display: 'flex',
         flexDirection: 'column',
-        zIndex: 200,
+        zIndex: 220,
+        transform: isMobile ? (open ? 'translateX(0)' : 'translateX(-100%)') : 'translateX(0)',
+        transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
       }}
     >
       {/* Logo */}
@@ -193,22 +249,69 @@ export default function Sidebar() {
           display: 'flex',
           alignItems: 'center',
           gap: 10,
-          padding: 20,
+          // Matches the Header's 64px so both bottom rules form one line
+          height: 64,
+          flexShrink: 0,
+          padding: '0 20px',
           borderBottom: '1px solid var(--border-subtle)',
+          // The sidebar is what scrolls, so the brand has to be pinned to its
+          // top the way the header is pinned to the top of the page. It needs
+          // its own background, or the nav would slide underneath it.
+          position: 'sticky',
+          top: 0,
+          zIndex: 2,
+          background: 'var(--bg-secondary)',
         }}
       >
-        <Gem size={22} color="var(--accent-gold)" strokeWidth={2} />
-        <span
-          style={{
-            fontFamily: 'Manrope, sans-serif',
-            fontWeight: 800,
-            fontSize: 22,
-            color: 'var(--accent-gold)',
-            letterSpacing: '-0.5px',
-          }}
-        >
-          GEM
-        </span>
+        <Gem size={29} color="var(--accent-gold)" strokeWidth={1.9} style={{ flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontFamily: 'Manrope, sans-serif',
+              fontWeight: 800,
+              fontSize: 19,
+              color: 'var(--accent-gold)',
+              letterSpacing: '-0.5px',
+              lineHeight: 1.1,
+            }}
+          >
+            GEM
+          </div>
+          <div
+            style={{
+              fontSize: 9.5,
+              lineHeight: 1.2,
+              color: 'var(--text-muted)',
+              letterSpacing: '0.04em',
+              marginTop: 1,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            GymElite Manager
+          </div>
+        </div>
+        {/* Close button - mobile only */}
+        {isMobile && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onClose?.(); }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+              padding: 4,
+              borderRadius: 6,
+            }}
+          >
+            <X size={18} />
+          </button>
+        )}
       </div>
 
       {/* Nav sections */}
@@ -216,11 +319,11 @@ export default function Sidebar() {
         {NAV_SECTIONS.map(section => {
           const visibleItems = section.items.filter(item => canSee(item.path));
           if (visibleItems.length === 0) return null;
-          const sectionTitleMap = { MAIN: t('nav.dashboard') !== 'dashboard' ? 'MAIN' : 'MAIN', OPERATIONS: 'OPERATIONS', FINANCE: 'FINANCE', SYSTEM: 'SYSTEM' };
+          const sectionTitleKeys = { MAIN: 'nav.sectionMain', MEMBERS: 'nav.sectionMembers', OPERATIONS: 'nav.sectionOperations', FINANCE: 'nav.sectionFinance', ADMIN: 'nav.sectionAdmin' };
           return (
             <div key={section.title}>
               <div style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '2.5px', color: 'var(--text-muted)', padding: '12px 20px 6px', fontFamily: 'DM Sans, sans-serif' }}>
-                {section.title}
+                {t(sectionTitleKeys[section.title] || section.title)}
               </div>
               {visibleItems.map(item => {
                 const navKey = PATH_TO_NAV_KEY[item.path];
@@ -230,7 +333,8 @@ export default function Sidebar() {
                     key={item.path}
                     item={{ ...item, label: translatedLabel, badge: item.badgeKey ? badges[item.badgeKey] : item.badge }}
                     isActive={location.pathname === item.path || location.pathname.startsWith(item.path + '/')}
-                    onClick={() => navigate(item.path)}
+                    hasWarning={setupWarnings.includes(item.path)}
+                    onClick={() => { navigate(item.path); onClose?.(); }}
                   />
                 );
               })}
@@ -288,7 +392,7 @@ export default function Sidebar() {
               lineHeight: 1.3,
             }}
           >
-            {roleProfile?.name || 'Manager'}
+            {roleLabel}
           </div>
         </div>
       </div>

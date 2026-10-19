@@ -43,10 +43,10 @@ const LabeledField = ({ label, children }) => (
 
 
 const MOCK_STAFF = [
-  { id: "me", name: "Myself — Owner" },
-  { id: "stephen", name: "Stephen — Manager" },
-  { id: "amina", name: "Amina — Front Desk" },
-  { id: "sam", name: "Sam — Coach" },
+  { id: "me", name: "Myself (Owner)" },
+  { id: "stephen", name: "Stephen (Manager)" },
+  { id: "amina", name: "Amina (Front Desk)" },
+  { id: "sam", name: "Sam (Coach)" },
 ];
 
 function nowISODate() {

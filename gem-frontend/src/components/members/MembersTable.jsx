@@ -1,4 +1,5 @@
 import React from "react";
+import { formatMoney } from "../../utils/currency";
 import {
   Avatar,
   Box,
@@ -84,10 +85,7 @@ export default function MembersTable({ rows = [], onRowClick }) {
 
               <TableCell align="right">
                 <Typography sx={{ fontWeight: 900 }}>
-                  {Number(m.amountOwing || 0).toLocaleString()}{" "}
-                  <Typography component="span" sx={{ fontWeight: 800, color: "text.secondary" }}>
-                    XAF
-                  </Typography>
+                  {formatMoney(m.amountOwing || 0)}
                 </Typography>
               </TableCell>
             </TableRow>

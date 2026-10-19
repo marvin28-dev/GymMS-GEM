@@ -1,56 +1,93 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Settings, LogOut, User, Trash2 } from 'lucide-react';
-import { getAll as getNotifs, markAllRead as apiMarkAllRead } from '../services/notifications.service';
-import { getAuth, clearAuth } from '../utils/auth';
+import { Bell, Settings, LogOut, User, Trash2, Menu, Gem } from 'lucide-react';
+import { getAll as getNotifs, markAllRead as apiMarkAllRead, remove as removeNotif, removeAll as removeAllNotifs } from '../services/notifications.service';
+import { getAuth, clearAuth, getRole } from '../utils/auth';
+import { TASKS_PATH } from '../utils/rolePages';
+import { useLanguage } from '../contexts/LanguageContext';
+import { useSessionPhoto } from '../utils/sessionPhoto';
+import GlobalSearch from './GlobalSearch';
 
-function formatRole(role) {
-  if (!role) return 'Manager';
-  return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
+const ROLE_KEYS = {
+  general_manager: 'generalManager',
+  manager: 'manager',
+  trainer: 'trainer',
+  instructor: 'instructor',
+  front_desk: 'frontDesk',
+  coach: 'coach',
+  other: 'roleOther',
+  accountant: 'accountant',
+};
 
-function formatNotifTime(iso) {
+function formatNotifTime(iso, t) {
   if (!iso) return '';
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t('common.justNow');
+  if (mins < 60) return t('common.minsAgo', { n: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+  if (hrs < 24) return t('common.hoursAgo', { n: hrs });
+  return t('common.daysAgoShort', { n: Math.floor(hrs / 24) });
 }
 
-export default function Header() {
+export default function Header({ onMenuClick, isMobile: isMobileProp }) {
+  const { t } = useLanguage();
   const navigate = useNavigate();
+  const isMobileHook = useIsMobile();
+  const isMobile = isMobileProp ?? isMobileHook;
   const [notifs, setNotifs] = useState([]);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showAvatar, setShowAvatar] = useState(false);
 
   const authUser = getAuth()?.user || {};
+  const myPhoto = useSessionPhoto();
   const firstName = authUser.firstName || '';
   const lastName = authUser.lastName || '';
   const displayName = [firstName, lastName].filter(Boolean).join(' ') || 'Manager';
   const initials = ([firstName[0], lastName[0]].filter(Boolean).join('') || 'ME').toUpperCase();
-  const roleLabel = formatRole(authUser.role);
-  const staffId = authUser.id;
+  const roleKey = ROLE_KEYS[authUser.role];
+  const roleLabel = roleKey ? t(`staff.${roleKey}`) : (authUser.role || 'Manager');
   const [expandNotifs, setExpandNotifs] = useState(false);
 
-  useEffect(() => {
+  // The header never unmounts, so fetching once on mount meant a new
+  // notification only appeared after a full page reload.
+  const refreshNotifs = useCallback(() => {
     getNotifs()
       .then(res => setNotifs((res.data || []).map(n => ({
         ...n,
         unread: !n.isRead,
         text: n.body,
-        time: formatNotifTime(n.createdAt),
+        time: formatNotifTime(n.createdAt, t),
       }))))
       .catch(() => {});
-  }, []);
+  }, [t]);
+
+  useEffect(() => { refreshNotifs(); }, [refreshNotifs]);
+
+  useEffect(() => {
+    // Something this session did, such as assigning a task
+    const onChanged = () => refreshNotifs();
+    // Coming back to the tab after time away
+    const onVisible = () => { if (!document.hidden) refreshNotifs(); };
+    window.addEventListener('gem:data-changed', onChanged);
+    document.addEventListener('visibilitychange', onVisible);
+
+    // Some notifications are raised by the server with no user action at all,
+    // such as a task falling due, so the header also polls.
+    const poll = setInterval(() => { if (!document.hidden) refreshNotifs(); }, 60_000);
+
+    return () => {
+      window.removeEventListener('gem:data-changed', onChanged);
+      document.removeEventListener('visibilitychange', onVisible);
+      clearInterval(poll);
+    };
+  }, [refreshNotifs]);
 
   const notifsRef = useRef(null);
   const avatarRef = useRef(null);
 
   const unreadCount = notifs.filter(n => n.unread).length;
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClick(e) {
       if (notifsRef.current && !notifsRef.current.contains(e.target)) { setShowNotifs(false); setExpandNotifs(false); }
@@ -64,29 +101,60 @@ export default function Header() {
     try { await apiMarkAllRead(); } catch (_) {}
     setNotifs(n => n.map(x => ({ ...x, unread: false })));
   };
-  const clearAll = () => setNotifs([]);
+  // These have to reach the server. Dropping them from local state alone meant
+  // the next fetch brought every one of them straight back.
+  const clearAll = async () => {
+    const previous = notifs;
+    setNotifs([]);
+    try {
+      await removeAllNotifs();
+    } catch (err) {
+      console.error('Failed to clear notifications:', err);
+      setNotifs(previous);
+    }
+  };
 
   const NOTIF_ICONS = {
     membership: '🔔',
     inventory: '📦',
     task: '✅',
     signup: '👤',
+    payment: '💳',
+    system: '⚙️',
   };
 
-  const NOTIF_ROUTES = {
-    membership: '/members',
-    inventory: '/sales',
-    task: '/tasks',
-    signup: '/members',
+  const dismissNotif = async (id) => {
+    const previous = notifs;
+    setNotifs(prev => prev.filter(x => x.id !== id));
+    try {
+      await removeNotif(id);
+    } catch (err) {
+      console.error('Failed to dismiss notification:', err);
+      setNotifs(previous);
+    }
   };
 
-  const dismissNotif = (id) => setNotifs(prev => prev.filter(x => x.id !== id));
+  const resolveRoute = (n) => {
+    // The server says where a notification points when it knows; the title
+    // matching below is only a fallback for older ones.
+    if (n.link) return n.link;
+    const title = (n.title || '').toLowerCase();
+    if (title.includes('payroll') || title.includes('paystub') || title.includes('pay issued') || title.includes('pay settled')) return '/accounting?tab=paystubs';
+    if (title.includes('staff') || title.includes('employee') || title.includes('reactivated') || title.includes('deactivated')) return '/staff';
+    if (title.includes('member') || title.includes('visitor') || title.includes('signup') || title.includes('enrolled') || title.includes('joined') || title.includes('registered')) return '/members';
+    if (title.includes('payment') || title.includes('revenue') || title.includes('paid') || title.includes('received')) return '/payments';
+    if (title.includes('task')) return TASKS_PATH(getRole());
+    if (title.includes('finish')) return '/dashboard';
+    if (title.includes('setup') || title.includes('profile') || title.includes('configure')) return '/settings';
+    const typeMap = { signup: '/members', payment: '/payments', task: TASKS_PATH(getRole()), membership: '/members', system: '/settings' };
+    return typeMap[n.type] || '/dashboard';
+  };
 
   const handleNotifClick = (n) => {
     dismissNotif(n.id);
     setShowNotifs(false);
     setExpandNotifs(false);
-    navigate(NOTIF_ROUTES[n.type] || '/dashboard');
+    navigate(resolveRoute(n));
   };
 
   return (
@@ -95,23 +163,41 @@ export default function Header() {
         position: 'sticky',
         top: 0,
         height: 64,
-        background: 'rgba(10,10,15,0.8)',
+        background: 'var(--bg-header)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderBottom: '1px solid var(--border-subtle)',
-        zIndex: 100,
+        zIndex: 210,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 28px',
+        padding: isMobile ? '0 16px' : '0 28px',
         flexShrink: 0,
       }}
     >
-      {/* Left spacer */}
-      <div />
+      {/* Logo - mobile only */}
+      {isMobile && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <Gem size={18} color="var(--accent-gold)" strokeWidth={2} />
+          <span
+            style={{
+              fontFamily: 'Manrope, sans-serif',
+              fontWeight: 800,
+              fontSize: 18,
+              color: 'var(--accent-gold)',
+              letterSpacing: '-0.3px',
+            }}
+          >
+            GEM
+          </span>
+        </div>
+      )}
 
       {/* Right controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginLeft: 'auto' }}>
+
+        {/* Search - a button that opens a command-palette-style overlay */}
+        <GlobalSearch compact={isMobile} />
 
         {/* Bell */}
         <div ref={notifsRef} style={{ position: 'relative' }}>
@@ -132,7 +218,7 @@ export default function Header() {
                   height: 8,
                   borderRadius: '50%',
                   background: 'var(--accent-red)',
-                  border: '1.5px solid rgba(10,10,15,0.8)',
+                  border: '1.5px solid var(--bg-header)',
                 }}
               />
             )}
@@ -142,10 +228,11 @@ export default function Header() {
           {showNotifs && (
             <div
               style={{
-                position: 'absolute',
-                top: 'calc(100% + 12px)',
-                right: 0,
-                width: 320,
+                position: isMobile ? 'fixed' : 'absolute',
+                top: isMobile ? 64 : 'calc(100% + 12px)',
+                right: isMobile ? 8 : 0,
+                left: isMobile ? 8 : 'auto',
+                width: isMobile ? 'auto' : 320,
                 background: 'var(--bg-secondary)',
                 border: '1px solid var(--border-subtle)',
                 borderRadius: 14,
@@ -161,7 +248,7 @@ export default function Header() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>
-                    Notifications
+                    {t('header.notifications')}
                   </span>
                   {unreadCount > 0 && (
                     <span style={{
@@ -181,7 +268,7 @@ export default function Header() {
                       fontSize: 11, color: 'var(--accent-gold)', fontFamily: 'DM Sans',
                     }}
                   >
-                    Mark all read
+                    {t('header.markAllRead')}
                   </button>
                 )}
               </div>
@@ -190,7 +277,7 @@ export default function Header() {
               <div style={{ maxHeight: expandNotifs ? 520 : 280, overflowY: 'auto', transition: 'max-height 0.25s ease' }}>
                 {notifs.length === 0 && (
                   <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>
-                    No notifications
+                    {t('header.noNotifications')}
                   </div>
                 )}
                 {notifs.map(n => (
@@ -200,42 +287,27 @@ export default function Header() {
                       display: 'flex', gap: 12, padding: '12px 16px',
                       background: n.unread ? 'var(--accent-gold-glow)' : 'transparent',
                       borderBottom: '1px solid var(--border-subtle)',
-                      transition: 'background 0.15s',
-                      position: 'relative',
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = n.unread ? 'var(--accent-gold-glow)' : 'transparent')}
                   >
-                    {/* Clickable main area → navigate + dismiss */}
-                    <div
-                      onClick={() => handleNotifClick(n)}
-                      style={{ display: 'flex', gap: 12, flex: 1, minWidth: 0, cursor: 'pointer' }}
-                    >
-                      <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>
-                        {NOTIF_ICONS[n.type] || '🔔'}
-                      </span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontSize: 13, color: n.unread ? 'var(--text-primary)' : 'var(--text-secondary)',
-                          lineHeight: 1.4, fontFamily: 'DM Sans',
-                          fontWeight: n.unread ? 500 : 400,
-                        }}>
-                          {n.text}
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{n.time}</div>
+                    <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>
+                      {NOTIF_ICONS[n.type] || '🔔'}
+                    </span>
+                    <div onClick={() => handleNotifClick(n)} role="button" style={{ cursor: 'pointer', flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 13, color: n.unread ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        lineHeight: 1.4, fontFamily: 'DM Sans',
+                        fontWeight: n.unread ? 500 : 400,
+                      }}>
+                        {n.text}
                       </div>
-                      {n.unread && (
-                        <div style={{
-                          width: 6, height: 6, borderRadius: '50%',
-                          background: 'var(--accent-gold)', flexShrink: 0, marginTop: 5,
-                        }} />
-                      )}
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{n.time}</div>
                     </div>
-
-                    {/* Trash icon — dismiss only, no navigation */}
+                    {n.unread && (
+                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-gold)', marginTop: 5, flexShrink: 0 }} />
+                    )}
                     <button
-                      onClick={e => { e.stopPropagation(); dismissNotif(n.id); }}
-                      title="Dismiss"
+                      onClick={() => dismissNotif(n.id)}
+                      title={t('header.dismiss')}
                       style={{
                         background: 'none', border: 'none', cursor: 'pointer',
                         color: 'var(--text-muted)', padding: '2px 4px', borderRadius: 4,
@@ -260,14 +332,14 @@ export default function Header() {
                   style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--accent-gold)', fontFamily: 'DM Sans' }}
                   onClick={() => setExpandNotifs(v => !v)}
                 >
-                  {expandNotifs ? '↑ Show less' : '↓ See all notifications'}
+                  {expandNotifs ? `↑ ${t('header.showLess')}` : `↓ ${t('header.seeAll')}`}
                 </button>
                 {notifs.length > 0 && (
                   <button
                     style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}
                     onClick={clearAll}
                   >
-                    Clear all
+                    {t('header.clearAll')}
                   </button>
                 )}
               </div>
@@ -294,9 +366,13 @@ export default function Header() {
               cursor: 'pointer',
               fontFamily: 'DM Sans, sans-serif',
               transition: 'background 0.15s, color 0.15s',
+              overflow: 'hidden',
             }}
           >
-            {initials}
+            {/* Their own photo if they have filed one, initials until then */}
+            {myPhoto
+              ? <img src={myPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              : initials}
           </div>
 
           {/* Avatar dropdown */}
@@ -341,11 +417,11 @@ export default function Header() {
 
               {/* Menu items */}
               {[
-                { icon: User, label: 'My Profile', action: () => { navigate(`/staff/${staffId}`); setShowAvatar(false); } },
-                { icon: Settings, label: 'Settings', action: () => { navigate('/settings'); setShowAvatar(false); } },
-              ].map(({ icon: Icon, label, action }) => (
+                { icon: User, labelKey: 'header.myProfile', action: () => { navigate('/my-profile'); setShowAvatar(false); } },
+                authUser.role === 'general_manager' && { icon: Settings, labelKey: 'nav.settings', action: () => { navigate('/settings'); setShowAvatar(false); } },
+              ].filter(Boolean).map(({ icon: Icon, labelKey, action }) => (
                 <div
-                  key={label}
+                  key={labelKey}
                   onClick={action}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10,
@@ -358,7 +434,7 @@ export default function Header() {
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
                 >
                   <Icon size={14} strokeWidth={1.8} />
-                  {label}
+                  {t(labelKey)}
                 </div>
               ))}
 
@@ -375,7 +451,7 @@ export default function Header() {
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
                 <LogOut size={14} strokeWidth={1.8} />
-                Sign Out
+                {t('header.signOut')}
               </div>
             </div>
           )}

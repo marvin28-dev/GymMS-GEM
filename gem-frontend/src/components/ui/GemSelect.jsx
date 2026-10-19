@@ -1,8 +1,14 @@
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 
-export default function GemSelect({ label, error, options = [], ...rest }) {
+// A required field shows " *" after its label. Some labels already carry the
+// star in their translation, so it is never added twice.
+const withMark = (label, required) =>
+  required && !(typeof label === 'string' && /\*\s*$/.test(label)) ? <>{label} *</> : label;
+
+export default function GemSelect({ label, error, options = [], hint, required, ...rest }) {
   const [focused, setFocused] = useState(false);
+  const disabled = !!rest.disabled;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -10,14 +16,14 @@ export default function GemSelect({ label, error, options = [], ...rest }) {
         <label
           style={{
             fontSize: 12,
-            color: 'var(--text-secondary)',
+            color: disabled ? 'var(--text-muted)' : 'var(--text-secondary)',
             marginBottom: 6,
             display: 'block',
             fontFamily: 'DM Sans, sans-serif',
             fontWeight: 500,
           }}
         >
-          {label}
+          {withMark(label, required)}
         </label>
       )}
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -33,19 +39,20 @@ export default function GemSelect({ label, error, options = [], ...rest }) {
           }}
           style={{
             width: '100%',
-            background: 'var(--bg-elevated)',
+            background: disabled ? 'var(--bg-card)' : 'var(--bg-elevated)',
             border: `1px solid ${focused ? 'var(--accent-gold)' : error ? 'var(--accent-red)' : 'var(--border-subtle)'}`,
             borderRadius: 10,
             padding: '9px 36px 9px 14px',
             fontSize: 13,
-            color: 'var(--text-primary)',
+            color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
             fontFamily: 'DM Sans, sans-serif',
             outline: 'none',
             boxSizing: 'border-box',
             appearance: 'none',
             WebkitAppearance: 'none',
             MozAppearance: 'none',
-            cursor: 'pointer',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            opacity: disabled ? 0.7 : 1,
             transition: 'border-color 0.15s',
             ...rest.style,
           }}
@@ -71,6 +78,8 @@ export default function GemSelect({ label, error, options = [], ...rest }) {
       </div>
       {error && (
         <span
+          role="alert"
+          data-field-error
           style={{
             fontSize: 11,
             color: 'var(--accent-red)',
@@ -79,6 +88,18 @@ export default function GemSelect({ label, error, options = [], ...rest }) {
           }}
         >
           {error}
+        </span>
+      )}
+      {!error && hint && (
+        <span
+          style={{
+            fontSize: 11,
+            color: 'var(--text-muted)',
+            marginTop: 4,
+            fontFamily: 'DM Sans, sans-serif',
+          }}
+        >
+          {hint}
         </span>
       )}
     </div>

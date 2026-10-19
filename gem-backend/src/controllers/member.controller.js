@@ -1,4 +1,25 @@
 const prisma = require('../utils/prisma');
+const { sendMemberWelcome, sendPaymentReceipt, sendAccessCode, sendMembershipUpdate } = require('../utils/memberEmail');
+const { findEmailConflict, emailConflictMessage } = require('../utils/emailGuard');
+
+const { toPaymentMethod } = require('../utils/paymentMethod');
+
+function generatePaymentRef() {
+  const ts = Date.now().toString(36).toUpperCase();
+  const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
+  return `TXN-${ts}-${rand}`;
+}
+const { logActivity, changesBetween, describeChanges, fullName, money } = require('../utils/activityLog');
+
+const MEMBER_FIELDS = {
+  firstName: 'First name', lastName: 'Last name', phone: 'Phone', email: 'Email', gender: 'Gender',
+  status: 'Status', packageId: 'Package', startDate: 'Start date', endDate: 'End date',
+  balance: 'Balance', passesTotal: 'Total passes', passesRemaining: 'Passes left', dayPasses: 'Day passes',
+  isVisitor: 'Visitor', freezeStartDate: 'Freeze start', regFeeDate: 'Registration fee date',
+  accessCode: 'Check-in code', dob: 'Date of birth', houseNumber: 'House number', street: 'Street',
+  city: 'City', region: 'Region', country: 'Country', postalCode: 'Postal code', emergencyContact: 'Emergency contact',
+  emergencyPhone: 'Emergency phone', howHeard: 'How they heard of us', notes: 'Notes',
+};
 
 async function generateAccessCode(gymId) {
   let attempts = 0;
@@ -27,6 +48,16 @@ async function generateMemberCode(gymId) {
   return code;
 }
 
+// Fitness staff work with the members, not with their money, so what a member
+// owes and what they have paid are left out of the reply entirely rather than
+// hidden on the screen.
+const FITNESS_ROLES = ['trainer', 'instructor', 'coach'];
+function withoutMoney(member, role) {
+  if (!member || !FITNESS_ROLES.includes(role)) return member;
+  const { balance, payments, ...rest } = member;
+  return rest;
+}
+
 async function getAll(req, res) {
   const { status } = req.query;
   const where = { gymId: req.user.gymId };
@@ -34,7 +65,7 @@ async function getAll(req, res) {
 
   const members = await prisma.member.findMany({
     where,
-    include: { package: { select: { id: true, name: true } } },
+    include: { package: { select: { id: true, name: true, price: true } }, coach: { select: { id: true, firstName: true, lastName: true } } },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -85,7 +116,15 @@ async function getAll(req, res) {
   toExpiringSoon.forEach(m => { m.status = 'expiring'; });
   toBackActive.forEach(m => { m.status = 'active'; });
 
-  res.json(members);
+  // A request waiting for a manager puts the member under Needs attention. A coach
+  // has no part in membership requests, so their list never carries them.
+  const waiting = FITNESS_ROLES.includes(req.user.role) ? [] : await prisma.approvalRequest.findMany({
+    where: { gymId: req.user.gymId, status: 'pending' },
+    select: { memberId: true, summary: true },
+  }).catch(() => []);
+  const waitingFor = new Map(waiting.map(w => [w.memberId, w.summary]));
+
+  res.json(members.map(m => ({ ...withoutMoney(m, req.user.role), pendingApproval: waitingFor.get(m.id) || null })));
 }
 
 async function getOne(req, res) {
@@ -96,8 +135,9 @@ async function getOne(req, res) {
     },
     include: {
       package: true,
-      payments:    { orderBy: { createdAt: 'desc' }, take: 20, include: { staff: { select: { id: true, firstName: true, lastName: true } } } },
-      attendances: { orderBy: { checkIn:  'desc' }, take: 20, include: { staff: { select: { id: true, firstName: true, lastName: true } } } },
+      coach: { select: { id: true, firstName: true, lastName: true } },
+      payments:    { orderBy: { createdAt: 'desc' }, include: { staff: { select: { id: true, firstName: true, lastName: true } } } },
+      attendances: { orderBy: { checkIn:  'desc' }, include: { staff: { select: { id: true, firstName: true, lastName: true } } } },
     },
   });
   if (!member) return res.status(404).json({ error: 'Member not found' });
@@ -122,7 +162,7 @@ async function getOne(req, res) {
     member.status = correctedStatus;
   }
 
-  res.json(member);
+  res.json(withoutMoney(member, req.user.role));
 }
 
 async function create(req, res) {
@@ -130,8 +170,8 @@ async function create(req, res) {
     firstName, lastName, phone, email, gender, avatarColor, photo,
     accessCode, packageId, status, startDate, endDate, balance,
     regFeeDate, freezeStartDate, preFreezEndDate, passesTotal,
-    passesRemaining, isVisitor,
-    dob, houseNumber, street, city, postalCode,
+    passesRemaining, isVisitor, dayPasses,
+    dob, houseNumber, street, city, region, postalCode, country,
     emergencyContact, emergencyPhone,
     howHeard, notes,
   } = req.body;
@@ -139,6 +179,10 @@ async function create(req, res) {
   if (!firstName || !lastName) {
     return res.status(400).json({ error: 'firstName and lastName are required' });
   }
+  if (!String(city || '').trim()) return res.status(400).json({ error: 'Enter the city.', field: 'city' });
+  if (!String(region || '').trim()) return res.status(400).json({ error: 'Enter the region.', field: 'region' });
+  // Members live in the gym's own country; the forms show it but never change it
+  const homeGym = await prisma.gym.findUnique({ where: { id: req.user.gymId }, select: { country: true } });
 
   // Validate packageId exists if provided
   if (packageId) {
@@ -146,10 +190,22 @@ async function create(req, res) {
     if (!pkg) return res.status(400).json({ error: 'Package not found' });
   }
 
-  // Check email uniqueness within gym
-  if (email && email.trim()) {
-    const emailTaken = await prisma.member.findFirst({ where: { gymId: req.user.gymId, email: email.trim() } });
-    if (emailTaken) return res.status(409).json({ error: 'A member with this email already exists' });
+  // An email must identify one person per gym, staff and members alike
+  const clash = await findEmailConflict(req.user.gymId, email, { scope: 'member' });
+  if (clash) return res.status(409).json({ error: emailConflictMessage(clash), field: 'email' });
+
+  // Nobody is added without the money for it being collected first: a member's
+  // registration fee (when the gym charges one), a visitor's bundle or day pass.
+  const firstPayment = req.body.initialPayment;
+  if (isVisitor) {
+    if (!(Number(firstPayment?.amount) > 0)) {
+      return res.status(400).json({ error: 'Collect the payment for the visitor bundle or day pass before adding the visitor.' });
+    }
+  } else {
+    const feeGym = await prisma.gym.findUnique({ where: { id: req.user.gymId }, select: { registrationFee: true, registrationFeeRequired: true } });
+    if (feeGym?.registrationFeeRequired && Number(feeGym.registrationFee) > 0 && !req.body.regFeeMethod) {
+      return res.status(400).json({ error: 'Collect the registration fee before adding the member.' });
+    }
   }
 
   const memberCode = await generateMemberCode(req.user.gymId);
@@ -177,12 +233,15 @@ async function create(req, res) {
       preFreezEndDate: preFreezEndDate ? new Date(preFreezEndDate) : undefined,
       passesTotal: passesTotal != null ? Number(passesTotal) : undefined,
       passesRemaining: passesRemaining != null ? Number(passesRemaining) : undefined,
+      dayPasses: Math.max(0, Number(dayPasses) || 0),
       isVisitor: isVisitor ?? false,
       dob: dob ? String(dob).slice(0, 10) : undefined,
       houseNumber: houseNumber?.trim() || undefined,
       street: street?.trim() || undefined,
       city: city?.trim() || undefined,
+      region: region?.trim() || undefined,
       postalCode: postalCode?.trim() || undefined,
+      country: homeGym?.country || country?.trim() || undefined,
       emergencyContact: emergencyContact?.trim() || undefined,
       emergencyPhone: emergencyPhone?.trim() || undefined,
       howHeard: howHeard?.trim() || undefined,
@@ -190,6 +249,67 @@ async function create(req, res) {
     },
     include: { package: { select: { id: true, name: true } } },
   });
+
+  // A new member pays the gym's registration fee at signup (if it charges one),
+  // recorded as a payment so it shows in Payments and emails them a receipt.
+  // Visitors are not members and do not pay it.
+  if (!member.isVisitor) {
+    try {
+      const gym = await prisma.gym.findUnique({
+        where: { id: req.user.gymId },
+        select: { registrationFee: true, registrationFeeRequired: true },
+      });
+      const fee = Number(gym?.registrationFee) || 0;
+      if (gym?.registrationFeeRequired && fee > 0) {
+        const regFeeMethod = toPaymentMethod(req.body.regFeeMethod);
+        const payment = await prisma.payment.create({
+          data: {
+            memberId: member.id, gymId: req.user.gymId, staffId: req.user.id,
+            amount: fee, method: regFeeMethod, type: 'registration', note: 'Registration fee',
+            // Every payment carries a reference. A registration fee leaves the
+            // membership balance untouched, so "balance after" is what they owe
+            // on the membership (0 when nothing is due, never blank).
+            reference: generatePaymentRef(),
+            balanceAfter: Number(member.balance) || 0,
+          },
+        });
+        await prisma.member.update({ where: { id: member.id }, data: { regFeeDate: new Date() } }).catch(() => {});
+        logActivity(req, {
+          category: 'money', action: 'payment.recorded',
+          summary: `Collected the registration fee of ${money(fee)} from ${fullName(member)}`,
+          target: { type: 'member', id: member.id }, details: { type: 'registration' },
+        });
+        sendPaymentReceipt(payment, member, req.user.gymId).catch(err => console.error('Reg fee receipt email failed:', err.message));
+      }
+    } catch (err) {
+      console.error('Registration fee payment failed:', err.message);
+    }
+  }
+
+  // A visitor's first payment is saved with them, so one never exists without
+  // the other. It is a pass purchase, so it leaves the balance as created (the
+  // unpaid part of the bundle), which is what it records as the balance after.
+  if (member.isVisitor) {
+    try {
+      const payment = await prisma.payment.create({
+        data: {
+          memberId: member.id, gymId: req.user.gymId, staffId: req.user.id,
+          amount: Number(firstPayment.amount), method: toPaymentMethod(firstPayment.method),
+          type: 'product', note: firstPayment.description || 'Visitor bundle',
+          reference: generatePaymentRef(), balanceAfter: Number(member.balance) || 0,
+        },
+      });
+      logActivity(req, {
+        category: 'money', action: 'payment.recorded',
+        summary: `Collected ${money(payment.amount)} from new visitor ${fullName(member)}`,
+        target: { type: 'member', id: member.id }, details: { type: 'product' },
+      });
+      sendPaymentReceipt(payment, member, req.user.gymId).catch(err => console.error('Visitor receipt email failed:', err.message));
+    } catch (err) {
+      console.error('Visitor first payment failed:', err.message);
+    }
+  }
+
   prisma.notification.create({
     data: {
       gymId: req.user.gymId,
@@ -198,6 +318,18 @@ async function create(req, res) {
       type: 'signup',
     },
   }).catch(() => {});
+
+  // Welcome email with their member ID and check-in code - fire and forget
+  sendMemberWelcome(member, req.user.gymId)
+    .catch(err => console.error('Member welcome email failed:', err.message));
+
+  logActivity(req, {
+    category: 'members', action: member.isVisitor ? 'visitor.created' : 'member.created',
+    summary: member.isVisitor
+      ? `Registered visitor ${fullName(member)} (${member.memberCode})`
+      : `Added member ${fullName(member)} (${member.memberCode})${member.package?.name ? ` on ${member.package.name}` : ''}`,
+    target: { type: 'member', id: member.id },
+  });
 
   res.status(201).json(member);
 }
@@ -211,13 +343,18 @@ async function update(req, res) {
   });
   if (!existing) return res.status(404).json({ error: 'Member not found' });
 
+  if (req.body.email !== undefined) {
+    const clash = await findEmailConflict(req.user.gymId, req.body.email, { scope: 'member', excludeMemberId: existing.id });
+    if (clash) return res.status(409).json({ error: emailConflictMessage(clash), field: 'email' });
+  }
+
   // Only pass fields that exist in the Prisma Member schema
   const ALLOWED_FIELDS = new Set([
     'firstName', 'lastName', 'phone', 'email', 'gender', 'avatarColor', 'photo',
     'accessCode', 'status', 'balance', 'packageId', 'isVisitor',
     'startDate', 'endDate', 'lastVisit', 'regFeeDate',
-    'freezeStartDate', 'preFreezEndDate', 'passesTotal', 'passesRemaining',
-    'dob', 'houseNumber', 'street', 'city', 'postalCode',
+    'freezeStartDate', 'preFreezEndDate', 'passesTotal', 'passesRemaining', 'dayPasses',
+    'dob', 'houseNumber', 'street', 'city', 'region', 'postalCode', 'country',
     'emergencyContact', 'emergencyPhone',
     'howHeard', 'notes',
   ]);
@@ -225,6 +362,19 @@ async function update(req, res) {
   const safeData = Object.fromEntries(
     Object.entries(req.body).filter(([k]) => ALLOWED_FIELDS.has(k))
   );
+
+  if ('dayPasses' in safeData) safeData.dayPasses = Math.max(0, Number(safeData.dayPasses) || 0);
+  if ('country' in safeData) {
+    const homeGym = await prisma.gym.findUnique({ where: { id: req.user.gymId }, select: { country: true } });
+    if (homeGym?.country) safeData.country = homeGym.country;
+  }
+
+  const owed = Number(existing.balance) || 0;
+  const addsPasses = ('dayPasses' in safeData && safeData.dayPasses > (existing.dayPasses || 0))
+    || ('passesTotal' in safeData && Number(safeData.passesTotal) > (existing.passesTotal || 0));
+  if (existing.isVisitor && owed > 0 && addsPasses) {
+    return res.status(400).json({ error: `This visitor still owes ${money(owed)}. Settle the balance before buying new passes.`, owes: owed });
+  }
 
   // Convert bare date strings (YYYY-MM-DD) to full ISO-8601 that Prisma requires
   const DATE_FIELDS = ['startDate', 'endDate', 'lastVisit', 'regFeeDate', 'freezeStartDate', 'preFreezEndDate'];
@@ -240,6 +390,37 @@ async function update(req, res) {
     where: { id: existing.id },
     data: safeData,
   });
+
+  // The renew flow asks us to tell the member their membership was renewed.
+  // Best-effort, never blocks the save.
+  if (req.body._notify === 'renew_membership') {
+    sendMembershipUpdate(member, 'renew_membership', req.user.gymId).catch(() => {});
+  }
+
+  let packageNames = {};
+  if ('packageId' in safeData && (safeData.packageId || null) !== (existing.packageId || null)) {
+    const ids = [existing.packageId, safeData.packageId].filter(Boolean);
+    const pkgs = await prisma.package.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }).catch(() => []);
+    packageNames = Object.fromEntries(pkgs.map(p => [p.id, p.name]));
+  }
+  const changes = changesBetween(existing, safeData, MEMBER_FIELDS, {
+    hidden: ['accessCode', 'notes'],
+    format: {
+      balance: (v) => money(v),
+      packageId: (v) => (v ? packageNames[v] || 'unchanged' : 'none'),
+    },
+  });
+  if (changes.length) {
+    const name = fullName(member);
+    const status = changes.find(c => c.field === 'Status');
+    logActivity(req, {
+      category: 'members', action: 'member.updated',
+      summary: status && changes.length === 1
+        ? `Changed ${name}'s status from ${status.from} to ${status.to}`
+        : `Updated member ${name}: ${describeChanges(changes)}`,
+      target: { type: 'member', id: member.id }, details: { changes },
+    });
+  }
   res.json(member);
 }
 
@@ -256,7 +437,36 @@ async function remove(req, res) {
     where: { id: existing.id },
     data: { status: 'deactivated' },
   });
+  logActivity(req, {
+    category: 'members', action: 'member.deactivated',
+    summary: `Deactivated member ${fullName(existing)} (${existing.memberCode})`,
+    target: { type: 'member', id: existing.id },
+  });
   res.json({ message: 'Member deactivated' });
 }
 
-module.exports = { getAll, getOne, create, update, remove };
+// Re-send a member their own check-in code by email, on request from the desk.
+async function sendCode(req, res) {
+  const member = await prisma.member.findFirst({
+    where: {
+      gymId: req.user.gymId,
+      OR: [{ id: req.params.id }, { memberCode: req.params.id }],
+    },
+    select: { id: true, firstName: true, email: true, accessCode: true },
+  });
+  if (!member) return res.status(404).json({ error: 'Member not found' });
+  if (!member.email) return res.status(400).json({ error: 'This member has no email on file.' });
+  if (!member.accessCode) return res.status(400).json({ error: 'This member has no check-in code.' });
+
+  let sent = false;
+  try {
+    sent = await sendAccessCode(member, req.user.gymId);
+  } catch (err) {
+    console.error(`Send access code to ${member.email} failed:`, err.message);
+    return res.status(502).json({ error: 'Could not send the email right now. Please try again.' });
+  }
+  if (!sent) return res.status(502).json({ error: 'Email is not set up on this gym yet.' });
+  res.json({ message: 'Check-in code sent', to: member.email });
+}
+
+module.exports = { getAll, getOne, create, update, remove, sendCode };

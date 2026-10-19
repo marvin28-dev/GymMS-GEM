@@ -10,9 +10,30 @@ model Gym {
   id                          String   @id @default(cuid())
   code                        String   @unique
   name                        String
+  // Setting the gym up: the Settings sections the owner has confirmed, and the
+  // moment everything was done. Kept here rather than in a browser, so every
+  // device the owner signs in on shows the same progress.
+  setupConfirmed              String[]  @default([])
+  setupCompletedAt            DateTime?
   location                    String?
   phone                       String?
   email                       String?
+  logo                        String?
+  payDay                      Int?
+  altPhone                    String?
+  city                        String?
+  province                    String?
+  country                     String?
+  postal                      String?
+  website                     String?
+  facebook                    String?
+  instagram                   String?
+  twitter                     String?
+  schedule                    Json?
+  // How this gym runs: the payment methods it accepts, tax and late fees, and
+  // which notifications go out. On the record rather than in a browser, so
+  // every employee on every device is looking at the same settings.
+  settings                    Json?
   currency                    String   @default("XAF")
   registrationFee             Int      @default(0)
   registrationFeeRequired     Boolean  @default(false)
@@ -38,6 +59,9 @@ model Gym {
   calendarEvents  CalendarEvent[]
   communications  Communication[]
   timecards       TimeCard[]
+  payRecords      PayRecord[]
+  payAdjustments  PayAdjustment[]
+  activityLogs    ActivityLog[]
 }
 
 model Staff {
@@ -53,27 +77,103 @@ model Staff {
   accessCode        String?
   shiftStart        String?
   schedule          Json?
+  scheduleOverrides Json?
+  staffNotes        Json?
   passwordHash      String
   avatarColor       String?
   photo             String?
   photoId           String?
   emergencyContact  String?
   emergencyPhone    String?
+  houseNumber       String?
+  street            String?
+  city              String?
+  region            String?
+  postalCode        String?
+  country           String?
+  // 'Full Time' pays a flat monthly salary; 'Part Time' pays the salary
+  // field as an hourly rate against hours actually clocked.
+  employmentType    String?   @default("Full Time")
   salary            Float?
+  payDay            Int?
   isActive          Boolean   @default(true)
+  // A new account has no password until its owner picks one at their first
+  // sign-in; nothing is emailed to set it up
+  mustSetPassword   Boolean   @default(false)
+  resetToken        String?
+  resetTokenExpiry  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   gym            Gym             @relation(fields: [gymId], references: [id])
   tasksAssigned  Task[]          @relation("AssignedTo")
   tasksCreated   Task[]          @relation("CreatedBy")
-  timecards      TimeCard[]
+  timecards         TimeCard[]
+  timecardsApproved TimeCard[]      @relation("TimeCardApprovedBy")
   payments       Payment[]
-  attendances    Attendance[]
+  attendances    Attendance[] @relation("AttendanceRecordedBy")
+  workouts       Attendance[] @relation("AttendanceWorkout")
   calendarEvents CalendarEvent[]
   communications Communication[]
+  notifications  Notification[]
+  payRecords     PayRecord[]     @relation("PayRecordStaff")
+  payIssued      PayRecord[]     @relation("PayRecordIssuedBy")
+  payAdjustments PayAdjustment[]
+  coachClients   Member[]        @relation("CoachClients")
+  progressLogs   ProgressLog[]
 
   @@unique([gymId, email])
+  @@index([gymId])
+}
+
+model PayRecord {
+  id         String   @id @default(cuid())
+  gymId      String
+  staffId    String
+  month      String
+  // What the employee earned this period: basic pay plus bonuses. This is the
+  // figure the books record as the gym's salary cost.
+  amount     Float
+  // Withheld from that pay: advances being repaid, fines and the like
+  deductions Float    @default(0)
+  // What is actually handed over: amount less deductions
+  netAmount  Float?
+  basePay    Float?
+  breakdown  Json?
+  status     String   @default("issued")
+  paidAt     DateTime?
+  note       String?
+  issuedAt   DateTime @default(now())
+  issuedById String?
+  createdAt  DateTime @default(now())
+
+  gym      Gym    @relation(fields: [gymId], references: [id])
+  staff    Staff  @relation("PayRecordStaff", fields: [staffId], references: [id])
+  issuedBy Staff? @relation("PayRecordIssuedBy", fields: [issuedById], references: [id])
+
+  @@index([gymId])
+  @@index([staffId])
+}
+
+model PayAdjustment {
+  id        String   @id @default(cuid())
+  gymId     String
+  staffId   String
+  kind      String
+  label     String
+  amount    Float
+  recurring Boolean  @default(false)
+  month     String?
+  note      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  gym   Gym   @relation(fields: [gymId], references: [id])
+  staff Staff @relation(fields: [staffId], references: [id])
+
+  @@index([gymId])
+  @@index([staffId])
 }
 
 model Member {
@@ -96,14 +196,21 @@ model Member {
   regFeeDate      DateTime?
   freezeStartDate DateTime?
   preFreezEndDate DateTime?
+  freezeFeeLastChargedAt DateTime?
   passesTotal     Int?
   passesRemaining Int?
+  // Paid single-day passes not yet used. Kept apart from passesRemaining (a
+  // package session limit or a visitor bundle) so a day pass is always known
+  // as one, and a lapsed member on a limited package is not let in by sessions.
+  dayPasses       Int          @default(0)
   isVisitor       Boolean      @default(false)
   dob             String?
   houseNumber     String?
   street          String?
   city            String?
+  region          String?
   postalCode      String?
+  country         String?
   emergencyContact String?
   emergencyPhone  String?
   howHeard        String?
@@ -116,8 +223,53 @@ model Member {
   package     Package?     @relation(fields: [packageId], references: [id])
   payments    Payment[]
   attendances Attendance[]
+  // The coach who trains this member, if any (one coach per member)
+  coachId     String?
+  coach       Staff?        @relation("CoachClients", fields: [coachId], references: [id])
+  progressLogs ProgressLog[]
+  // What the member and their coach are working towards, set when the coach
+  // takes them on. Whether they are on track is judged against these.
+  goalType            String?
+  goalWeight          Float?
+  goalWaist           Float?
+  goalBodyFat         Float?
+  goalSessionsPerWeek Int?
+  goalTargetDate      DateTime?
+  goalNote            String?
+  goalSetAt           DateTime?
 
   @@unique([gymId, accessCode])
+}
+
+// What a coach records about a member: a training session, a measurement
+// (weight, body fat, waist) or a note. Sessions this month are what a coach is
+// often paid on; the measurements show the member's progress over time.
+model ProgressLog {
+  id        String   @id @default(cuid())
+  gymId     String
+  memberId  String
+  staffId   String?
+  kind      String   // session | measure | note | followup
+  weight    Float?   // kg
+  bodyFat   Float?   // %
+  waist     Float?   // cm
+  hips      Float?   // cm
+  chest     Float?   // cm
+  // A session: how long, what was worked, how hard
+  durationMin Int?
+  focus     String?  // comma separated: legs,core,cardio...
+  effort    String?  // easy | moderate | hard
+  // A note: what it is about (general | injury | nutrition | motivation)
+  category  String?
+  note      String?
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  staff  Staff? @relation(fields: [staffId], references: [id])
+
+  @@index([gymId, memberId])
+  @@index([gymId, staffId, date])
 }
 
 model Package {
@@ -127,6 +279,9 @@ model Package {
   name         String
   price        Float
   minPayment   Float    @default(0)
+  // What a single day pass costs for a member on this (non-visitor) package, so
+  // a member can pay for one day's access up front without a full renewal.
+  dayPassPrice Float?
   duration     String?
   sessions     String   @default("Unlimited")
   access       String?
@@ -164,6 +319,13 @@ model Product {
   id          String   @id @default(cuid())
   gymId       String
   name        String
+  // A short code the desk can type or scan, unique within the gym
+  code        String?
+  costPrice   Float?
+  // Stock at or below this reads as low and is flagged
+  reorderLevel Int?
+  // Taken off the selling price on every sale while set (whole percent, 1-99)
+  discountPercent Int?
   category    String
   price       Float
   stock       Int      @default(0)
@@ -175,6 +337,8 @@ model Product {
 
   gym       Gym        @relation(fields: [gymId], references: [id])
   saleItems SaleItem[]
+
+  @@unique([gymId, code])
 }
 
 model Sale {
@@ -194,6 +358,9 @@ model SaleItem {
   productId String
   quantity  Int
   unitPrice Float
+  // The cost price when it was sold, so a later change of supplier price
+  // does not rewrite the profit an old sale made
+  unitCost  Float?
 
   sale    Sale    @relation(fields: [saleId], references: [id])
   product Product @relation(fields: [productId], references: [id])
@@ -202,15 +369,25 @@ model SaleItem {
 model Attendance {
   id       String    @id @default(cuid())
   gymId    String
-  memberId String
+  // A visit belongs either to a member or to an employee who came in to train
+  // on their own time. Their own workout is never counted as work.
+  memberId String?
   staffId  String?
+  workoutStaffId String?
   checkIn  DateTime  @default(now())
   checkOut DateTime?
   note     String?
+  // How the visit was paid for: day_pass, visitor_pass, or null for a membership
+  kind     String?
+  // Where the member stood at the moment they came in, so the visit keeps its
+  // own marker (owing, lapsed) even after they pay or renew later
+  balanceAtCheckIn Float?
+  statusAtCheckIn  String?
 
   gym    Gym    @relation(fields: [gymId], references: [id])
-  member Member @relation(fields: [memberId], references: [id])
-  staff  Staff? @relation(fields: [staffId], references: [id])
+  member Member? @relation(fields: [memberId], references: [id])
+  staff  Staff? @relation("AttendanceRecordedBy", fields: [staffId], references: [id])
+  workoutStaff Staff? @relation("AttendanceWorkout", fields: [workoutStaffId], references: [id])
 }
 
 model Task {
@@ -221,15 +398,35 @@ model Task {
   priority     Priority   @default(medium)
   status       TaskStatus @default(todo)
   dueDate      DateTime?
-  dueTime      String?
   assignedToId String?
+  // A task can belong to a whole department instead of one person. Everyone in
+  // it sees the task and any of them can act on it. 'management' is the only
+  // group so far, used for the reviews the system raises.
+  assignedGroup String?
+  // Or everyone who does a particular job: all trainers, the whole front desk
+  assignedRole String?
   createdById  String?
+  // Raised by the system rather than typed by somebody
+  createdBySystem Boolean @default(false)
+  // The time card this review belongs to. A card has at most one open review,
+  // so a second change updates this task instead of raising another.
+  timeCardId   String?
+  // The calendar event this task stands for, one per person put on it. Their
+  // response lives right here as the task's own status — accepted/declined —
+  // rather than a second table, since each invite is already its own row.
+  eventId      String?
+  category     String?
+  notes        String?
+  dueSoonNotifiedAt DateTime?
+  overdueNotifiedAt DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
   gym        Gym    @relation(fields: [gymId], references: [id])
   assignedTo Staff? @relation("AssignedTo", fields: [assignedToId], references: [id])
   createdBy  Staff? @relation("CreatedBy", fields: [createdById], references: [id])
+  // Cancelling the class takes everyone's invite to it with it
+  event      CalendarEvent? @relation(fields: [eventId], references: [id], onDelete: Cascade)
 }
 
 model Expense {
@@ -242,7 +439,24 @@ model Expense {
   paidTo      String?
   method      PaymentMethod?
   note        String?
+  // Who the money went to or who spent it, as typed on the form
   recordedBy  String?
+  // Who entered it in GEM, and who last changed it. Taken from the signed-in
+  // account rather than typed, so an entry always says where it came from.
+  createdById String?
+  createdByName String?
+  editedById  String?
+  editedByName String?
+  editedAt    DateTime?
+  // Where the entry came from: 'frontdesk' (logged at the kiosk) or 'operations'
+  // (booked directly in Accounting), so each can be listed on its own.
+  source      String?        @default("operations")
+  // A desk expense above the gym's front-desk limit is held for a manager to
+  // approve before it counts in the books. Ordinary entries are born approved.
+  approvalStatus String      @default("approved")
+  approvedById   String?
+  approvedByName String?
+  approvedAt     DateTime?
   createdAt   DateTime       @default(now())
 
   gym Gym @relation(fields: [gymId], references: [id])
@@ -270,8 +484,24 @@ model TimeCard {
   punchIn  DateTime?
   punchOut DateTime?
 
-  gym   Gym   @relation(fields: [gymId], references: [id])
-  staff Staff @relation(fields: [staffId], references: [id])
+  // A clock-in stands on its own. A time entered or adjusted by hand is
+  // 'pending' until a manager signs it off on the staff profile, and only
+  // approved hours count toward part-time pay.
+  // 'approved' | 'pending' | 'rejected'. Only approved hours count toward pay.
+  approvalStatus String?   @default("approved")
+  // Everything wrong with this card, gathered as the shift runs and raised as
+  // one review when it closes: 'unscheduled', 'outside_hours', 'adjusted'.
+  issues         Json?
+  adjustmentNote String?
+  // The times as first recorded, so a rejected change can be put back.
+  originalPunchIn  DateTime?
+  originalPunchOut DateTime?
+  approvedById   String?
+  approvedAt     DateTime?
+
+  gym        Gym    @relation(fields: [gymId], references: [id])
+  staff      Staff  @relation(fields: [staffId], references: [id])
+  approvedBy Staff? @relation("TimeCardApprovedBy", fields: [approvedById], references: [id])
 }
 
 model CalendarEvent {
@@ -290,46 +520,147 @@ model CalendarEvent {
   repeat       String?
   repeatUntil  String?
   seriesId     String?
+  // A trainer's own diary entry: nobody else sees it, not even management
+  createdById  String?
+  isPrivate    Boolean  @default(false)
+  // Class, Training, Personal... and for a coach's training session, the client
+  category     String?
+  memberId     String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   gym        Gym    @relation(fields: [gymId], references: [id])
   instructor Staff? @relation(fields: [instructorId], references: [id])
+  tasks      Task[]
 }
 
+// A message to members by email, text (SMS) or both. The audience is kept as
+// the rule it was chosen by and worked out when it is sent; targetGroup is that
+// audience in words. Each person it went to is a CommunicationDelivery.
 model Communication {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   gymId       String
   subject     String
   body        String
   sentById    String?
   targetGroup String?
-  createdAt   DateTime @default(now())
+  channel     String    @default("email") // email | sms | both
+  status      String    @default("sent")  // draft | scheduled | sending | sent | partial | failed
+  audience    Json?                       // { type, packageId?, memberIds? }
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  total       Int       @default(0)
+  emailSent   Int       @default(0)
+  emailFailed Int       @default(0)
+  smsSent     Int       @default(0)
+  smsFailed   Int       @default(0)
+  skipped     Int       @default(0)
+  testMode    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
 
-  gym    Gym    @relation(fields: [gymId], references: [id])
-  sentBy Staff? @relation(fields: [sentById], references: [id])
+  gym        Gym                     @relation(fields: [gymId], references: [id])
+  sentBy     Staff?                  @relation(fields: [sentById], references: [id])
+  deliveries CommunicationDelivery[]
+
+  @@index([gymId, status])
+}
+
+// One person, one channel, of one message: where it went and whether it got there
+model CommunicationDelivery {
+  id              String   @id @default(cuid())
+  communicationId String
+  gymId           String
+  memberId        String?
+  name            String
+  channel         String   // email | sms
+  address         String?  // the email address or phone number it went to
+  status          String   // sent | failed | skipped
+  error           String?
+  providerId      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  communication Communication @relation(fields: [communicationId], references: [id], onDelete: Cascade)
+
+  @@index([communicationId])
+  @@index([gymId, memberId])
 }
 
 model Notification {
   id        String   @id @default(cuid())
   gymId     String
+  staffId   String?
   title     String
   body      String
   type      String?
+  link      String?
+  // Who a gym-wide notification is for: null/'all', 'managers', or 'owner'.
+  // Ignored when staffId is set, since that already names the recipient.
+  audience  String?
+  // The employee a gym-wide notice is about. Nobody is told about themselves:
+  // signing in should not announce your own arrival to you.
+  aboutStaffId String?
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  gym Gym @relation(fields: [gymId], references: [id])
+  gym        Gym                     @relation(fields: [gymId], references: [id])
+  staff      Staff?                  @relation(fields: [staffId], references: [id])
+  dismissals NotificationDismissal[]
+}
+
+// Someone clearing a gym-wide notification from their own list. The notice
+// stays for everyone else; only a notification addressed to one person is
+// deleted outright when they clear it.
+model NotificationDismissal {
+  id             String       @id @default(cuid())
+  notificationId String
+  staffId        String
+  createdAt      DateTime     @default(now())
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, staffId])
+  @@index([staffId])
+}
+
+// A change to a member that needs a manager's sign-off (extend, freeze, cancel,
+// …). A non-manager raises one with a note; a manager approves it and the change
+// is applied server-side from the stored action + params, so there is one place
+// the change actually happens. Standalone (no relations) to keep it additive.
+model ApprovalRequest {
+  id              String    @id @default(cuid())
+  gymId           String
+  memberId        String
+  memberName      String?
+  action          String
+  params          String?   // JSON
+  summary         String?
+  note            String?
+  status          String    @default("pending") // pending | approved | rejected
+  requestedById   String?
+  requestedByName String?
+  resolvedById    String?
+  resolvedNote    String?
+  taskId          String?
+  createdAt       DateTime  @default(now())
+  resolvedAt      DateTime?
+
+  @@index([gymId, status])
+  @@index([memberId])
 }
 
 enum StaffRole {
   general_manager
   manager
-  accountant
   front_desk
+  trainer
+  // Works at the gym without working in it: a cleaner, a technician. They have
+  // an account to be paid and clocked, and reach nothing else.
+  other
+  // Kept so older records still read; new accounts are never given these
+  accountant
   coach
   instructor
-  trainer
 }
 
 enum MemberStatus {
@@ -340,6 +671,7 @@ enum MemberStatus {
   frozen
   expired
   deactivated
+  cancelled
   visitor
 }
 
@@ -367,6 +699,10 @@ enum TaskStatus {
   todo
   in_progress
   done
+  // Only for a task born from a calendar invite: there is no "in progress" for
+  // being on a class roster, only whether you are coming.
+  accepted
+  declined
 }
 
 enum IssueSeverity {
@@ -380,4 +716,28 @@ enum IssueStatus {
   open
   in_progress
   resolved
+}
+
+// A record of the important things done in the gym, for the owner's eyes only.
+// Names are copied in as text so an entry still reads correctly after the
+// person is renamed or removed. Entries are deleted after 30 days
+// (jobs/logRetention.js).
+model ActivityLog {
+  id         String   @id @default(cuid())
+  gymId      String
+  actorId    String?
+  actorName  String?
+  actorRole  String?
+  category   String
+  action     String
+  summary    String
+  targetType String?
+  targetId   String?
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  gym Gym @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  @@index([gymId, createdAt])
+  @@index([createdAt])
 }

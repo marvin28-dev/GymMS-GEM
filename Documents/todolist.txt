@@ -1,0 +1,7 @@
+-Fix the onboarding to make it more organised (Expecially when creating the managers account, i want to be able to collect as much information as i need for the account, phone number department, and it should show the code at the end which the manager can use for authorization and login)
+-It is taking too much time to create an account
+-First thing first when i create the account it should take me to the first thing to do which is finish setting up the gym profile, also finish setting up the managers profile
+-Fix the whole Setup Algorithm from beginning to end 
+-When you create a new profile, in the product sales page under the fontdesk mode i see a list of products which i actually never created, 
+-under the front desk mode on operations page, i see revenue for products where as i never sold any products, it also says i solve 5 items which is not true too
+-So with all of this done and the design almost complete, i want you to produce me a testing checklist, please read the code very well and thing and produce me a full detailed testing checklist to make sure that each part of the system is function as it should, please take your time

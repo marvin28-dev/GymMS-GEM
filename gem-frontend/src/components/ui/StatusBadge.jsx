@@ -1,87 +1,36 @@
-const STATUS_MAP = {
-  // ── Member statuses ──────────────────────────────────────────────────────
-  pending: {
-    bg: 'rgba(99,102,241,0.12)',
-    color: '#6366f1',
-    label: 'Not Started',
-  },
-  active: {
-    bg: 'rgba(52,211,153,0.12)',
-    color: '#10b981',
-    label: 'Active',
-  },
-  frozen: {
-    bg: 'rgba(96,165,250,0.12)',
-    color: '#3b82f6',
-    label: 'Frozen',
-  },
-  deactivated: {
-    bg: 'rgba(248,113,113,0.12)',
-    color: '#ef4444',
-    label: 'Deactivated',
-  },
-  expired: {
-    bg: 'rgba(251,146,60,0.12)',
-    color: '#f97316',
-    label: 'Expired',
-  },
-  suspended: {
-    bg: 'rgba(239,68,68,0.12)',
-    color: '#ef4444',
-    label: 'Suspended',
-  },
-  registered: {
-    bg: 'rgba(212,175,55,0.12)',
-    color: '#c9a96e',
-    label: 'Registered',
-  },
-  // ── Legacy / other statuses ──────────────────────────────────────────────
-  expiring: {
-    bg: 'rgba(251,191,36,0.12)',
-    color: '#f59e0b',
-    label: 'Expiring Soon',
-  },
-  visitor: {
-    bg: 'rgba(167,139,250,0.12)',
-    color: '#8b5cf6',
-    label: 'Visitor',
-  },
-  staff: {
-    bg: 'rgba(201,169,110,0.12)',
-    color: '#c9a96e',
-    label: 'Staff',
-  },
-  inactive: {
-    bg: 'rgba(90,90,106,0.12)',
-    color: 'var(--text-muted)',
-    label: 'Inactive',
-  },
-  overdue: {
-    bg: 'rgba(248,113,113,0.12)',
-    color: '#ef4444',
-    label: 'Overdue',
-  },
-  'in progress': {
-    bg: 'rgba(96,165,250,0.12)',
-    color: '#3b82f6',
-    label: 'In Progress',
-  },
-  done: {
-    bg: 'rgba(52,211,153,0.12)',
-    color: '#10b981',
-    label: 'Done',
-  },
+import { useLanguage } from '../../contexts/LanguageContext';
+
+const STATUS_STYLE = {
+  pending:      { bg: 'rgba(99,102,241,0.12)',  color: '#6366f1',  key: 'status.pending' },
+  active:       { bg: 'rgba(52,211,153,0.12)',  color: '#10b981',  key: 'status.active' },
+  frozen:       { bg: 'rgba(96,165,250,0.12)',  color: '#3b82f6',  key: 'status.frozen' },
+  deactivated:  { bg: 'rgba(248,113,113,0.12)', color: '#ef4444',  key: 'status.deactivated' },
+  cancelled:    { bg: 'rgba(148,163,184,0.14)', color: '#94a3b8',  key: 'status.cancelled' },
+  expired:      { bg: 'rgba(251,146,60,0.12)',  color: '#f97316',  key: 'status.expired' },
+  suspended:    { bg: 'rgba(239,68,68,0.12)',   color: '#ef4444',  key: 'status.suspended' },
+  registered:   { bg: 'rgba(212,175,55,0.12)',  color: '#c9a96e',  key: 'status.registered' },
+  expiring:     { bg: 'rgba(251,191,36,0.12)',  color: '#f59e0b',  key: 'status.expiringSoon' },
+  visitor:      { bg: 'rgba(167,139,250,0.12)', color: '#8b5cf6',  key: 'status.visitor' },
+  staff:        { bg: 'rgba(201,169,110,0.12)', color: '#c9a96e',  key: 'status.staff' },
+  inactive:     { bg: 'rgba(90,90,106,0.12)',   color: 'var(--text-muted)', key: 'status.inactive' },
+  overdue:      { bg: 'rgba(248,113,113,0.12)', color: '#ef4444',  key: 'status.overdue' },
+  'in progress':{ bg: 'rgba(96,165,250,0.12)',  color: '#3b82f6',  key: 'status.inProgress' },
+  done:         { bg: 'rgba(52,211,153,0.12)',  color: '#10b981',  key: 'status.done' },
+  open:         { bg: 'rgba(99,102,241,0.12)',  color: '#6366f1',  key: 'status.open' },
+  accepted:     { bg: 'rgba(52,211,153,0.12)',  color: '#10b981',  key: 'status.accepted' },
+  declined:     { bg: 'rgba(248,113,113,0.12)', color: '#ef4444',  key: 'status.declined' },
 };
 
-const DEFAULT_CONFIG = {
+const DEFAULT_STYLE = {
   bg: 'rgba(90,90,106,0.15)',
   color: 'var(--text-muted)',
-  label: '',
 };
 
 export default function StatusBadge({ status }) {
+  const { t } = useLanguage();
   const key = (status || '').toLowerCase();
-  const config = STATUS_MAP[key] || { ...DEFAULT_CONFIG, label: status || '' };
+  const style = STATUS_STYLE[key] || DEFAULT_STYLE;
+  const label = style.key ? t(style.key) : (status || '');
 
   return (
     <span
@@ -89,8 +38,8 @@ export default function StatusBadge({ status }) {
         display: 'inline-flex',
         alignItems: 'center',
         gap: 5,
-        background: config.bg,
-        color: config.color,
+        background: style.bg,
+        color: style.color,
         borderRadius: 20,
         padding: '3px 10px',
         fontSize: 11,
@@ -104,11 +53,11 @@ export default function StatusBadge({ status }) {
           width: 5,
           height: 5,
           borderRadius: '50%',
-          background: config.color,
+          background: style.color,
           flexShrink: 0,
         }}
       />
-      {config.label}
+      {label}
     </span>
   );
 }

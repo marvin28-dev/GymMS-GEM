@@ -26,6 +26,8 @@
   --accent-purple-dim: rgba(167,139,250,0.12);
   --accent-yellow: #fbbf24;
   --accent-yellow-dim: rgba(251,191,36,0.12);
+  /* the sticky top bar, which is translucent over whatever scrolls beneath */
+  --bg-header: rgba(10,10,15,0.8);
   --shadow-card: 0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03);
   --shadow-elevated: 0 8px 32px rgba(0,0,0,0.5);
 }
@@ -33,96 +35,54 @@
 /* ── Ivory (light) ───────────────────────────────────────────────── */
 [data-theme="light"] {
   color-scheme: light;
-  --bg-primary: #f2f2f7;
-  --bg-secondary: #e8e8f0;
-  --bg-card: #ffffff;
-  --bg-card-hover: #f8f8fc;
-  --bg-elevated: #eeeef6;
-  --border: #d0d0e0;
-  --border-subtle: #e2e2ee;
-  --text-primary: #0a0a1a;
-  --text-secondary: #555570;
-  --text-muted: #9090aa;
-  --accent-gold: #b08a40;
-  --accent-gold-dim: rgba(176,138,64,0.12);
-  --accent-gold-glow: rgba(176,138,64,0.07);
-  --accent-green: #16a34a;
-  --accent-green-dim: rgba(22,163,74,0.1);
-  --accent-red: #dc2626;
-  --accent-red-dim: rgba(220,38,38,0.1);
-  --accent-blue: #2563eb;
-  --accent-blue-dim: rgba(37,99,235,0.1);
-  --accent-purple: #7c3aed;
-  --accent-purple-dim: rgba(124,58,237,0.1);
-  --accent-yellow: #d97706;
-  --accent-yellow-dim: rgba(217,119,6,0.1);
-  --shadow-card: 0 1px 4px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.05);
-  --shadow-elevated: 0 8px 32px rgba(0,0,0,0.14);
+  /* Warm stone, not paper-white.
+     The first attempt put near-white cards on a near-white page: only a few
+     percent apart, so the whole screen read as one bright field with no depth,
+     and a full day in front of it glared. The page now sits a clear step below
+     the cards, which do the lifting, and every neutral carries a little of the
+     gold so the accent belongs to the palette rather than sitting on top of it.
+     Gold is darkened to #8a6a24 so it can also be read as text. */
+  --bg-primary: #eae6dd;
+  --bg-secondary: #e3ded3;
+  --bg-card: #fbfaf7;
+  --bg-card-hover: #f5f2eb;
+  --bg-elevated: #f1ede4;
+  --border: #cfc8b8;
+  --border-subtle: #ded8cb;
+  --text-primary: #1f1b14;
+  --text-secondary: #564f43;
+  --text-muted: #857d6e;
+  --accent-gold: #8a6a24;
+  --accent-gold-dim: rgba(138,106,36,0.11);
+  --accent-gold-glow: rgba(138,106,36,0.06);
+  --accent-green: #15803d;
+  --accent-green-dim: rgba(21,128,61,0.1);
+  --accent-red: #b91c1c;
+  --accent-red-dim: rgba(185,28,28,0.09);
+  --accent-blue: #1d4ed8;
+  --accent-blue-dim: rgba(29,78,216,0.09);
+  --accent-purple: #6d28d9;
+  --accent-purple-dim: rgba(109,40,217,0.09);
+  --accent-yellow: #b45309;
+  --accent-yellow-dim: rgba(180,83,9,0.1);
+  --bg-header: rgba(251,250,247,0.88);
+  --shadow-card: 0 1px 3px rgba(60,48,26,0.06), 0 0 0 1px rgba(60,48,26,0.04);
+  --shadow-elevated: 0 10px 30px rgba(60,48,26,0.13);
 }
 
-/* ── Midnight (deep navy) ────────────────────────────────────────── */
-[data-theme="midnight"] {
-  color-scheme: dark;
-  --bg-primary: #060a18;
-  --bg-secondary: #09102a;
-  --bg-card: #0d1630;
-  --bg-card-hover: #121e3e;
-  --bg-elevated: #172448;
-  --border: #1e2e5e;
-  --border-subtle: #121e48;
-  --text-primary: #dce8ff;
-  --text-secondary: #6278a8;
-  --text-muted: #384f78;
-  --accent-gold: #e0b860;
-  --accent-gold-dim: rgba(224,184,96,0.15);
-  --accent-gold-glow: rgba(224,184,96,0.08);
-  --accent-green: #34d399;
-  --accent-green-dim: rgba(52,211,153,0.12);
-  --accent-red: #fb7185;
-  --accent-red-dim: rgba(251,113,133,0.12);
-  --accent-blue: #818cf8;
-  --accent-blue-dim: rgba(129,140,248,0.12);
-  --accent-purple: #c084fc;
-  --accent-purple-dim: rgba(192,132,252,0.12);
-  --accent-yellow: #fcd34d;
-  --accent-yellow-dim: rgba(252,211,77,0.12);
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.5), 0 0 0 1px rgba(100,150,255,0.04);
-  --shadow-elevated: 0 8px 32px rgba(0,0,0,0.6);
-}
 
-/* ── Forest (dark green) ─────────────────────────────────────────── */
-[data-theme="forest"] {
-  color-scheme: dark;
-  --bg-primary: #060d08;
-  --bg-secondary: #0a140c;
-  --bg-card: #0e1810;
-  --bg-card-hover: #121e14;
-  --bg-elevated: #162619;
-  --border: #1c3420;
-  --border-subtle: #122418;
-  --text-primary: #dcf0e0;
-  --text-secondary: #5a9068;
-  --text-muted: #3a6045;
-  --accent-gold: #c8a84a;
-  --accent-gold-dim: rgba(200,168,74,0.15);
-  --accent-gold-glow: rgba(200,168,74,0.08);
-  --accent-green: #4ade80;
-  --accent-green-dim: rgba(74,222,128,0.15);
-  --accent-red: #f87171;
-  --accent-red-dim: rgba(248,113,113,0.12);
-  --accent-blue: #60a5fa;
-  --accent-blue-dim: rgba(96,165,250,0.12);
-  --accent-purple: #a78bfa;
-  --accent-purple-dim: rgba(167,139,250,0.12);
-  --accent-yellow: #fbbf24;
-  --accent-yellow-dim: rgba(251,191,36,0.12);
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.5), 0 0 0 1px rgba(60,150,70,0.04);
-  --shadow-elevated: 0 8px 32px rgba(0,0,0,0.6);
-}
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body, #root { height: 100%; min-height: 100vh; }
+
+/* Edge and Chrome turn a sideways swipe or a horizontal wheel into a
+   back/forward gesture, and rubber-band the whole page while doing it. In an
+   app with no sideways content that only ever looks like the page sliding
+   about, so the gesture is turned off. Vertical scrolling is untouched. */
+html, body {
+  overscroll-behavior-x: none;
+}
 
 body {
   background-color: var(--bg-primary);
@@ -146,11 +106,44 @@ input:-webkit-autofill:focus {
   transition: background-color 5000s ease-in-out 0s;
 }
 
+/* A gentle settle, NOT a fade from transparent. Fading a page in from
+   opacity:0 leaves one frame where the just-mounted page is invisible and the
+   dark page background shows through - between two populated screens that reads
+   as a black flicker on every navigation. Sliding an already-opaque page up a
+   few pixels gives the same sense of arrival with no blank frame. */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { transform: translateY(8px); }
+  to   { transform: translateY(0); }
 }
-.page-fade { animation: fadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+.page-fade { animation: fadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Placeholders breathe rather than shimmer across: a moving highlight draws
+   the eye to the loading state, which is the opposite of what it is for. */
+@keyframes gem-skeleton {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 0.85; }
+}
+
+@media (max-width: 768px) {
+  .gem-list-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .gem-two-col { grid-template-columns: minmax(0, 1fr) !important; }
+  .gem-eod-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
+@media (max-width: 1500px) {
+  .gem-col-start { display: none; }
+}
+
+/* Four pay tiles sit in one row only when each has room for a full amount;
+   narrower, they go two by two, never three and one. */
+@media (max-width: 1100px) {
+  .gem-pay-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-fade { animation: none; }
+  [style*="gem-skeleton"] { animation: none !important; opacity: 0.6 !important; }
+}
 
 @keyframes overlayIn {
   from { opacity: 0; }
@@ -162,3 +155,10 @@ input:-webkit-autofill:focus {
 }
 .modal-overlay-enter { animation: overlayIn 0.2s ease-out; }
 .modal-content-enter { animation: modalSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Edge and IE draw their own reveal and clear buttons inside a password box,
+   which sit next to the eye we draw ourselves. Ours stays, theirs goes. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}

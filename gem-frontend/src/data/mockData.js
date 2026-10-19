@@ -1,4 +1,4 @@
-export const members = [
+﻿export const members = [
   // ── Active ───────────────────────────────────────────────────────────────────
   { id: 'GEM-0342', firstName: 'Armand',    lastName: 'Kamga',     phone: '+237 655 123 456', email: 'armand.k@gmail.com',    package: 'Premium 12M',    status: 'active',      startDate: '2026-01-15', endDate: '2027-01-14', balance: 0,      lastVisit: '2026-03-23', gender: 'Male',   avatarColor: 'gold',   accessCode: '4271', regFeeDate: '2026-01-15' },
   { id: 'GEM-0518', firstName: 'Sophie',    lastName: 'Ngono',     phone: '+237 677 234 567', email: 'sophie.n@gmail.com',    package: 'Standard 6M',    status: 'active',      startDate: '2025-11-01', endDate: '2026-04-30', balance: 0,      lastVisit: '2026-03-23', gender: 'Female', avatarColor: 'blue',   accessCode: '8364', regFeeDate: '2025-11-01' },
@@ -104,7 +104,7 @@ export const expenses = [
   { id: 3, title: 'Equipment Repair', category: 'Maintenance', amount: 105000, date: '2026-03-20', paidTo: 'SportFix Cameroun', method: 'Cash' },
 ];
 
-// Visitor session bundles — charged per session, cheaper per session as qty grows
+// Visitor session bundles - charged per session, cheaper per session as qty grows
 export const visitorSessionPackages = [
   { id: 'vs-1',  sessions: 1,  pricePerSession: 3500, totalPrice: 3500,  label: '1 Session',   status: 'active' },
   { id: 'vs-2',  sessions: 3,  pricePerSession: 3000, totalPrice: 9000,  label: '3 Sessions',  status: 'active' },
@@ -115,7 +115,7 @@ export const visitorSessionPackages = [
 
 export const equipmentIssues = [
   { id: 1, equipment: 'Treadmill #3', location: 'Cardio Zone', severity: 'High',   status: 'Open',        reportedBy: 'Sandrine Kom',   date: '2026-04-18', description: 'Belt slipping and making loud noise during use.' },
-  { id: 2, equipment: 'AC Unit – Studio A', location: 'Studio A', severity: 'High',   status: 'In Progress', reportedBy: 'Claude Nkemeni', date: '2026-04-17', description: 'AC not cooling properly. Room temperature is too high during classes.' },
+  { id: 2, equipment: 'AC Unit - Studio A', location: 'Studio A', severity: 'High',   status: 'In Progress', reportedBy: 'Claude Nkemeni', date: '2026-04-17', description: 'AC not cooling properly. Room temperature is too high during classes.' },
   { id: 3, equipment: 'Barbell (20kg)', location: 'Weight Room', severity: 'Medium', status: 'Open',        reportedBy: 'Michel Roko',    date: '2026-04-19', description: 'Collar locking mechanism is loose. Needs replacement.' },
   { id: 4, equipment: 'Locker #14', location: 'Changing Room', severity: 'Low',    status: 'Resolved',    reportedBy: 'Sandrine Kom',   date: '2026-04-15', description: 'Lock was jammed. Fixed with lubricant.' },
   { id: 5, equipment: 'Rowing Machine #1', location: 'Cardio Zone', severity: 'Medium', status: 'Open',     reportedBy: 'Sandrine Kom',   date: '2026-04-20', description: 'Display screen not responding. Resistance levels still work.' },
@@ -142,7 +142,7 @@ export function getEffectiveStatus(member, gym) {
 
 // ── Staff Time Cards ──────────────────────────────────────────────────────────
 // Generated punch-in / punch-out records for every working day in March 2026.
-// Working days: Mon–Sat (gym closed Sundays).
+// Working days: Mon-Sat (gym closed Sundays).
 function _buildTimeCards() {
   const days = [
     '2026-03-02','2026-03-03','2026-03-04','2026-03-05','2026-03-06','2026-03-07',
@@ -189,19 +189,17 @@ function _buildTimeCards() {
 }
 export const staffTimeCards = _buildTimeCards();
 
-// Owner-only authorization audit log — persists in memory for this session
+// Owner-only authorization audit log - persists in memory for this session
 export const managerAuthLog = [];
 export const getInitials = (firstName, lastName) => `${firstName[0]}${lastName[0]}`;
 
 export const formatDate = (dateStr) => {
-  if (!dateStr) return '—';
+  if (!dateStr) return '-';
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
 };
 
-export const formatMoney = (amount) => {
-  return `${Math.round(Number(amount)).toLocaleString('fr-FR')} FCFA`;
-};
+export { formatMoney } from '../utils/currency';
 
 export const avatarColors = {
   gold: { bg: 'var(--accent-gold-dim)', color: 'var(--accent-gold)' },
@@ -210,17 +208,4 @@ export const avatarColors = {
   red: { bg: 'var(--accent-red-dim)', color: 'var(--accent-red)' },
   purple: { bg: 'var(--accent-purple-dim)', color: 'var(--accent-purple)' },
 };
-
-// All navigable route keys used for permission filtering
-export const ALL_PAGES = ['dashboard','members','attendance','calendar','front-desk','tasks','sales','operations','payments','accounting','packages','communication','staff','settings'];
-
-export const ROLE_PROFILES = [
-  { id: 'general_manager', name: 'General Manager', color: '#c9a96e', pages: ['dashboard','members','attendance','calendar','front-desk','tasks','sales','operations','payments','accounting','packages','communication','staff','settings'] },
-  { id: 'manager',         name: 'Manager',         color: '#60a5fa', pages: ['dashboard','members','attendance','calendar','front-desk','tasks','sales','operations','payments','accounting','packages','communication','staff','settings'] },
-  { id: 'accountant',      name: 'Accountant',      color: '#34d399', pages: ['dashboard','payments','accounting'] },
-  { id: 'front_desk',      name: 'Front Desk',      color: '#f59e0b', pages: ['dashboard','members','attendance','front-desk','tasks'] },
-  { id: 'coach',           name: 'Coach',           color: '#a78bfa', pages: ['dashboard','attendance','calendar','tasks'] },
-  { id: 'instructor',      name: 'Instructor',      color: '#818cf8', pages: ['dashboard','calendar','tasks'] },
-  { id: 'trainer',         name: 'Trainer',         color: '#fb923c', pages: ['dashboard','members','attendance','calendar','tasks'] },
-];
 

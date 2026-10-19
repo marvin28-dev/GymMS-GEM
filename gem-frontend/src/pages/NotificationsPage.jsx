@@ -1,18 +1,13 @@
+import { useLiveTick } from '../hooks/useLiveRefresh';
 import { useState, useEffect } from 'react';
-import { User, CreditCard, ClipboardList, Package, Settings, Bell, Trash2, Check } from 'lucide-react';
-import { getAll as getNotifications, markAllRead as apiMarkAllRead, markOneRead as apiMarkOneRead, remove as apiRemoveNotif } from '../services/notifications.service';
-
-function formatTime(iso) {
-  if (!iso) return '';
-  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days === 1) return 'Yesterday';
-  return `${days} days ago`;
-}
+import { useNavigate } from 'react-router-dom';
+import { User, CreditCard, ClipboardList, Package, Settings, Bell, Trash2, Check, ChevronRight, Eye } from 'lucide-react';
+import RowMenu from '../components/ui/RowMenu';
+import { getAll as getNotifications, markAllRead as apiMarkAllRead, markOneRead as apiMarkOneRead, remove as apiRemoveNotif, removeAll as apiRemoveAll } from '../services/notifications.service';
+import { useIsMobile } from '../hooks/useIsMobile';
+import { getRole } from '../utils/auth';
+import { TASKS_PATH } from '../utils/rolePages';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const cardStyle = { background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, boxShadow: 'var(--shadow-card)' };
 const secondaryBtn = { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '8px 16px', cursor: 'pointer', fontFamily: 'DM Sans' };
@@ -27,10 +22,54 @@ const TYPE_ICONS = {
 };
 
 const CATEGORIES = ['All', 'Membership', 'Payment', 'Task', 'Inventory', 'System'];
+const FITNESS_CATEGORIES = ['All', 'Task'];
+
+const CATEGORY_KEYS = {
+  All: 'notifications.catAll',
+  Membership: 'notifications.catMembership',
+  Payment: 'notifications.catPayment',
+  Task: 'notifications.catTask',
+  Inventory: 'notifications.catInventory',
+  System: 'notifications.catSystem',
+};
+
+function resolveNotifLink(n) {
+  // The server says where a notification points when it knows; the title
+  // matching below is only a fallback for older ones.
+  if (n.link) return n.link;
+  const title = (n.title || '').toLowerCase();
+  if (title.includes('payroll') || title.includes('paystub') || title.includes('pay issued') || title.includes('pay settled')) return '/accounting?tab=paystubs';
+  if (title.includes('staff') || title.includes('employee') || title.includes('reactivated') || title.includes('deactivated')) return '/staff';
+  if (title.includes('member') || title.includes('visitor') || title.includes('signup') || title.includes('enrolled') || title.includes('joined') || title.includes('registered')) return '/members';
+  if (title.includes('payment') || title.includes('revenue') || title.includes('paid') || title.includes('received')) return '/payments';
+  if (title.includes('task') || title.includes('maintenance') || title.includes('issue') || title.includes('review')) return TASKS_PATH(getRole());
+  if (title.includes('finish')) return '/dashboard';
+  if (title.includes('setup') || title.includes('profile') || title.includes('configure')) return '/settings';
+  const typeMap = { signup: '/members', payment: '/payments', task: TASKS_PATH(getRole()), membership: '/members', system: '/settings' };
+  // Never a dead end - everything at least lands on the dashboard.
+  return typeMap[n.type] || '/dashboard';
+}
 
 export default function NotificationsPage() {
+  const { t } = useLanguage();
+  const nav = useNavigate();
+  const isMobile = useIsMobile();
+  const isFitnessRole = ['trainer', 'instructor', 'coach'].includes(getRole());
   const [notifs, setNotifs] = useState([]);
 
+  function formatTime(iso) {
+    if (!iso) return '';
+    const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (mins < 1) return t('common.justNow');
+    if (mins < 60) return t('common.minsAgo', { n: mins });
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return t('common.hoursAgo', { n: hrs });
+    const days = Math.floor(hrs / 24);
+    if (days === 1) return t('common.yesterday');
+    return t('common.daysAgoLong', { n: days });
+  }
+
+  const liveTick = useLiveTick();
   useEffect(() => {
     getNotifications()
       .then(res => setNotifs((res.data || []).map(n => ({
@@ -40,7 +79,7 @@ export default function NotificationsPage() {
         time: formatTime(n.createdAt),
       }))))
       .catch(console.error);
-  }, []);
+  }, [liveTick]);
   const [activeCategory, setActiveCategory] = useState('All');
 
   const filtered = notifs.filter(n => {
@@ -59,9 +98,21 @@ export default function NotificationsPage() {
     try { await apiMarkAllRead(); } catch (_) {}
     setNotifs(prev => prev.map(n => ({ ...n, unread: false })));
   };
+  // Clears this person's own list; a gym-wide notice stays for everyone else
+  const clearAll = async () => {
+    const previous = notifs;
+    setNotifs([]);
+    try { await apiRemoveAll(); } catch (_) { setNotifs(previous); }
+  };
   const deleteNotif = async (id) => {
     try { await apiRemoveNotif(id); } catch (_) {}
     setNotifs(prev => prev.filter(n => n.id !== id));
+  };
+
+  const handleNotifClick = (n) => {
+    if (n.unread) markRead(n.id);
+    const link = resolveNotifLink(n);
+    if (link) nav(link);
   };
 
   const chipStyle = (active) => ({
@@ -72,26 +123,122 @@ export default function NotificationsPage() {
     borderColor: active ? 'var(--accent-gold)' : 'transparent',
   });
 
+  if (isMobile) {
+    return (
+      <div style={{ padding: '16px 16px 0' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div>
+            <h1 style={{ fontFamily: 'Manrope', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+              {t('notifications.title')}
+            </h1>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3, fontFamily: 'DM Sans' }}>
+              {unreadCount > 0 ? t('notifications.unread', { count: unreadCount }) : t('notifications.allCaughtUp')}
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            {unreadCount > 0 && (
+              <button onClick={markAllRead} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '8px 12px', cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Check size={13} /> {t('notifications.markAllRead')}
+              </button>
+            )}
+            {notifs.length > 0 && (
+              <button data-clear-all onClick={clearAll} aria-label={t('header.clearAll')} title={t('header.clearAll')} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '8px 10px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Category chips */}
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 12, scrollbarWidth: 'none' }}>
+          {(isFitnessRole ? FITNESS_CATEGORIES : CATEGORIES).map(c => {
+            const active = activeCategory === c;
+            return (
+              <button key={c} onClick={() => setActiveCategory(c)} style={{ flexShrink: 0, padding: '7px 14px', borderRadius: 20, border: `1px solid ${active ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, background: active ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', color: active ? 'var(--accent-gold)' : 'var(--text-muted)', fontSize: 12, fontWeight: active ? 600 : 400, cursor: 'pointer', fontFamily: 'DM Sans', WebkitTapHighlightColor: 'transparent' }}>
+                {t(CATEGORY_KEYS[c])}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Notification list */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 16 }}>
+          {filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px 16px' }}>
+              <Bell size={36} color="var(--text-muted)" style={{ marginBottom: 10 }} />
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'DM Sans', marginBottom: 6 }}>
+                {t('notifications.noNotifications')}
+              </div>
+              {isFitnessRole && (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans', lineHeight: 1.6 }}>
+                  {t('notifications.fitnessEmpty')}
+                </div>
+              )}
+            </div>
+          ) : filtered.map(n => {
+            const tc = TYPE_ICONS[n.type] || TYPE_ICONS.system;
+            const IconComp = tc.icon;
+            const link = resolveNotifLink(n);
+            return (
+              <div key={n.id} onClick={() => handleNotifClick(n)} style={{ background: n.unread ? 'var(--accent-gold-glow)' : 'var(--bg-card)', border: `1px solid ${n.unread ? 'var(--accent-gold-dim)' : 'var(--border-subtle)'}`, borderRadius: 12, padding: '13px 14px', display: 'flex', alignItems: 'flex-start', gap: 12, cursor: link ? 'pointer' : 'default', WebkitTapHighlightColor: 'transparent' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: tc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <IconComp size={16} color={tc.color} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    {n.unread && <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent-gold)', flexShrink: 0 }} />}
+                    <span style={{ fontSize: 13, fontWeight: n.unread ? 600 : 500, color: 'var(--text-primary)', fontFamily: 'DM Sans', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.text}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{n.time}</div>
+                </div>
+                <div style={{ flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                  <RowMenu title={t('common.actions')} items={[
+                    { label: t('common.view'), icon: <Eye size={15} />, onClick: () => handleNotifClick(n), hidden: !link },
+                    { label: t('notifications.markRead'), icon: <Check size={15} />, onClick: () => markRead(n.id), hidden: !n.unread },
+                    { label: t('common.delete'), icon: <Trash2 size={15} />, onClick: () => deleteNotif(n.id), danger: true },
+                  ]} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page-fade">
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>Notifications</h1>
+          <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>
+            {t('notifications.title')}
+          </h1>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-            {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}` : 'All caught up!'}
+            {unreadCount > 0 ? t('notifications.unreadPlural', { count: unreadCount }) : t('notifications.allCaughtUp')}
           </p>
         </div>
-        {unreadCount > 0 && (
-          <button style={secondaryBtn} onClick={markAllRead}>
-            <Check size={12} style={{ marginRight: 4 }} />Mark All as Read
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {unreadCount > 0 && (
+            <button style={secondaryBtn} onClick={markAllRead}>
+              <Check size={12} style={{ marginRight: 4 }} />{t('notifications.markAllRead')}
+            </button>
+          )}
+          {notifs.length > 0 && (
+            <button data-clear-all style={secondaryBtn} onClick={clearAll}>
+              <Trash2 size={12} style={{ marginRight: 4 }} />{t('header.clearAll')}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Category tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: 'var(--bg-elevated)', padding: 4, borderRadius: 8, width: 'fit-content' }}>
-        {CATEGORIES.map(c => (
-          <button key={c} style={chipStyle(activeCategory === c)} onClick={() => setActiveCategory(c)}>{c}</button>
+        {(isFitnessRole ? FITNESS_CATEGORIES : CATEGORIES).map(c => (
+          <button key={c} style={chipStyle(activeCategory === c)} onClick={() => setActiveCategory(c)}>
+            {t(CATEGORY_KEYS[c])}
+          </button>
         ))}
       </div>
 
@@ -99,31 +246,35 @@ export default function NotificationsPage() {
         {filtered.length === 0 ? (
           <div style={{ padding: 60, textAlign: 'center' }}>
             <Bell size={40} color="var(--text-muted)" style={{ marginBottom: 12 }} />
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>No notifications</div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>You have no notifications in this category.</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>
+              {t('notifications.noNotifications')}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              {isFitnessRole ? t('notifications.fitnessEmpty') : t('notifications.categoryEmpty')}
+            </div>
           </div>
         ) : (
           filtered.map((n, idx) => {
             const tc = TYPE_ICONS[n.type] || TYPE_ICONS.system;
             const IconComp = tc.icon;
+            const link = resolveNotifLink(n);
             return (
               <div
                 key={n.id}
+                onClick={() => handleNotifClick(n)}
                 style={{
                   display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 20px',
                   borderBottom: idx < filtered.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                   background: n.unread ? 'var(--accent-gold-glow)' : 'transparent',
-                  cursor: 'pointer', transition: 'background 0.15s',
+                  cursor: link ? 'pointer' : 'default', transition: 'background 0.15s',
                 }}
-                onMouseEnter={e => { if (!n.unread) e.currentTarget.style.background = 'var(--bg-card-hover)'; }}
+                onMouseEnter={e => { e.currentTarget.style.background = n.unread ? 'rgba(201,169,110,0.1)' : 'var(--bg-card-hover)'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = n.unread ? 'var(--accent-gold-glow)' : 'transparent'; }}
               >
-                {/* Icon */}
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: tc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
                   <IconComp size={16} color={tc.color} />
                 </div>
 
-                {/* Content */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{n.title}</span>
@@ -135,22 +286,14 @@ export default function NotificationsPage() {
                   <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>{n.time}</span>
                 </div>
 
-                {/* Actions */}
-                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                  {n.unread && (
-                    <button title="Mark as read" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 8px', borderRadius: 4, fontSize: 11, fontFamily: 'DM Sans' }}
-                      onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-gold)'}
-                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-                      onClick={e => { e.stopPropagation(); markRead(n.id); }}>
-                      Mark read
-                    </button>
-                  )}
-                  <button title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, borderRadius: 4 }}
-                    onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-red)'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-                    onClick={e => { e.stopPropagation(); deleteNotif(n.id); }}>
-                    <Trash2 size={14} />
-                  </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                  <div onClick={e => e.stopPropagation()}>
+                    <RowMenu title={t('common.actions')} items={[
+                      { label: t('common.view'), icon: <Eye size={15} />, onClick: () => handleNotifClick(n), hidden: !link },
+                      { label: t('notifications.markRead'), icon: <Check size={15} />, onClick: () => markRead(n.id), hidden: !n.unread },
+                      { label: t('common.delete'), icon: <Trash2 size={15} />, onClick: () => deleteNotif(n.id), danger: true },
+                    ]} />
+                  </div>
                 </div>
               </div>
             );

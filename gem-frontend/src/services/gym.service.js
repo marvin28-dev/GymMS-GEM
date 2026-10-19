@@ -8,3 +8,9 @@ export const getMyGym = () =>
 
 export const updateMyGym = (data) =>
   api.patch('/gyms/me', data);
+
+export const getSetupStatus = () =>
+  api.get('/gyms/me/setup');
+
+export const confirmSetupSection = (section) =>
+  api.post('/gyms/me/setup/confirm', { section });

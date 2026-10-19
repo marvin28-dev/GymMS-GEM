@@ -11,3 +11,6 @@ export const markOneRead = (id) =>
 
 export const remove = (id) =>
   api.delete(`/notifications/${id}`);
+
+export const removeAll = () =>
+  api.delete('/notifications/all');

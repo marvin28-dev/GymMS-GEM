@@ -1,6 +1,11 @@
+﻿import RevenueSplit from '../components/ui/RevenueSplit';
+import { useLiveTick } from '../hooks/useLiveRefresh';
 import { useState, useEffect } from 'react';
+import { getCurrencySymbol, getMoneyLocale } from '../utils/currency';
 import { useNavigate } from 'react-router-dom';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { useLanguage } from '../contexts/LanguageContext';
+import OpenShiftsWarning, { useOpenShifts } from '../components/OpenShiftsWarning';
 import {
   FileText,
   UserCheck,
@@ -29,6 +34,10 @@ import GemSelect from '../components/ui/GemSelect';
 import StatusBadge from '../components/ui/StatusBadge';
 import Avatar from '../components/ui/Avatar';
 import { AddMemberModal } from './MembersPage';
+import EodReport from '../components/EodReport';
+import { getEod } from '../services/reports.service';
+import { getMyGym } from '../services/gym.service';
+import { formatMoney } from '../utils/currency';
 import { getAll as getTasks, create as createTask } from '../services/tasks.service';
 import { getAll as getEquipment, update as updateEquipment, create as createEquipmentIssue } from '../services/equipment.service';
 import { getAll as getStaff } from '../services/staff.service';
@@ -36,6 +45,14 @@ import { getAll as getAttendance } from '../services/attendance.service';
 import { getAll as getMembers } from '../services/members.service';
 import { getAll as getPayments } from '../services/payments.service';
 import { getAll as getExpenses } from '../services/expenses.service';
+import { fmtDate, fmtTime, getDateLocale, todayStr, dayStr } from '../utils/date';
+import { membershipEndsThisWeek } from '../utils/attention';
+import { TASK_CATEGORIES } from '../utils/taskCategories';
+import { assignFields } from '../utils/departments';
+import TaskAssigneeField from '../components/TaskAssigneeField';
+import { SkeletonCards } from '../components/Skeleton';
+import { softAll } from '../utils/loadAll';
+import { gymCache } from '../utils/gymCache';
 
 const sName = s => s ? `${s.firstName || ''} ${s.lastName || ''}`.trim() || s.id : 'Unassigned';
 
@@ -82,46 +99,17 @@ const priorityColors = {
   low:    { bg: 'var(--accent-blue-dim)',   color: 'var(--accent-blue)'   },
 };
 
-const EOD_DATE = 'April 21, 2026';
+const emptyTaskForm = { title: '', assignedTo: '', dueDate: '', priority: 'Medium', category: '' };
 
-const eodCheckins = [
-  { name: 'Armand Kamga',       id: 'GEM-0342', time: '09:42 AM', type: 'Member'  },
-  { name: 'Sophie Ngono',       id: 'GEM-0518', time: '09:38 AM', type: 'Member'  },
-  { name: 'Marcel Fonkoua',     id: 'GEM-0201', time: '09:31 AM', type: 'Member'  },
-  { name: 'Laure Tchinda',      id: 'GEM-0729', time: '09:15 AM', type: 'Member'  },
-  { name: 'Dieudonne Wamba',    id: 'GEM-0455', time: '09:02 AM', type: 'Visitor' },
-  { name: 'Patrick Mekontchou', id: 'GEM-0634', time: '10:05 AM', type: 'Member'  },
-  { name: 'Christelle Abena',   id: 'GEM-0711', time: '10:22 AM', type: 'Member'  },
-  { name: 'Esther Kouam',       id: 'GEM-0846', time: '10:44 AM', type: 'Member'  },
-  { name: 'Joëlle Abanda',      id: 'GEM-V101', time: '11:00 AM', type: 'Visitor' },
-  { name: 'Bruno Talla',        id: 'GEM-0503', time: '11:30 AM', type: 'Member'  },
-];
-
-const eodRegistrations = [
-  { name: 'Esther Kouam',  id: 'GEM-0846', type: 'Membership', pkg: 'Standard 6M',  amount: 75000,  time: '08:55 AM' },
-  { name: 'Joëlle Abanda', id: 'GEM-V101', type: 'Visitor',    pkg: '5 Sessions',   amount: 14000,  time: '10:58 AM' },
-  { name: 'Kevin Simo',    id: 'GEM-V102', type: 'Visitor',    pkg: '3 Sessions',   amount: 9000,   time: '02:15 PM' },
-];
-
-const eodSales = [
-  { item: 'Whey Protein (1kg)', qty: 2, unit: 13500, total: 27000, time: '09:10 AM', method: 'Card' },
-  { item: 'Water Bottle',       qty: 5, unit: 600,   total: 3000,  time: '10:30 AM', method: 'Cash' },
-  { item: 'Protein Bar',        qty: 8, unit: 1200,  total: 9600,  time: '11:15 AM', method: 'Cash' },
-  { item: 'Gym Gloves',         qty: 1, unit: 5400,  total: 5400,  time: '01:00 PM', method: 'Card' },
-  { item: 'Energy Drink',       qty: 6, unit: 1050,  total: 6300,  time: '03:45 PM', method: 'Cash' },
-  { item: 'Protein Bar',        qty: 4, unit: 1200,  total: 4800,  time: '05:20 PM', method: 'Cash' },
-];
-
-const eodPayments = [
-  { member: 'Armand Kamga',     desc: 'Premium 12M Renewal',    amount: 130000, method: 'Card', time: '08:50 AM' },
-  { member: 'Marcel Fonkoua',   desc: 'Personal Training (4x)', amount: 100000, method: 'Cash', time: '09:05 AM' },
-  { member: 'Esther Kouam',     desc: 'Standard 6M — New',      amount: 75000,  method: 'Cash', time: '08:55 AM' },
-  { member: 'Sophie Ngono',     desc: 'Outstanding Balance',     amount: 25000,  method: 'Card', time: '09:40 AM' },
-  { member: 'Nadège Bisseck',   desc: 'Basic Monthly Renewal',   amount: 15000,  method: 'Cash', time: '11:20 AM' },
-  { member: 'Christelle Abena', desc: 'Student Monthly',         amount: 10000,  method: 'Cash', time: '10:15 AM' },
-];
-
-const emptyTaskForm = { title: '', assignedTo: '', dueDate: '', priority: 'Medium', notes: '' };
+const ROLE_KEYS = {
+  general_manager: 'generalManager', 'General Manager': 'generalManager',
+  manager: 'manager', 'Manager': 'manager',
+  trainer: 'trainer', 'Trainer': 'trainer',
+  instructor: 'instructor', 'Instructor': 'instructor',
+  front_desk: 'frontDesk', 'Front Desk': 'frontDesk',
+  coach: 'coach', 'Coach': 'coach',
+  other: 'roleOther', 'Other': 'roleOther',
+};
 
 const emptyIssueForm = { equipment: '', location: '', description: '', severity: 'Medium' };
 
@@ -207,66 +195,60 @@ function ReportIssueModal({ open, onClose }) {
 function AddTaskModal({ open, onClose, onSave, staffList = [] }) {
   const { t } = useLanguage();
   const [form, setForm] = useState(emptyTaskForm);
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const [errors, setErrors] = useState({});
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: '' })); };
 
+  // The same fields the Tasks page asks for, which the server also insists on
   const handleSave = () => {
-    if (!form.title) return;
+    const e = {};
+    if (!form.title.trim()) e.title = t('tasks.titleRequired');
+    if (!form.assignedTo) e.assignedTo = t('tasks.assigneeRequired');
+    if (!form.dueDate) e.dueDate = t('tasks.dueDateRequired');
+    if (!form.category) e.category = t('tasks.categoryRequired');
+    if (Object.keys(e).length) { setErrors(e); return; }
     onSave(form);
     onClose();
     setForm(emptyTaskForm);
   };
-  const handleClose = () => { onClose(); setForm(emptyTaskForm); };
+  const handleClose = () => { onClose(); setForm(emptyTaskForm); setErrors({}); };
 
   return (
     <Modal open={open} onClose={handleClose} title={t('tasks.addTask')} maxWidth={500}>
       <div style={{ display: 'grid', gap: 14 }}>
-        <GemInput label={t('tasks.titleLabel')} value={form.title} onChange={e => set('title', e.target.value)} placeholder={t('tasks.taskTitlePlaceholder')} />
+        <GemInput label={t('tasks.titleLabel')} required error={errors.title} value={form.title} onChange={e => set('title', e.target.value)} placeholder={t('tasks.taskTitlePlaceholder')} />
+        <div>
+          <TaskAssigneeField
+            value={form.assignedTo}
+            dueDate={form.dueDate}
+            onChange={v => set('assignedTo', v)}
+            staffList={staffList}
+            fieldStyle={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '9px 14px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', boxSizing: 'border-box' }}
+            labelStyle={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6, display: 'block', fontFamily: 'DM Sans', fontWeight: 500 }}
+            required
+          />
+          {errors.assignedTo && <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{errors.assignedTo}</span>}
+        </div>
+        <GemInput label={t('tasks.dueDate')} required error={errors.dueDate} type="date" value={form.dueDate} onChange={e => set('dueDate', e.target.value)} />
         <GemSelect
-          label={t('tasks.assignTo')}
-          value={form.assignedTo}
-          onChange={e => set('assignedTo', e.target.value)}
-          options={[{ value: '', label: `— ${t('common.none')} —` }, ...staffList.map(s => ({ value: s.id, label: sName(s) }))]}
+          label={t('tasks.category')}
+          required
+          error={errors.category}
+          value={form.category}
+          onChange={e => set('category', e.target.value)}
+          options={[{ value: '', label: t('tasks.selectCategory') }, ...TASK_CATEGORIES.map(c => ({ value: c.value, label: t(c.labelKey) }))]}
         />
-        <GemInput label={t('tasks.dueDate')} type="date" value={form.dueDate} onChange={e => set('dueDate', e.target.value)} />
         <GemSelect
           label={t('tasks.priority')}
           value={form.priority}
           onChange={e => set('priority', e.target.value)}
           options={[['Low', t('tasks.priorityLow')], ['Medium', t('tasks.priorityMedium')], ['High', t('tasks.priorityHigh')]].map(([v, l]) => ({ value: v, label: l }))}
         />
-        <div>
-          <label style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6, display: 'block', fontFamily: 'DM Sans', fontWeight: 500 }}>{t('tasks.notesLabel')}</label>
-          <textarea
-            value={form.notes}
-            onChange={e => set('notes', e.target.value)}
-            rows={3}
-            placeholder={t('tasks.notesPlaceholder')}
-            style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '9px 14px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
-          />
-        </div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 24 }}>
         <button style={secondaryBtn} onClick={handleClose}>{t('common.cancel')}</button>
         <button style={primaryBtn} onClick={handleSave}>{t('tasks.saveTask')}</button>
       </div>
     </Modal>
-  );
-}
-
-function Section({ title, icon: Icon, accent, dim, badge, children, defaultOpen = true }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden', marginBottom: 12 }}>
-      <button onClick={() => setOpen(v => !v)} style={{ width: '100%', background: 'var(--bg-elevated)', border: 'none', padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-        <div style={{ width: 26, height: 26, borderRadius: 6, background: dim, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Icon size={12} color={accent} />
-        </div>
-        <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', flex: 1, textAlign: 'left' }}>{title}</span>
-        {badge !== undefined && <span style={{ background: dim, color: accent, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, fontFamily: 'DM Sans', marginRight: 4 }}>{badge}</span>}
-        {open ? <ChevronUp size={13} color="var(--text-muted)" /> : <ChevronDown size={13} color="var(--text-muted)" />}
-      </button>
-      {open && <div style={{ background: 'var(--bg-card)' }}>{children}</div>}
-    </div>
   );
 }
 
@@ -277,249 +259,7 @@ function isWorkingToday(s) {
   return !day?.off;
 }
 
-function EODModal({ open, onClose, issues, staffList = [] }) {
-  const { t } = useLanguage();
-  const [notes, setNotes] = useState('');
-
-  const memberRev  = eodPayments.reduce((s, p) => s + p.amount, 0);
-  const productRev = eodSales.reduce((s, p) => s + p.total, 0);
-  const totalRev   = memberRev + productRev;
-  const regRev     = eodRegistrations.reduce((s, r) => s + r.amount, 0);
-  const openIssues = (issues || []).filter(i => i.status !== 'resolved');
-  const fmt = n => `${n.toLocaleString('fr-FR')} FCFA`;
-
-  const thStyle = { padding: '8px 14px', textAlign: 'left', fontSize: 10, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--text-muted)', fontWeight: 600, fontFamily: 'DM Sans' };
-  const tdBase  = { padding: '9px 14px', fontFamily: 'DM Sans' };
-  const rowSep  = { borderBottom: '1px solid var(--border-subtle)' };
-
-  const handleDownload = () => {
-    const sep = '─'.repeat(54);
-    const lines = [
-      'GEM FITNESS CENTER', `END OF DAY REPORT — ${EOD_DATE}`, sep, '',
-      '── SUMMARY ──',
-      `  Check-ins        : ${eodCheckins.length}`,
-      `  New Registrations: ${eodRegistrations.length}`,
-      `  Product Sales    : ${eodSales.length} items`,
-      `  Membership Rev.  : ${fmt(memberRev)}`,
-      `  Product Rev.     : ${fmt(productRev)}`,
-      `  TOTAL REVENUE    : ${fmt(totalRev)}`,
-      `  Open Issues      : ${openIssues.length}`, '',
-      '── CHECK-INS ──',
-      ...eodCheckins.map(c => `  ${c.time}  ${c.name} (${c.id}) [${c.type}]`), '',
-      '── NEW REGISTRATIONS ──',
-      ...eodRegistrations.map(r => `  ${r.time}  ${r.name} — ${r.type} · ${r.pkg} · ${fmt(r.amount)}`), '',
-      '── MEMBERSHIP PAYMENTS ──',
-      ...eodPayments.map(p => `  ${p.time}  ${p.member}  ${p.desc}  ${fmt(p.amount)}  [${p.method}]`),
-      `  SUBTOTAL: ${fmt(memberRev)}`, '',
-      '── PRODUCT SALES ──',
-      ...eodSales.map(s => `  ${s.time}  ${s.item} ×${s.qty}  ${fmt(s.total)}  [${s.method}]`),
-      `  SUBTOTAL: ${fmt(productRev)}`, '',
-      '── STAFF ON DUTY ──',
-      ...staffList.filter(s => s.isActive !== false && isWorkingToday(s)).map(s => `  ${sName(s)} — ${s.role || ''}${s.shiftStart ? ` (Shift: ${s.shiftStart})` : ''}`), '',
-      '── EQUIPMENT ISSUES ──',
-      ...(issues || []).map(i => `  [${i.status}] ${i.equipment} (${i.location}) — ${i.severity}`),
-      notes ? `\n── NOTES ──\n  ${notes}` : '',
-      '', sep, `Generated: ${new Date().toLocaleString('en-US')}`,
-    ];
-    const a = document.createElement('a');
-    a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(lines.join('\n'));
-    a.download = `EOD_${EOD_DATE.replace(/ /g, '_')}.txt`;
-    a.click();
-  };
-
-  return (
-    <Modal open={open} onClose={onClose} title={`End of Day Report — ${EOD_DATE}`} maxWidth={760}>
-
-      {/* ── Summary strip ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
-        {[
-          { label: t('operations.checkInsToday'),  value: eodCheckins.length,         icon: UserCheck,  accent: 'var(--accent-green)',  dim: 'var(--accent-green-dim)'  },
-          { label: t('operations.eodNewSignups'),  value: eodRegistrations.length,    icon: UserPlus,   accent: 'var(--accent-gold)',   dim: 'var(--accent-gold-dim)'   },
-          { label: t('operations.eodItemsSold'),   value: eodSales.reduce((s,x)=>s+x.qty,0), icon: ShoppingBag, accent: 'var(--accent-blue)', dim: 'var(--accent-blue-dim)' },
-          { label: t('operations.eodMemberRev'),   value: fmt(memberRev),             icon: CreditCard, accent: 'var(--accent-purple)', dim: 'var(--accent-purple-dim)' },
-          { label: t('operations.eodProductRev'),  value: fmt(productRev),            icon: ShoppingBag,accent: 'var(--accent-yellow)', dim: 'var(--accent-yellow-dim)' },
-          { label: t('operations.revenueToday'),   value: fmt(totalRev),              icon: TrendingUp, accent: 'var(--accent-green)',  dim: 'var(--accent-green-dim)'  },
-        ].map(({ label, value, icon: Ic, accent, dim }) => (
-          <div key={label} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: dim, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Ic size={13} color={accent} />
-            </div>
-            <div>
-              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1 }}>{value}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2 }}>{label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Check-ins ── */}
-      <Section title={t('operations.checkInsToday')} icon={UserCheck} accent="var(--accent-green)" dim="var(--accent-green-dim)" badge={eodCheckins.length}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr style={rowSep}>{['Time','Name','ID','Type'].map(h=><th key={h} style={thStyle}>{h}</th>)}</tr></thead>
-          <tbody>
-            {eodCheckins.map((c,i) => (
-              <tr key={i} style={rowSep}>
-                <td style={{ ...tdBase, fontSize: 12, fontFamily: 'monospace', color: 'var(--text-muted)' }}>{c.time}</td>
-                <td style={{ ...tdBase, fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{c.name}</td>
-                <td style={{ ...tdBase, fontSize: 11, fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{c.id}</td>
-                <td style={tdBase}><span style={{ background: c.type==='Member'?'var(--accent-blue-dim)':'var(--accent-purple-dim)', color: c.type==='Member'?'var(--accent-blue)':'var(--accent-purple)', fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4 }}>{c.type}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Section>
-
-      {/* ── New Registrations ── */}
-      <Section title={t('operations.eodNewRegistrations')} icon={UserPlus} accent="var(--accent-gold)" dim="var(--accent-gold-dim)" badge={eodRegistrations.length}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr style={rowSep}>{['Time','Name','Type','Package','Amount'].map(h=><th key={h} style={thStyle}>{h}</th>)}</tr></thead>
-          <tbody>
-            {eodRegistrations.map((r,i) => (
-              <tr key={i} style={rowSep}>
-                <td style={{ ...tdBase, fontSize: 12, fontFamily: 'monospace', color: 'var(--text-muted)' }}>{r.time}</td>
-                <td style={{ ...tdBase, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{r.name}</td>
-                <td style={tdBase}><span style={{ background: r.type==='Membership'?'var(--accent-gold-dim)':'var(--accent-purple-dim)', color: r.type==='Membership'?'var(--accent-gold)':'var(--accent-purple)', fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4 }}>{r.type}</span></td>
-                <td style={{ ...tdBase, fontSize: 12, color: 'var(--text-secondary)' }}>{r.pkg}</td>
-                <td style={{ ...tdBase, fontSize: 12, fontWeight: 700, color: 'var(--accent-green)' }}>{fmt(r.amount)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr style={{ borderTop: '2px solid var(--border-subtle)', background: 'var(--bg-elevated)' }}>
-              <td colSpan={4} style={{ ...tdBase, fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>TOTAL</td>
-              <td style={{ ...tdBase, fontSize: 13, fontWeight: 800, color: 'var(--accent-green)', fontFamily: 'Manrope, sans-serif' }}>{fmt(regRev)}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </Section>
-
-      {/* ── Membership Payments ── */}
-      <Section title={t('operations.eodMembershipPayments')} icon={CreditCard} accent="var(--accent-blue)" dim="var(--accent-blue-dim)" badge={eodPayments.length}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr style={rowSep}>{['Time','Member','Description','Method','Amount'].map(h=><th key={h} style={thStyle}>{h}</th>)}</tr></thead>
-          <tbody>
-            {eodPayments.map((p,i) => (
-              <tr key={i} style={rowSep}>
-                <td style={{ ...tdBase, fontSize: 12, fontFamily: 'monospace', color: 'var(--text-muted)' }}>{p.time}</td>
-                <td style={{ ...tdBase, fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{p.member}</td>
-                <td style={{ ...tdBase, fontSize: 12, color: 'var(--text-secondary)' }}>{p.desc}</td>
-                <td style={tdBase}><span style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4, color: 'var(--text-secondary)' }}>{p.method}</span></td>
-                <td style={{ ...tdBase, fontSize: 13, fontWeight: 700, color: 'var(--accent-green)' }}>{fmt(p.amount)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr style={{ borderTop: '2px solid var(--border-subtle)', background: 'var(--bg-elevated)' }}>
-              <td colSpan={4} style={{ ...tdBase, fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>TOTAL</td>
-              <td style={{ ...tdBase, fontSize: 13, fontWeight: 800, color: 'var(--accent-green)', fontFamily: 'Manrope, sans-serif' }}>{fmt(memberRev)}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </Section>
-
-      {/* ── Product Sales ── */}
-      <Section title={t('operations.eodProductSales')} icon={ShoppingBag} accent="var(--accent-yellow)" dim="var(--accent-yellow-dim)" badge={`${eodSales.length} items`}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr style={rowSep}>{['Time','Product','Qty','Unit Price','Method','Total'].map(h=><th key={h} style={thStyle}>{h}</th>)}</tr></thead>
-          <tbody>
-            {eodSales.map((s,i) => (
-              <tr key={i} style={rowSep}>
-                <td style={{ ...tdBase, fontSize: 12, fontFamily: 'monospace', color: 'var(--text-muted)' }}>{s.time}</td>
-                <td style={{ ...tdBase, fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{s.item}</td>
-                <td style={{ ...tdBase, fontSize: 12, color: 'var(--text-secondary)' }}>×{s.qty}</td>
-                <td style={{ ...tdBase, fontSize: 12, color: 'var(--text-secondary)' }}>{fmt(s.unit)}</td>
-                <td style={tdBase}><span style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4, color: 'var(--text-secondary)' }}>{s.method}</span></td>
-                <td style={{ ...tdBase, fontSize: 13, fontWeight: 700, color: 'var(--accent-yellow)' }}>{fmt(s.total)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr style={{ borderTop: '2px solid var(--border-subtle)', background: 'var(--bg-elevated)' }}>
-              <td colSpan={5} style={{ ...tdBase, fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>TOTAL</td>
-              <td style={{ ...tdBase, fontSize: 13, fontWeight: 800, color: 'var(--accent-yellow)', fontFamily: 'Manrope, sans-serif' }}>{fmt(productRev)}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </Section>
-
-      {/* ── Staff on Duty ── */}
-      {(() => {
-        const activeStaff = staffList.filter(s => s.isActive !== false && isWorkingToday(s));
-        return (
-          <Section title={t('operations.staffOnDuty')} icon={Users} accent="var(--accent-purple)" dim="var(--accent-purple-dim)" badge={activeStaff.length} defaultOpen={false}>
-            <div>
-              {activeStaff.map((s,i,arr) => (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderBottom: i<arr.length-1 ? '1px solid var(--border-subtle)' : 'none' }}>
-                  <Avatar firstName={s.firstName || ''} lastName={s.lastName || ''} avatarColor={['gold','green','blue','purple','red'][i%5]} size={32}/>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{sName(s)}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{s.role}{s.department ? ` · ${s.department}` : ''}</div>
-                  </div>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>from {s.shiftStart || '—'}</span>
-                </div>
-              ))}
-            </div>
-          </Section>
-        );
-      })()}
-
-      {/* ── Equipment Issues ── */}
-      <Section title={t('operations.equipmentIssues')} icon={Wrench} accent="var(--accent-red)" dim="var(--accent-red-dim)" badge={`${openIssues.length} open`} defaultOpen={openIssues.length > 0}>
-        {(issues||[]).length === 0
-          ? <div style={{ padding: '18px 14px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('operations.noIssuesReported')}</div>
-          : (issues||[]).map((iss,i,arr) => (
-              <div key={iss.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderBottom: i<arr.length-1?'1px solid var(--border-subtle)':'none' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{iss.equipment}</span>
-                    {(() => { const sv = severityConfig[iss.severity] || severityConfig.medium; return <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: sv.bg, color: sv.color }}>{iss.severity}</span>; })()}
-                    {(() => { const sc = issueStatusConfig[iss.status] || issueStatusConfig.open; return <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: sc.bg, color: sc.color }}>{iss.status}</span>; })()}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{iss.location} · Reported by {iss.reportedBy}</div>
-                </div>
-              </div>
-            ))
-        }
-      </Section>
-
-      {/* ── Financial Summary ── */}
-      <div style={{ border: '1px solid var(--accent-gold-dim)', borderRadius: 12, overflow: 'hidden', marginBottom: 16, background: 'rgba(201,169,110,0.02)' }}>
-        <div style={{ padding: '11px 16px', borderBottom: '1px solid var(--accent-gold-dim)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <TrendingUp size={13} color="var(--accent-gold)"/>
-          <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{t('operations.eodFinancialSummary')}</span>
-        </div>
-        {[
-          { label: t('operations.eodMemberRev'),       value: fmt(memberRev),  accent: null,                      bold: false },
-          { label: t('operations.eodProductRev'),     value: fmt(productRev), accent: null,                      bold: false },
-          { label: t('operations.revenueToday'),      value: fmt(totalRev),   accent: 'var(--accent-green)',      bold: true  },
-          { label: t('operations.eodTotalExp'),       value: fmt(0),          accent: null,                      bold: false },
-          { label: t('operations.eodNetRevenue'),     value: fmt(totalRev),   accent: 'var(--accent-green)',      bold: true  },
-          { label: t('operations.eodOutstanding'),    value: '437 500 FCFA',  accent: 'var(--accent-yellow)',     bold: false },
-        ].map((row,i,arr) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: i<arr.length-1?'1px solid var(--border-subtle)':'none', background: row.bold?'rgba(201,169,110,0.04)':'transparent' }}>
-            <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'DM Sans', fontWeight: row.bold?600:400 }}>{row.label}</span>
-            <span style={{ fontSize: row.bold?15:13, fontWeight: row.bold?800:600, color: row.accent||'var(--text-primary)', fontFamily: row.bold?'Manrope, sans-serif':'DM Sans' }}>{row.value}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Notes ── */}
-      <div style={{ marginBottom: 20 }}>
-        <label style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6, display: 'block', fontFamily: 'DM Sans', fontWeight: 500 }}>{t('operations.eodNotes')}</label>
-        <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={3} placeholder={t('operations.eodNotesPlaceholder')} style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '9px 14px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}/>
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        <button style={secondaryBtn} onClick={onClose}>{t('common.close')}</button>
-        <button style={{ ...primaryBtn, display: 'flex', alignItems: 'center', gap: 6 }} onClick={handleDownload}>
-          <Download size={13}/> {t('operations.downloadReport')}
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
-function SummaryCard({ label, value, icon: Icon, accent, dim, onClick }) {
+function SummaryCard({ label, value, sub, icon: Icon, accent, dim, onClick }) {
   const [hovered, setHovered] = useState(false);
   return (
     <div
@@ -534,6 +274,7 @@ function SummaryCard({ label, value, icon: Icon, accent, dim, onClick }) {
       <div>
         <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1 }}>{value}</div>
         <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'DM Sans', marginTop: 2 }}>{label}</div>
+        {sub && <div style={{ fontSize: 10.5, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2 }}>{sub}</div>}
       </div>
     </div>
   );
@@ -553,46 +294,87 @@ const issueStatusConfig = {
 
 export default function OperationsPage() {
   const { t } = useLanguage();
+  const translateRole = (role) => { const k = ROLE_KEYS[role]; return k ? t(`staff.${k}`) : (role || ''); };
   const navigate = useNavigate();
-  const [tasks, setTasks] = useState([]);
-  const [staffList, setStaffList] = useState([]);
+  const isMobile = useIsMobile();
+  // Show the last overview at once and refresh quietly; a first-ever visit
+  // falls back to the skeleton. See utils/gymCache.js.
+  const cache = gymCache('operations');
+  const [tasks, setTasks] = useState(() => cache.read('tasks', []));
+  const [staffList, setStaffList] = useState(() => cache.read('staff', []));
   const [showEOD, setShowEOD] = useState(false);
+  const openShifts = useOpenShifts();
   const [showAddTask, setShowAddTask] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
   const [showReportIssue, setShowReportIssue] = useState(false);
-  const [issues, setIssues] = useState([]);
+  const [issues, setIssues] = useState(() => cache.read('issues', []));
   const [issueFilter, setIssueFilter] = useState('All');
-  const [glanceNote, setGlanceNote] = useState('');
-  const [glanceNoteSaved, setGlanceNoteSaved] = useState(false);
-  const [attendance, setAttendance] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [payments, setPayments] = useState([]);
-  const [expenses, setExpenses] = useState([]);
+  // Today's figures come from the same server report as the end-of-day report,
+  // so the two can never disagree; gym holds the opening hours.
+  const [eod, setEod] = useState(null);
+  const [gym, setGym] = useState(null);
+  const [attendance, setAttendance] = useState(() => cache.read('attendance', []));
+  const [members, setMembers] = useState(() => cache.read('members', []));
+  const [payments, setPayments] = useState(() => cache.read('payments', []));
+  const [expenses, setExpenses] = useState(() => cache.read('expenses', []));
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  // The gym's own calendar day, never the UTC one (a day off east of GMT)
+  const today = todayStr();
 
+  const [loading, setLoading] = useState(() => !cache.has('tasks'));
+
+  const liveTick = useLiveTick();
   useEffect(() => {
-    Promise.all([getTasks(), getEquipment(), getStaff(), getAttendance(), getMembers(), getPayments(), getExpenses()])
+    softAll([getTasks(), getEquipment(), getStaff(), getAttendance(), getMembers(), getPayments(), getExpenses()])
       .then(([tasksRes, equipRes, staffRes, attRes, membRes, payRes, expRes]) => {
-        setTasks(tasksRes.data || []);
-        setIssues(equipRes.data || []);
-        setStaffList(staffRes.data || []);
-        setAttendance(attRes.data || []);
-        setMembers(membRes.data || []);
-        setPayments(payRes.data || []);
-        setExpenses(expRes.data || []);
+        const tk = tasksRes.data || [], iss = equipRes.data || [], stf = staffRes.data || [],
+          att = attRes.data || [], mem = membRes.data || [], pay = payRes.data || [], exp = expRes.data || [];
+        setTasks(tk); cache.write('tasks', tk);
+        setIssues(iss); cache.write('issues', iss);
+        setStaffList(stf); cache.write('staff', stf);
+        setAttendance(att); cache.write('attendance', att);
+        setMembers(mem); cache.write('members', mem);
+        setPayments(pay); cache.write('payments', pay);
+        setExpenses(exp); cache.write('expenses', exp);
       })
-      .catch(console.error);
-  }, []);
+      .catch(console.error)
+      .finally(() => setLoading(false));
+    getEod(todayStr()).then(r => setEod(r.data)).catch(() => {});
+    getMyGym().then(r => setGym(r.data)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveTick]);
 
-  const todayAttendance = attendance.filter(a => (a.checkIn || a.createdAt || '').slice(0, 10) === todayStr);
-  const todayCheckIns = todayAttendance.length;
-  const todayVisitors = todayAttendance.filter(a => a.type === 'visitor' || a.memberType === 'visitor').length;
-  const todayMembers = members.filter(m => (m.createdAt || '').slice(0, 10) === todayStr).length;
-  const todayPayments = payments.filter(p => (p.createdAt || '').slice(0, 10) === todayStr);
-  const todayRevenue = todayPayments.reduce((s, p) => s + (p.amount || 0), 0);
-  const todayExpenses = expenses.filter(e => (e.date || '').slice(0, 10) === todayStr).reduce((s, e) => s + Number(e.amount || 0), 0);
-  const fmtMoney = (n) => `${Math.round(n).toLocaleString('fr-FR')} FCFA`;
+  const todayAttendance = attendance.filter(a => dayStr(a.checkIn || a.createdAt) === today && !a.staffWorkout);
+  const todayCheckIns = eod ? eod.totals.checkins : todayAttendance.length;
+  const todayVisitors = eod ? eod.checkins.filter(c => c.who === 'visitor').length : todayAttendance.filter(a => a.member?.isVisitor).length;
+  const todayMembers = eod ? eod.totals.registrations : members.filter(m => dayStr(m.createdAt) === today).length;
+  const todayPayments = eod ? eod.payments : payments.filter(p => dayStr(p.createdAt) === today);
+  // Revenue is membership payments plus shop sales, as on the end-of-day report
+  const todayRevenue = eod ? eod.totals.revenue : todayPayments.reduce((s, p) => s + (p.amount || 0), 0);
+  const revenueSplit = <RevenueSplit members={eod ? eod.totals.paymentsTotal : todayRevenue} shop={eod ? (eod.totals.salesProfit ?? 0) : 0} />;
+  const todayExpenses = eod ? eod.totals.expensesTotal : expenses.filter(e => dayStr(e.date) === today).reduce((s, e) => s + Number(e.amount || 0), 0);
+  const fmtMoney = (n) => formatMoney(n);
+
+  // ── Today at a glance ──
+  const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date().getDay()];
+  const hoursToday = gym?.schedule?.[weekday];
+  const hoursLabel = !gym ? '-'
+    : !hoursToday ? t('operations.hoursNotSet')
+    : !hoursToday.open ? t('operations.closedToday')
+    : (hoursToday.slots || []).map(s => `${s.from} - ${s.to}`).join(', ');
+  const memberVisits = attendance.filter(a => !a.staffWorkout && a.memberId);
+  const lastHour = memberVisits.filter(a => Date.now() - new Date(a.checkIn).getTime() <= 3600000).length;
+  const endingSoon = members.filter(membershipEndsThisWeek).length;
+  const owing = members.filter(m => (m.balance || 0) > 0);
+  const owedTotal = owing.reduce((s, m) => s + (m.balance || 0), 0);
+  const openIssues = issues.filter(i => i.status !== 'resolved').length;
+  const glanceRows = [
+    { icon: Clock, label: t('operations.openingHours'), value: hoursLabel },
+    { icon: UserCheck, label: t('operations.checkInsLastHour'), value: lastHour, color: lastHour ? 'var(--accent-green)' : undefined },
+    { icon: AlertTriangle, label: t('operations.endingThisWeek'), value: endingSoon, color: endingSoon ? 'var(--accent-yellow)' : undefined },
+    { icon: Wallet, label: t('operations.membersOwing'), value: owing.length ? `${owing.length} · ${formatMoney(owedTotal)}` : '0', color: owing.length ? 'var(--accent-red)' : undefined },
+    { icon: Wrench, label: t('operations.openIssues'), value: openIssues, color: openIssues ? 'var(--accent-red)' : undefined },
+  ];
 
   const pendingTasks = tasks.filter(t => t.status !== 'Done' && t.status !== 'done');
 
@@ -600,15 +382,93 @@ export default function OperationsPage() {
     const payload = {
       title: form.title,
       description: form.notes || undefined,
-      assignedToId: form.assignedTo || undefined,
+      ...assignFields(form.assignedTo),
       dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined,
       priority: form.priority.toLowerCase(),
+      category: form.category,
     };
     try {
       const res = await createTask(payload);
       setTasks(ts => [res.data, ...ts]);
     } catch (err) { console.error(err); }
   };
+
+  // ── Mobile layout ────────────────────────────────────────────────────────────
+  if (isMobile) {
+    const kpis = [
+      { label: t('operations.checkInsToday'), value: todayCheckIns, icon: UserCheck, path: '/attendance', color: '#22c55e' },
+      { label: t('operations.newMembers'), value: todayMembers, icon: UserPlus, path: '/members', color: '#c9a96e' },
+      { label: t('operations.revenueToday'), value: fmtMoney(todayRevenue), sub: revenueSplit, icon: TrendingUp, path: '/accounting', color: '#60a5fa' },
+      { label: t('operations.expendituresToday'), value: fmtMoney(todayExpenses), icon: TrendingDown, path: '/accounting', color: '#f87171' },
+    ];
+    return (
+      <div style={{ minHeight: '100%' }}>
+        <div style={{ padding: '16px 16px 10px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+          <div>
+            <h1 style={{ fontFamily: 'Manrope', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{t('nav.operations')}</h1>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '3px 0 0', fontFamily: 'DM Sans' }}>{t('operations.todayGlance')}</p>
+          </div>
+          <button onClick={() => setShowEOD(true)} style={{ ...primaryBtn, padding: '8px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <FileText size={13} /> {t('eod.title')}
+          </button>
+        </div>
+
+        {/* KPI grid */}
+        <div style={{ padding: '0 16px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {kpis.map(({ label, value, sub, icon: Icon, path, color }) => (
+            <div
+              key={label}
+              onClick={() => navigate(path)}
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px 14px', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <Icon size={13} strokeWidth={2} color={color} />
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'DM Sans', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</span>
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color, fontFamily: 'JetBrains Mono, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+              {sub && <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 4, lineHeight: 1.35 }}>{sub}</div>}
+            </div>
+          ))}
+        </div>
+
+        {/* Pending tasks */}
+        {pendingTasks.length > 0 && (
+          <div style={{ padding: '0 16px 14px' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 10, fontFamily: 'DM Sans' }}>
+              Pending Tasks ({pendingTasks.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {pendingTasks.slice(0, 5).map(task => (
+                <div key={task.id} onClick={() => navigate('/tasks')} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '11px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <ClipboardList size={14} strokeWidth={1.8} color="var(--text-muted)" />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
+                    {task.dueDate && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{String(task.dueDate).slice(0, 10)}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Open equipment issues */}
+        {issues.filter(i => i.status !== 'resolved').length > 0 && (
+          <div style={{ padding: '0 16px 14px' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 10, fontFamily: 'DM Sans' }}>
+              Equipment Issues
+            </div>
+            {issues.filter(i => i.status !== 'resolved').slice(0, 3).map(issue => (
+              <div key={issue.id} style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12, padding: '11px 14px', marginBottom: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{issue.equipment || issue.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2 }}>{issue.issue || issue.status}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        <EodReport open={showEOD} onClose={() => setShowEOD(false)} footer={openShifts.length > 0 ? <OpenShiftsWarning shifts={openShifts} /> : null} />
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '24px 28px', minHeight: '100vh', background: 'var(--bg-primary)' }}>
@@ -618,16 +478,16 @@ export default function OperationsPage() {
         </button>
       </PageHeader>
 
-      {/* Row 1 — 4 cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 14 }}>
+      {/* Row 1 : 4 cards */}
+      <div className="gem-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 14 }}>
         <SummaryCard label={t('operations.checkInsToday')} value={String(todayCheckIns)} icon={UserCheck} accent="var(--accent-green)" dim="var(--accent-green-dim)" onClick={() => navigate('/attendance')} />
         <SummaryCard label={t('operations.newMembers')} value={String(todayMembers)} icon={UserPlus} accent="var(--accent-gold)" dim="var(--accent-gold-dim)" onClick={() => navigate('/members')} />
         <SummaryCard label={t('operations.paymentsReceived')} value={String(todayPayments.length)} icon={CreditCard} accent="var(--accent-blue)" dim="var(--accent-blue-dim)" onClick={() => navigate('/payments')} />
-        <SummaryCard label={t('operations.revenueToday')} value={fmtMoney(todayRevenue)} icon={TrendingUp} accent="var(--accent-purple)" dim="var(--accent-purple-dim)" onClick={() => navigate('/accounting')} />
+        <SummaryCard label={t('operations.revenueToday')} value={fmtMoney(todayRevenue)} sub={revenueSplit} icon={TrendingUp} accent="var(--accent-purple)" dim="var(--accent-purple-dim)" onClick={() => navigate('/accounting')} />
       </div>
 
-      {/* Row 2 — 3 cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+      {/* Row 2 : 3 cards */}
+      <div className="gem-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
         <SummaryCard label={t('operations.visitorsToday')} value={String(todayVisitors)} icon={Users} accent="var(--accent-blue)" dim="var(--accent-blue-dim)" onClick={() => navigate('/attendance')} />
         <SummaryCard label={t('operations.staffCount')} value={String(staffList.filter(s => s.isActive !== false && isWorkingToday(s)).length)} icon={ShoppingBag} accent="var(--accent-yellow)" dim="var(--accent-yellow-dim)" onClick={() => navigate('/staff')} />
         <SummaryCard label={t('operations.expendituresToday')} value={fmtMoney(todayExpenses)} icon={TrendingDown} accent="var(--accent-red)" dim="var(--accent-red-dim)" onClick={() => navigate('/accounting')} />
@@ -646,16 +506,18 @@ export default function OperationsPage() {
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{staffList.filter(s => s.isActive !== false && isWorkingToday(s)).length} {t('operations.onDuty')}</span>
             </div>
             <div style={{ padding: '8px 0' }}>
-              {staffList.filter(s => s.isActive !== false && isWorkingToday(s)).length === 0 ? (
+              {loading ? (
+                <div style={{ padding: '8px 16px' }}><SkeletonCards count={3} height={56} /></div>
+              ) : staffList.filter(s => s.isActive !== false && isWorkingToday(s)).length === 0 ? (
                 <div style={{ padding: '24px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('operations.noStaffOnDuty')}</div>
               ) : staffList.filter(s => s.isActive !== false && isWorkingToday(s)).slice(0, 8).map((s, i, arr) => (
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: i < arr.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
                   <Avatar firstName={s.firstName || ''} lastName={s.lastName || ''} avatarColor={s.avatarColor || ['gold','green','blue','purple','red'][i % 5]} size={36} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{sName(s)}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'DM Sans', marginTop: 1 }}>{s.role}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'DM Sans', marginTop: 1 }}>{(() => { const k = ROLE_KEYS[s.role]; return k ? t(`staff.${k}`) : (s.role || ''); })()}</div>
                   </div>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-green)', flexShrink: 0 }} title="Active" />
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-green)', flexShrink: 0 }} title={t('common.active')} />
                 </div>
               ))}
             </div>
@@ -667,25 +529,27 @@ export default function OperationsPage() {
               <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{t('operations.pendingItems')}</span>
             </div>
             <div style={{ padding: '8px 0' }}>
-              {pendingTasks.length === 0 ? (
+              {loading ? (
+                <div style={{ padding: '8px 16px' }}><SkeletonCards count={3} height={56} /></div>
+              ) : pendingTasks.length === 0 ? (
                 <div style={{ padding: '24px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, fontFamily: 'DM Sans' }}>{t('operations.allTasksDone')}</div>
-              ) : pendingTasks.map((t, i) => {
-                const pc = priorityColors[(t.priority || '').toLowerCase()] || priorityColors.low;
-                const assigneeName = typeof t.assignedTo === 'string' ? (t.assignedTo || 'Unassigned') : (t.assignedTo ? sName(t.assignedTo) : 'Unassigned');
-                const dueDisplay = t.dueDate ? String(t.dueDate).slice(0, 10) : '—';
+              ) : pendingTasks.map((task, i) => {
+                const pc = priorityColors[(task.priority || '').toLowerCase()] || priorityColors.low;
+                const assigneeName = typeof task.assignedTo === 'string' ? (task.assignedTo || 'Unassigned') : (task.assignedTo ? sName(task.assignedTo) : 'Unassigned');
+                const dueDisplay = task.dueDate ? String(task.dueDate).slice(0, 10) : '-';
                 return (
-                  <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 20px', borderBottom: i < pendingTasks.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
+                  <div key={task.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 20px', borderBottom: i < pendingTasks.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
                     <ClipboardList size={15} color="var(--text-muted)" style={{ marginTop: 2, flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{t.title}</span>
-                        <span style={{ ...pc, borderRadius: 20, padding: '2px 8px', fontSize: 10, fontWeight: 600, fontFamily: 'DM Sans', whiteSpace: 'nowrap', flexShrink: 0 }}>{t.priority}</span>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{task.title}</span>
+                        <span style={{ ...pc, borderRadius: 20, padding: '2px 8px', fontSize: 10, fontWeight: 600, fontFamily: 'DM Sans', whiteSpace: 'nowrap', flexShrink: 0 }}>{task.priority}</span>
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 3 }}>
                         {assigneeName} · {t('operations.due')} {dueDisplay}
                       </div>
                     </div>
-                    <StatusBadge status={t.status} />
+                    <StatusBadge status={task.status} />
                   </div>
                 );
               })}
@@ -719,7 +583,9 @@ export default function OperationsPage() {
                     ))}
                   </div>
                 </div>
-                {filtered.length === 0 ? (
+                {loading ? (
+                  <div style={{ padding: '8px 16px' }}><SkeletonCards count={2} height={56} /></div>
+                ) : filtered.length === 0 ? (
                   <div style={{ padding: '32px 20px', textAlign: 'center' }}>
                     <CheckCircle2 size={28} color="var(--accent-green)" style={{ marginBottom: 8 }} />
                     <div style={{ fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{t('operations.noIssues')}</div>
@@ -748,7 +614,7 @@ export default function OperationsPage() {
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans', lineHeight: 1.5, marginBottom: 6, paddingLeft: 36 }}>{issue.description}</div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: 36 }}>
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{issue.reportedAt ? String(issue.reportedAt).slice(0, 10) : '—'}</span>
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{issue.reportedAt ? String(issue.reportedAt).slice(0, 10) : '-'}</span>
                             {issue.status !== 'resolved' && (
                               <button
                                 onClick={async () => {
@@ -809,54 +675,27 @@ export default function OperationsPage() {
             </div>
           </div>
 
-          {/* Today at a Glance */}
+          {/* Today at a Glance: every line comes from the gym's own records */}
           <div style={card}>
             <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
               <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{t('operations.todayGlance')}</span>
             </div>
-            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Clock size={14} color="var(--text-muted)" />
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{t('operations.openingHours')}</span>
+            <div style={{ padding: '6px 16px 10px' }}>
+              {glanceRows.map(({ icon: Ic, label, value, color }, i) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < glanceRows.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <Ic size={14} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{label}</span>
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: color || 'var(--text-primary)', fontFamily: 'DM Sans', textAlign: 'right' }}>{value}</span>
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>6:00 AM – 10:00 PM</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Users size={14} color="var(--text-muted)" />
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{t('operations.currentOccupancy')}</span>
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-green)', fontFamily: 'DM Sans' }}>42 members present</span>
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6, display: 'block', fontFamily: 'DM Sans', fontWeight: 500 }}>{t('operations.shiftNotes')}</label>
-                <textarea
-                  rows={3}
-                  value={glanceNote}
-                  onChange={e => { setGlanceNote(e.target.value); setGlanceNoteSaved(false); }}
-                  placeholder={t('operations.shiftNotesPlaceholder')}
-                  style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '9px 14px', fontSize: 12, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
-                />
-                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginTop: 8 }}>
-                  {glanceNoteSaved && (
-                    <span style={{ fontSize: 11, color: 'var(--accent-green)', fontFamily: 'DM Sans' }}>✓ {t('operations.saved')}</span>
-                  )}
-                  <button
-                    onClick={() => { if (glanceNote.trim()) setGlanceNoteSaved(true); }}
-                    disabled={!glanceNote.trim() || glanceNoteSaved}
-                    style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', color: '#0a0a0f', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, padding: '7px 16px', cursor: glanceNote.trim() && !glanceNoteSaved ? 'pointer' : 'not-allowed', fontFamily: 'DM Sans', opacity: glanceNote.trim() && !glanceNoteSaved ? 1 : 0.45 }}
-                  >
-                    {t('operations.saveNote')}
-                  </button>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
       </div>
 
-      <EODModal open={showEOD} onClose={() => setShowEOD(false)} issues={issues} staffList={staffList} />
+      <EodReport open={showEOD} onClose={() => setShowEOD(false)} footer={openShifts.length > 0 ? <OpenShiftsWarning shifts={openShifts} /> : null} />
       <AddTaskModal open={showAddTask} onClose={() => setShowAddTask(false)} onSave={handleSaveTask} staffList={staffList} />
       <AddMemberModal open={showAddMember} onClose={() => setShowAddMember(false)} />
       <ReportIssueModal open={showReportIssue} onClose={() => setShowReportIssue(false)} />

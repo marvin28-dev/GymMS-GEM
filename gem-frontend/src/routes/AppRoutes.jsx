@@ -1,17 +1,19 @@
 import { Route, Routes, Navigate } from "react-router-dom";
 import AppLayout from "../layouts/AppLayout";
-import ProtectedRoute from "./ProtectedRoute";
+import ProtectedRoute, { RoleGuard } from "./ProtectedRoute";
 import { appRoutes } from "./routeConfig";
 import ScrollToTop from "../components/ScrollToTop";
-import { isAuthed, checkDailyExpiry } from "../utils/auth";
+import { isAuthed, checkDailyExpiry, getHomeRoute } from "../utils/auth";
 
 import LandingPage from "../pages/LandingPage";
 import SignUpPage from "../pages/SignUpPage";
 import GymCodePage from "../pages/GymCodePage";
 import GymLoginPage from "../pages/GymLoginPage";
-import FrontDeskMode from "../pages/FrontDeskMode";
+import ForgotPasswordPage from "../pages/ForgotPasswordPage";
+import ResetPasswordPage from "../pages/ResetPasswordPage";
 import FrontDeskPage from "../pages/FrontDeskPage";
 import MemberProfilePage from "../pages/MemberProfilePage";
+import StaffProfilePage from "../pages/StaffProfilePage";
 
 export default function AppRoutes() {
   // Clear expired auth before any route logic so isAuthed() reflects reality
@@ -22,25 +24,37 @@ export default function AppRoutes() {
     <ScrollToTop />
     <Routes>
       {/* Public marketing & auth */}
-      <Route path="/" element={isAuthed() ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+      <Route path="/" element={isAuthed() ? <Navigate to={getHomeRoute()} replace /> : <LandingPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/register" element={<Navigate to="/signup" replace />} />
       <Route path="/login" element={<GymCodePage />} />
       <Route path="/:gymCode/login" element={<GymLoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       {/* Fullscreen Front Desk (no app layout) */}
       <Route element={<ProtectedRoute />}>
-        <Route path="/front-desk/mode" element={<FrontDeskMode />} />
-        <Route path="/front-desk" element={<FrontDeskPage />} />
-        <Route path="/front-desk/member/:id" element={<MemberProfilePage />} />
+        <Route element={<RoleGuard />}>
+          <Route path="/front-desk" element={<FrontDeskPage />} />
+          <Route path="/front-desk/member/:id" element={<MemberProfilePage />} />
+          {/* Opening a colleague's profile from the desk keeps the desk: the
+              person on it is mid-shift and should not land on the dashboard. */}
+          <Route path="/front-desk/staff/:id" element={<StaffProfilePage />} />
+          {/* Same for your own profile: "My Profile" from the desk header must
+              not exit to the dashboard either. No :id means StaffProfilePage
+              falls back to the signed-in user, i.e. your own record. */}
+          <Route path="/front-desk/my-profile" element={<StaffProfilePage />} />
+        </Route>
       </Route>
 
       {/* Protected app (normal layout) */}
       <Route element={<ProtectedRoute />}>
-        <Route element={<AppLayout />}>
-          {appRoutes.map((r) => (
-            <Route key={r.path} path={r.path} element={r.element} />
-          ))}
+        <Route element={<RoleGuard />}>
+          <Route element={<AppLayout />}>
+            {appRoutes.map((r) => (
+              <Route key={r.path} path={r.path} element={r.element} />
+            ))}
+          </Route>
         </Route>
       </Route>
 

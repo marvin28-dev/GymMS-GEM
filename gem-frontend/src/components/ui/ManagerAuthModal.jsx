@@ -1,92 +1,84 @@
 import { useState, useRef, useEffect } from 'react';
-import { ShieldAlert } from 'lucide-react';
-import { getCode } from '../../services/staff.service';
+import { ShieldAlert, Eye, EyeOff } from 'lucide-react';
+import { verifyManager, verifyManagerPassword } from '../../services/auth.service';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { getAuth } from '../../utils/auth';
 
 /**
  * ManagerAuthModal
  *
- * Reusable 4-digit PIN gate for manager-level actions.
+ * Gate for manager-level actions, opened with the manager's own 4-digit access
+ * code. The code is checked on the server and never sent to the browser, so
+ * nothing that could pass the gate is ever in the page.
  *
  * Props:
- *   open        – boolean
- *   onClose     – called on cancel / close
- *   onConfirm   – called when correct code is entered
- *   action      – short description of the action being authorized (string)
- *   danger      – boolean, makes the confirm styling red instead of gold
+ *   open        - boolean
+ *   onClose     - called on cancel / close
+ *   onConfirm   - called once the code is accepted
+ *   onVerified  - alias for onConfirm, both are supported
+ *   action      - short description of the action being authorised (string)
+ *   usePassword - ask for the account password instead of the code. Only for
+ *                 revealing your own access code, where asking for that code
+ *                 would be circular. Anyone else's code takes your own code.
+ *   danger      - boolean, makes the confirm styling red instead of gold
  */
-export default function ManagerAuthModal({ open, onClose, onConfirm, action = 'this action', danger = false }) {
-  const [digits, setDigits] = useState(['', '', '', '']);
-  const [error, setError]   = useState('');
-  const [shake, setShake]   = useState(false);
-  const [managerCode, setManagerCode] = useState(null);
-  const inputRefs           = useRef([]);
+export default function ManagerAuthModal({ open, onClose, onConfirm, onVerified, action = 'this action', usePassword = false, danger = false }) {
+  const { t } = useLanguage();
+  const [code, setCode] = useState('');
+  const [showCode, setShowCode] = useState(false);
+  const [error, setError] = useState('');
+  const [shake, setShake] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     if (open) {
-      setDigits(['', '', '', '']);
+      setCode('');
       setError('');
-      setTimeout(() => inputRefs.current[0]?.focus(), 50);
-      if (managerCode === null) {
-        const staffId = getAuth()?.user?.id;
-        if (staffId) {
-          getCode(staffId).then(res => setManagerCode(res.data?.accessCode || '')).catch(() => setManagerCode(''));
-        } else {
-          setManagerCode('');
-        }
-      }
+      setShowCode(false);
+      setChecking(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
 
   if (!open) return null;
 
-  const handleDigit = (idx, val) => {
-    if (!/^\d?$/.test(val)) return;
-    const next = [...digits];
-    next[idx] = val;
-    setDigits(next);
+  const fail = (msg) => {
+    setError(msg);
+    setShake(true);
+    setTimeout(() => { setShake(false); setCode(''); inputRef.current?.focus(); }, 600);
+  };
+
+  const handleSubmit = async () => {
+    if (checking) return;
+    if (usePassword ? !code : code.length < 4) { setError(t(usePassword ? 'managerAuth.incompletePassword' : 'managerAuth.incomplete')); return; }
+    setChecking(true);
     setError('');
-    if (val && idx < 3) inputRefs.current[idx + 1]?.focus();
-  };
-
-  const handleKeyDown = (idx, e) => {
-    if (e.key === 'Backspace' && !digits[idx] && idx > 0) {
-      inputRefs.current[idx - 1]?.focus();
+    try {
+      const res = await (usePassword ? verifyManagerPassword(code, action) : verifyManager(code, action));
+      if (res.data?.authorized) {
+        setCode('');
+        (onConfirm || onVerified)?.();
+      } else {
+        fail(t(usePassword ? 'managerAuth.incorrectPassword' : 'managerAuth.incorrect'));
+      }
+    } catch (err) {
+      fail(err?.response?.data?.error || t(usePassword ? 'managerAuth.incorrectPassword' : 'managerAuth.incorrect'));
+    } finally {
+      setChecking(false);
     }
-    if (e.key === 'Enter') handleSubmit();
-  };
-
-  const handlePaste = (e) => {
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
-    if (pasted.length === 4) {
-      setDigits(pasted.split(''));
-      inputRefs.current[3]?.focus();
-    }
-    e.preventDefault();
-  };
-
-  const handleSubmit = () => {
-    const code = digits.join('');
-    if (code.length < 4) { setError('Please enter the full 4-digit code.'); return; }
-    if (!managerCode || code !== managerCode) {
-      setError('Incorrect authorization code. Try again.');
-      setShake(true);
-      setTimeout(() => { setShake(false); setDigits(['', '', '', '']); inputRefs.current[0]?.focus(); }, 600);
-      return;
-    }
-    setDigits(['', '', '', '']);
-    setError('');
-    onConfirm();
   };
 
   const handleClose = () => {
-    setDigits(['', '', '', '']);
+    setCode('');
     setError('');
-    onClose();
+    onClose?.();
   };
 
+  const signedInUser = getAuth()?.user;
+  const signedInName = signedInUser ? `${signedInUser.firstName || ''} ${signedInUser.lastName || ''}`.trim() : '';
   const accentColor = danger ? 'var(--accent-red)' : 'var(--accent-gold)';
-  const confirmBg   = danger
+  const confirmBg = danger
     ? 'linear-gradient(135deg, #ef4444, #dc2626)'
     : 'linear-gradient(135deg, #c9a96e, #b08d4a)';
 
@@ -119,7 +111,6 @@ export default function ManagerAuthModal({ open, onClose, onConfirm, action = 't
           animation: shake ? 'shake 0.5s ease' : 'none',
         }}
       >
-        {/* Icon */}
         <div style={{
           width: 56, height: 56, borderRadius: '50%',
           background: danger ? 'var(--accent-red-dim)' : 'var(--accent-gold-dim)',
@@ -128,48 +119,70 @@ export default function ManagerAuthModal({ open, onClose, onConfirm, action = 't
           <ShieldAlert size={26} color={accentColor} strokeWidth={1.8} />
         </div>
 
-        {/* Title */}
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-            Manager Authorization
+            {t('managerAuth.title')}
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, fontFamily: 'DM Sans' }}>
-            Enter the manager code to authorize:<br />
+            {t(usePassword ? 'managerAuth.subtitlePassword' : 'managerAuth.subtitle')}<br />
             <span style={{ color: accentColor, fontWeight: 600 }}>{action}</span>
+          </div>
+          {/* The code is checked against this account and no other */}
+          {signedInName && (
+            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5, fontFamily: 'DM Sans' }}>
+              {t(usePassword ? 'managerAuth.signedInAsPassword' : 'managerAuth.signedInAs', { name: signedInName })}
+            </div>
+          )}
+        </div>
+
+        <div style={{ width: '100%' }}>
+          <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6, fontFamily: 'DM Sans' }}>
+            {t(usePassword ? 'managerAuth.passwordLabel' : 'managerAuth.codeLabel')}
+          </label>
+          <div style={{ position: 'relative' }}>
+            <input
+              ref={inputRef}
+              type={showCode ? 'text' : 'password'}
+              value={code}
+              onChange={e => { setCode(usePassword ? e.target.value : e.target.value.replace(/\D/g, '').slice(0, 4)); setError(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              inputMode={usePassword ? 'text' : 'numeric'}
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              name="gem-verify-field"
+              data-lpignore="true"
+              data-1p-ignore="true"
+              data-form-type="other"
+              maxLength={usePassword ? undefined : 4}
+              placeholder={t(usePassword ? 'managerAuth.passwordPh' : 'managerAuth.codePh')}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                background: 'var(--bg-elevated)',
+                border: `1.5px solid ${error ? 'var(--accent-red)' : 'var(--border-subtle)'}`,
+                borderRadius: 10, padding: '11px 40px 11px 14px',
+                fontSize: usePassword ? 14 : 22,
+                letterSpacing: usePassword ? 'normal' : '0.5em',
+                textAlign: usePassword ? 'left' : 'center',
+                color: 'var(--text-primary)',
+                fontFamily: usePassword ? 'DM Sans' : 'JetBrains Mono, monospace',
+                outline: 'none',
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowCode(v => !v)}
+              style={{
+                position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 2,
+              }}
+            >
+              {showCode ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
           </div>
         </div>
 
-        {/* PIN boxes */}
-        <div style={{ display: 'flex', gap: 12 }}>
-          {digits.map((d, i) => (
-            <input
-              key={i}
-              ref={el => (inputRefs.current[i] = el)}
-              type="password"
-              inputMode="numeric"
-              maxLength={1}
-              value={d}
-              onChange={e => handleDigit(i, e.target.value)}
-              onKeyDown={e => handleKeyDown(i, e)}
-              onPaste={handlePaste}
-              style={{
-                width: 56, height: 64,
-                textAlign: 'center',
-                fontSize: 28, fontWeight: 700,
-                fontFamily: 'Manrope, sans-serif',
-                background: 'var(--bg-elevated)',
-                border: `2px solid ${error ? 'var(--accent-red)' : d ? accentColor : 'var(--border-subtle)'}`,
-                borderRadius: 12,
-                color: 'var(--text-primary)',
-                outline: 'none',
-                caretColor: accentColor,
-                transition: 'border-color 0.15s',
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Error */}
         {error && (
           <div style={{
             fontSize: 12, color: 'var(--accent-red)',
@@ -181,7 +194,6 @@ export default function ManagerAuthModal({ open, onClose, onConfirm, action = 't
           </div>
         )}
 
-        {/* Buttons */}
         <div style={{ display: 'flex', gap: 10, width: '100%' }}>
           <button
             onClick={handleClose}
@@ -193,23 +205,25 @@ export default function ManagerAuthModal({ open, onClose, onConfirm, action = 't
               cursor: 'pointer', fontFamily: 'DM Sans',
             }}
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSubmit}
+            disabled={checking}
             style={{
               flex: 1, background: confirmBg,
               border: 'none', color: '#fff',
               borderRadius: 8, fontSize: 13, fontWeight: 600,
-              padding: '10px 0', cursor: 'pointer', fontFamily: 'DM Sans',
+              padding: '10px 0', cursor: checking ? 'default' : 'pointer',
+              fontFamily: 'DM Sans', opacity: checking ? 0.7 : 1,
             }}
           >
-            Authorize
+            {checking ? t('managerAuth.checking') : t('managerAuth.authorize')}
           </button>
         </div>
 
         <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', textAlign: 'center' }}>
-          Only the gym manager can authorize this action.
+          {t('managerAuth.note')}
         </div>
       </div>
 
