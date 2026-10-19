@@ -227,23 +227,23 @@ Every file in the repository except `node_modules`, build output (`dist`), lockf
 | `gem-backend/src/controllers/attendance.controller.js` | 391 | [x] | [ ] |
 | `gem-backend/src/controllers/auth.controller.js` | 508 | [x] | [ ] |
 | `gem-backend/src/controllers/calendar.controller.js` | 398 | [x] | [ ] |
-| `gem-backend/src/controllers/coach.controller.js` | 400 | [ ] | [ ] |
-| `gem-backend/src/controllers/communication.controller.js` | 208 | [ ] | [ ] |
-| `gem-backend/src/controllers/equipment.controller.js` | 77 | [ ] | [ ] |
-| `gem-backend/src/controllers/expense.controller.js` | 200 | [ ] | [ ] |
-| `gem-backend/src/controllers/gym.controller.js` | 131 | [ ] | [ ] |
-| `gem-backend/src/controllers/member.controller.js` | 472 | [ ] | [ ] |
-| `gem-backend/src/controllers/notification.controller.js` | 60 | [ ] | [ ] |
-| `gem-backend/src/controllers/package.controller.js` | 87 | [ ] | [ ] |
-| `gem-backend/src/controllers/payAdjustment.controller.js` | 251 | [ ] | [ ] |
-| `gem-backend/src/controllers/payment.controller.js` | 208 | [ ] | [ ] |
-| `gem-backend/src/controllers/payroll.controller.js` | 275 | [ ] | [ ] |
-| `gem-backend/src/controllers/product.controller.js` | 144 | [ ] | [ ] |
-| `gem-backend/src/controllers/report.controller.js` | 200 | [ ] | [ ] |
-| `gem-backend/src/controllers/sale.controller.js` | 151 | [ ] | [ ] |
-| `gem-backend/src/controllers/staff.controller.js` | 745 | [ ] | [ ] |
-| `gem-backend/src/controllers/task.controller.js` | 370 | [ ] | [ ] |
-| `gem-backend/src/controllers/timecard.controller.js` | 737 | [ ] | [ ] |
+| `gem-backend/src/controllers/coach.controller.js` | 400 | [x] | [ ] |
+| `gem-backend/src/controllers/communication.controller.js` | 208 | [x] | [ ] |
+| `gem-backend/src/controllers/equipment.controller.js` | 77 | [x] | [ ] |
+| `gem-backend/src/controllers/expense.controller.js` | 200 | [x] | [ ] |
+| `gem-backend/src/controllers/gym.controller.js` | 131 | [x] | [ ] |
+| `gem-backend/src/controllers/member.controller.js` | 472 | [x] | [ ] |
+| `gem-backend/src/controllers/notification.controller.js` | 60 | [x] | [ ] |
+| `gem-backend/src/controllers/package.controller.js` | 87 | [x] | [ ] |
+| `gem-backend/src/controllers/payAdjustment.controller.js` | 251 | [x] | [ ] |
+| `gem-backend/src/controllers/payment.controller.js` | 208 | [x] | [ ] |
+| `gem-backend/src/controllers/payroll.controller.js` | 275 | [x] | [ ] |
+| `gem-backend/src/controllers/product.controller.js` | 144 | [x] | [ ] |
+| `gem-backend/src/controllers/report.controller.js` | 200 | [x] | [ ] |
+| `gem-backend/src/controllers/sale.controller.js` | 151 | [x] | [ ] |
+| `gem-backend/src/controllers/staff.controller.js` | 745 | [x] | [ ] |
+| `gem-backend/src/controllers/task.controller.js` | 370 | [x] | [ ] |
+| `gem-backend/src/controllers/timecard.controller.js` | 737 | [x] | [ ] |
 | `gem-backend/src/controllers/upload.controller.js` | 26 | [x] | [ ] |
 
 ### Backend: utilities (23 files, 1,641 lines)
@@ -596,6 +596,27 @@ Severity: Critical, High, Medium, Low. Status: Open, Fixed, Needs decision, Won'
 | F-050 | Low | Quality | backend, 37 places | `.catch(() => {})` swallows failures of notifications, emails and tasks without a trace, so a broken side effect goes unnoticed in production. | One helper that logs what failed. | Open |
 | F-051 | Low | Performance | `attendance.controller.js:30-49`, `calendar.controller.js:46-68` | Without a date, the attendance and calendar lists return every row the gym has ever made. | Check the callers; give each a default range or a limit. | Open |
 | F-052 | Low | i18n | `attendance.controller.js:132,164`, `activityLog.controller.js:5` | Server messages format dates in the server's locale and time zone, and the activity log filters days by server time (UTC on Railway, an hour off for Cameroon). | Format with the gym's language and the caller's time zone. | Open |
+| F-053 | High | Bug | `approval.controller.js:55,93,103`, `coach.controller.js:240-245`, `payment.controller.js:41` | Prisma reads `undefined` in a filter as "no condition". A request that leaves out `memberId` makes `findFirst({ gymId, OR: [{ id: undefined }, { memberCode: undefined }] })` match the gym's first member, so `POST /api/approvals/apply` without a member cancels, freezes or extends somebody at random, and `POST /api/coach/assign` changes a random member's coach. | Refuse a missing or non-string id with 400 before looking anything up. | Open |
+| F-054 | Low | Bug | `communication.controller.js:108-113,171-186` | Two retries at once, or an edit of a scheduled message while the scheduler picks it up, can send the same message twice. | Claim the message with a conditional update before sending. | Open |
+| F-055 | High | Security | `equipment.controller.js:56-75` | Reporting and updating an equipment issue pass the request body to the database: an update can set `gymId` and move the issue into another gym, and any column can be set. A missing equipment name or description answers 500. | List the fields; validate the required ones. | Open |
+| F-056 | Medium | Bug | `member.controller.js:36-49` | Member codes are `GEM-` plus a count of every member on the platform: each new member counts the whole table, two gyms adding members at once get the same code (the unique index then answers 500), and after 20 collisions a taken code is used anyway. | Try the next code when the database refuses a duplicate. | Open |
+| F-057 | High | Security | `member.controller.js:337-392`, `routes/member.routes.js:11` | The front desk may PATCH a member's `balance`, `status`, `startDate`, `endDate`, `passesRemaining` and `dayPasses` directly. Renewals and pass purchases are worked out in the browser and saved this way, so anyone at the desk can wipe a debt without a payment, or unfreeze and extend a membership without the manager approval the app otherwise requires. | Move renewals and pass purchases to server actions that take the payment and apply the change in one transaction; keep direct edits of these fields to management. Touches payments. | Needs decision |
+| F-058 | Medium | Security | `payment.controller.js:180-206`, `routes/payment.routes.js:11` | The front desk may delete any payment, of any age, by anyone (it exists to undo a payment when an action is cancelled). Deleting restores the debt for membership payments only. | Limit the desk to its own payments from the last few minutes; anything else to management. Touches payments. | Needs decision |
+| F-059 | Medium | Bug | `staff.controller.js:60-62,183,387,639`, `auth.controller.js:18-20` | Staff 4-digit codes are drawn at random without checking the gym (staff create, code reveal, reactivation, gym owner). Two people can share a code, and the desk's sign-in by code then signs in whoever is found first. `uniqueStaffCode()` already exists for regeneration. | Use `uniqueStaffCode()` everywhere a code is issued, with `crypto.randomInt`. | Open |
+| F-060 | Medium | Security | `staff.controller.js:477-519`, `routes/staff.routes.js:21` | Only the owner may (de)activate staff through PATCH, but `DELETE /api/staff/:id` (management) deactivates anyone below the caller, so a manager can do it anyway. Nothing in the app calls it. | Hold DELETE to the owner, like PATCH. | Open |
+| F-061 | Medium | Privacy | `staff.controller.js:73-96,98-150` | The staff list and profile send `photoId` (the scan of an employee's identity document) to every colleague, while pay and notes are kept to those who outrank them. | Treat the ID scan like pay: self or someone senior. | Open |
+| F-062 | Low | Bug | `staff.controller.js:64-67` | The role map turns the label "Other" into `coach` (a fitness role). If a form ever sends the label rather than `other`, a cleaner gets a coach's access. To check: what the staff form sends. | Map "Other" to `other`. | Open |
+| F-063 | Medium | Bug | `expense.controller.js:26-38,50-113,152-183` | Amounts go through `parseFloat`: a non-number is stored as NaN and "Infinity" as Infinity (PostgreSQL keeps both), so the books total NaN; negative amounts are accepted; a missing title or date answers 500; and an edit that leaves out `category` resets it to "Other" (out `amount`: NaN). | Validate amount (finite, above 0), title and date; edit only the fields sent. | Open |
+| F-064 | Medium | Bug | `payment.controller.js:34-114`, `member.controller.js:214-311` | A payment is written in three steps (the row, a raw SQL patch for reference and balance-after, then the member's balance), so a failure in between leaves a payment that never reduced the debt. A new visitor and their first payment are not one transaction either, although the code says neither can exist without the other. "Infinity" passes the amount check. | One transaction per payment; validate the amount as finite. Touches payments, but only makes the existing behaviour reliable. | Open |
+| F-065 | Medium | Bug | `payroll.controller.js:144-185` | Issuing pay checks for a duplicate and then creates, with no unique key: a double click pays the same month twice. Months are free text, so "Sep 2026" and "sep 2026" are different months. | Normalise the month; check and write in one serializable transaction (a unique index later, with D-4). | Open |
+| F-066 | Medium | Data | `package.controller.js:73-85` | Deleting a package silently takes it off every member on it (`ON DELETE SET NULL`), unlike products, which are retired once they have history. | Refuse while members use it and offer Inactive instead. | Needs decision |
+| F-067 | Medium | Security | `package.controller.js:13-18,56-59` | A package update passes the body to the database, so it can set `gymId` (owner only, but a write into another gym) and any column; an unknown field answers 500. | List the fields. | Open |
+| F-068 | Low | Security | `gym.controller.js:34-39` | `GET /api/gyms/me` returns the whole gym record to every role, including the unused `managerCode` (in the seeded demo gym it equals the owner's own 4-digit code). | Leave `managerCode` out. | Open |
+| F-069 | Low | Bug | `gym.controller.js:41-91` | Gym settings are saved without checks: an unknown currency code makes `Intl.NumberFormat` throw wherever money is shown (screens, emails, receipts); a non-number fee answers 500. | Accept only the supported currency codes and numbers where numbers belong. | Open |
+| F-070 | Low | Security | `task.controller.js:245-289` | The check on who may change a task's content leaves out `assignedRole` and `assignedGroup`, so anyone can hand someone else's task to a whole role or to management. | Count both as content. | Open |
+| F-071 | Low | Bug | `calendar.controller.js:146,287`, `timecard.controller.js:139,256,421-427`, `staff.controller.js:350` | Unreadable input answers 500 instead of 400 in several places: `staffIds` that is not JSON, an unreadable date, a time like 25:99 (rolls into the next day). | Validate and answer 400 with the field. | Open |
+| F-072 | Low | Quality | `staff.controller.js:123-137,205-218,390-429`, `payment.controller.js:92-102` | Four raw SQL statements work around "a stale Prisma client" that no longer exists: the generated client has these columns. | Use the client; drop the raw SQL. | Open |
+| F-073 | Low | Security | `staff.controller.js:173,202` | A new account's placeholder password is `GEM` plus the creation time in milliseconds (unusable while `mustSetPassword` is set, but guessable), and a failed staff create returns the database's error text to the browser. | A random placeholder; a plain error message. | Open |
 
 ## 7. Needs my decision
 
