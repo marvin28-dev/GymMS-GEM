@@ -314,35 +314,35 @@ Every file in the repository except `node_modules`, build output (`dist`), lockf
 
 | File | Lines | Pass 1 | Pass 2 |
 | :- | -: | :-: | :-: |
-| `gem-frontend/.gitignore` | 24 | [ ] | [ ] |
-| `gem-frontend/README.md` | 16 | [ ] | [ ] |
-| `gem-frontend/eslint.config.js` | 29 | [ ] | [ ] |
-| `gem-frontend/index.html` | 16 | [ ] | [ ] |
-| `gem-frontend/package.json` | 44 | [ ] | [ ] |
-| `gem-frontend/postcss.config.js` | 6 | [ ] | [ ] |
-| `gem-frontend/public/vite.svg` | 0 | [ ] | [ ] |
-| `gem-frontend/tailwind.config.js` | 11 | [ ] | [ ] |
-| `gem-frontend/vercel.json` | 5 | [ ] | [ ] |
-| `gem-frontend/vite.config.js` | 8 | [ ] | [ ] |
+| `gem-frontend/.gitignore` | 24 | [x] | [ ] |
+| `gem-frontend/README.md` | 16 | [x] | [ ] |
+| `gem-frontend/eslint.config.js` | 29 | [x] | [ ] |
+| `gem-frontend/index.html` | 16 | [x] | [ ] |
+| `gem-frontend/package.json` | 44 | [x] | [ ] |
+| `gem-frontend/postcss.config.js` | 6 | [x] | [ ] |
+| `gem-frontend/public/vite.svg` | 0 | [x] | [ ] |
+| `gem-frontend/tailwind.config.js` | 11 | [x] | [ ] |
+| `gem-frontend/vercel.json` | 5 | [x] | [ ] |
+| `gem-frontend/vite.config.js` | 8 | [x] | [ ] |
 
 ### Frontend: entry, app shell and styles (14 files, 1,388 lines)
 
 | File | Lines | Pass 1 | Pass 2 |
 | :- | -: | :-: | :-: |
-| `gem-frontend/src/App.css` | 42 | [ ] | [ ] |
-| `gem-frontend/src/App.jsx` | 300 | [ ] | [ ] |
-| `gem-frontend/src/app/App.jsx` | 5 | [ ] | [ ] |
-| `gem-frontend/src/assets/react.svg` | 0 | [ ] | [ ] |
-| `gem-frontend/src/contexts/LanguageContext.jsx` | 61 | [ ] | [ ] |
-| `gem-frontend/src/index.css` | 164 | [ ] | [ ] |
-| `gem-frontend/src/layouts/AppLayout.jsx` | 77 | [ ] | [ ] |
-| `gem-frontend/src/main.jsx` | 43 | [ ] | [ ] |
-| `gem-frontend/src/routes/AppRoutes.jsx` | 65 | [ ] | [ ] |
-| `gem-frontend/src/routes/ProtectedRoute.jsx` | 28 | [ ] | [ ] |
-| `gem-frontend/src/routes/routeConfig.jsx` | 42 | [ ] | [ ] |
-| `gem-frontend/src/styles/calendar.css` | 78 | [ ] | [ ] |
-| `gem-frontend/src/styles/globals.css` | 316 | [ ] | [ ] |
-| `gem-frontend/src/styles/theme.js` | 167 | [ ] | [ ] |
+| `gem-frontend/src/App.css` | 42 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/App.jsx` | 300 | [x] | [ ] |
+| `gem-frontend/src/app/App.jsx` | 5 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/assets/react.svg` | 0 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/contexts/LanguageContext.jsx` | 61 | [x] | [ ] |
+| `gem-frontend/src/index.css` | 164 | [x] | [ ] |
+| `gem-frontend/src/layouts/AppLayout.jsx` | 77 | [x] | [ ] |
+| `gem-frontend/src/main.jsx` | 43 | [x] | [ ] |
+| `gem-frontend/src/routes/AppRoutes.jsx` | 65 | [x] | [ ] |
+| `gem-frontend/src/routes/ProtectedRoute.jsx` | 28 | [x] | [ ] |
+| `gem-frontend/src/routes/routeConfig.jsx` | 42 | [x] | [ ] |
+| `gem-frontend/src/styles/calendar.css` | 78 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/styles/globals.css` | 316 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/styles/theme.js` | 167 | deleted (8b95823) | deleted (8b95823) |
 
 ### Frontend: services (API calls) (24 files, 528 lines)
 
@@ -429,12 +429,12 @@ Every file in the repository except `node_modules`, build output (`dist`), lockf
 
 | File | Lines | Pass 1 | Pass 2 |
 | :- | -: | :-: | :-: |
-| `gem-frontend/src/data/mockCommunications.js` | 42 | [ ] | [ ] |
-| `gem-frontend/src/data/mockData.js` | 211 | [ ] | [ ] |
-| `gem-frontend/src/data/mockGym.js` | 72 | [ ] | [ ] |
-| `gem-frontend/src/data/mockMembers.js` | 93 | [ ] | [ ] |
-| `gem-frontend/src/data/mockPackages.js` | 30 | [ ] | [ ] |
-| `gem-frontend/src/data/mockProducts.js` | 15 | [ ] | [ ] |
+| `gem-frontend/src/data/mockCommunications.js` | 42 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/data/mockData.js` | 211 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/data/mockGym.js` | 72 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/data/mockMembers.js` | 93 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/data/mockPackages.js` | 30 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/data/mockProducts.js` | 15 | deleted (8b95823) | deleted (8b95823) |
 
 ### Frontend: shared UI components (26 files, 1,627 lines)
 
@@ -445,12 +445,12 @@ Every file in the repository except `node_modules`, build output (`dist`), lockf
 | `gem-frontend/src/components/ui/ConfirmModal.jsx` | 77 | [ ] | [ ] |
 | `gem-frontend/src/components/ui/DayStepper.jsx` | 39 | [ ] | [ ] |
 | `gem-frontend/src/components/ui/EmptyState.jsx` | 45 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/GemButton.jsx` | 5 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/GemCard.jsx` | 11 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/GemDialog.jsx` | 45 | [ ] | [ ] |
+| `gem-frontend/src/components/ui/GemButton.jsx` | 5 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/ui/GemCard.jsx` | 11 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/ui/GemDialog.jsx` | 45 | deleted (8b95823) | deleted (8b95823) |
 | `gem-frontend/src/components/ui/GemInput.jsx` | 75 | [ ] | [ ] |
 | `gem-frontend/src/components/ui/GemSelect.jsx` | 107 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/GemTextField.jsx` | 40 | [ ] | [ ] |
+| `gem-frontend/src/components/ui/GemTextField.jsx` | 40 | deleted (8b95823) | deleted (8b95823) |
 | `gem-frontend/src/components/ui/ManagerAuthModal.jsx` | 241 | [ ] | [ ] |
 | `gem-frontend/src/components/ui/MemberStatusTags.jsx` | 29 | [ ] | [ ] |
 | `gem-frontend/src/components/ui/Modal.jsx` | 114 | [ ] | [ ] |
@@ -458,7 +458,7 @@ Every file in the repository except `node_modules`, build output (`dist`), lockf
 | `gem-frontend/src/components/ui/PriceTag.jsx` | 15 | [ ] | [ ] |
 | `gem-frontend/src/components/ui/RevenueSplit.jsx` | 15 | [ ] | [ ] |
 | `gem-frontend/src/components/ui/RowMenu.jsx` | 119 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/Sparkline.jsx` | 21 | [ ] | [ ] |
+| `gem-frontend/src/components/ui/Sparkline.jsx` | 21 | deleted (8b95823) | deleted (8b95823) |
 | `gem-frontend/src/components/ui/StatusBadge.jsx` | 63 | [ ] | [ ] |
 | `gem-frontend/src/components/ui/TimeInput.jsx` | 175 | [ ] | [ ] |
 | `gem-frontend/src/components/ui/TrackPill.jsx` | 43 | [ ] | [ ] |
@@ -472,7 +472,7 @@ Every file in the repository except `node_modules`, build output (`dist`), lockf
 | File | Lines | Pass 1 | Pass 2 |
 | :- | -: | :-: | :-: |
 | `gem-frontend/src/components/AddressInputs.jsx` | 48 | [ ] | [ ] |
-| `gem-frontend/src/components/BottomSheet.jsx` | 94 | [ ] | [ ] |
+| `gem-frontend/src/components/BottomSheet.jsx` | 94 | deleted (8b95823) | deleted (8b95823) |
 | `gem-frontend/src/components/BottomTabBar.jsx` | 161 | [ ] | [ ] |
 | `gem-frontend/src/components/BusyWarning.jsx` | 44 | [ ] | [ ] |
 | `gem-frontend/src/components/CheckinStats.jsx` | 328 | [ ] | [ ] |
@@ -481,7 +481,7 @@ Every file in the repository except `node_modules`, build output (`dist`), lockf
 | `gem-frontend/src/components/EodReport.jsx` | 383 | [ ] | [ ] |
 | `gem-frontend/src/components/FAB.jsx` | 37 | [ ] | [ ] |
 | `gem-frontend/src/components/FillInPreview.jsx` | 28 | [ ] | [ ] |
-| `gem-frontend/src/components/FrontDeskTour.jsx` | 228 | [ ] | [ ] |
+| `gem-frontend/src/components/FrontDeskTour.jsx` | 228 | deleted (8b95823) | deleted (8b95823) |
 | `gem-frontend/src/components/GlobalSearch.jsx` | 299 | [ ] | [ ] |
 | `gem-frontend/src/components/GoalsModal.jsx` | 160 | [ ] | [ ] |
 | `gem-frontend/src/components/Header.jsx` | 462 | [ ] | [ ] |
@@ -498,21 +498,21 @@ Every file in the repository except `node_modules`, build output (`dist`), lockf
 | `gem-frontend/src/components/Sidebar.jsx` | 401 | [ ] | [ ] |
 | `gem-frontend/src/components/Skeleton.jsx` | 54 | [ ] | [ ] |
 | `gem-frontend/src/components/TaskAssigneeField.jsx` | 64 | [ ] | [ ] |
-| `gem-frontend/src/components/dashboard/GymCalendar.jsx` | 674 | [ ] | [ ] |
-| `gem-frontend/src/components/dashboard/KpiCard.jsx` | 121 | [ ] | [ ] |
-| `gem-frontend/src/components/dashboard/NotificationsPanel.jsx` | 39 | [ ] | [ ] |
-| `gem-frontend/src/components/dashboard/TasksTable.jsx` | 583 | [ ] | [ ] |
-| `gem-frontend/src/components/members/AddMemberVisitorPage.jsx` | 593 | [ ] | [ ] |
-| `gem-frontend/src/components/members/AddPackageDialog.jsx` | 149 | [ ] | [ ] |
-| `gem-frontend/src/components/members/CommunicationsTable.jsx` | 138 | [ ] | [ ] |
-| `gem-frontend/src/components/members/CreateCommunicationPanel.jsx` | 295 | [ ] | [ ] |
-| `gem-frontend/src/components/members/MembersTable.jsx` | 109 | [ ] | [ ] |
-| `gem-frontend/src/components/members/PackagesTable.jsx` | 149 | [ ] | [ ] |
-| `gem-frontend/src/components/navigation/NavItem.jsx` | 51 | [ ] | [ ] |
-| `gem-frontend/src/components/navigation/Sidebar.jsx` | 63 | [ ] | [ ] |
-| `gem-frontend/src/components/navigation/Topbar.jsx` | 23 | [ ] | [ ] |
-| `gem-frontend/src/components/products/AddCategoryDialog.jsx` | 121 | [ ] | [ ] |
-| `gem-frontend/src/components/products/AddProductDialog.jsx` | 365 | [ ] | [ ] |
+| `gem-frontend/src/components/dashboard/GymCalendar.jsx` | 674 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/dashboard/KpiCard.jsx` | 121 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/dashboard/NotificationsPanel.jsx` | 39 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/dashboard/TasksTable.jsx` | 583 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/members/AddMemberVisitorPage.jsx` | 593 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/members/AddPackageDialog.jsx` | 149 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/members/CommunicationsTable.jsx` | 138 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/members/CreateCommunicationPanel.jsx` | 295 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/members/MembersTable.jsx` | 109 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/members/PackagesTable.jsx` | 149 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/navigation/NavItem.jsx` | 51 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/navigation/Sidebar.jsx` | 63 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/navigation/Topbar.jsx` | 23 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/products/AddCategoryDialog.jsx` | 121 | deleted (8b95823) | deleted (8b95823) |
+| `gem-frontend/src/components/products/AddProductDialog.jsx` | 365 | deleted (8b95823) | deleted (8b95823) |
 
 ### Frontend: pages (25 files, 28,970 lines)
 
@@ -584,7 +584,7 @@ Severity: Critical, High, Medium, Low. Status: Open, Fixed, Needs decision, Won'
 | F-013 | Low | Public pages | `gem-frontend/index.html` | No meta description or social sharing tags; the favicon is the default Vite logo; the title contains a long dash. | Add meta tags (no behaviour change); favicon and title wording go to the owner. | Open |
 | F-014 | Low | Usability | `gem-frontend/src/main.jsx:17`, `gem-frontend/src/routes/AppRoutes.jsx:59` | If a screen crashes, the user sees the raw technical error. Unknown addresses silently send people to the home page; there is no "page not found". | A friendly error screen with a reload button, and a 404 page. User-visible, so the owner decides. | Needs decision |
 | F-015 | Low | Documentation | `CLAUDE.md` | Says React 18 (it is 19), describes `DemoTour.jsx` (deleted), and says "no CSS framework" while Tailwind and MUI are installed. No root README; `gem-frontend/README.md` is the Vite template. | Correct the docs; write a README in Phase 7. | Open |
-| F-016 | Medium | Dependencies, dead code | `gem-frontend/package.json`, `src/components/members/*`, `src/components/dashboard/GymCalendar.jsx`, `src/components/products/*`, `src/data/mock*.js`, `src/app/App.jsx` | MUI, Emotion, Tailwind and react-big-calendar look used only by leftover components, and several files look unused. To be proven with knip and by hand before anything is removed. | Remove what is proven unused, in small commits. | Open |
+| F-016 | Medium | Dead code | `gem-frontend/src`, `gem-frontend/package.json` | 34 files nothing imported (an older MUI-based interface, template leftovers, mock data with real-looking gmail addresses, two stylesheets never loaded) and 8 packages only they used. Tailwind is not dead: `index.css` imports it and its reset shapes every page. | Deleted after knip and an import scan of every live file; build and the 62-screen smoke test unchanged. | Fixed (8b95823) |
 | F-017 | Medium | Quality | whole repo | No automated tests at all, no backend lint, no type-check. | Add Vitest (unit and API integration with a test database) and Playwright (end to end, Chromium, Firefox, WebKit, mobile, axe). | Open |
 | F-018 | Low | Secrets | Twilio account | The Twilio Auth Token was pasted into a chat on 2026-10-19 (it is now only in the ignored `gem-backend/.env`). | Regenerate the token in the Twilio Console before using it. Owner action. | Needs decision |
 | F-019 | Low | Leftover | `gem-backend/src/app.js:50` | `app.use('/uploads', express.static('uploads'))` serves an empty local folder; uploads go to Cloudinary. | Remove once confirmed unused. | Open |
@@ -648,6 +648,11 @@ Severity: Critical, High, Medium, Low. Status: Open, Fixed, Needs decision, Won'
 | F-077 | Low | Bug | `jobs/freezeFees.js:25-39` | The freeze-fee job reads the balance and the last charge date, then writes both: run on two servers at once (or beside a payment) it charges twice or loses a payment. | Charge with a conditional, atomic update (part of F-042). | Fixed (ee6805d) |
 | F-078 | Medium | Security | `controllers/member.controller.js:61-128`, `pages/AttendancePage.jsx:557,649`, `pages/DashboardPage.jsx:534,576`, `pages/FrontDeskPage.jsx:961`, `components/ui/VisitorCodeModal.jsx:28` | Every member's 4-digit check-in code is sent to every signed-in browser in the members list, because four screens compare a typed code with it locally. Anyone with the developer tools open at the desk, or any trainer's account, can read every code and check in as someone else. | Check codes on the server (a rate-limited endpoint), then send codes only to management. | Open |
 | F-079 | Low | Quality | `jobs/payrollReminders.js:23,136-151` | `ordinal` is never used. The "overdue email sent" marker is stored as a notification, so it shows in the owner's list ("Overdue payroll email sent for Oct 2026"). | Remove the helper; keep the marker out of the visible list. | Fixed (0ad220f) |
+| F-080 | Low | Accessibility | `gem-frontend/index.html:2`, `contexts/LanguageContext.jsx` | The page's `lang` stays `en` when the app is switched to French, so screen readers read French text with English pronunciation. | Set `document.documentElement.lang` from the chosen language. | Open |
+| F-081 | Low | Bug | `gem-frontend/src/components/Sidebar.jsx:169`, `pages/SettingsPage.jsx:712` | The amber "still to set up" dots were meant to pulse, but their keyframe lived only in `styles/globals.css`, which nothing loads. | Keyframe moved to `index.css`. | Fixed (8b95823) |
+| F-082 | Low | Robustness | `gem-frontend/src/main.jsx:14`, `contexts/LanguageContext.jsx:7` | The first `localStorage` reads are not guarded: a browser that blocks site storage (Firefox with cookies blocked) gets a blank page instead of a message. | Guard the reads; say that GEM needs site storage to sign in. | Open |
+| F-083 | Low | Accessibility | `gem-frontend/src/App.jsx:163-277` | The "Are you still there?" warning is a plain overlay, not a dialog: no `role="dialog"`, no focus moved into it, and keyboard focus stays on the page behind. | Build it on the shared `Modal` (a real dialog). Phase 6. | Open |
+| F-084 | Medium | Bug | `gem-frontend/src/pages/FrontDeskPage.jsx:1267-1276` | Reporting an equipment issue at the desk shows "Issue reported" and adds it to the activity list even when saving failed: the error is only written to the console. The same "fake success" pattern CLAUDE.md forbids elsewhere. | Show the server's error and keep the form. Frontend review. | Open |
 
 ## 7. Needs my decision
 
