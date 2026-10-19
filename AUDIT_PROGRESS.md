@@ -440,32 +440,32 @@ Every file in the repository except `node_modules`, build output (`dist`), lockf
 
 | File | Lines | Pass 1 | Pass 2 |
 | :- | -: | :-: | :-: |
-| `gem-frontend/src/components/ui/Avatar.jsx` | 36 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/CodeInput.jsx` | 35 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/ConfirmModal.jsx` | 77 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/DayStepper.jsx` | 39 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/EmptyState.jsx` | 45 | [ ] | [ ] |
+| `gem-frontend/src/components/ui/Avatar.jsx` | 36 | [x] | [ ] |
+| `gem-frontend/src/components/ui/CodeInput.jsx` | 35 | [x] | [ ] |
+| `gem-frontend/src/components/ui/ConfirmModal.jsx` | 77 | [x] | [ ] |
+| `gem-frontend/src/components/ui/DayStepper.jsx` | 39 | [x] | [ ] |
+| `gem-frontend/src/components/ui/EmptyState.jsx` | 45 | [x] | [ ] |
 | `gem-frontend/src/components/ui/GemButton.jsx` | 5 | deleted (8b95823) | deleted (8b95823) |
 | `gem-frontend/src/components/ui/GemCard.jsx` | 11 | deleted (8b95823) | deleted (8b95823) |
 | `gem-frontend/src/components/ui/GemDialog.jsx` | 45 | deleted (8b95823) | deleted (8b95823) |
-| `gem-frontend/src/components/ui/GemInput.jsx` | 75 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/GemSelect.jsx` | 107 | [ ] | [ ] |
+| `gem-frontend/src/components/ui/GemInput.jsx` | 75 | [x] | [ ] |
+| `gem-frontend/src/components/ui/GemSelect.jsx` | 107 | [x] | [ ] |
 | `gem-frontend/src/components/ui/GemTextField.jsx` | 40 | deleted (8b95823) | deleted (8b95823) |
-| `gem-frontend/src/components/ui/ManagerAuthModal.jsx` | 241 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/MemberStatusTags.jsx` | 29 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/Modal.jsx` | 114 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/PageHeader.jsx` | 45 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/PriceTag.jsx` | 15 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/RevenueSplit.jsx` | 15 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/RowMenu.jsx` | 119 | [ ] | [ ] |
+| `gem-frontend/src/components/ui/ManagerAuthModal.jsx` | 241 | [x] | [ ] |
+| `gem-frontend/src/components/ui/MemberStatusTags.jsx` | 29 | [x] | [ ] |
+| `gem-frontend/src/components/ui/Modal.jsx` | 114 | [x] | [ ] |
+| `gem-frontend/src/components/ui/PageHeader.jsx` | 45 | [x] | [ ] |
+| `gem-frontend/src/components/ui/PriceTag.jsx` | 15 | [x] | [ ] |
+| `gem-frontend/src/components/ui/RevenueSplit.jsx` | 15 | [x] | [ ] |
+| `gem-frontend/src/components/ui/RowMenu.jsx` | 119 | [x] | [ ] |
 | `gem-frontend/src/components/ui/Sparkline.jsx` | 21 | deleted (8b95823) | deleted (8b95823) |
-| `gem-frontend/src/components/ui/StatusBadge.jsx` | 63 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/TimeInput.jsx` | 175 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/TrackPill.jsx` | 43 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/TrendChart.jsx` | 94 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/VisitKindBadge.jsx` | 19 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/VisitorCodeModal.jsx` | 83 | [ ] | [ ] |
-| `gem-frontend/src/components/ui/WeekBars.jsx` | 36 | [ ] | [ ] |
+| `gem-frontend/src/components/ui/StatusBadge.jsx` | 63 | [x] | [ ] |
+| `gem-frontend/src/components/ui/TimeInput.jsx` | 175 | [x] | [ ] |
+| `gem-frontend/src/components/ui/TrackPill.jsx` | 43 | [x] | [ ] |
+| `gem-frontend/src/components/ui/TrendChart.jsx` | 94 | [x] | [ ] |
+| `gem-frontend/src/components/ui/VisitKindBadge.jsx` | 19 | [x] | [ ] |
+| `gem-frontend/src/components/ui/VisitorCodeModal.jsx` | 83 | [x] | [ ] |
+| `gem-frontend/src/components/ui/WeekBars.jsx` | 36 | [x] | [ ] |
 
 ### Frontend: components (42 files, 8,086 lines)
 
@@ -660,6 +660,11 @@ Severity: Critical, High, Medium, Low. Status: Open, Fixed, Needs decision, Won'
 | F-089 | Low | Bug | `gem-frontend/src/utils/auth.js:9` | The daily re-login compares the UTC day (`toISOString().slice(0, 10)`), which CLAUDE.md's own rule forbids: in Cameroon the "new day" begins at 01:00, so someone signing in at 00:30 is signed out half an hour later. | Use `todayStr()`. | Open |
 | F-090 | Low | Bug | `gem-frontend/src/pages/AccountingPage.jsx:765,804` | The Financial Overview and Payroll exports are headed "GEM Fitness" instead of the gym's own name. | Use the gym's name. | Open |
 | F-091 | Low | Quality | `gem-frontend/src/hooks/useIsMobile.js`, `utils/useIsMobile.js`, `utils/hierarchy.js:9-16` | Two `useIsMobile` hooks with different breakpoints (800 px media query, 768 px resize listener), so pages switch to their phone layout at different widths; the frontend copy of the access ladder has no `other` role (the server's does). | One hook; the same ladder. | Open |
+| F-092 | Medium | Accessibility | `gem-frontend/src/components/ui/GemInput.jsx:15`, `GemSelect.jsx:16` | Every form's labels are drawn but not connected to their fields (no `htmlFor`/`id`): screen readers do not announce them, clicking a label does not focus its box, and errors are not tied to the field (`aria-describedby`, `aria-invalid`). | Give each field an id (`useId`) and connect label, field and error. Phase 6. | Open |
+| F-093 | Medium | Bug | `gem-frontend/src/components/ui/ManagerAuthModal.jsx:143-157` | The manager code box is a `type="password"` field, which CLAUDE.md forbids for codes because browsers (Firefox above all) fill saved logins into it; `autocomplete="off"` does not stop Firefox for password fields. | Use `CodeInput` for the code (the password mode keeps a password field). Confirm in Firefox, Phase 5. | Open |
+| F-094 | Medium | Bug | `gem-frontend/src/pages/PaymentsPage.jsx:68-80` | The receipt printed from the Payments page asks for seven translation keys that do not exist (`payments.paymentReceiptTitle`, `receiptReference`, `receiptDate`, `receiptDescription`, `receiptMethod`, `receiptRecordedBy`, `thankYouReceipt`), so it prints the key names instead of labels. The member profile's receipt has working keys. | Add the keys in EN and FR. | Open |
+| F-095 | Low | i18n | `gem-frontend/src/components/ui/ConfirmModal.jsx:63,45`, `ui/Modal.jsx:86`, `utils/paystubPdf.js` | Some shared text is fixed English: the confirm dialog's Cancel and default Delete, the dialog close button's label, and the whole payslip PDF. | Translate them (the payslip with F-075). | Open |
+| F-096 | Low | Accessibility | `gem-frontend/src/components/ui/Modal.jsx`, `ManagerAuthModal.jsx`, `RowMenu.jsx` | Dialogs do not move focus in, keep it in, or give it back on close; the code dialog is not a dialog to assistive technology; the row menu has no arrow-key navigation; the eye button has no label. | Phase 6. | Open |
 
 ## 7. Needs my decision
 
