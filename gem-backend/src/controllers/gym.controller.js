@@ -1,7 +1,7 @@
 const prisma = require('../utils/prisma');
 const { REQUIRED_SECTIONS, setupStatus } = require('../utils/gymSetup');
 const { logActivity, changesBetween, describeChanges, money } = require('../utils/activityLog');
-const { currencyForCountry } = require('../utils/money');
+const { currencyForCountry, SYMBOLS } = require('../utils/money');
 
 const GYM_FIELDS = {
   name: 'Gym name', location: 'Address', phone: 'Phone', email: 'Email', currency: 'Currency', logo: 'Logo',
@@ -35,8 +35,19 @@ async function getMyGym(req, res) {
   const gym = await prisma.gym.findUnique({
     where: { id: req.user.gymId },
   });
+  if (!gym) return res.status(404).json({ error: 'Gym not found' });
+  // An old shared code nothing uses any more; in the demo gym it equals the
+  // owner's own, so it is never sent to anyone
+  delete gym.managerCode;
   res.json(gym);
 }
+
+const FREQUENCIES = ['yearly', 'one-time'];
+// A number within bounds, or null
+const numberIn = (v, { min = 0, max = Infinity, whole = false } = {}) => {
+  const n = Number(v);
+  return v !== '' && v !== null && typeof v !== 'boolean' && Number.isFinite(n) && n >= min && n <= max && (!whole || Number.isInteger(n)) ? n : null;
+};
 
 async function updateMyGym(req, res) {
   const {
@@ -48,8 +59,12 @@ async function updateMyGym(req, res) {
     managerCode, settings,
   } = req.body;
 
+  const refuse = (error, field) => res.status(400).json({ error, field });
   const data = {};
-  if (name !== undefined) data.name = name;
+  if (name !== undefined) {
+    data.name = String(name ?? '').trim();
+    if (!data.name) return refuse('The gym needs a name.', 'name');
+  }
   // Gym profile details - stored on the record so they follow the gym across
   // devices and can't leak between accounts via browser storage.
   for (const [key, value] of Object.entries({
@@ -66,13 +81,29 @@ async function updateMyGym(req, res) {
   if (location !== undefined) data.location = location;
   if (phone !== undefined) data.phone = phone;
   if (email !== undefined) data.email = email;
-  if (currency !== undefined) data.currency = currency;
-  if (registrationFee !== undefined) data.registrationFee = registrationFee;
-  if (registrationFeeRequired !== undefined) data.registrationFeeRequired = registrationFeeRequired;
-  if (registrationFeeFrequency !== undefined) data.registrationFeeFrequency = registrationFeeFrequency;
-  if (registrationGracePeriodDays !== undefined) data.registrationGracePeriodDays = registrationGracePeriodDays;
-  if (minUpfrontPercent !== undefined) data.minUpfrontPercent = minUpfrontPercent;
-  if (paymentDeadlineDays !== undefined) data.paymentDeadlineDays = paymentDeadlineDays;
+  // Only a currency GEM can show: an unknown one was stored, then ignored by the
+  // screens and printed as a bare code on receipts
+  if (currency !== undefined) {
+    const code = String(currency ?? '').trim().toUpperCase();
+    if (!SYMBOLS[code]) return refuse('Choose one of the currencies GEM supports.', 'currency');
+    data.currency = code;
+  }
+  if (registrationFee !== undefined) {
+    const n = numberIn(registrationFee);
+    if (n === null) return refuse('Enter the registration fee as a number.', 'registrationFee');
+    data.registrationFee = Math.round(n);
+  }
+  if (registrationFeeRequired !== undefined) data.registrationFeeRequired = registrationFeeRequired === true || registrationFeeRequired === 'true';
+  if (registrationFeeFrequency !== undefined) {
+    if (!FREQUENCIES.includes(registrationFeeFrequency)) return refuse('Choose how often the registration fee is paid.', 'registrationFeeFrequency');
+    data.registrationFeeFrequency = registrationFeeFrequency;
+  }
+  for (const [field, value, max] of [['registrationGracePeriodDays', registrationGracePeriodDays, 3650], ['minUpfrontPercent', minUpfrontPercent, 100], ['paymentDeadlineDays', paymentDeadlineDays, 3650]]) {
+    if (value === undefined) continue;
+    const n = numberIn(value, { max, whole: true });
+    if (n === null) return refuse(`Enter a whole number from 0 to ${max}.`, field);
+    data[field] = n;
+  }
   if (managerCode !== undefined) data.managerCode = managerCode;
 
   const previous = await prisma.gym.findUnique({ where: { id: req.user.gymId } });
@@ -101,6 +132,7 @@ async function updateMyGym(req, res) {
       summary: `Changed gym settings: ${describeChanges(changes)}`, details: { changes },
     });
   }
+  delete gym.managerCode;
   res.json(gym);
 }
 

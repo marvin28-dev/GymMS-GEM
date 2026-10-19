@@ -78,7 +78,8 @@ async function update(req, res) {
   if (!existing) return res.status(404).json({ error: 'Product not found' });
 
   // Stock only moves through a sale or a restock, so a stale screen can't overwrite it
-  const { stock: _stock, ...data } = extractKnownFields(req.body);
+  const data = extractKnownFields(req.body);
+  delete data.stock;
   const problem = invalid(data, false);
   if (problem) return res.status(400).json({ error: problem });
   if (data.code && await codeTaken(req.user.gymId, data.code, existing.id)) {

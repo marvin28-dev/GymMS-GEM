@@ -3,6 +3,7 @@ const { clockInCheck, clockOutCheck, rosteredDay, minutesOf } = require('../util
 const { sendGroupTaskEmail } = require('../utils/taskEmail');
 const { rankOf } = require('../utils/hierarchy');
 const { logActivity, fullName } = require('../utils/activityLog');
+const { logFailure } = require('../utils/bestEffort');
 
 const dayLabel = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -65,7 +66,7 @@ const MAX_UNROSTERED_MS = 10 * 60 * 60 * 1000;
 async function overdueFrom(gymId, card) {
   if (!card.punchIn) return null;
   const inAt = new Date(card.punchIn);
-  const day = await rosteredDay({ gymId, staffId: card.staffId, when: inAt }).catch(() => null);
+  const day = await rosteredDay({ gymId, staffId: card.staffId, when: inAt }).catch(logFailure('Reading the rota'));
   const endMins = day ? minutesOf(day.end) : null;
 
   if (endMins !== null) {
@@ -377,7 +378,7 @@ async function raiseApprovalTasks({ gymId, card }) {
         type: 'task',
         link: `/staff/${card.staffId}?tab=pay`,
       },
-    }).catch(() => {})));
+    }).catch(logFailure('Time card review notification'))));
 
     sendGroupTaskEmail({ task, recipients: managers, gymId })
       .catch(err => console.error('Review task email failed:', err.message));

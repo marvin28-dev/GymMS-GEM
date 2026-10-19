@@ -22,7 +22,11 @@ async function runTaskReminders() {
   try {
     const tasks = await prisma.task.findMany({
       where: {
-        status: { not: 'done' },
+        // Ordinary open work only. A calendar invite is answered, never done, so
+        // "not done" reminded people about classes they declined, or went to.
+        status: { in: ['todo', 'in_progress'] },
+        eventId: null,
+        AND: [{ OR: [{ category: null }, { category: { not: 'Calendar' } }] }],
         dueDate: { not: null },
         assignedToId: { not: null },
         // Nobody deactivated is reminded of work they can no longer sign in to see

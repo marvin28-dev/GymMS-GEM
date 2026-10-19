@@ -41,7 +41,8 @@ async function deleteOne(req, res) {
   });
   if (!notif) return res.status(404).json({ error: 'Notification not found' });
   if (notif.staffId === req.user.id) await prisma.notification.delete({ where: { id: notif.id } });
-  else await prisma.notificationDismissal.create({ data: { notificationId: notif.id, staffId: req.user.id } }).catch(() => {});
+  // Cleared twice (two tabs) is still cleared once
+  else await prisma.notificationDismissal.createMany({ data: [{ notificationId: notif.id, staffId: req.user.id }], skipDuplicates: true });
   res.json({ message: 'Notification cleared' });
 }
 

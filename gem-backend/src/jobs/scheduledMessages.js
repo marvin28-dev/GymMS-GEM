@@ -1,5 +1,6 @@
 const prisma = require('../utils/prisma');
 const { deliverCommunication } = require('../utils/messaging');
+const { logFailure } = require('../utils/bestEffort');
 
 // Scheduled messages go out on their minute. Each is claimed before it is sent
 // (scheduled -> sending in one update), so two servers or two runs can never
@@ -18,7 +19,7 @@ async function runScheduledMessages() {
       if (!count) continue;
       await deliverCommunication(id).catch(async (err) => {
         console.error(`Scheduled message ${id} failed:`, err.message);
-        await prisma.communication.update({ where: { id }, data: { status: 'failed' } }).catch(() => {});
+        await prisma.communication.update({ where: { id }, data: { status: 'failed' } }).catch(logFailure('Marking the scheduled message failed'));
       });
     }
   } catch (err) {

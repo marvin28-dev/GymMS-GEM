@@ -51,7 +51,7 @@ const PRIVILEGED = new Set([
 // same basic read the staff list already gives everyone. What is withheld is
 // decided per field, in refuseFields and canSeePrivateFields below, not by
 // blocking the page outright.
-function canView(_actor, _target) {
+function canView() {
   return true;
 }
 

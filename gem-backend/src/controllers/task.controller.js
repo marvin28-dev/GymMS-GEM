@@ -4,6 +4,7 @@ const normalizeCategory = (c) => LEGACY_CATEGORIES[c] || c;
 const { refuseAssignees } = require('../utils/assignees');
 const { sendTaskAssignedEmail } = require('../utils/taskEmail');
 const { parseDateOnly } = require('../utils/dates');
+const { logFailure } = require('../utils/bestEffort');
 
 // Departments a task can belong to instead of one person. Everyone in the
 // group sees the task and any one of them can move it on.
@@ -157,7 +158,7 @@ async function create(req, res) {
           type: 'task',
           link: '/tasks',
         },
-      }).catch(() => {})));
+      }).catch(logFailure('Team task notification'))));
     }
 
     // Same, for a task given to a whole department
@@ -177,7 +178,7 @@ async function create(req, res) {
           type: 'task',
           link: '/tasks',
         },
-      }).catch(() => {})));
+      }).catch(logFailure('Department task notification'))));
     }
 
     if (assignedToId && toPerson) {
@@ -208,7 +209,7 @@ async function create(req, res) {
           type: 'task',
           link: assigneeLink,
         },
-      }).catch(() => {});
+      }).catch(logFailure('Task assigned notification'));
 
       // And whoever raised it gets a confirmation, unless they assigned it to
       // themselves and would otherwise be told twice.
@@ -222,7 +223,7 @@ async function create(req, res) {
             type: 'task',
             link: creatorLink,
           },
-        }).catch(() => {});
+        }).catch(logFailure('Task assigned confirmation'));
 
         sendTaskAssignedEmail({ task, assigneeId: assignedToId, gymId: req.user.gymId, assignedByName })
           .catch(err => console.error('Task assignment email failed:', err.message));
@@ -245,7 +246,7 @@ async function update(req, res) {
   const { title, description, dueDate, assignedToId, priority, status, category, notes } = req.body;
   // A completion note travels with the status change, so it belongs to the
   // assignee too; everything else is the task's content.
-  const editsContent = [title, description, dueDate, assignedToId, priority, category].some(v => v !== undefined);
+  const editsContent = [title, description, dueDate, assignedToId, priority, category, req.body.assignedRole, req.body.assignedGroup].some(v => v !== undefined);
   if (editsContent && !canEditTask(req.user, existing)) {
     return res.status(403).json({ error: 'Only the person who set this task, or a manager, can change it.' });
   }
@@ -348,7 +349,7 @@ async function update(req, res) {
         type: 'task',
         link: task.eventId ? '/calendar' : '/tasks',
       },
-    }).catch(() => {});
+    }).catch(logFailure('Task settled notification'));
   }
 
   res.json(mapTask(task));

@@ -20,7 +20,6 @@ const TITLE_EMAIL_MARKER = 'Payroll Overdue Email Sent';
 const periodKey = (d) => d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
 const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const startOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
-const ordinal = (n) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`;
 
 async function hasNotificationSince(gymId, title, since) {
   const existing = await prisma.notification.findFirst({
@@ -137,11 +136,12 @@ async function checkGym(gym, now) {
       try {
         const sent = await sendOverdueEmail(owner, gym.name, overdue, period, gym.code);
         if (sent) {
-          // Marker row so the email only goes out once per pay period
+          // Marker row so the email only goes out once per pay period. Its
+          // audience is nobody's, so it never shows in anyone's list.
           await prisma.notification.create({
             data: {
               gymId: gym.id,
-              staffId: owner.id,
+              audience: 'internal',
               title: TITLE_EMAIL_MARKER,
               body: `Overdue payroll email sent for ${period}.`,
               type: NOTIF_TYPE,

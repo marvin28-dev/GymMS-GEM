@@ -2,6 +2,7 @@ const router = require('express').Router();
 const jwt = require('jsonwebtoken');
 const prisma = require('../utils/prisma');
 const { subscribe } = require('../utils/liveHub');
+const { logFailure } = require('../utils/bestEffort');
 
 // EventSource cannot send an Authorization header, so the token comes in the query
 router.get('/', async (req, res) => {
@@ -11,7 +12,7 @@ router.get('/', async (req, res) => {
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
-  const account = await prisma.staff.findUnique({ where: { id: payload.id }, select: { gymId: true, isActive: true } }).catch(() => null);
+  const account = await prisma.staff.findUnique({ where: { id: payload.id }, select: { gymId: true, isActive: true } }).catch(logFailure('Checking the live stream account'));
   if (!account || !account.isActive || account.gymId !== payload.gymId) return res.status(401).json({ error: 'Unauthorized' });
 
   res.set({

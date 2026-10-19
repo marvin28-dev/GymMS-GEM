@@ -3,6 +3,7 @@ const { logActivity } = require('../utils/activityLog');
 const { AUDIENCES, resolveAudience, hasEmail, fieldValues, channelStatus, deliverCommunication } = require('../utils/messaging');
 const { toE164 } = require('../utils/phone');
 const { smsParts } = require('../utils/sms');
+const { logFailure } = require('../utils/bestEffort');
 
 const MANAGEMENT = ['general_manager', 'manager'];
 const CHANNELS = ['email', 'sms', 'both'];
@@ -161,7 +162,7 @@ async function create(req, res) {
   if (action === 'send') {
     deliverCommunication(comm.id).catch(async (err) => {
       console.error('Sending message failed:', err.message);
-      await prisma.communication.update({ where: { id: comm.id }, data: { status: 'failed' } }).catch(() => {});
+      await prisma.communication.update({ where: { id: comm.id }, data: { status: 'failed' } }).catch(logFailure('Marking the message failed'));
     });
   }
   res.status(action === 'send' ? 202 : 201).json(comm);
@@ -180,7 +181,7 @@ async function retry(req, res) {
   logActivity(req, { category: 'members', action: 'message.retried', summary: `Retried "${comm.subject}" for ${failed.length} failed deliveries`, target: { type: 'communication', id: comm.id } });
   deliverCommunication(comm.id, { only: failed }).catch(async (err) => {
     console.error('Retrying message failed:', err.message);
-    await prisma.communication.update({ where: { id: comm.id }, data: { status: 'failed' } }).catch(() => {});
+    await prisma.communication.update({ where: { id: comm.id }, data: { status: 'failed' } }).catch(logFailure('Marking the retry failed'));
   });
   res.status(202).json({ retrying: failed.length });
 }

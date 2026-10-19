@@ -2,6 +2,7 @@ const prisma = require('../utils/prisma');
 const { logActivity, fullName } = require('../utils/activityLog');
 const { membershipEnded } = require('../utils/membership');
 const { sendCoachIntro } = require('../utils/memberEmail');
+const { logFailure } = require('../utils/bestEffort');
 
 // The coach's side of the gym: who they train, what they are working towards,
 // what they have on today, and the progress they record. Everything is read
@@ -241,6 +242,7 @@ async function assign(req, res) {
   const coachId = req.body.coachId || null;
   const role = req.user.role;
   if (!isFitness(role) && !isManagement(role)) return res.status(403).json({ error: 'Only a coach or a manager can do this.' });
+  if (typeof memberId !== 'string' || !memberId.trim()) return res.status(400).json({ error: 'Choose the member.', field: 'memberId' });
 
   const member = await prisma.member.findFirst({ where: { gymId: req.user.gymId, OR: [{ id: memberId }, { memberCode: memberId }] }, include: { coach: { select: { id: true, firstName: true, lastName: true } } } });
   if (!member) return res.status(404).json({ error: 'Member not found' });
@@ -289,7 +291,7 @@ async function assign(req, res) {
     if (coachId !== req.user.id) {
       await prisma.notification.create({
         data: { gymId: req.user.gymId, staffId: coachId, title: 'New client', body: `You now coach ${fullName(member)}. Set their goals and take their starting measurements.`, type: 'system', link: `/members/${member.id}` },
-      }).catch(() => {});
+      }).catch(logFailure('New client notification'));
     }
     // The member is told who their coach is and how to reach them
     sendCoachIntro(member, coach, req.user.gymId).catch(err => console.error('Coach intro email failed:', err.message));

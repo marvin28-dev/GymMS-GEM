@@ -159,7 +159,11 @@ async function deliverCommunication(id, { only = null } = {}) {
     const { rowId, ...data } = r;
     await prisma.communicationDelivery.update({ where: { id: rowId }, data: { status: data.status, error: data.error || null, providerId: data.providerId || null, address: data.address || undefined } });
   }
-  const fresh = rows.filter(x => !x.rowId).map(({ rowId, ...r }) => r);
+  const fresh = rows.filter(x => !x.rowId).map((r) => {
+    const row = { ...r };
+    delete row.rowId;
+    return row;
+  });
   if (fresh.length) await prisma.communicationDelivery.createMany({ data: fresh });
 
   // Totals from every delivery of this message, so a retry adds up correctly
