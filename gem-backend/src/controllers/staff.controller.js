@@ -10,6 +10,7 @@ const { forgetAccount, DEACTIVATED } = require('../middleware/auth.middleware');
 const { sendWelcomeEmail } = require('../utils/welcomeEmail');
 const { deliver } = require('../utils/sendEmail');
 const { bestEffort } = require('../utils/bestEffort');
+const { newResetToken } = require('../utils/resetToken');
 
 const STAFF_FIELDS = {
   firstName: 'First name', lastName: 'Last name', email: 'Email', phone: 'Phone',
@@ -33,9 +34,10 @@ function formatRole(role) {
 // A link for an employee to choose a new password, sent when a manager asks.
 // It lasts a day, since the person may not see it straight away.
 async function sendResetLinkEmail(staff, gymId, sentBy) {
-  const token = crypto.randomBytes(32).toString('hex');
+  // Only a hash of the token is stored; the link in the email carries the token itself
+  const { token, hash } = newResetToken();
   const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  await prisma.staff.update({ where: { id: staff.id }, data: { resetToken: token, resetTokenExpiry: expiry } });
+  await prisma.staff.update({ where: { id: staff.id }, data: { resetToken: hash, resetTokenExpiry: expiry } });
 
   const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, logo: true, phone: true, email: true, website: true, location: true, city: true, country: true } });
   const gymName = gym?.name || 'your gym';

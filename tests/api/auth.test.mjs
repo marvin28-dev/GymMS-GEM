@@ -126,4 +126,59 @@ describe('resetting a forgotten password', () => {
     const res = await api.post('/api/auth/forgot-password', { gymCode: gym.gymCode, email: 'nobody@example.test' });
     expect(res.status).toBe(404);
   });
+
+  it('sends the link to the address on the account, not the one as typed', async () => {
+    const asked = await api.post('/api/auth/forgot-password', { gymCode: gym.gymCode.toUpperCase(), email: `  ${gym.email.toUpperCase()}  ` });
+    expect(asked.status).toBe(200);
+    const mail = outbox().filter(m => /Reset your GEM password/.test(m.subject)).at(-1);
+    expect(mail.to).toBe(gym.email);
+  });
+
+  it('keeps only a hash of the token, so the database alone holds no working link', async () => {
+    await api.post('/api/auth/forgot-password', { gymCode: gym.gymCode, email: gym.email });
+    const mail = outbox().filter(m => m.to === gym.email && /Reset your GEM password/.test(m.subject)).at(-1);
+    const token = /reset-password\?token=([a-f0-9]{64})/.exec(mail.html)[1];
+    const { prisma } = await import('./helpers/server.mjs').then(m => ({ prisma: m.backend('./utils/prisma.js') }));
+    const stored = await prisma.staff.findFirst({ where: { email: gym.email }, select: { resetToken: true } });
+    expect(stored.resetToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(stored.resetToken).not.toBe(token);
+    expect((await api.get(`/api/auth/verify-reset-token/${stored.resetToken}`)).body.valid).toBe(false);
+    expect((await api.get(`/api/auth/verify-reset-token/${token}`)).body.valid).toBe(true);
+  });
+});
+
+describe('gym codes typed another way', () => {
+  it('signs in, looks up and sets up whatever the capitals', async () => {
+    const upper = gym.gymCode.toUpperCase();
+    expect((await api.post('/api/auth/login', { gymCode: upper, email: gym.email, password: OWNER_PASSWORD })).status).toBe(200);
+    expect((await api.post('/api/auth/login-status', { gymCode: ` ${upper} `, email: gym.email })).body.status).toBe('existing');
+  });
+});
+
+describe('what a new gym must have', () => {
+  const body = (over) => ({ ...gym.body, gymCode: uniqueCode('rule'), email: `${uniqueCode('r')}@example.test`, ...over });
+
+  it('refuses a password shorter than 6, as every other password box does', async () => {
+    const res = await api.post('/api/auth/register', body({ password: '12345' }));
+    expect(res.status).toBe(400);
+    expect(res.body.field).toBe('password');
+  });
+
+  it('refuses a gym code with spaces or symbols, which would break the sign-in address', async () => {
+    for (const gymCode of ['my gym', 'gym/../x', 'café!']) {
+      const res = await api.post('/api/auth/register', body({ gymCode }));
+      expect(res.status).toBe(400);
+      expect(res.body.field).toBe('gymCode');
+    }
+  });
+
+  it('refuses an email that is not an address', async () => {
+    expect((await api.post('/api/auth/register', body({ email: 'not-an-email' }))).body.field).toBe('email');
+  });
+
+  it('gives a new gym its country\'s currency when the one named is not a currency code', async () => {
+    const res = await api.post('/api/auth/register', body({ currency: 'francs' }));
+    expect(res.status).toBe(201);
+    expect(res.body.user.gymCurrency).toBe('XAF');
+  });
 });

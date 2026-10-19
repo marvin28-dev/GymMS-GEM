@@ -366,6 +366,7 @@ const translations = {
     common: {
       save: 'Save', cancel: 'Cancel', add: 'Add', edit: 'Edit', delete: 'Delete',
       needsAttention: 'Needs attention',
+      tooManyTries: 'Too many tries. Try again in {minutes} min.',
       search: 'Search', searchEverything: 'Search pages, settings, people…', loading: 'Loading...', export: 'Export', confirm: 'Confirm',
       back: 'Back', close: 'Close', yes: 'Yes', no: 'No', actions: 'Actions',
       required: 'Required', total: 'Total', status: 'Status', date: 'Date',
@@ -2474,6 +2475,7 @@ const translations = {
     common: {
       save: 'Enregistrer', cancel: 'Annuler', add: 'Ajouter', edit: 'Modifier',
       needsAttention: 'À traiter',
+      tooManyTries: 'Trop d\'essais. Réessayez dans {minutes} min.',
       delete: 'Supprimer', search: 'Rechercher', searchEverything: 'Rechercher pages, paramètres, personnes…', loading: 'Chargement...', export: 'Exporter',
       confirm: 'Confirmer', back: 'Retour', close: 'Fermer', yes: 'Oui', no: 'Non',
       actions: 'Actions', required: 'Requis', total: 'Total', status: 'Statut', date: 'Date',

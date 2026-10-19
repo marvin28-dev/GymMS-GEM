@@ -27,6 +27,13 @@ const reportRoutes = require('./routes/report.routes');
 
 const app = express();
 
+// Behind a proxy (Railway's edge) every request arrives from the proxy, and the
+// visitor's own address is in X-Forwarded-For. Without trusting that one hop,
+// every visitor shared one rate limit: 30 sign-in lookups for the whole world.
+// TRUST_PROXY overrides it (a number of hops, true or false); on Railway it is 1.
+const trustProxy = process.env.TRUST_PROXY ?? (process.env.RAILWAY_ENVIRONMENT ? '1' : '');
+if (trustProxy) app.set('trust proxy', /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy === 'true');
+
 const ALLOWED_ORIGINS = [
   'https://gym-ms-gem.vercel.app',
   ...(process.env.ALLOWED_ORIGINS

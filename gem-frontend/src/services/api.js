@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { getAuth, clearAuth } from '../utils/auth';
 import { notifyDataChanged, CLIENT_ID, LIVE_CHANGED } from '../utils/events';
+import translations from '../i18n/translations';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
@@ -37,6 +38,17 @@ function signOut() {
   if (window.location.pathname !== target) window.location.href = target;
 }
 
+// The server refuses too many tries (codes, sign-ins, reset emails) with a code,
+// so every screen shows the refusal in the reader's own language
+function sayTooManyInLanguage(error) {
+  const data = error.response?.data;
+  if (error.response?.status !== 429 || data?.code !== 'TOO_MANY_TRIES') return;
+  let lang = 'en';
+  try { lang = localStorage.getItem('gem-lang') || 'en'; } catch { /* storage blocked: English */ }
+  const text = translations[lang]?.common?.tooManyTries || translations.en.common.tooManyTries;
+  data.error = text.replace('{minutes}', String(data.retryInMinutes || 1));
+}
+
 // On 401, clear auth and redirect to login - but not if already on a login page
 api.interceptors.response.use(
   (response) => {
@@ -56,6 +68,7 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    sayTooManyInLanguage(error);
     if (error.response?.status === 401 && SIGN_OUT_CODES.has(error.response?.data?.code)) {
       signOut();
       return Promise.reject(error);
