@@ -1,5 +1,6 @@
 const prisma = require('../utils/prisma');
 const { logActivity } = require('../utils/activityLog');
+const { attemptCounter } = require('../utils/attempts');
 
 const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 const LAPSED = ['expired', 'frozen', 'suspended', 'cancelled', 'deactivated'];
@@ -27,51 +28,80 @@ function asVisit(record) {
   };
 }
 
+const FITNESS_ROLES = ['trainer', 'instructor', 'coach'];
+
+// Fitness staff work with members, not with their money: what a member owes,
+// and owed at each visit, is left out of what they are sent
+function forRole(visit, role) {
+  if (!FITNESS_ROLES.includes(role)) return visit;
+  const copy = { ...visit };
+  delete copy.balanceAtCheckIn;
+  if (copy.member) {
+    copy.member = { ...copy.member };
+    delete copy.member.balance;
+  }
+  return copy;
+}
+
 async function getAll(req, res) {
   const { date } = req.query;
   const where = { gymId: req.user.gymId };
   if (date) {
-    const start = new Date(date);
-    const end = new Date(date);
+    const start = new Date(String(date));
+    if (Number.isNaN(start.getTime())) return res.status(400).json({ error: 'That date could not be read.', field: 'date' });
+    const end = new Date(start);
     end.setDate(end.getDate() + 1);
     where.checkIn = { gte: start, lt: end };
   }
   const records = await prisma.attendance.findMany({
     where,
     include: {
-      member: { select: { id: true, firstName: true, lastName: true, accessCode: true, memberCode: true, status: true, isVisitor: true, balance: true, avatarColor: true, photo: true, package: { select: { name: true } } } },
+      // A member's check-in code is never sent with a visit: nothing reads it here,
+      // and the desk is deliberately never shown one
+      member: { select: { id: true, firstName: true, lastName: true, memberCode: true, status: true, isVisitor: true, balance: true, avatarColor: true, photo: true, package: { select: { name: true } } } },
       staff:  { select: { id: true, firstName: true, lastName: true, photo: true } },
       workoutStaff: { select: { id: true, firstName: true, lastName: true, avatarColor: true, photo: true, role: true } },
     },
     orderBy: { checkIn: 'desc' },
   });
-  res.json(records.map(asVisit));
+  res.json(records.map(r => forRole(asVisit(r), req.user.role)));
 }
+
+// Unknown codes typed at the desk, counted per account. A staff code also
+// checks its holder in to train and names them, so trying every code in turn
+// would find them all; a member's code would let someone in as them.
+const codeTries = attemptCounter({ max: 10, windowMs: 15 * 60 * 1000 });
 
 async function checkIn(req, res) {
  try {
-  const { memberId, accessCode, note } = req.body;
+  const { memberId, note } = req.body;
+  const gymId = req.user.gymId;
+  const rawCode = req.body.accessCode;
+  const accessCode = rawCode !== undefined && rawCode !== null && String(rawCode).trim() !== '' ? String(rawCode).trim() : null;
+  const triesKey = `${gymId}:${req.user.id}`;
 
-  const where = { gymId: req.user.gymId };
+  const where = { gymId };
   if (accessCode) {
+    const wait = codeTries.lockedFor(triesKey);
+    if (wait) return res.status(429).json({ error: `Too many unknown codes. Try again in ${Math.ceil(wait / 60000)} minutes, or find the member by name.` });
     where.accessCode = accessCode;
-  } else if (memberId) {
+  } else if (typeof memberId === 'string' && memberId.trim()) {
     where.OR = [{ id: memberId }, { memberCode: memberId }];
   } else {
     return res.status(400).json({ error: 'memberId or accessCode is required' });
   }
 
-  const [member, gym] = await Promise.all([
-    prisma.member.findFirst({ where }),
-    prisma.gym.findUnique({ where: { id: req.user.gymId }, select: { registrationFeeRequired: true, registrationFeeFrequency: true, registrationGracePeriodDays: true } }),
+  const [found, gym] = await Promise.all([
+    prisma.member.findFirst({ where, select: { id: true } }),
+    prisma.gym.findUnique({ where: { id: gymId }, select: { registrationFeeRequired: true, registrationFeeFrequency: true, registrationGracePeriodDays: true } }),
   ]);
 
   // Nobody by that code on the membership list. It may be an employee's own
   // 4-digit code, which they use when they come in to train on their own time.
   // That is a visit to the gym, never a shift: work is clocked by name.
-  if (!member && accessCode) {
+  if (!found && accessCode) {
     const staff = await prisma.staff.findFirst({
-      where: { gymId: req.user.gymId, accessCode: String(accessCode) },
+      where: { gymId, accessCode },
       select: { id: true, firstName: true, lastName: true, avatarColor: true, photo: true, role: true, isActive: true },
     });
     if (staff) {
@@ -79,13 +109,13 @@ async function checkIn(req, res) {
         return res.status(403).json({ error: 'That account is deactivated.' });
       }
       const already = await prisma.attendance.findFirst({
-        where: { gymId: req.user.gymId, workoutStaffId: staff.id, checkOut: null, checkIn: { gte: startOfToday() } },
+        where: { gymId, workoutStaffId: staff.id, checkOut: null, checkIn: { gte: startOfToday() } },
       });
       if (already) {
         return res.status(409).json({ error: `${staff.firstName} is already checked in to train.`, staffWorkout: true });
       }
       const visit = await prisma.attendance.create({
-        data: { gymId: req.user.gymId, workoutStaffId: staff.id, note: note || null },
+        data: { gymId, workoutStaffId: staff.id, note: note || null },
         include: { workoutStaff: { select: { id: true, firstName: true, lastName: true, avatarColor: true, photo: true, role: true } } },
       });
       logActivity(req, {
@@ -97,135 +127,154 @@ async function checkIn(req, res) {
     }
   }
 
-  if (!member) return res.status(404).json({ error: 'Member not found' });
-
-  // Correct status on the fly before check-in gate
-  const now = new Date();
-  const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  if (['active', 'expiring'].includes(member.status) && !member.isVisitor && member.startDate && new Date(member.startDate) > now) {
-    await prisma.member.update({ where: { id: member.id }, data: { status: 'pending' } });
-    member.status = 'pending';
-  } else if (['active', 'expiring'].includes(member.status) && !member.isVisitor && member.endDate && new Date(member.endDate) < now) {
-    await prisma.member.update({ where: { id: member.id }, data: { status: 'expired' } });
-    member.status = 'expired';
-  } else if (member.status === 'active' && !member.isVisitor && member.endDate && new Date(member.endDate) >= now && new Date(member.endDate) <= in7Days) {
-    await prisma.member.update({ where: { id: member.id }, data: { status: 'expiring' } });
-    member.status = 'expiring';
+  if (!found) {
+    if (accessCode) codeTries.miss(triesKey);
+    return res.status(404).json({ error: 'Member not found' });
   }
 
-  // What this visit spends. A visitor spends a bundle pass while the bundle is
-  // still valid, then a day pass. A lapsed member (frozen / suspended / expired /
-  // cancelled / deactivated) can only come in on a paid day pass. Everyone else
-  // comes in on their membership. Day passes are counted apart from bundle and
-  // package sessions, so a lapsed member on a limited package is never let in
-  // on sessions they have left.
-  const dayPasses = member.dayPasses || 0;
-  let kind = null;
-  if (member.isVisitor) {
-    // The end date is the last day the passes work (stored as that day at midnight
-    // UTC), so they lapse once that whole day has gone by.
-    const bundleExpired = member.endDate && new Date(member.endDate).getTime() + 86400000 <= now.getTime();
-    if ((member.passesRemaining || 0) > 0 && !bundleExpired) kind = 'visitor_pass';
-    else if (dayPasses > 0) kind = 'day_pass';
-    else {
-      const why = (member.passesRemaining || 0) > 0 && bundleExpired
-        ? `visitor passes expired on ${new Date(member.endDate).toLocaleDateString()}`
-        : 'no passes remaining';
-      return res.status(403).json({ error: `Cannot check in - ${why}. Renew passes or buy a day pass.`, member });
+  // The member's row is held for the whole check-in, so two at the same moment
+  // (a double click, two desks) take turns: the second finds the first visit
+  // and is refused by the 30-minute rule. Three at once used to record three
+  // visits and spend three passes.
+  const outcome = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "Member" WHERE "id" = ${found.id} FOR UPDATE`;
+    const member = await tx.member.findUnique({ where: { id: found.id } });
+
+    // Correct status on the fly before check-in gate
+    const now = new Date();
+    const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    if (['active', 'expiring'].includes(member.status) && !member.isVisitor && member.startDate && new Date(member.startDate) > now) {
+      await tx.member.update({ where: { id: member.id }, data: { status: 'pending' } });
+      member.status = 'pending';
+    } else if (['active', 'expiring'].includes(member.status) && !member.isVisitor && member.endDate && new Date(member.endDate) < now) {
+      await tx.member.update({ where: { id: member.id }, data: { status: 'expired' } });
+      member.status = 'expired';
+    } else if (member.status === 'active' && !member.isVisitor && member.endDate && new Date(member.endDate) >= now && new Date(member.endDate) <= in7Days) {
+      await tx.member.update({ where: { id: member.id }, data: { status: 'expiring' } });
+      member.status = 'expiring';
     }
-  } else if (LAPSED.includes(member.status)) {
-    if (dayPasses > 0) kind = 'day_pass';
-    else {
-      const why = member.status === 'frozen' ? 'membership is frozen'
-        : member.status === 'suspended' ? 'account is suspended'
-        : member.status === 'cancelled' ? 'membership was cancelled'
-        : member.status === 'deactivated' ? 'account is deactivated'
-        : `membership is ${member.status}`;
-      // A frozen member gets back in by unfreezing; cancelled/deactivated reactivate; the rest renew.
-      const fix = member.status === 'frozen' ? 'Buy a day pass or unfreeze membership.'
-        : (member.status === 'cancelled' || member.status === 'deactivated') ? 'Buy a day pass or reactivate.'
-        : 'Buy a day pass or renew.';
-      return res.status(403).json({ error: `Cannot check in - ${why}. ${fix}`, member });
+
+    // What this visit spends. A visitor spends a bundle pass while the bundle is
+    // still valid, then a day pass. A lapsed member (frozen / suspended / expired /
+    // cancelled / deactivated) can only come in on a paid day pass. Everyone else
+    // comes in on their membership. Day passes are counted apart from bundle and
+    // package sessions, so a lapsed member on a limited package is never let in
+    // on sessions they have left.
+    const dayPasses = member.dayPasses || 0;
+    let kind = null;
+    if (member.isVisitor) {
+      // The end date is the last day the passes work (stored as that day at midnight
+      // UTC), so they lapse once that whole day has gone by.
+      const bundleExpired = member.endDate && new Date(member.endDate).getTime() + 86400000 <= now.getTime();
+      if ((member.passesRemaining || 0) > 0 && !bundleExpired) kind = 'visitor_pass';
+      else if (dayPasses > 0) kind = 'day_pass';
+      else {
+        const why = (member.passesRemaining || 0) > 0 && bundleExpired
+          ? `visitor passes expired on ${new Date(member.endDate).toLocaleDateString()}`
+          : 'no passes remaining';
+        return { status: 403, body: { error: `Cannot check in - ${why}. Renew passes or buy a day pass.`, member } };
+      }
+    } else if (LAPSED.includes(member.status)) {
+      if (dayPasses > 0) kind = 'day_pass';
+      else {
+        const why = member.status === 'frozen' ? 'membership is frozen'
+          : member.status === 'suspended' ? 'account is suspended'
+          : member.status === 'cancelled' ? 'membership was cancelled'
+          : member.status === 'deactivated' ? 'account is deactivated'
+          : `membership is ${member.status}`;
+        // A frozen member gets back in by unfreezing; cancelled/deactivated reactivate; the rest renew.
+        const fix = member.status === 'frozen' ? 'Buy a day pass or unfreeze membership.'
+          : (member.status === 'cancelled' || member.status === 'deactivated') ? 'Buy a day pass or reactivate.'
+          : 'Buy a day pass or renew.';
+        return { status: 403, body: { error: `Cannot check in - ${why}. ${fix}`, member } };
+      }
     }
-  }
 
-  // Block check-in if annual registration fee is overdue
-  if (gym?.registrationFeeRequired && gym?.registrationFeeFrequency === 'yearly' && member.regFeeDate) {
-    const dueDate = new Date(member.regFeeDate);
-    dueDate.setFullYear(dueDate.getFullYear() + 1);
-    const graceDays = gym.registrationGracePeriodDays || 0;
-    const suspendDate = new Date(dueDate);
-    suspendDate.setDate(suspendDate.getDate() + graceDays);
-    if (now > suspendDate) {
-      return res.status(403).json({ error: 'Annual registration fee has expired. Member must renew before checking in.', member });
+    // Block check-in if annual registration fee is overdue
+    if (gym?.registrationFeeRequired && gym?.registrationFeeFrequency === 'yearly' && member.regFeeDate) {
+      const dueDate = new Date(member.regFeeDate);
+      dueDate.setFullYear(dueDate.getFullYear() + 1);
+      const graceDays = gym.registrationGracePeriodDays || 0;
+      const suspendDate = new Date(dueDate);
+      suspendDate.setDate(suspendDate.getDate() + graceDays);
+      if (now > suspendDate) {
+        return { status: 403, body: { error: 'Annual registration fee has expired. Member must renew before checking in.', member } };
+      }
     }
-  }
-  if (member.status === 'pending' && !kind) {
-    const startLabel = member.startDate ? new Date(member.startDate).toLocaleDateString() : 'unknown date';
-    return res.status(403).json({ error: `Membership not started yet (starts ${startLabel})`, member });
-  }
+    if (member.status === 'pending' && !kind) {
+      const startLabel = member.startDate ? new Date(member.startDate).toLocaleDateString() : 'unknown date';
+      return { status: 403, body: { error: `Membership not started yet (starts ${startLabel})`, member } };
+    }
 
-  // On a membership, a null passesRemaining means the package is unlimited; any
-  // number is a session limit.
-  const sessionLimited = !kind && member.passesRemaining !== null && member.passesRemaining !== undefined;
-  if (sessionLimited && member.passesRemaining <= 0) {
-    return res.status(403).json({ error: 'No sessions remaining on this package', member });
-  }
+    // On a membership, a null passesRemaining means the package is unlimited; any
+    // number is a session limit.
+    const sessionLimited = !kind && member.passesRemaining !== null && member.passesRemaining !== undefined;
+    if (sessionLimited && member.passesRemaining <= 0) {
+      return { status: 403, body: { error: 'No sessions remaining on this package', member } };
+    }
 
-  // A member can come in as many times a day as they like, but a second check-in
-  // within half an hour is the same visit, not a new one - whoever they are and
-  // however they pay. It is refused before anything is spent, so a visitor or a
-  // day pass is never charged twice for one visit.
-  const recent = await prisma.attendance.findFirst({
-    where: { gymId: req.user.gymId, memberId: member.id, checkIn: { gte: new Date(now.getTime() - 30 * 60000) } },
-    orderBy: { checkIn: 'desc' },
-    include: {
-      member: { select: { id: true, memberCode: true, firstName: true, lastName: true, status: true, avatarColor: true, photo: true } },
-    },
-  });
-  if (recent) {
-    return res.status(409).json({
-      error: `${member.firstName} was already checked in within the last 30 minutes.`,
-      alreadyCheckedIn: true,
-      lastCheckIn: recent.checkIn,
-      member: { ...recent.member, passesRemaining: member.passesRemaining, dayPasses, isVisitor: member.isVisitor },
+    // A member can come in as many times a day as they like, but a second check-in
+    // within half an hour is the same visit, not a new one - whoever they are and
+    // however they pay. It is refused before anything is spent, so a visitor or a
+    // day pass is never charged twice for one visit.
+    const recent = await tx.attendance.findFirst({
+      where: { gymId, memberId: member.id, checkIn: { gte: new Date(now.getTime() - 30 * 60000) } },
+      orderBy: { checkIn: 'desc' },
+      include: {
+        member: { select: { id: true, memberCode: true, firstName: true, lastName: true, status: true, avatarColor: true, photo: true } },
+      },
     });
-  }
+    if (recent) {
+      return {
+        status: 409,
+        body: {
+          error: `${member.firstName} was already checked in within the last 30 minutes.`,
+          alreadyCheckedIn: true,
+          lastCheckIn: recent.checkIn,
+          member: { ...recent.member, passesRemaining: member.passesRemaining, dayPasses, isVisitor: member.isVisitor },
+        },
+      };
+    }
 
-  const record = await prisma.attendance.create({
-    // The visit keeps where the member stood as they came in: paying later does
-    // not change the marker on a visit made while owing
-    data: { gymId: req.user.gymId, memberId: member.id, staffId: req.user.id || null, note, kind, balanceAtCheckIn: Number(member.balance) || 0, statusAtCheckIn: member.status || null },
-    include: {
-      member: { select: { id: true, memberCode: true, firstName: true, lastName: true, status: true, avatarColor: true, photo: true } },
-      staff:  { select: { id: true, firstName: true, lastName: true, photo: true } },
-    },
+    const record = await tx.attendance.create({
+      // The visit keeps where the member stood as they came in: paying later does
+      // not change the marker on a visit made while owing
+      data: { gymId, memberId: member.id, staffId: req.user.id || null, note, kind, balanceAtCheckIn: Number(member.balance) || 0, statusAtCheckIn: member.status || null },
+      include: {
+        member: { select: { id: true, memberCode: true, firstName: true, lastName: true, status: true, avatarColor: true, photo: true } },
+        staff:  { select: { id: true, firstName: true, lastName: true, photo: true } },
+      },
+    });
+
+    const memberUpdate = { lastVisit: new Date() };
+    if (kind === 'day_pass') {
+      memberUpdate.dayPasses = dayPasses - 1;
+    } else if (kind === 'visitor_pass' || sessionLimited) {
+      memberUpdate.passesRemaining = member.passesRemaining - 1;
+    }
+    // A visitor with nothing left to come in on is spent: mark them expired so
+    // they read as inactive until they buy more.
+    if (member.isVisitor) {
+      const passesLeft = memberUpdate.passesRemaining ?? member.passesRemaining ?? 0;
+      const dayLeft = memberUpdate.dayPasses ?? dayPasses;
+      if (passesLeft <= 0 && dayLeft <= 0) memberUpdate.status = 'expired';
+    }
+
+    const updatedMember = await tx.member.update({
+      where: { id: member.id },
+      data: memberUpdate,
+      select: { id: true, passesRemaining: true, dayPasses: true, isVisitor: true, status: true },
+    });
+
+    return {
+      status: 201,
+      body: {
+        ...record,
+        member: { ...record.member, passesRemaining: updatedMember.passesRemaining, dayPasses: updatedMember.dayPasses, isVisitor: updatedMember.isVisitor, status: updatedMember.status },
+      },
+    };
   });
-
-  const memberUpdate = { lastVisit: new Date() };
-  if (kind === 'day_pass') {
-    memberUpdate.dayPasses = dayPasses - 1;
-  } else if (kind === 'visitor_pass' || sessionLimited) {
-    memberUpdate.passesRemaining = member.passesRemaining - 1;
-  }
-  // A visitor with nothing left to come in on is spent: mark them expired so
-  // they read as inactive until they buy more.
-  if (member.isVisitor) {
-    const passesLeft = memberUpdate.passesRemaining ?? member.passesRemaining ?? 0;
-    const dayLeft = memberUpdate.dayPasses ?? dayPasses;
-    if (passesLeft <= 0 && dayLeft <= 0) memberUpdate.status = 'expired';
-  }
-
-  const updatedMember = await prisma.member.update({
-    where: { id: member.id },
-    data: memberUpdate,
-    select: { id: true, passesRemaining: true, dayPasses: true, isVisitor: true, status: true },
-  });
-
-  res.status(201).json({
-    ...record,
-    member: { ...record.member, passesRemaining: updatedMember.passesRemaining, dayPasses: updatedMember.dayPasses, isVisitor: updatedMember.isVisitor, status: updatedMember.status },
-  });
+  return res.status(outcome.status).json(outcome.body);
  } catch (err) {
   // Without this, a thrown error in this async handler never sends a response
   // and the check-in request hangs - which reads on the page as a freeze.
