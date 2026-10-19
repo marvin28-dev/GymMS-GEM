@@ -3,7 +3,7 @@
 This file is the source of truth for the audit. A new session starts by reading it top to bottom.
 
 - **Branch:** `production-audit` (made from `main` at `69cefa8`). Nothing is pushed; `main` is never touched.
-- **Current phase:** Phase 1 (baseline) done; Phase 2 (line-by-line review) next.
+- **Current phase:** Phase 2. Pass 1 of the repository root and the whole backend is done (112 of 296 files), with findings F-029 to F-079. Next: fix the backend findings marked Open, each with a test (see "Plan for the backend fixes" below), then Pass 1 of the frontend.
 - **Started:** 2026-10-19. The owner replied "go" without answering the four Phase 0 questions, so the proposed defaults were used: a local `gem_test` database for tests, the baseline commit (D-9), tool downloads allowed, and the Railway details treated as unknown until the owner answers (see "Open questions").
 
 ### Open questions for the owner
@@ -15,6 +15,7 @@ This file is the source of truth for the audit. A new session starts by reading 
 | Date | Phase | What happened |
 | :- | :- | :- |
 | 2026-10-19 | 0 | Discovery. Branch created. Inventory, integration points, journeys and first findings written. Stopped for "go". |
+| 2026-10-19 | 2 | Test harness (Vitest on a local gem_test database; Resend and Cloudinary faked), backend ESLint (29 errors), knip with real entry points. Pass 1 of 112 root and backend files. Prisma refused to reset a database from an AI session without the owner's consent, so the harness never resets: it only pushes the schema, and `npm run test:db:reset` is left for a person to run. |
 | 2026-10-19 | 1 | "go" received. Baseline commit `e789a22` (earlier uncommitted work, minus `Documents/login.txt`). Commit `f194d32`: login notes untracked, every `.env.*` ignored. Baseline results recorded (section 5). The owner had added root tooling at 15:21 (Playwright 1.64.1 with browsers, knip 6.42.0, Vitest 5.0.5, TypeScript 7.0.2); it is now part of the inventory. |
 
 ### Commits on this branch
@@ -23,6 +24,21 @@ This file is the source of truth for the audit. A new session starts by reading 
 | :- | :- |
 | `e789a22` | Baseline: work in progress before the audit (258 files). |
 | `f194d32` | security: stop tracking sign-in notes; ignore every .env variant. |
+
+### Plan for the backend fixes (Phase 2 and 3 work on the backend)
+
+Each fix gets a test in `tests/api/` that fails before it and passes after, then its own commit. Order:
+
+1. App-wide: `req.body` defaults to `{}` (F-031); client errors keep their status, unknown `/api` routes answer JSON 404 (F-032). Test: `tests/api/robustness.test.mjs`.
+2. Missing ids (F-053) in approvals, coach assign, payments. Test: `approvals.test.mjs`, `payments.test.mjs`.
+3. Calendar: date and series validation (F-047), field list on update (F-048), staff kept when not sent (F-049), 400 for unreadable input (F-071). Test: `calendar.test.mjs`.
+4. Tenancy and mass assignment: attendance checkout (F-044), equipment (F-055), packages (F-067). Tests per file.
+5. Approvals: atomic claim and state checks (F-039), day validation (F-040).
+6. Money: atomic balance (F-042, F-077), payment transaction and finite amounts (F-064), expenses validation (F-063), payroll duplicate guard (F-065), member and first payment in one transaction (F-064).
+7. Check-in: row lock (F-043), attendance list without codes (F-045 part), code attempt limit (F-046).
+8. Staff: unique codes (F-059), DELETE owner-only (F-060), ID scan private (F-061), role map (F-062), placeholder password and error text (F-073), raw SQL removed (F-072).
+9. Auth: verify-manager attempt limit (F-030), gym code case (F-033), reset email address (F-034), registration rules (F-035), hashed reset tokens (F-036), rate limits (F-003, F-029 with `TRUST_PROXY`).
+10. Smaller: gym response without `managerCode` (F-068), currency and number checks (F-069), task content rule (F-070), task reminders (F-076), member codes (F-056), payroll job helper (F-079), every silent `.catch(() => {})` logs (F-050), backend lint to zero.
 
 ## 1. Stack
 
@@ -250,40 +266,40 @@ Every file in the repository except `node_modules`, build output (`dist`), lockf
 
 | File | Lines | Pass 1 | Pass 2 |
 | :- | -: | :-: | :-: |
-| `gem-backend/src/utils/activityLog.js` | 73 | [ ] | [ ] |
-| `gem-backend/src/utils/assignees.js` | 21 | [ ] | [ ] |
+| `gem-backend/src/utils/activityLog.js` | 73 | [x] | [ ] |
+| `gem-backend/src/utils/assignees.js` | 21 | [x] | [ ] |
 | `gem-backend/src/utils/cloudinary.js` | 9 | [x] | [ ] |
-| `gem-backend/src/utils/dates.js` | 17 | [ ] | [ ] |
-| `gem-backend/src/utils/emailGuard.js` | 43 | [ ] | [ ] |
-| `gem-backend/src/utils/emailLayout.js` | 203 | [ ] | [ ] |
-| `gem-backend/src/utils/gymSetup.js` | 54 | [ ] | [ ] |
-| `gem-backend/src/utils/hierarchy.js` | 138 | [ ] | [ ] |
-| `gem-backend/src/utils/liveHub.js` | 39 | [ ] | [ ] |
-| `gem-backend/src/utils/memberEmail.js` | 195 | [ ] | [ ] |
-| `gem-backend/src/utils/membership.js` | 29 | [ ] | [ ] |
-| `gem-backend/src/utils/messaging.js` | 183 | [ ] | [ ] |
-| `gem-backend/src/utils/money.js` | 40 | [ ] | [ ] |
-| `gem-backend/src/utils/notificationScope.js` | 45 | [ ] | [ ] |
-| `gem-backend/src/utils/paymentMethod.js` | 13 | [ ] | [ ] |
-| `gem-backend/src/utils/phone.js` | 38 | [ ] | [ ] |
+| `gem-backend/src/utils/dates.js` | 17 | [x] | [ ] |
+| `gem-backend/src/utils/emailGuard.js` | 43 | [x] | [ ] |
+| `gem-backend/src/utils/emailLayout.js` | 203 | [x] | [ ] |
+| `gem-backend/src/utils/gymSetup.js` | 54 | [x] | [ ] |
+| `gem-backend/src/utils/hierarchy.js` | 138 | [x] | [ ] |
+| `gem-backend/src/utils/liveHub.js` | 39 | [x] | [ ] |
+| `gem-backend/src/utils/memberEmail.js` | 195 | [x] | [ ] |
+| `gem-backend/src/utils/membership.js` | 29 | [x] | [ ] |
+| `gem-backend/src/utils/messaging.js` | 183 | [x] | [ ] |
+| `gem-backend/src/utils/money.js` | 40 | [x] | [ ] |
+| `gem-backend/src/utils/notificationScope.js` | 45 | [x] | [ ] |
+| `gem-backend/src/utils/paymentMethod.js` | 13 | [x] | [ ] |
+| `gem-backend/src/utils/phone.js` | 38 | [x] | [ ] |
 | `gem-backend/src/utils/prisma.js` | 7 | [x] | [ ] |
-| `gem-backend/src/utils/receiptPdf.js` | 135 | [ ] | [ ] |
-| `gem-backend/src/utils/scheduleAlert.js` | 106 | [ ] | [ ] |
+| `gem-backend/src/utils/receiptPdf.js` | 135 | [x] | [ ] |
+| `gem-backend/src/utils/scheduleAlert.js` | 106 | [x] | [ ] |
 | `gem-backend/src/utils/sendEmail.js` | 31 | [x] | [ ] |
-| `gem-backend/src/utils/sms.js` | 71 | [ ] | [ ] |
-| `gem-backend/src/utils/taskEmail.js` | 94 | [ ] | [ ] |
-| `gem-backend/src/utils/welcomeEmail.js` | 57 | [ ] | [ ] |
+| `gem-backend/src/utils/sms.js` | 71 | [x] | [ ] |
+| `gem-backend/src/utils/taskEmail.js` | 94 | [x] | [ ] |
+| `gem-backend/src/utils/welcomeEmail.js` | 57 | [x] | [ ] |
 
 ### Backend: background jobs (6 files, 502 lines)
 
 | File | Lines | Pass 1 | Pass 2 |
 | :- | -: | :-: | :-: |
-| `gem-backend/src/jobs/autoPayroll.js` | 115 | [ ] | [ ] |
-| `gem-backend/src/jobs/freezeFees.js` | 53 | [ ] | [ ] |
-| `gem-backend/src/jobs/logRetention.js` | 24 | [ ] | [ ] |
-| `gem-backend/src/jobs/payrollReminders.js` | 188 | [ ] | [ ] |
-| `gem-backend/src/jobs/scheduledMessages.js` | 34 | [ ] | [ ] |
-| `gem-backend/src/jobs/taskReminders.js` | 88 | [ ] | [ ] |
+| `gem-backend/src/jobs/autoPayroll.js` | 115 | [x] | [ ] |
+| `gem-backend/src/jobs/freezeFees.js` | 53 | [x] | [ ] |
+| `gem-backend/src/jobs/logRetention.js` | 24 | [x] | [ ] |
+| `gem-backend/src/jobs/payrollReminders.js` | 188 | [x] | [ ] |
+| `gem-backend/src/jobs/scheduledMessages.js` | 34 | [x] | [ ] |
+| `gem-backend/src/jobs/taskReminders.js` | 88 | [x] | [ ] |
 
 ### Frontend: configuration and public files (10 files, 159 lines)
 
@@ -617,6 +633,12 @@ Severity: Critical, High, Medium, Low. Status: Open, Fixed, Needs decision, Won'
 | F-071 | Low | Bug | `calendar.controller.js:146,287`, `timecard.controller.js:139,256,421-427`, `staff.controller.js:350` | Unreadable input answers 500 instead of 400 in several places: `staffIds` that is not JSON, an unreadable date, a time like 25:99 (rolls into the next day). | Validate and answer 400 with the field. | Open |
 | F-072 | Low | Quality | `staff.controller.js:123-137,205-218,390-429`, `payment.controller.js:92-102` | Four raw SQL statements work around "a stale Prisma client" that no longer exists: the generated client has these columns. | Use the client; drop the raw SQL. | Open |
 | F-073 | Low | Security | `staff.controller.js:173,202` | A new account's placeholder password is `GEM` plus the creation time in milliseconds (unusable while `mustSetPassword` is set, but guessable), and a failed staff create returns the database's error text to the browser. | A random placeholder; a plain error message. | Open |
+| F-074 | High | Bug | `utils/scheduleAlert.js`, `controllers/timecard.controller.js` and 12 more files (59 places) | Days and times are worked out in the server's own time zone (`setHours`, `getHours`, `toLocaleDateString` with no zone). Railway runs in UTC unless `TZ` is set, and Cameroon is UTC+1: an employee clocking in on time at 08:00 is measured as 07:00, flagged "1 h early" and sent for review every day; a time the desk types as 09:00 is stored as 09:00 UTC and shown back as 10:00; reminders and pay days turn over at 01:00. The developer's own machine runs on Cameroon time, which hides it. Endpoints that take the browser's `tz` (attendance stats, sales, reports, coach) are right. | Quick: set `TZ=Africa/Douala` on Railway (right for Cameroon and Nigeria, not for Ghana, Senegal or Kenya). Proper: a time zone on each gym (from its country) used for every day and time. | Needs decision |
+| F-075 | Low | i18n | `utils/memberEmail.js`, `utils/welcomeEmail.js`, `utils/taskEmail.js`, `utils/receiptPdf.js`, server messages | Every email, the receipt PDF and the server's error messages are in English only, although the app is bilingual and most Cameroonian members read French. | Send emails and the PDF in the gym's language (a language setting on the gym). A feature. | Needs decision |
+| F-076 | Low | Bug | `jobs/taskReminders.js:138-151` | Reminders go to every task not marked `done`, which includes calendar invites (they end as `accepted` or `declined`): someone who declined, or accepted, a class gets "Task Overdue: 'Yoga' was due 12 Oct and is still open" the day after. | Remind only ordinary open tasks (`todo`, `in_progress`, no `eventId`). | Open |
+| F-077 | Low | Bug | `jobs/freezeFees.js:25-39` | The freeze-fee job reads the balance and the last charge date, then writes both: run on two servers at once (or beside a payment) it charges twice or loses a payment. | Charge with a conditional, atomic update (part of F-042). | Open |
+| F-078 | Medium | Security | `controllers/member.controller.js:61-128`, `pages/AttendancePage.jsx:557,649`, `pages/DashboardPage.jsx:534,576`, `pages/FrontDeskPage.jsx:961`, `components/ui/VisitorCodeModal.jsx:28` | Every member's 4-digit check-in code is sent to every signed-in browser in the members list, because four screens compare a typed code with it locally. Anyone with the developer tools open at the desk, or any trainer's account, can read every code and check in as someone else. | Check codes on the server (a rate-limited endpoint), then send codes only to management. | Open |
+| F-079 | Low | Quality | `jobs/payrollReminders.js:23,136-151` | `ordinal` is never used. The "overdue email sent" marker is stored as a notification, so it shows in the owner's list ("Overdue payroll email sent for Oct 2026"). | Remove the helper; keep the marker out of the visible list. | Open |
 
 ## 7. Needs my decision
 
@@ -640,3 +662,9 @@ Severity: Critical, High, Medium, Low. Status: Open, Fixed, Needs decision, Won'
 | D-16 (F-038) | Adding indexes on `gymId` (and the date each list sorts by). | Yes: additive and safe, and the schema already goes out with `db push`. Best done together with D-4 (migrations). |
 | D-17 (F-041) | What extending an ended membership means. | Count the extra days from today when the membership has already ended, so an extension always gives the member that many days of access. |
 | D-18 (F-008) | A migration once added `Task.dueTime`, which the schema no longer has. If that column holds data on Railway, `prisma db push` in the start command refuses, and the backend does not start. | Check the live column; drop it on purpose (or keep it in the schema) before the next deploy. |
+| D-19 (F-074) | Time zones. | Now: set `TZ=Africa/Douala` on the Railway backend (one variable, no code). Next: a `timezone` on each gym, filled from its country, used by every day and time calculation. |
+| D-20 (F-057) | The desk can change a member's balance, status, dates and passes directly. | Server actions for renew, buy passes and day pass that take the payment and apply the change in one transaction; direct edits of those fields kept to management. The screens stay the same. |
+| D-21 (F-058) | The desk can delete any payment. | The desk may undo only its own payment from the last 15 minutes (the cancelled-action case); anything older or anyone else's goes to management. |
+| D-22 (F-066) | Deleting a package that members are on. | Refuse with the number of members on it, and offer "Inactive" (already supported) instead. |
+| D-23 (F-075) | Emails and receipts in French. | A language setting on the gym (English / French) that emails, the receipt PDF and server messages follow. |
+| D-24 | Reads by role. The API answers some reads to roles whose screens never show them: trainers can read the books (`/api/expenses`, `/api/sales`), every time card (`/api/timecards`) and members' balances through the attendance list. CLAUDE.md says "the books read the same for everyone" as a deliberate choice. | Keep reads to the roles whose pages show them (the page list in `rolePages.js`), so the API matches the screens. |
