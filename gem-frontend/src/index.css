@@ -145,6 +145,14 @@ input:-webkit-autofill:focus {
   [style*="gem-skeleton"] { animation: none !important; opacity: 0.6 !important; }
 }
 
+/* The amber dot on a Settings section, and on the sidebar's Settings link,
+   that still needs setting up. It used to be defined only in styles/globals.css,
+   which nothing loads, so the dots never pulsed. */
+@keyframes gem-dot-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201,169,110,0.6); }
+  50%      { box-shadow: 0 0 0 5px rgba(201,169,110,0); }
+}
+
 @keyframes overlayIn {
   from { opacity: 0; }
   to   { opacity: 1; }
