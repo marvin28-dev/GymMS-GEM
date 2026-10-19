@@ -348,76 +348,76 @@ Every file in the repository except `node_modules`, build output (`dist`), lockf
 
 | File | Lines | Pass 1 | Pass 2 |
 | :- | -: | :-: | :-: |
-| `gem-frontend/src/services/api.js` | 80 | [ ] | [ ] |
-| `gem-frontend/src/services/approvals.service.js` | 10 | [ ] | [ ] |
-| `gem-frontend/src/services/attendance.service.js` | 14 | [ ] | [ ] |
-| `gem-frontend/src/services/auth.service.js` | 39 | [ ] | [ ] |
-| `gem-frontend/src/services/calendar.service.js` | 17 | [ ] | [ ] |
-| `gem-frontend/src/services/coach.service.js` | 13 | [ ] | [ ] |
-| `gem-frontend/src/services/communications.service.js` | 33 | [ ] | [ ] |
-| `gem-frontend/src/services/equipment.service.js` | 10 | [ ] | [ ] |
-| `gem-frontend/src/services/expenses.service.js` | 20 | [ ] | [ ] |
-| `gem-frontend/src/services/gym.service.js` | 16 | [ ] | [ ] |
-| `gem-frontend/src/services/logs.service.js` | 4 | [ ] | [ ] |
-| `gem-frontend/src/services/members.service.js` | 19 | [ ] | [ ] |
-| `gem-frontend/src/services/notifications.service.js` | 16 | [ ] | [ ] |
-| `gem-frontend/src/services/packages.service.js` | 13 | [ ] | [ ] |
-| `gem-frontend/src/services/payAdjustments.service.js` | 12 | [ ] | [ ] |
-| `gem-frontend/src/services/payments.service.js` | 30 | [ ] | [ ] |
-| `gem-frontend/src/services/payroll.service.js` | 11 | [ ] | [ ] |
-| `gem-frontend/src/services/products.service.js` | 17 | [ ] | [ ] |
-| `gem-frontend/src/services/reports.service.js` | 6 | [ ] | [ ] |
-| `gem-frontend/src/services/sales.service.js` | 11 | [ ] | [ ] |
-| `gem-frontend/src/services/staff.service.js` | 37 | [ ] | [ ] |
-| `gem-frontend/src/services/tasks.service.js` | 13 | [ ] | [ ] |
-| `gem-frontend/src/services/timecards.service.js` | 37 | [ ] | [ ] |
-| `gem-frontend/src/services/upload.service.js` | 50 | [ ] | [ ] |
+| `gem-frontend/src/services/api.js` | 80 | [x] | [ ] |
+| `gem-frontend/src/services/approvals.service.js` | 10 | [x] | [ ] |
+| `gem-frontend/src/services/attendance.service.js` | 14 | [x] | [ ] |
+| `gem-frontend/src/services/auth.service.js` | 39 | [x] | [ ] |
+| `gem-frontend/src/services/calendar.service.js` | 17 | [x] | [ ] |
+| `gem-frontend/src/services/coach.service.js` | 13 | [x] | [ ] |
+| `gem-frontend/src/services/communications.service.js` | 33 | [x] | [ ] |
+| `gem-frontend/src/services/equipment.service.js` | 10 | [x] | [ ] |
+| `gem-frontend/src/services/expenses.service.js` | 20 | [x] | [ ] |
+| `gem-frontend/src/services/gym.service.js` | 16 | [x] | [ ] |
+| `gem-frontend/src/services/logs.service.js` | 4 | [x] | [ ] |
+| `gem-frontend/src/services/members.service.js` | 19 | [x] | [ ] |
+| `gem-frontend/src/services/notifications.service.js` | 16 | [x] | [ ] |
+| `gem-frontend/src/services/packages.service.js` | 13 | [x] | [ ] |
+| `gem-frontend/src/services/payAdjustments.service.js` | 12 | [x] | [ ] |
+| `gem-frontend/src/services/payments.service.js` | 30 | [x] | [ ] |
+| `gem-frontend/src/services/payroll.service.js` | 11 | [x] | [ ] |
+| `gem-frontend/src/services/products.service.js` | 17 | [x] | [ ] |
+| `gem-frontend/src/services/reports.service.js` | 6 | [x] | [ ] |
+| `gem-frontend/src/services/sales.service.js` | 11 | [x] | [ ] |
+| `gem-frontend/src/services/staff.service.js` | 37 | [x] | [ ] |
+| `gem-frontend/src/services/tasks.service.js` | 13 | [x] | [ ] |
+| `gem-frontend/src/services/timecards.service.js` | 37 | [x] | [ ] |
+| `gem-frontend/src/services/upload.service.js` | 50 | [x] | [ ] |
 
 ### Frontend: hooks (4 files, 180 lines)
 
 | File | Lines | Pass 1 | Pass 2 |
 | :- | -: | :-: | :-: |
-| `gem-frontend/src/hooks/useGymSettings.js` | 70 | [ ] | [ ] |
-| `gem-frontend/src/hooks/useIsMobile.js` | 16 | [ ] | [ ] |
-| `gem-frontend/src/hooks/useLiveRefresh.js` | 33 | [ ] | [ ] |
-| `gem-frontend/src/hooks/useSetupStatus.js` | 61 | [ ] | [ ] |
+| `gem-frontend/src/hooks/useGymSettings.js` | 70 | [x] | [ ] |
+| `gem-frontend/src/hooks/useIsMobile.js` | 16 | [x] | [ ] |
+| `gem-frontend/src/hooks/useLiveRefresh.js` | 33 | [x] | [ ] |
+| `gem-frontend/src/hooks/useSetupStatus.js` | 61 | [x] | [ ] |
 
 ### Frontend: utilities (32 files, 1,578 lines)
 
 | File | Lines | Pass 1 | Pass 2 |
 | :- | -: | :-: | :-: |
-| `gem-frontend/src/utils/address.js` | 33 | [ ] | [ ] |
-| `gem-frontend/src/utils/attention.js` | 79 | [ ] | [ ] |
-| `gem-frontend/src/utils/auth.js` | 227 | [ ] | [ ] |
-| `gem-frontend/src/utils/checkin.js` | 69 | [ ] | [ ] |
-| `gem-frontend/src/utils/coaching.js` | 146 | [ ] | [ ] |
-| `gem-frontend/src/utils/contact.js` | 26 | [ ] | [ ] |
-| `gem-frontend/src/utils/countries.js` | 51 | [ ] | [ ] |
-| `gem-frontend/src/utils/currency.js` | 48 | [ ] | [ ] |
-| `gem-frontend/src/utils/date.js` | 62 | [ ] | [ ] |
-| `gem-frontend/src/utils/departments.js` | 55 | [ ] | [ ] |
-| `gem-frontend/src/utils/events.js` | 20 | [ ] | [ ] |
-| `gem-frontend/src/utils/formErrors.js` | 24 | [ ] | [ ] |
-| `gem-frontend/src/utils/gymAddress.js` | 16 | [ ] | [ ] |
-| `gem-frontend/src/utils/gymCache.js` | 38 | [ ] | [ ] |
-| `gem-frontend/src/utils/hierarchy.js` | 56 | [ ] | [ ] |
-| `gem-frontend/src/utils/live.js` | 58 | [ ] | [ ] |
-| `gem-frontend/src/utils/loadAll.js` | 9 | [ ] | [ ] |
-| `gem-frontend/src/utils/number.js` | 5 | [ ] | [ ] |
-| `gem-frontend/src/utils/numberGuard.js` | 43 | [ ] | [ ] |
-| `gem-frontend/src/utils/packages.js` | 10 | [ ] | [ ] |
-| `gem-frontend/src/utils/paymentDescription.js` | 21 | [ ] | [ ] |
-| `gem-frontend/src/utils/paymentMethods.js` | 36 | [ ] | [ ] |
-| `gem-frontend/src/utils/paystubPdf.js` | 177 | [ ] | [ ] |
-| `gem-frontend/src/utils/productCode.js` | 12 | [ ] | [ ] |
-| `gem-frontend/src/utils/productPrice.js` | 29 | [ ] | [ ] |
-| `gem-frontend/src/utils/receipt.js` | 78 | [ ] | [ ] |
-| `gem-frontend/src/utils/revenue.js` | 23 | [ ] | [ ] |
-| `gem-frontend/src/utils/rolePages.js` | 42 | [ ] | [ ] |
-| `gem-frontend/src/utils/sessionPhoto.js` | 25 | [ ] | [ ] |
-| `gem-frontend/src/utils/smsCount.js` | 24 | [ ] | [ ] |
-| `gem-frontend/src/utils/taskCategories.js` | 25 | [ ] | [ ] |
-| `gem-frontend/src/utils/useIsMobile.js` | 11 | [ ] | [ ] |
+| `gem-frontend/src/utils/address.js` | 33 | [x] | [ ] |
+| `gem-frontend/src/utils/attention.js` | 79 | [x] | [ ] |
+| `gem-frontend/src/utils/auth.js` | 227 | [x] | [ ] |
+| `gem-frontend/src/utils/checkin.js` | 69 | [x] | [ ] |
+| `gem-frontend/src/utils/coaching.js` | 146 | [x] | [ ] |
+| `gem-frontend/src/utils/contact.js` | 26 | [x] | [ ] |
+| `gem-frontend/src/utils/countries.js` | 51 | [x] | [ ] |
+| `gem-frontend/src/utils/currency.js` | 48 | [x] | [ ] |
+| `gem-frontend/src/utils/date.js` | 62 | [x] | [ ] |
+| `gem-frontend/src/utils/departments.js` | 55 | [x] | [ ] |
+| `gem-frontend/src/utils/events.js` | 20 | [x] | [ ] |
+| `gem-frontend/src/utils/formErrors.js` | 24 | [x] | [ ] |
+| `gem-frontend/src/utils/gymAddress.js` | 16 | [x] | [ ] |
+| `gem-frontend/src/utils/gymCache.js` | 38 | [x] | [ ] |
+| `gem-frontend/src/utils/hierarchy.js` | 56 | [x] | [ ] |
+| `gem-frontend/src/utils/live.js` | 58 | [x] | [ ] |
+| `gem-frontend/src/utils/loadAll.js` | 9 | [x] | [ ] |
+| `gem-frontend/src/utils/number.js` | 5 | [x] | [ ] |
+| `gem-frontend/src/utils/numberGuard.js` | 43 | [x] | [ ] |
+| `gem-frontend/src/utils/packages.js` | 10 | [x] | [ ] |
+| `gem-frontend/src/utils/paymentDescription.js` | 21 | [x] | [ ] |
+| `gem-frontend/src/utils/paymentMethods.js` | 36 | [x] | [ ] |
+| `gem-frontend/src/utils/paystubPdf.js` | 177 | [x] | [ ] |
+| `gem-frontend/src/utils/productCode.js` | 12 | [x] | [ ] |
+| `gem-frontend/src/utils/productPrice.js` | 29 | [x] | [ ] |
+| `gem-frontend/src/utils/receipt.js` | 78 | [x] | [ ] |
+| `gem-frontend/src/utils/revenue.js` | 23 | [x] | [ ] |
+| `gem-frontend/src/utils/rolePages.js` | 42 | [x] | [ ] |
+| `gem-frontend/src/utils/sessionPhoto.js` | 25 | [x] | [ ] |
+| `gem-frontend/src/utils/smsCount.js` | 24 | [x] | [ ] |
+| `gem-frontend/src/utils/taskCategories.js` | 25 | [x] | [ ] |
+| `gem-frontend/src/utils/useIsMobile.js` | 11 | [x] | [ ] |
 
 ### Frontend: translations (1 files, 4,229 lines)
 
@@ -653,6 +653,13 @@ Severity: Critical, High, Medium, Low. Status: Open, Fixed, Needs decision, Won'
 | F-082 | Low | Robustness | `gem-frontend/src/main.jsx:14`, `contexts/LanguageContext.jsx:7` | The first `localStorage` reads are not guarded: a browser that blocks site storage (Firefox with cookies blocked) gets a blank page instead of a message. | Guard the reads; say that GEM needs site storage to sign in. | Open |
 | F-083 | Low | Accessibility | `gem-frontend/src/App.jsx:163-277` | The "Are you still there?" warning is a plain overlay, not a dialog: no `role="dialog"`, no focus moved into it, and keyboard focus stays on the page behind. | Build it on the shared `Modal` (a real dialog). Phase 6. | Open |
 | F-084 | Medium | Bug | `gem-frontend/src/pages/FrontDeskPage.jsx:1267-1276` | Reporting an equipment issue at the desk shows "Issue reported" and adds it to the activity list even when saving failed: the error is only written to the console. The same "fake success" pattern CLAUDE.md forbids elsewhere. | Show the server's error and keep the form. Frontend review. | Open |
+| F-085 | High | Security | `gem-frontend/src/pages/AccountingPage.jsx:747,794,1891-1919`, `pages/MembersPage.jsx:1681-1704` | Stored XSS in print and export windows. These build HTML from records and write it into a window opened from the app (same origin, so it can read the signed-in token in localStorage) without escaping: an expense's title, category, paid-to, method, recorded-by and note (all typed by the front desk at the kiosk), the financial overview's category labels, payroll names, and every cell of the members export. A front desk employee can save an expense titled with a script that runs when the owner prints it, with the owner's session in reach. The receipt image address goes into an attribute unescaped as well. Receipts on the member profile and Payments page already escape. | Escape every value (`escapeHtml` from `utils/receipt.js`) and allow only http(s) or data:image addresses for the image. | Open |
+| F-086 | Medium | Bug | `gem-frontend/src/hooks/useGymSettings.js:10,27`, `utils/paymentMethods.js:28-34` | A gym that has not saved its payment settings is meant to be offered all four methods, but `useGymSettings` fills in a default of three (no Mobile Money), so `enabledMethods()` never reaches its "all four" fallback: a new gym's payment forms leave out Mobile Money, the most common way to pay in Cameroon, until the owner visits Settings. | Default to all four methods. | Open |
+| F-087 | Low | Bug | `gem-frontend/src/utils/rolePages.js:22` | Legacy `instructor` accounts cannot open Members, although instructors and coaches are meant to be treated as trainers everywhere (`coach` and `trainer` both can). | Give instructor the trainer's pages. | Open |
+| F-088 | Low | Bug | `gem-frontend/src/services/api.js:76-86`, `services/gym.service.js:4` | An expired session sends the person to the generic `/login` (gym code first) instead of their own gym's sign-in page, as the deactivation path already does; the gym code is put into the lookup address without encoding. | Use the same sign-out path; encode the code. | Open |
+| F-089 | Low | Bug | `gem-frontend/src/utils/auth.js:9` | The daily re-login compares the UTC day (`toISOString().slice(0, 10)`), which CLAUDE.md's own rule forbids: in Cameroon the "new day" begins at 01:00, so someone signing in at 00:30 is signed out half an hour later. | Use `todayStr()`. | Open |
+| F-090 | Low | Bug | `gem-frontend/src/pages/AccountingPage.jsx:765,804` | The Financial Overview and Payroll exports are headed "GEM Fitness" instead of the gym's own name. | Use the gym's name. | Open |
+| F-091 | Low | Quality | `gem-frontend/src/hooks/useIsMobile.js`, `utils/useIsMobile.js`, `utils/hierarchy.js:9-16` | Two `useIsMobile` hooks with different breakpoints (800 px media query, 768 px resize listener), so pages switch to their phone layout at different widths; the frontend copy of the access ladder has no `other` role (the server's does). | One hook; the same ladder. | Open |
 
 ## 7. Needs my decision
 
