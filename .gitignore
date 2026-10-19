@@ -3,14 +3,15 @@ node_modules/
 gem-frontend/node_modules/
 gem-backend/node_modules/
 
-# Environment files — NEVER commit these (contain passwords & secrets)
+# Environment files: never commit these, they hold passwords and keys.
+# Every variant is ignored at any depth (.env.test, .env.production...),
+# except the example files, which list the names with no real values.
 .env
-.env.local
-.env.production
-gem-frontend/.env
-gem-frontend/.env.local
-gem-backend/.env
-gem-backend/.env.local
+.env.*
+!.env.example
+
+# Personal notes with sign-in details
+Documents/login.txt
 
 # Build output
 gem-frontend/dist/

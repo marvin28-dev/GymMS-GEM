@@ -1,5 +1,0 @@
-Password : gymelite
-email: gymelite@elite.com
-firstname + lastname: Marvin Ekokobe
-gymcode : gymelite
-gymname :  elite fitness club
