@@ -7,6 +7,11 @@
     "vitest": "^5.0.5"
   },
   "scripts": {
-    "knip": "knip"
+    "knip": "knip",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:api": "vitest run --project api",
+    "test:e2e": "playwright test",
+    "test:db:reset": "node -e \"require('./tests/support/testDb.cjs').resetTestDatabase()\""
   }
 }
