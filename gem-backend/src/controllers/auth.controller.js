@@ -15,8 +15,9 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
 }
 
+// The owner of a new gym is its first account, so no other code can clash
 function generateAccessCode() {
-  return String(Math.floor(1000 + Math.random() * 9000));
+  return String(crypto.randomInt(1000, 10000));
 }
 
 async function register(req, res) {

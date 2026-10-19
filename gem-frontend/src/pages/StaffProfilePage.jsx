@@ -506,6 +506,8 @@ export default function StaffProfilePage() {
           joinDate: s.joinDate || s.createdAt || null,
           photoData: s.photo || null,
           photoIdData: s.photoId || null,
+          // A colleague who does not outrank them is told an ID is on file, never sent it
+          photoIdOnFile: !!(s.photoId || s.photoIdOnFile),
         });
         if (s.salary != null) {
           const sal = Number(s.salary);
@@ -932,7 +934,7 @@ export default function StaffProfilePage() {
   // the person it belongs to (the owner excepted), so their own profile says so.
   const photoIdBlock = (
     <>
-      {memberData.photoIdData ? (
+      {memberData.photoIdData || memberData.photoIdOnFile ? (
         // The label and the buttons are given room to fall onto separate
         // lines: squeezed together they read as one run-on control
         <div style={{
@@ -948,20 +950,22 @@ export default function StaffProfilePage() {
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('staff.photoIdOnFile')}</div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 'auto' }}>
-            <button
-              type="button"
-              onClick={() => {
-                const a = document.createElement('a');
-                a.href = memberData.photoIdData;
-                a.download = `${memberData.name.replace(/\s+/g, '_')}_PhotoID`;
-                a.click();
-              }}
-              style={{ ...secondaryBtn, padding: '6px 12px', gap: 4, flexShrink: 0 }}
-              title={t('staff.downloadPhotoId')}
-            >
-              <Download size={13} />
-              {t('staff.download')}
-            </button>
+            {memberData.photoIdData && (
+              <button
+                type="button"
+                onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = memberData.photoIdData;
+                  a.download = `${memberData.name.replace(/\s+/g, '_')}_PhotoID`;
+                  a.click();
+                }}
+                style={{ ...secondaryBtn, padding: '6px 12px', gap: 4, flexShrink: 0 }}
+                title={t('staff.downloadPhotoId')}
+              >
+                <Download size={13} />
+                {t('staff.download')}
+              </button>
+            )}
             {canEditIdentity && (
               <button type="button" onClick={() => photoIdRef.current?.click()} disabled={photoIdSaving}
                 style={{ ...secondaryBtn, padding: '6px 12px', gap: 4, flexShrink: 0 }}

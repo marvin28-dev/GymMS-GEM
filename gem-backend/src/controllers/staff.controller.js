@@ -3,12 +3,13 @@ const crypto = require('crypto');
 const { Resend } = require('resend');
 const prisma = require('../utils/prisma');
 const E = require('../utils/emailLayout');
-const { canView, canSeePrivateFields, canManage, refuseFields, canCreateRole, isManagement, rankOf, isOwner } = require('../utils/hierarchy');
+const { canView, canSeePrivateFields, canManage, refuseFields, canCreateRole, isOwner } = require('../utils/hierarchy');
 const { findEmailConflict, emailConflictMessage } = require('../utils/emailGuard');
 const { logActivity, fullName, money } = require('../utils/activityLog');
 const { forgetAccount, DEACTIVATED } = require('../middleware/auth.middleware');
 const { sendWelcomeEmail } = require('../utils/welcomeEmail');
 const { deliver } = require('../utils/sendEmail');
+const { bestEffort } = require('../utils/bestEffort');
 
 const STAFF_FIELDS = {
   firstName: 'First name', lastName: 'Last name', email: 'Email', phone: 'Phone',
@@ -57,17 +58,28 @@ async function sendResetLinkEmail(staff, gymId, sentBy) {
   });
 }
 
-function generateAccessCode() {
-  return String(Math.floor(1000 + Math.random() * 9000));
-}
-
+// The labels a form may send, and the role each is stored as. "Other" used to
+// be stored as coach, a fitness role that reaches members' records.
 const ROLE_MAP = {
-  Manager: 'manager', Trainer: 'trainer', Instructor: 'instructor',
-  'Front Desk': 'front_desk', Receptionist: 'front_desk', Other: 'coach',
+  Manager: 'manager', Trainer: 'trainer', Instructor: 'trainer', Coach: 'trainer',
+  'Front Desk': 'front_desk', Receptionist: 'front_desk', Other: 'other',
 };
+// The roles a new account can be given; coach and instructor only remain on older records
+const NEW_ROLES = ['manager', 'front_desk', 'trainer', 'other'];
 
 function normalizeRole(role) {
   return ROLE_MAP[role] || role;
+}
+
+// What a colleague is not sent about someone they do not outrank: their pay,
+// their access code, and the scan of their identity document, of which they
+// are only told that one is on file
+function withoutPrivate(s) {
+  const copy = { ...s, photoIdOnFile: !!s.photoId };
+  delete copy.accessCode;
+  delete copy.salary;
+  delete copy.photoId;
+  return copy;
 }
 
 async function getAll(req, res) {
@@ -85,13 +97,11 @@ async function getAll(req, res) {
     orderBy: { firstName: 'asc' },
   });
 
-  // A colleague's name and role are fine to see. Their access code and pay are
-  // only for someone who outranks them, and for themselves.
+  // A colleague's name and role are fine to see. Their access code, pay and ID
+  // scan are only for someone who outranks them, and for themselves.
   res.json(staff.map(s => {
     const self = String(s.id) === String(req.user.id);
-    if (self || canManage(req.user, s)) return s;
-    const { accessCode, salary, ...rest } = s;
-    return rest;
+    return self || canManage(req.user, s) ? s : withoutPrivate(s);
   }));
 }
 
@@ -116,108 +126,122 @@ async function getOne(req, res) {
       avatarColor: true, photo: true, photoId: true, isActive: true, createdAt: true,
       schedule: true, scheduleOverrides: true, salary: true, staffNotes: true, payDay: true, employmentType: true,
       houseNumber: true, street: true, city: true, region: true, postalCode: true, country: true,
+      emergencyContact: true, emergencyPhone: true,
     },
   });
   if (!staff) return res.status(404).json({ error: 'Staff not found' });
 
-  // Fetch emergency contact via raw SQL so it works even with a stale Prisma client
-  if (seesPrivate) {
-    try {
-      const rows = await prisma.$queryRawUnsafe(
-        `SELECT "emergencyContact", "emergencyPhone" FROM "Staff" WHERE "id" = $1`,
-        req.params.id,
-      );
-      if (rows[0]) {
-        staff.emergencyContact = rows[0].emergencyContact;
-        staff.emergencyPhone = rows[0].emergencyPhone;
-      }
-    } catch (_) {
-      // Column doesn't exist yet - migration not applied, just omit the fields
-    }
-  }
-
   // A colleague's name, role, schedule and contact details are an open book -
-  // the same basic read the staff list already gives everyone. Their pay and
-  // private notes are not, unless the viewer outranks them or it's their own.
+  // the same basic read the staff list already gives everyone. Their pay,
+  // private notes, emergency contact and ID scan are not, unless the viewer
+  // outranks them or it's their own.
   if (!seesPrivate) {
     delete staff.salary;
     delete staff.staffNotes;
     delete staff.payDay;
     delete staff.scheduleOverrides;
+    delete staff.emergencyContact;
+    delete staff.emergencyPhone;
+    staff.photoIdOnFile = !!staff.photoId;
+    delete staff.photoId;
   }
 
   res.json(staff);
 }
 
-async function create(req, res) {
-  const { password, role, emergencyContact, emergencyPhone, salary, joinDate, employmentType, address: _oldAddress, ...rest } = req.body;
-  if (!String(rest.city || '').trim()) return res.status(400).json({ error: 'Enter the city.', field: 'city' });
-  if (!String(rest.region || '').trim()) return res.status(400).json({ error: 'Enter the region.', field: 'region' });
-  // People live in the gym's own country; the forms show it but never change it
-  const homeGym = await prisma.gym.findUnique({ where: { id: req.user.gymId }, select: { country: true } });
-  if (homeGym?.country) rest.country = homeGym.country;
+// Text fields a new employee can be given as they are typed
+const NEW_STAFF_TEXT = ['phone', 'department', 'shiftStart', 'avatarColor', 'photo', 'photoId', 'houseNumber', 'street', 'postalCode', 'emergencyContact', 'emergencyPhone'];
 
+const STAFF_SELECT = {
+  id: true, firstName: true, lastName: true,
+  email: true, phone: true, role: true,
+  department: true, joinDate: true, shiftStart: true, payDay: true, schedule: true, staffNotes: true,
+  avatarColor: true, photo: true, photoId: true, isActive: true, createdAt: true, salary: true, employmentType: true,
+  houseNumber: true, street: true, city: true, region: true, postalCode: true, country: true,
+  emergencyContact: true, emergencyPhone: true,
+};
+
+async function create(req, res) {
+  const body = req.body;
   // Taking somebody on is the owner's decision. A manager runs the people who
-  // are already here; he does not decide who joins them.
+  // are already here; they do not decide who joins them.
   if (!isOwner(req.user.role)) {
     return res.status(403).json({ error: 'Only the general manager can add staff.' });
   }
-  if (!canCreateRole(req.user, normalizeRole(role))) {
+
+  const firstName = String(body.firstName ?? '').trim();
+  const lastName = String(body.lastName ?? '').trim();
+  const email = String(body.email ?? '').trim();
+  if (!firstName) return res.status(400).json({ error: 'Enter their first name.', field: 'firstName' });
+  if (!lastName) return res.status(400).json({ error: 'Enter their last name.', field: 'lastName' });
+  // The email is how they sign in, so an account without one could never be used
+  if (!email) return res.status(400).json({ error: 'Enter their email: it is how they sign in.', field: 'email' });
+  if (!String(body.city || '').trim()) return res.status(400).json({ error: 'Enter the city.', field: 'city' });
+  if (!String(body.region || '').trim()) return res.status(400).json({ error: 'Enter the region.', field: 'region' });
+  const role = normalizeRole(body.role);
+  if (!NEW_ROLES.includes(role)) return res.status(400).json({ error: 'Choose their role.', field: 'role' });
+  if (!canCreateRole(req.user, role)) {
     return res.status(403).json({ error: 'You cannot create an account at or above your own level.' });
+  }
+  let salary = null;
+  if (body.salary !== undefined && body.salary !== '' && body.salary !== null) {
+    salary = Number(body.salary);
+    if (!Number.isFinite(salary) || salary < 0) return res.status(400).json({ error: 'Enter the salary as a number.', field: 'salary' });
+  }
+  let joinDate = null;
+  if (body.joinDate) {
+    joinDate = new Date(body.joinDate);
+    if (Number.isNaN(joinDate.getTime())) return res.status(400).json({ error: 'The join date could not be read.', field: 'joinDate' });
   }
 
   // An email must identify one person per gym, staff and members alike
-  const clash = await findEmailConflict(req.user.gymId, rest.email, { scope: 'staff' });
+  const clash = await findEmailConflict(req.user.gymId, email, { scope: 'staff' });
   if (clash) return res.status(409).json({ error: emailConflictMessage(clash), field: 'email' });
 
-  const passwordHash = await bcrypt.hash(password || `GEM${Date.now()}`, 10);
+  // People live in the gym's own country; the forms show it but never change it
+  const homeGym = await prisma.gym.findUnique({ where: { id: req.user.gymId }, select: { country: true } });
+
+  // Only the fields an employee is made of are taken from the request. Which
+  // gym, the password, the 4-digit code and any reset link are set here: the
+  // whole request body used to go to the database, reset token included.
+  const data = {
+    gymId: req.user.gymId,
+    firstName, lastName, email, role,
+    city: String(body.city).trim(),
+    region: String(body.region).trim(),
+    country: homeGym?.country || (String(body.country || '').trim() || null),
+    // Without a password of their own, the account waits for its owner to
+    // choose one at their first sign-in; this stand-in is never told to anyone
+    passwordHash: await bcrypt.hash(body.password ? String(body.password) : crypto.randomBytes(24).toString('base64url'), 10),
+    mustSetPassword: !body.password,
+    accessCode: await uniqueStaffCode(req.user.gymId),
+    salary,
+    joinDate,
+    employmentType: body.employmentType === 'Part Time' ? 'Part Time' : 'Full Time',
+    isActive: body.isActive !== false && body.isActive !== 'false',
+  };
+  for (const key of NEW_STAFF_TEXT) {
+    if (body[key] !== undefined && body[key] !== null) data[key] = String(body[key]).trim() || null;
+  }
+  if (Array.isArray(body.staffNotes)) data.staffNotes = body.staffNotes;
+  if (body.schedule && typeof body.schedule === 'object') data.schedule = body.schedule;
+  if (body.payDay !== undefined && body.payDay !== null && body.payDay !== '') {
+    const d = Number(body.payDay);
+    if (Number.isFinite(d)) data.payDay = Math.min(28, Math.max(1, Math.trunc(d)));
+  }
+
   let staff;
   try {
-    staff = await prisma.staff.create({
-      data: {
-        ...rest,
-        role: normalizeRole(role),
-        gymId: req.user.gymId,
-        passwordHash,
-        mustSetPassword: !password,
-        accessCode: generateAccessCode(),
-        // Only the owner sets pay; anyone else hiring leaves it for him to fill in
-        salary: isOwner(req.user.role) && salary !== undefined && salary !== '' && salary !== null ? parseFloat(salary) : null,
-        joinDate: joinDate && joinDate !== '' ? new Date(joinDate) : null,
-        employmentType: employmentType === 'Part Time' ? 'Part Time' : 'Full Time',
-      },
-      select: {
-        id: true, firstName: true, lastName: true,
-        email: true, phone: true, role: true,
-        department: true, joinDate: true, shiftStart: true, payDay: true, schedule: true, staffNotes: true,
-        avatarColor: true, photo: true, photoId: true, isActive: true, createdAt: true, salary: true, employmentType: true,
-        houseNumber: true, street: true, city: true, region: true, postalCode: true, country: true,
-      },
-    });
+    staff = await prisma.staff.create({ data, select: STAFF_SELECT });
   } catch (err) {
     console.error('Staff create failed:', err.message);
     if (err.code === 'P2002') {
       return res.status(409).json({ error: 'A staff member with this email already exists.', field: 'email' });
     }
-    return res.status(500).json({ error: 'Failed to create staff', detail: err.message });
+    return res.status(500).json({ error: 'Failed to create staff' });
   }
 
-  if (emergencyContact !== undefined || emergencyPhone !== undefined) {
-    try {
-      await prisma.$executeRawUnsafe(
-        `UPDATE "Staff" SET "emergencyContact" = $1, "emergencyPhone" = $2 WHERE "id" = $3`,
-        emergencyContact ?? null,
-        emergencyPhone ?? null,
-        staff.id,
-      );
-      staff.emergencyContact = emergencyContact ?? null;
-      staff.emergencyPhone = emergencyPhone ?? null;
-    } catch (rawErr) {
-      console.error('Emergency contact raw insert failed:', rawErr.message);
-    }
-  }
-
-  prisma.notification.create({
+  bestEffort(prisma.notification.create({
     data: {
       gymId: req.user.gymId,
       title: 'New Staff Member Added',
@@ -226,7 +250,7 @@ async function create(req, res) {
       audience: 'managers',
       aboutStaffId: staff.id,
     },
-  }).catch(() => {});
+  }), 'New staff notification');
 
   // They are written to with the gym code and how to sign in. Their 4-digit
   // code is not in it: a manager reads that to them, and it is what proves the
@@ -384,26 +408,21 @@ async function update(req, res) {
 
   // Deactivation clears the access code, so reactivating has to issue a fresh one
   if (isActive === true && existing.isActive === false && !existing.accessCode) {
-    data.accessCode = generateAccessCode();
+    data.accessCode = await uniqueStaffCode(req.user.gymId);
   }
-
-  // Remove emergency fields from the Prisma update - handle them via raw SQL
-  // so a stale Prisma client can't block or silently drop them
-  const prismaData = { ...data };
-  delete prismaData.emergencyContact;
-  delete prismaData.emergencyPhone;
 
   let staff;
   try {
     staff = await prisma.staff.update({
-      where: { id: req.params.id },
-      data: prismaData,
+      where: { id: existing.id },
+      data,
       select: {
         id: true, firstName: true, lastName: true,
         email: true, phone: true, role: true,
         department: true, joinDate: true, shiftStart: true,
         avatarColor: true, photo: true, photoId: true, isActive: true, salary: true, staffNotes: true, payDay: true, employmentType: true,
         houseNumber: true, street: true, city: true, region: true, postalCode: true, country: true,
+        emergencyContact: true, emergencyPhone: true,
       },
     });
   } catch (err) {
@@ -412,24 +431,8 @@ async function update(req, res) {
     return res.status(500).json({ error: 'Failed to update staff' });
   }
 
-  // Save emergency contact via raw SQL - bypasses Prisma client schema validation
-  if (emergencyContact !== undefined || emergencyPhone !== undefined) {
-    try {
-      await prisma.$executeRawUnsafe(
-        `UPDATE "Staff" SET "emergencyContact" = $1, "emergencyPhone" = $2 WHERE "id" = $3`,
-        emergencyContact ?? null,
-        emergencyPhone ?? null,
-        req.params.id,
-      );
-      staff.emergencyContact = emergencyContact ?? null;
-      staff.emergencyPhone = emergencyPhone ?? null;
-    } catch (rawErr) {
-      console.error('Emergency contact raw update failed:', rawErr.message);
-    }
-  }
-
   if (isActive !== undefined && isActive !== existing.isActive) {
-    prisma.notification.create({
+    bestEffort(prisma.notification.create({
       data: {
         gymId: req.user.gymId,
         title: isActive ? 'Staff Reactivated' : 'Staff Deactivated',
@@ -438,7 +441,7 @@ async function update(req, res) {
         audience: 'managers',
         aboutStaffId: staff.id,
       },
-    }).catch(() => {});
+    }), 'Staff status notification');
   }
 
   forgetAccount(existing.id);
@@ -479,6 +482,11 @@ async function remove(req, res) {
     where: { id: req.params.id, gymId: req.user.gymId },
   });
   if (!existing) return res.status(404).json({ error: 'Staff not found' });
+  // Switching someone off is the general manager's alone, the same as through
+  // an edit: this route let a manager do it anyway
+  if (!isOwner(req.user.role)) {
+    return res.status(403).json({ error: 'Only the general manager can activate or deactivate a staff member.' });
+  }
   if (existing.role === 'general_manager') {
     return res.status(400).json({ error: 'The gym owner account cannot be deactivated.' });
   }
@@ -498,7 +506,7 @@ async function remove(req, res) {
   });
   forgetAccount(existing.id);
 
-  prisma.notification.create({
+  bestEffort(prisma.notification.create({
     data: {
       gymId: req.user.gymId,
       title: 'Staff Deactivated',
@@ -507,7 +515,7 @@ async function remove(req, res) {
       audience: 'managers',
       aboutStaffId: existing.id,
     },
-  }).catch(() => {});
+  }), 'Staff deactivated notification');
 
   logActivity(req, {
     category: 'staff', action: 'staff.deactivated',
@@ -636,7 +644,7 @@ async function getCode(req, res) {
   if (!staff.accessCode) {
     staff = await prisma.staff.update({
       where: { id: req.params.id },
-      data: { accessCode: generateAccessCode() },
+      data: { accessCode: await uniqueStaffCode(req.user.gymId) },
       select: { id: true, accessCode: true },
     });
   }
@@ -649,7 +657,7 @@ async function getCode(req, res) {
 // let one of them in as the other.
 async function uniqueStaffCode(gymId, current) {
   for (let i = 0; i < 60; i++) {
-    const code = String(Math.floor(1000 + Math.random() * 9000));
+    const code = String(crypto.randomInt(1000, 10000));
     if (code === String(current || '')) continue;
     const [staff, member] = await Promise.all([
       prisma.staff.findFirst({ where: { gymId, accessCode: code }, select: { id: true } }),
@@ -687,7 +695,7 @@ async function regenerateCode(req, res) {
   });
   // They are told it changed, never what it is
   if (!isSelf) {
-    prisma.notification.create({
+    bestEffort(prisma.notification.create({
       data: {
         gymId: req.user.gymId,
         staffId: staff.id,
@@ -696,7 +704,7 @@ async function regenerateCode(req, res) {
         type: 'system',
         link: '/my-profile',
       },
-    }).catch(() => {});
+    }), 'New access code notification');
   }
   res.json({ accessCode: code });
 }
@@ -737,7 +745,7 @@ async function resendInvite(req, res) {
   } catch (err) {
     console.error('Password reset link error:', err.message);
     // The link only exists to be emailed, so an undelivered one is taken back
-    await prisma.staff.update({ where: { id: staff.id }, data: { resetToken: null, resetTokenExpiry: null } }).catch(() => {});
+    await bestEffort(prisma.staff.update({ where: { id: staff.id }, data: { resetToken: null, resetTokenExpiry: null } }), 'Taking back the undelivered reset link');
     res.status(502).json({ error: 'The reset link could not be emailed. Check the email address and the email settings, then try again.' });
   }
 }

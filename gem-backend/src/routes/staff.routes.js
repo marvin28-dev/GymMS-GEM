@@ -17,6 +17,7 @@ router.get('/:id', ctrl.getOne);
 router.post('/', ctrl.create);
 router.post('/:id/resend-invite', only(MANAGEMENT), ctrl.resendInvite);
 router.patch('/:id', ctrl.update);
-router.delete('/:id', only(MANAGEMENT), ctrl.remove);
+// Deactivating someone is the owner's alone, the same rule as an edit of isActive
+router.delete('/:id', only(OWNER), ctrl.remove);
 
 module.exports = router;
