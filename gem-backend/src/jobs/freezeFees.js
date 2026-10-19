@@ -20,7 +20,7 @@ async function runFreezeFees() {
 
       const frozen = await prisma.member.findMany({
         where: { gymId: gym.id, status: 'frozen' },
-        select: { id: true, balance: true, freezeStartDate: true, freezeFeeLastChargedAt: true },
+        select: { id: true, freezeStartDate: true, freezeFeeLastChargedAt: true },
       });
       for (const m of frozen) {
         const last = m.freezeFeeLastChargedAt || m.freezeStartDate;
@@ -30,10 +30,13 @@ async function runFreezeFees() {
         if (intervals < 1) continue;
         const charge = fee * intervals;
         const newLast = new Date(new Date(last).getTime() + intervals * intervalMs);
+        // Charged only if nothing has charged it since it was read, and added
+        // in the database: two runs at once charge once, and a payment taken
+        // at the same moment is kept (writing the read balance back lost it)
         try {
-          await prisma.member.update({
-            where: { id: m.id },
-            data: { balance: (m.balance || 0) + charge, freezeFeeLastChargedAt: newLast },
+          await prisma.member.updateMany({
+            where: { id: m.id, status: 'frozen', freezeFeeLastChargedAt: m.freezeFeeLastChargedAt },
+            data: { balance: { increment: charge }, freezeFeeLastChargedAt: newLast },
           });
         } catch (e) { console.error('Freeze fee update failed:', e.message); }
       }

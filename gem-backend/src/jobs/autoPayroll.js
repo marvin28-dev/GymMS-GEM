@@ -101,10 +101,11 @@ async function issueForGym(gym, now) {
       });
       if (taken) continue;
 
-      await recordPay({
+      // Nothing comes back when the month was paid in the meantime
+      const record = await recordPay({
         gymId: gym.id, staff: s, month: period, note: AUTO_NOTE, issuedById: null, calc,
       });
-      issued += 1;
+      if (record) issued += 1;
     } catch (err) {
       console.error(`Automatic pay failed for staff ${s.id}:`, err.message);
     }

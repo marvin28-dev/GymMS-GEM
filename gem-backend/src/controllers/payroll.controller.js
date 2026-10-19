@@ -1,6 +1,7 @@
 const prisma = require('../utils/prisma');
 const { computeMonthlyPay } = require('./payAdjustment.controller');
 const { logActivity, fullName } = require('../utils/activityLog');
+const { bestEffort } = require('../utils/bestEffort');
 
 // Issuing pay moves money, so it stays with the gym owner rather than
 // following the broader profile-edit permissions.
@@ -41,7 +42,8 @@ const RECORD_SELECT = {
 const { formatMoney } = require('../utils/money');
 const money = (n) => formatMoney(n);
 
-const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const { SHORT_MONTHS, normaliseMonth } = require('../utils/payPeriod');
+
 function paystubsLink(month) {
   const m = /^([A-Za-z]{3})\s+(\d{4})$/.exec(String(month || '').trim());
   const idx = m ? SHORT_MONTHS.indexOf(m[1]) : -1;
@@ -83,21 +85,30 @@ async function recordPay({ gymId, staff, month, note, issuedById, calc, req = nu
     totalDeductions: calc.totalDeductions,
   } : null;
 
-  const record = await prisma.payRecord.create({
-    data: {
-      gymId,
-      staffId: staff.id,
-      month,
-      amount,
-      deductions,
-      netAmount: net,
-      basePay: snapshot?.basePay ?? null,
-      breakdown: snapshot,
-      note: note || null,
-      issuedById: issuedById || null,
-    },
-    select: RECORD_SELECT,
+  // Whether the month is already paid is checked and the record written while
+  // holding a lock for that person and month: two clicks on Issue Pay, or the
+  // pay day job running at the same moment, used to pay a month twice.
+  const record = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${gymId}:${staff.id}:${month}`}))`;
+    const paid = await tx.payRecord.findFirst({ where: { gymId, staffId: staff.id, month }, select: { id: true } });
+    if (paid) return null;
+    return tx.payRecord.create({
+      data: {
+        gymId,
+        staffId: staff.id,
+        month,
+        amount,
+        deductions,
+        netAmount: net,
+        basePay: snapshot?.basePay ?? null,
+        breakdown: snapshot,
+        note: note || null,
+        issuedById: issuedById || null,
+      },
+      select: RECORD_SELECT,
+    });
   });
+  if (!record) return null;
 
   logActivity(req, {
     gymId,
@@ -123,7 +134,7 @@ async function recordPay({ gymId, staff, month, note, issuedById, calc, req = nu
   }
 
   // Pay is the owner's business alone, so managers are not told what anyone earns
-  prisma.notification.create({
+  bestEffort(prisma.notification.create({
     data: {
       gymId,
       title: 'Staff Pay Issued',
@@ -136,7 +147,7 @@ async function recordPay({ gymId, staff, month, note, issuedById, calc, req = nu
       link: paystubsLink(month),
       audience: 'owner',
     },
-  }).catch(() => {});
+  }), 'Pay issued notification');
 
   return record;
 }
@@ -148,10 +159,12 @@ async function create(req, res) {
 
   // The amount is worked out here from the salary, hours, bonuses and
   // deductions. Nothing typed in the browser can change it.
-  const { staffId, month, note } = req.body;
-  if (!staffId || !month) {
+  const { staffId, note } = req.body;
+  if (!staffId || !req.body.month) {
     return res.status(400).json({ error: 'staffId and month are required' });
   }
+  const month = normaliseMonth(req.body.month);
+  if (!month) return res.status(400).json({ error: 'Choose the month to pay, like "Oct 2026".', field: 'month' });
 
   const staff = await prisma.staff.findFirst({
     where: { id: staffId, gymId: req.user.gymId },
@@ -181,6 +194,7 @@ async function create(req, res) {
   const record = await recordPay({
     gymId: req.user.gymId, staff, month, note, issuedById: req.user.id, calc, req,
   });
+  if (!record) return res.status(409).json({ error: `${staff.firstName} has already been paid for ${month}.` });
   res.status(201).json(record);
 }
 
@@ -190,7 +204,8 @@ async function listAll(req, res) {
   if (!PAYROLL_ROLES.includes(req.user.role)) {
     return res.status(403).json({ error: 'Not allowed to view gym payroll' });
   }
-  const month = String(req.query.month || '').trim();
+  const asked = String(req.query.month || '').trim();
+  const month = asked ? (normaliseMonth(asked) || asked) : '';
 
   const records = await prisma.payRecord.findMany({
     where: { gymId: req.user.gymId, ...(month ? { month } : {}) },
@@ -238,7 +253,7 @@ async function setStatus(req, res) {
   }
 
   if (status === 'paid') {
-    prisma.notification.create({
+    bestEffort(prisma.notification.create({
       data: {
         gymId: req.user.gymId,
         title: 'Staff Pay Settled',
@@ -247,7 +262,7 @@ async function setStatus(req, res) {
         link: paystubsLink(existing.month),
         audience: 'owner',
       },
-    }).catch(() => {});
+    }), 'Pay settled notification');
   }
 
   res.json(record);

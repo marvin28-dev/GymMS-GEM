@@ -1,5 +1,6 @@
 const prisma = require('../utils/prisma');
 const { logActivity, changesBetween, describeChanges, fullName, money } = require('../utils/activityLog');
+const { normaliseMonth } = require('../utils/payPeriod');
 
 const PAYROLL_ROLES = ['general_manager'];
 const KINDS = ['bonus', 'deduction'];
@@ -146,9 +147,11 @@ async function create(req, res) {
 
   const isRecurring = !!recurring;
   // A one-off has to say which period it belongs to, otherwise it would either
-  // never apply or silently repeat.
-  if (!isRecurring && !String(month || '').trim()) {
-    return res.status(400).json({ error: 'A one-time adjustment needs a month' });
+  // never apply or silently repeat. It is written the way pay records are, or
+  // "oct 2026" would never be applied to the pay for "Oct 2026".
+  const period = isRecurring ? null : normaliseMonth(month);
+  if (!isRecurring && !period) {
+    return res.status(400).json({ error: 'A one-time adjustment needs a month', field: 'month' });
   }
 
   const staff = await prisma.staff.findFirst({
@@ -161,11 +164,11 @@ async function create(req, res) {
   // adjustment added afterwards would never be applied to anything.
   if (!isRecurring) {
     const alreadyPaid = await prisma.payRecord.findFirst({
-      where: { gymId: req.user.gymId, staffId, month: String(month).trim() },
+      where: { gymId: req.user.gymId, staffId, month: period },
       select: { id: true },
     });
     if (alreadyPaid) {
-      return res.status(409).json({ error: `${String(month).trim()} has already been paid, so it cannot take a new adjustment.` });
+      return res.status(409).json({ error: `${period} has already been paid, so it cannot take a new adjustment.` });
     }
   }
 
@@ -177,7 +180,7 @@ async function create(req, res) {
       label: label.trim(),
       amount: value,
       recurring: isRecurring,
-      month: isRecurring ? null : String(month).trim(),
+      month: period,
       note: note?.trim() || null,
     },
     select: SELECT,

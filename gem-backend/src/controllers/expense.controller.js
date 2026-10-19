@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const { bestEffort } = require('../utils/bestEffort');
 const { logActivity, changesBetween, describeChanges, money } = require('../utils/activityLog');
 
 const EXPENSE_FIELDS = { title: 'Title', category: 'Category', amount: 'Amount', date: 'Date', paidTo: 'Paid to', method: 'Method', note: 'Note' };
@@ -12,7 +13,7 @@ const EXPENSE_FIELDS = { title: 'Title', category: 'Category', amount: 'Amount',
 // screen.
 async function getAll(req, res) {
   const where = { gymId: req.user.gymId };
-  if (req.query.source) where.source = req.query.source;
+  if (req.query.source) where.source = String(req.query.source);
   // By default the books show only reviewed entries (pending excluded). A list
   // that wants the waiting ones too asks with ?status=all or ?pending=1.
   if (req.query.pending === '1') where.approvalStatus = 'pending';
@@ -23,18 +24,40 @@ async function getAll(req, res) {
 
 const { toPaymentMethod } = require('../utils/paymentMethod');
 
-function buildExpenseData(body) {
-  const { title, category, amount, date, paidTo, method, notes, note, recordedBy } = body;
-  return {
-    title,
-    category: category || 'Other',
-    amount: parseFloat(amount),
-    date: new Date(date),
-    paidTo: paidTo || undefined,
-    method: method ? toPaymentMethod(method) : undefined,
-    note: notes || note || undefined,
-    recordedBy: recordedBy || undefined,
-  };
+// The fields of an expense, checked: { data } or { error, field }. A new one
+// needs a title, an amount, a date and who was paid; an edit changes only what
+// it sends. Amounts went through parseFloat, so "abc" was stored as NaN and
+// "Infinity" as Infinity, and an edit without a category reset it to Other.
+function readExpense(body, creating) {
+  const data = {};
+  const sent = (key) => body[key] !== undefined;
+  if (creating || sent('title')) {
+    data.title = String(body.title ?? '').trim();
+    if (!data.title) return { error: 'Enter what the expense was for.', field: 'title' };
+  }
+  if (creating || sent('amount')) {
+    const amount = Number(body.amount);
+    if (body.amount === null || body.amount === '' || !Number.isFinite(amount) || amount <= 0) {
+      return { error: 'Enter an amount above zero.', field: 'amount' };
+    }
+    data.amount = amount;
+  }
+  if (creating || sent('date')) {
+    const date = body.date ? new Date(body.date) : null;
+    if (!date || Number.isNaN(date.getTime())) return { error: 'Choose the date.', field: 'date' };
+    data.date = date;
+  }
+  // Who the money went to is required, so an entry in the books can always be
+  // traced back to a person or vendor.
+  if (creating || sent('paidTo')) {
+    data.paidTo = String(body.paidTo ?? '').trim();
+    if (!data.paidTo) return { error: 'Paid to is required', field: 'paidTo' };
+  }
+  if (creating || sent('category')) data.category = String(body.category ?? '').trim() || 'Other';
+  if (sent('method')) data.method = body.method ? toPaymentMethod(body.method) : null;
+  if (sent('notes') || sent('note')) data.note = String(body.notes ?? body.note ?? '').trim() || null;
+  if (sent('recordedBy')) data.recordedBy = String(body.recordedBy ?? '').trim() || null;
+  return { data };
 }
 
 // The signed-in account, for the "entered by" stamp. Taken from the record
@@ -48,12 +71,9 @@ async function actorName(req) {
 }
 
 async function create(req, res) {
+  const read = readExpense(req.body, true);
+  if (read.error) return res.status(400).json({ error: read.error, field: read.field });
   try {
-    // Who the money went to is required, so an entry in the books can always be
-    // traced back to a person or vendor.
-    if (!req.body.paidTo || !String(req.body.paidTo).trim()) {
-      return res.status(400).json({ error: 'Paid to is required' });
-    }
     // Desk expenses are held: anything over the gym's front-desk limit can't be
     // created at all, and everything within the limit waits for a manager to
     // approve it before it reaches the books. An expense booked by management
@@ -61,17 +81,16 @@ async function create(req, res) {
     const gym = await prisma.gym.findUnique({ where: { id: req.user.gymId }, select: { settings: true } });
     const rawLimit = Number(gym?.settings?.expenseLimit);
     const limit = rawLimit > 0 ? rawLimit : 50000;
-    const amount = parseFloat(req.body.amount);
     const fromDesk = req.body.source === 'frontdesk' || req.user.role === 'front_desk';
-    if (fromDesk && Number.isFinite(amount) && amount > limit) {
-      return res.status(400).json({ error: `This is over the front-desk limit of ${money(limit)} and can't be logged here. A manager must record it directly.` });
+    if (fromDesk && read.data.amount > limit) {
+      return res.status(400).json({ error: `This is over the front-desk limit of ${money(limit)} and can't be logged here. A manager must record it directly.`, field: 'amount' });
     }
     const needsApproval = fromDesk;
     const name = await actorName(req);
 
     const expense = await prisma.expense.create({
       data: {
-        ...buildExpenseData(req.body),
+        ...read.data,
         gymId: req.user.gymId,
         createdById: req.user.id,
         createdByName: name,
@@ -86,7 +105,7 @@ async function create(req, res) {
         where: { gymId: req.user.gymId, isActive: true, role: { in: ['general_manager', 'manager'] } },
         select: { id: true },
       });
-      await Promise.all(managers.map(m => prisma.notification.create({
+      await Promise.all(managers.map(m => bestEffort(prisma.notification.create({
         data: {
           gymId: req.user.gymId,
           staffId: m.id,
@@ -95,7 +114,7 @@ async function create(req, res) {
           type: 'system',
           link: '/accounting?tab=expenses',
         },
-      }).catch(() => {})));
+      }), 'Expense review notification')));
     }
 
     logActivity(req, {
@@ -129,7 +148,7 @@ async function approve(req, res) {
   });
 
   if (existing.createdById && String(existing.createdById) !== String(req.user.id)) {
-    prisma.notification.create({
+    bestEffort(prisma.notification.create({
       data: {
         gymId: req.user.gymId,
         staffId: existing.createdById,
@@ -138,7 +157,7 @@ async function approve(req, res) {
         type: 'system',
         link: '/front-desk',
       },
-    }).catch(() => {});
+    }), 'Expense reviewed notification');
   }
 
   logActivity(req, {
@@ -154,12 +173,14 @@ async function update(req, res) {
     where: { id: req.params.id, gymId: req.user.gymId },
   });
   if (!existing) return res.status(404).json({ error: 'Expense not found' });
+  const read = readExpense(req.body, false);
+  if (read.error) return res.status(400).json({ error: read.error, field: read.field });
 
   try {
     const expense = await prisma.expense.update({
-      where: { id: req.params.id },
+      where: { id: existing.id },
       data: {
-        ...buildExpenseData(req.body),
+        ...read.data,
         // An edited entry carries who changed it and when, so a figure that
         // moved after the fact can always be traced
         editedById: req.user.id,
