@@ -471,33 +471,33 @@ Every file in the repository except `node_modules`, build output (`dist`), lockf
 
 | File | Lines | Pass 1 | Pass 2 |
 | :- | -: | :-: | :-: |
-| `gem-frontend/src/components/AddressInputs.jsx` | 48 | [ ] | [ ] |
+| `gem-frontend/src/components/AddressInputs.jsx` | 48 | [x] | [ ] |
 | `gem-frontend/src/components/BottomSheet.jsx` | 94 | deleted (8b95823) | deleted (8b95823) |
-| `gem-frontend/src/components/BottomTabBar.jsx` | 161 | [ ] | [ ] |
-| `gem-frontend/src/components/BusyWarning.jsx` | 44 | [ ] | [ ] |
-| `gem-frontend/src/components/CheckinStats.jsx` | 328 | [ ] | [ ] |
-| `gem-frontend/src/components/CoachClientsPanel.jsx` | 124 | [ ] | [ ] |
-| `gem-frontend/src/components/CollectPaymentStep.jsx` | 108 | [ ] | [ ] |
-| `gem-frontend/src/components/EodReport.jsx` | 383 | [ ] | [ ] |
-| `gem-frontend/src/components/FAB.jsx` | 37 | [ ] | [ ] |
-| `gem-frontend/src/components/FillInPreview.jsx` | 28 | [ ] | [ ] |
+| `gem-frontend/src/components/BottomTabBar.jsx` | 161 | [x] | [ ] |
+| `gem-frontend/src/components/BusyWarning.jsx` | 44 | [x] | [ ] |
+| `gem-frontend/src/components/CheckinStats.jsx` | 328 | [x] | [ ] |
+| `gem-frontend/src/components/CoachClientsPanel.jsx` | 124 | [x] | [ ] |
+| `gem-frontend/src/components/CollectPaymentStep.jsx` | 108 | [x] | [ ] |
+| `gem-frontend/src/components/EodReport.jsx` | 383 | [x] | [ ] |
+| `gem-frontend/src/components/FAB.jsx` | 37 | [x] | [ ] |
+| `gem-frontend/src/components/FillInPreview.jsx` | 28 | [x] | [ ] |
 | `gem-frontend/src/components/FrontDeskTour.jsx` | 228 | deleted (8b95823) | deleted (8b95823) |
-| `gem-frontend/src/components/GlobalSearch.jsx` | 299 | [ ] | [ ] |
-| `gem-frontend/src/components/GoalsModal.jsx` | 160 | [ ] | [ ] |
-| `gem-frontend/src/components/Header.jsx` | 462 | [ ] | [ ] |
-| `gem-frontend/src/components/LangToggle.jsx` | 110 | [ ] | [ ] |
-| `gem-frontend/src/components/LogProgressModal.jsx` | 204 | [ ] | [ ] |
-| `gem-frontend/src/components/MemberCoachRow.jsx` | 121 | [ ] | [ ] |
-| `gem-frontend/src/components/MemberProgressTab.jsx` | 480 | [ ] | [ ] |
-| `gem-frontend/src/components/NavDrawer.jsx` | 249 | [ ] | [ ] |
-| `gem-frontend/src/components/NextDayHint.jsx` | 44 | [ ] | [ ] |
-| `gem-frontend/src/components/NotificationBell.jsx` | 153 | [ ] | [ ] |
-| `gem-frontend/src/components/OpenShiftsWarning.jsx` | 57 | [ ] | [ ] |
-| `gem-frontend/src/components/ScrollToTop.jsx` | 12 | [ ] | [ ] |
-| `gem-frontend/src/components/SendMessageModal.jsx` | 160 | [ ] | [ ] |
-| `gem-frontend/src/components/Sidebar.jsx` | 401 | [ ] | [ ] |
-| `gem-frontend/src/components/Skeleton.jsx` | 54 | [ ] | [ ] |
-| `gem-frontend/src/components/TaskAssigneeField.jsx` | 64 | [ ] | [ ] |
+| `gem-frontend/src/components/GlobalSearch.jsx` | 299 | [x] | [ ] |
+| `gem-frontend/src/components/GoalsModal.jsx` | 160 | [x] | [ ] |
+| `gem-frontend/src/components/Header.jsx` | 462 | [x] | [ ] |
+| `gem-frontend/src/components/LangToggle.jsx` | 110 | [x] | [ ] |
+| `gem-frontend/src/components/LogProgressModal.jsx` | 204 | [x] | [ ] |
+| `gem-frontend/src/components/MemberCoachRow.jsx` | 121 | [x] | [ ] |
+| `gem-frontend/src/components/MemberProgressTab.jsx` | 480 | [x] | [ ] |
+| `gem-frontend/src/components/NavDrawer.jsx` | 249 | [x] | [ ] |
+| `gem-frontend/src/components/NextDayHint.jsx` | 44 | [x] | [ ] |
+| `gem-frontend/src/components/NotificationBell.jsx` | 153 | [x] | [ ] |
+| `gem-frontend/src/components/OpenShiftsWarning.jsx` | 57 | [x] | [ ] |
+| `gem-frontend/src/components/ScrollToTop.jsx` | 12 | [x] | [ ] |
+| `gem-frontend/src/components/SendMessageModal.jsx` | 160 | [x] | [ ] |
+| `gem-frontend/src/components/Sidebar.jsx` | 401 | [x] | [ ] |
+| `gem-frontend/src/components/Skeleton.jsx` | 54 | [x] | [ ] |
+| `gem-frontend/src/components/TaskAssigneeField.jsx` | 64 | [x] | [ ] |
 | `gem-frontend/src/components/dashboard/GymCalendar.jsx` | 674 | deleted (8b95823) | deleted (8b95823) |
 | `gem-frontend/src/components/dashboard/KpiCard.jsx` | 121 | deleted (8b95823) | deleted (8b95823) |
 | `gem-frontend/src/components/dashboard/NotificationsPanel.jsx` | 39 | deleted (8b95823) | deleted (8b95823) |
@@ -594,7 +594,7 @@ Severity: Critical, High, Medium, Low. Status: Open, Fixed, Needs decision, Won'
 | F-023 | High | Dependencies | `gem-frontend/package-lock.json`, `gem-backend/package-lock.json` | 24 frontend and 17 backend known vulnerabilities (see baseline), including a critical one in `proxy-addr` and a high one in `multer`. | `npm audit fix` in both apps (patch and minor only) in Phase 3, then build and full tests. `nodemon`'s suggested fix is a major change (D-11). | Open |
 | F-024 | Medium | Performance | `gem-frontend/src/routes/routeConfig.jsx` | The whole app is one 2.6 MB JavaScript file (706 kB gzip); every page loads every other page's code. | Lazy-load pages by route (`React.lazy`), Phase 7. | Open |
 | F-025 | Medium | Quality | 48 frontend files | Lint fails with 198 errors (baseline). Some are real bugs: 4 objects with a duplicated key (one value silently wins), 30 empty `catch` blocks that swallow errors, 36 components defined inside other components (remounted on every render, which can drop typed input). | Fix by hand during Phase 2, file by file, without disabling rules. | Open |
-| F-026 | Low | Dependencies | `gem-backend/node_modules` | Three extraneous packages (`pdf-to-img`, `pdfjs-dist`, `@napi-rs/canvas`) are installed but not declared. | `npm prune` (local only, no repo change). | Open |
+| F-026 | Low | Dependencies | `gem-backend/node_modules` | Three extraneous packages (`pdf-to-img`, `pdfjs-dist`, `@napi-rs/canvas`) are installed but not declared. | `npm prune` (local only, no repo change). | Fixed (pruned with b2370c2; `npm ls` shows none) |
 | F-027 | Low | Portability | repository | Files mix LF and CRLF line endings (git warns on every commit); there is no `.gitattributes`. | Add `.gitattributes` (`* text=auto`), Phase 5. | Open |
 | F-028 | Medium | CI | `.github/workflows/playwright.yml` | The workflow the owner added runs `npm ci` and the sample tests on pushes to `main`. GEM's real end-to-end tests will need a PostgreSQL service, both apps installed and started, and secrets kept out. | Rewrite the workflow once the suite exists. CI is infrastructure, so the owner decides. | Needs decision |
 | F-029 | High | Security | `gem-backend/src/controllers/auth.controller.js:226`, `app.js` | The sign-in lookup limit (30 per 10 min) is keyed by `req.ip`, and Express is not told it sits behind Railway's proxy, so every visitor shares one bucket: 30 lookups lock the sign-in lookup for every gym. | Read the client address through the proxy (`trust proxy`, D-14) and key limits by address plus gym. | Fixed (6fe825d) |
@@ -655,7 +655,7 @@ Severity: Critical, High, Medium, Low. Status: Open, Fixed, Needs decision, Won'
 | F-084 | Medium | Bug | `gem-frontend/src/pages/FrontDeskPage.jsx:1267-1276` | Reporting an equipment issue at the desk shows "Issue reported" and adds it to the activity list even when saving failed: the error is only written to the console. The same "fake success" pattern CLAUDE.md forbids elsewhere. | Show the server's error and keep the form. Frontend review. | Open |
 | F-085 | High | Security | `gem-frontend/src/pages/AccountingPage.jsx:747,794,1891-1919`, `pages/MembersPage.jsx:1681-1704` | Stored XSS in print and export windows. These build HTML from records and write it into a window opened from the app (same origin, so it can read the signed-in token in localStorage) without escaping: an expense's title, category, paid-to, method, recorded-by and note (all typed by the front desk at the kiosk), the financial overview's category labels, payroll names, and every cell of the members export. A front desk employee can save an expense titled with a script that runs when the owner prints it, with the owner's session in reach. The receipt image address goes into an attribute unescaped as well. Receipts on the member profile and Payments page already escape. | Escape every value (`escapeHtml` from `utils/receipt.js`) and allow only http(s) or data:image addresses for the image. | Open |
 | F-086 | Medium | Bug | `gem-frontend/src/hooks/useGymSettings.js:10,27`, `utils/paymentMethods.js:28-34` | A gym that has not saved its payment settings is meant to be offered all four methods, but `useGymSettings` fills in a default of three (no Mobile Money), so `enabledMethods()` never reaches its "all four" fallback: a new gym's payment forms leave out Mobile Money, the most common way to pay in Cameroon, until the owner visits Settings. | Default to all four methods. | Open |
-| F-087 | Low | Bug | `gem-frontend/src/utils/rolePages.js:22` | Legacy `instructor` accounts cannot open Members, although instructors and coaches are meant to be treated as trainers everywhere (`coach` and `trainer` both can). | Give instructor the trainer's pages. | Open |
+| F-087 | Low | Bug | `gem-frontend/src/utils/rolePages.js:22`, `routes/ProtectedRoute.jsx:16-19`, `components/Sidebar.jsx:215-222`, `NavDrawer.jsx:59-70`, `GlobalSearch.jsx:81` | Legacy roles get the wrong pages. `instructor` accounts cannot open Members, although instructors and coaches are meant to be treated as trainers everywhere. An `accountant` account (the role is still in the schema) matches no entry, and the route guard, sidebar, drawer and search read "no entry" as the owner's "everything": every page is listed and opens, and each one comes up empty because the server refuses the data. A missing role falls back to `general_manager` the same way. | Give instructor the trainer's pages; an unknown or missing role gets only its own profile. | Open |
 | F-088 | Low | Bug | `gem-frontend/src/services/api.js:76-86`, `services/gym.service.js:4` | An expired session sends the person to the generic `/login` (gym code first) instead of their own gym's sign-in page, as the deactivation path already does; the gym code is put into the lookup address without encoding. | Use the same sign-out path; encode the code. | Open |
 | F-089 | Low | Bug | `gem-frontend/src/utils/auth.js:9` | The daily re-login compares the UTC day (`toISOString().slice(0, 10)`), which CLAUDE.md's own rule forbids: in Cameroon the "new day" begins at 01:00, so someone signing in at 00:30 is signed out half an hour later. | Use `todayStr()`. | Open |
 | F-090 | Low | Bug | `gem-frontend/src/pages/AccountingPage.jsx:765,804` | The Financial Overview and Payroll exports are headed "GEM Fitness" instead of the gym's own name. | Use the gym's name. | Open |
@@ -663,8 +663,16 @@ Severity: Critical, High, Medium, Low. Status: Open, Fixed, Needs decision, Won'
 | F-092 | Medium | Accessibility | `gem-frontend/src/components/ui/GemInput.jsx:15`, `GemSelect.jsx:16` | Every form's labels are drawn but not connected to their fields (no `htmlFor`/`id`): screen readers do not announce them, clicking a label does not focus its box, and errors are not tied to the field (`aria-describedby`, `aria-invalid`). | Give each field an id (`useId`) and connect label, field and error. Phase 6. | Open |
 | F-093 | Medium | Bug | `gem-frontend/src/components/ui/ManagerAuthModal.jsx:143-157` | The manager code box is a `type="password"` field, which CLAUDE.md forbids for codes because browsers (Firefox above all) fill saved logins into it; `autocomplete="off"` does not stop Firefox for password fields. | Use `CodeInput` for the code (the password mode keeps a password field). Confirm in Firefox, Phase 5. | Open |
 | F-094 | Medium | Bug | `gem-frontend/src/pages/PaymentsPage.jsx:68-80` | The receipt printed from the Payments page asks for seven translation keys that do not exist (`payments.paymentReceiptTitle`, `receiptReference`, `receiptDate`, `receiptDescription`, `receiptMethod`, `receiptRecordedBy`, `thankYouReceipt`), so it prints the key names instead of labels. The member profile's receipt has working keys. | Add the keys in EN and FR. | Open |
-| F-095 | Low | i18n | `gem-frontend/src/components/ui/ConfirmModal.jsx:63,45`, `ui/Modal.jsx:86`, `utils/paystubPdf.js` | Some shared text is fixed English: the confirm dialog's Cancel and default Delete, the dialog close button's label, and the whole payslip PDF. | Translate them (the payslip with F-075). | Open |
+| F-095 | Low | i18n | `components/ui/ConfirmModal.jsx:45,63`, `ui/Modal.jsx:86`, `utils/paystubPdf.js`, `components/AddressInputs.jsx:19`, `OpenShiftsWarning.jsx:27`, `NavDrawer.jsx:167-170`, `Sidebar.jsx:385`, `Header.jsx:46,49`, `EodReport.jsx:117`, `pages/MembersPage.jsx:85,377,1926`, `StaffPage.jsx:760`, `TasksPage.jsx:438` | Text that stays English in French: the confirm dialog's Cancel and default Delete, the dialog close button's label, the whole payslip PDF, the "e.g. 12B" placeholder, "A staff member", the "Manager" name fallback, the role name in the phone drawer, the add buttons' labels on Members, Staff and Tasks, and equipment severities in the end-of-day report (shown as stored codes). | Translate them (the payslip with F-075). | Open |
 | F-096 | Low | Accessibility | `gem-frontend/src/components/ui/Modal.jsx`, `ManagerAuthModal.jsx`, `RowMenu.jsx` | Dialogs do not move focus in, keep it in, or give it back on close; the code dialog is not a dialog to assistive technology; the row menu has no arrow-key navigation; the eye button has no label. | Phase 6. | Open |
+| F-097 | Low | Bug | `gem-frontend/src/components/CollectPaymentStep.jsx:20-24` | The payment step in the Add member and Add visitor forms picks its method once, when it opens. If the gym's settings arrive after that (the first form of a session, before the settings fetch returns), it keeps "Cash" even when the gym does not take cash: the box shows another method or nothing, and the payment is saved as Cash. The Payments and Sales forms already re-check. | Re-check the chosen method against the gym's methods, as PaymentsPage does. | Open |
+| F-098 | Medium | Privacy | `gem-frontend/src/components/GlobalSearch.jsx:52-67` | The search keeps the members, staff and packages it fetched for 60 seconds in a module-level copy that does not know who is signed in. Signing out and signing in to another account (or another gym) in the same tab within that minute lists the previous account's members and staff, including staff records the new role may not read. | Key the copy by gym and user, and drop it on sign-out. | Open |
+| F-099 | Medium | Performance | `gem-frontend/src/components/Sidebar.jsx:200-211`, `utils/live.js:21-27` | The sidebar's two badges download the gym's whole member list and whole task list on every page change and after every write anywhere in the gym (live events from other desks arrive as data-changed). Each open tab does it, so a busy front desk makes every screen in the gym re-download every member several times a minute. | A small server endpoint that returns the two counts. Phase 7. | Open |
+| F-100 | Medium | Accessibility | `gem-frontend/src/components/Sidebar.jsx:88-123`, `NavDrawer.jsx:195-244`, `Header.jsx:204-209,352-455` | The app's navigation can only be used with a mouse or finger: the sidebar items, the phone drawer's items and Sign out, the header bell, the avatar menu, My Profile and Sign out are `div`s with click handlers, so they cannot be reached with Tab or used with Enter (WCAG 2.1.1, level A). The kiosk's bell and the phone's bottom bar use real buttons. | Make them links or buttons, with names on the icon-only ones. Phase 6. | Open |
+| F-101 | Low | Bug | `gem-frontend/src/pages/SalesPage.jsx:723`, `components/FAB.jsx:3` | On a phone the Sales page's round Add product button is meant to show only on the Products tab, but it passes a `style` that FAB ignores, so the button floats over every tab, History included. | Render it only on the Products tab. | Open |
+| F-102 | Low | Bug | `gem-frontend/src/components/MemberProgressTab.jsx:83`, `NotificationBell.jsx:47`, `Header.jsx:62`, `MemberCoachRow.jsx:39` | A failed load is shown as an empty list: the Progress tab says "No progress yet", the bells say there are no notifications, and the coach list offers no coaches, when the server could not be reached or refused. | Show that loading failed. More pages to check in the page review. | Open |
+| F-103 | Low | UX | `gem-frontend/src/components/MemberProgressTab.jsx:161-165,429` | A progress entry (a session, measurements or a note) is deleted the moment Delete is chosen in its menu, with no confirmation, unlike other deletions in the app. | Ask first (D-25). | Needs decision |
+| F-104 | Low | Quality | `gem-frontend/src/i18n/translations.js` (EN about lines 1246 and 1427, 1534 and 1643; FR 3357 and 3538, 3650 and 3764) | Two keys are defined twice in each language (`frontDesk.checkInFailed`, `memberProfile.unlimited`; lint reports them as `no-dupe-keys`). The later copy silently wins, so the earlier text is dead and misleads whoever edits it. | Remove the earlier copies after checking which text is shown today. | Open |
 
 ## 7. Needs my decision
 
@@ -694,3 +702,4 @@ Severity: Critical, High, Medium, Low. Status: Open, Fixed, Needs decision, Won'
 | D-22 (F-066) | Deleting a package that members are on. | Refuse with the number of members on it, and offer "Inactive" (already supported) instead. |
 | D-23 (F-075) | Emails and receipts in French. | A language setting on the gym (English / French) that emails, the receipt PDF and server messages follow. |
 | D-24 | Reads by role. The API answers some reads to roles whose screens never show them: trainers can read the books (`/api/expenses`, `/api/sales`), every time card (`/api/timecards`) and members' balances through the attendance list. CLAUDE.md says "the books read the same for everyone" as a deliberate choice. | Keep reads to the roles whose pages show them (the page list in `rolePages.js`), so the API matches the screens. |
+| D-25 (F-103) | Deleting a progress entry asks nothing first. | Ask "Delete this entry?" like other deletions; it is one tap more for a coach. |
