@@ -1,14 +1,12 @@
+const crypto = require('crypto');
 const prisma = require('../utils/prisma');
+const { bestEffort } = require('../utils/bestEffort');
+const { generatePaymentRef } = require('../utils/paymentRef');
 const { sendMemberWelcome, sendPaymentReceipt, sendAccessCode, sendMembershipUpdate } = require('../utils/memberEmail');
 const { findEmailConflict, emailConflictMessage } = require('../utils/emailGuard');
 
 const { toPaymentMethod } = require('../utils/paymentMethod');
 
-function generatePaymentRef() {
-  const ts = Date.now().toString(36).toUpperCase();
-  const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
-  return `TXN-${ts}-${rand}`;
-}
 const { logActivity, changesBetween, describeChanges, fullName, money } = require('../utils/activityLog');
 
 const MEMBER_FIELDS = {
@@ -21,31 +19,33 @@ const MEMBER_FIELDS = {
   emergencyPhone: 'Emergency phone', howHeard: 'How they heard of us', notes: 'Notes',
 };
 
+// A 4-digit check-in code no one else in the gym holds. A staff member's own
+// code also checks them in to train, so a member never shares one with staff.
 async function generateAccessCode(gymId) {
-  let attempts = 0;
-  while (attempts < 50) {
-    const code = String(Math.floor(1000 + Math.random() * 9000));
-    const taken = await prisma.member.findFirst({ where: { gymId, accessCode: code } });
-    if (!taken) return code;
-    attempts++;
+  for (let i = 0; i < 50; i++) {
+    const code = String(crypto.randomInt(1000, 10000));
+    const [member, staff] = await Promise.all([
+      prisma.member.findFirst({ where: { gymId, accessCode: code }, select: { id: true } }),
+      prisma.staff.findFirst({ where: { gymId, accessCode: code }, select: { id: true } }),
+    ]);
+    if (!member && !staff) return code;
   }
   // Fallback to 6-digit if 4-digit space is crowded
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(crypto.randomInt(100000, 1000000));
 }
 
-async function generateMemberCode(gymId) {
-  // Count globally to avoid collisions across gyms (memberCode is globally unique)
+// GEM- and the next number across every gym (member codes are unique
+// platform-wide). A retry after a clash starts a little further on, so members
+// added at the same moment stop drawing the same number.
+async function generateMemberCode(attempt = 0) {
   const count = await prisma.member.count();
-  let code = `GEM-${String(count + 1).padStart(4, '0')}`;
-  // Retry if code is taken (race condition / collision safety)
-  let attempts = 0;
-  while (attempts < 20) {
-    const taken = await prisma.member.findUnique({ where: { memberCode: code } });
-    if (!taken) break;
-    attempts++;
-    code = `GEM-${String(count + 1 + attempts).padStart(4, '0')}`;
+  let n = count + 1 + (attempt ? crypto.randomInt(0, attempt * 3 + 1) : 0);
+  for (let i = 0; i < 20; i++, n++) {
+    const code = `GEM-${String(n).padStart(4, '0')}`;
+    const taken = await prisma.member.findUnique({ where: { memberCode: code }, select: { id: true } });
+    if (!taken) return code;
   }
-  return code;
+  return `GEM-${String(n).padStart(4, '0')}`;
 }
 
 // Fitness staff work with the members, not with their money, so what a member
@@ -54,7 +54,17 @@ async function generateMemberCode(gymId) {
 const FITNESS_ROLES = ['trainer', 'instructor', 'coach'];
 function withoutMoney(member, role) {
   if (!member || !FITNESS_ROLES.includes(role)) return member;
-  const { balance, payments, ...rest } = member;
+  const rest = { ...member };
+  delete rest.balance;
+  delete rest.payments;
+  // Each visit keeps what the member owed as they came in; that is money too
+  if (Array.isArray(rest.attendances)) {
+    rest.attendances = rest.attendances.map((visit) => {
+      const copy = { ...visit };
+      delete copy.balanceAtCheckIn;
+      return copy;
+    });
+  }
   return rest;
 }
 
@@ -121,7 +131,7 @@ async function getAll(req, res) {
   const waiting = FITNESS_ROLES.includes(req.user.role) ? [] : await prisma.approvalRequest.findMany({
     where: { gymId: req.user.gymId, status: 'pending' },
     select: { memberId: true, summary: true },
-  }).catch(() => []);
+  }).then(rows => rows, err => { console.error('Reading waiting approvals failed:', err.message); return []; });
   const waitingFor = new Map(waiting.map(w => [w.memberId, w.summary]));
 
   res.json(members.map(m => ({ ...withoutMoney(m, req.user.role), pendingApproval: waitingFor.get(m.id) || null })));
@@ -175,152 +185,154 @@ async function create(req, res) {
     emergencyContact, emergencyPhone,
     howHeard, notes,
   } = req.body;
+  const gymId = req.user.gymId;
 
-  if (!firstName || !lastName) {
+  if (!String(firstName || '').trim() || !String(lastName || '').trim()) {
     return res.status(400).json({ error: 'firstName and lastName are required' });
   }
   if (!String(city || '').trim()) return res.status(400).json({ error: 'Enter the city.', field: 'city' });
   if (!String(region || '').trim()) return res.status(400).json({ error: 'Enter the region.', field: 'region' });
+  // What a member owes; the gym never owes a member, so it is never below zero
+  const owes = balance === undefined || balance === null || balance === '' ? 0 : Number(balance);
+  if (!Number.isFinite(owes) || owes < 0) return res.status(400).json({ error: 'The balance must be a number of 0 or more.', field: 'balance' });
+  const givenCode = accessCode === undefined || accessCode === null ? '' : String(accessCode).trim();
+  if (givenCode && !/^\d{4,6}$/.test(givenCode)) return res.status(400).json({ error: 'A check-in code is 4 to 6 digits.', field: 'accessCode' });
+
   // Members live in the gym's own country; the forms show it but never change it
-  const homeGym = await prisma.gym.findUnique({ where: { id: req.user.gymId }, select: { country: true } });
+  const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { country: true, registrationFee: true, registrationFeeRequired: true } });
 
   // Validate packageId exists if provided
   if (packageId) {
-    const pkg = await prisma.package.findFirst({ where: { id: packageId, gymId: req.user.gymId } });
+    const pkg = await prisma.package.findFirst({ where: { id: String(packageId), gymId } });
     if (!pkg) return res.status(400).json({ error: 'Package not found' });
   }
 
   // An email must identify one person per gym, staff and members alike
-  const clash = await findEmailConflict(req.user.gymId, email, { scope: 'member' });
+  const clash = await findEmailConflict(gymId, email, { scope: 'member' });
   if (clash) return res.status(409).json({ error: emailConflictMessage(clash), field: 'email' });
+  if (givenCode && await prisma.member.findFirst({ where: { gymId, accessCode: givenCode }, select: { id: true } })) {
+    return res.status(409).json({ error: 'That check-in code is already used by another member.', field: 'accessCode' });
+  }
 
   // Nobody is added without the money for it being collected first: a member's
   // registration fee (when the gym charges one), a visitor's bundle or day pass.
   const firstPayment = req.body.initialPayment;
-  if (isVisitor) {
-    if (!(Number(firstPayment?.amount) > 0)) {
-      return res.status(400).json({ error: 'Collect the payment for the visitor bundle or day pass before adding the visitor.' });
-    }
-  } else {
-    const feeGym = await prisma.gym.findUnique({ where: { id: req.user.gymId }, select: { registrationFee: true, registrationFeeRequired: true } });
-    if (feeGym?.registrationFeeRequired && Number(feeGym.registrationFee) > 0 && !req.body.regFeeMethod) {
-      return res.status(400).json({ error: 'Collect the registration fee before adding the member.' });
-    }
+  const firstAmount = Number(firstPayment?.amount);
+  const fee = Number(gym?.registrationFee) || 0;
+  const chargesFee = !isVisitor && !!gym?.registrationFeeRequired && fee > 0;
+  if (isVisitor && !(Number.isFinite(firstAmount) && firstAmount > 0)) {
+    return res.status(400).json({ error: 'Collect the payment for the visitor bundle or day pass before adding the visitor.' });
+  }
+  if (chargesFee && !req.body.regFeeMethod) {
+    return res.status(400).json({ error: 'Collect the registration fee before adding the member.' });
   }
 
-  const memberCode = await generateMemberCode(req.user.gymId);
-  const finalAccessCode = accessCode?.trim() || await generateAccessCode(req.user.gymId);
+  const data = {
+    gymId,
+    firstName: String(firstName).trim(),
+    lastName: String(lastName).trim(),
+    phone: phone?.trim() || undefined,
+    email: email?.trim() || undefined,
+    gender: gender || undefined,
+    avatarColor: avatarColor || undefined,
+    photo: photo || undefined,
+    packageId: packageId || undefined,
+    status: status || (startDate && new Date(startDate) > new Date() ? 'pending' : 'active'),
+    startDate: startDate ? new Date(startDate) : undefined,
+    endDate: endDate ? new Date(endDate) : undefined,
+    balance: owes,
+    // A fee collected now is paid as of now
+    regFeeDate: chargesFee ? new Date() : (regFeeDate ? new Date(regFeeDate) : undefined),
+    freezeStartDate: freezeStartDate ? new Date(freezeStartDate) : undefined,
+    preFreezEndDate: preFreezEndDate ? new Date(preFreezEndDate) : undefined,
+    passesTotal: passesTotal != null ? Number(passesTotal) : undefined,
+    passesRemaining: passesRemaining != null ? Number(passesRemaining) : undefined,
+    dayPasses: Math.max(0, Number(dayPasses) || 0),
+    isVisitor: isVisitor ?? false,
+    dob: dob ? String(dob).slice(0, 10) : undefined,
+    houseNumber: houseNumber?.trim() || undefined,
+    street: street?.trim() || undefined,
+    city: city?.trim() || undefined,
+    region: region?.trim() || undefined,
+    postalCode: postalCode?.trim() || undefined,
+    country: gym?.country || country?.trim() || undefined,
+    emergencyContact: emergencyContact?.trim() || undefined,
+    emergencyPhone: emergencyPhone?.trim() || undefined,
+    howHeard: howHeard?.trim() || undefined,
+    notes: notes?.trim() || undefined,
+  };
 
-  const member = await prisma.member.create({
-    data: {
-      gymId: req.user.gymId,
-      memberCode,
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      phone: phone?.trim() || undefined,
-      email: email?.trim() || undefined,
-      gender: gender || undefined,
-      avatarColor: avatarColor || undefined,
-      photo: photo || undefined,
-      accessCode: finalAccessCode,
-      packageId: packageId || undefined,
-      status: status || (startDate && new Date(startDate) > new Date() ? 'pending' : 'active'),
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
-      balance: Number(balance) || 0,
-      regFeeDate: regFeeDate ? new Date(regFeeDate) : undefined,
-      freezeStartDate: freezeStartDate ? new Date(freezeStartDate) : undefined,
-      preFreezEndDate: preFreezEndDate ? new Date(preFreezEndDate) : undefined,
-      passesTotal: passesTotal != null ? Number(passesTotal) : undefined,
-      passesRemaining: passesRemaining != null ? Number(passesRemaining) : undefined,
-      dayPasses: Math.max(0, Number(dayPasses) || 0),
-      isVisitor: isVisitor ?? false,
-      dob: dob ? String(dob).slice(0, 10) : undefined,
-      houseNumber: houseNumber?.trim() || undefined,
-      street: street?.trim() || undefined,
-      city: city?.trim() || undefined,
-      region: region?.trim() || undefined,
-      postalCode: postalCode?.trim() || undefined,
-      country: homeGym?.country || country?.trim() || undefined,
-      emergencyContact: emergencyContact?.trim() || undefined,
-      emergencyPhone: emergencyPhone?.trim() || undefined,
-      howHeard: howHeard?.trim() || undefined,
-      notes: notes?.trim() || undefined,
-    },
-    include: { package: { select: { id: true, name: true } } },
-  });
-
-  // A new member pays the gym's registration fee at signup (if it charges one),
-  // recorded as a payment so it shows in Payments and emails them a receipt.
-  // Visitors are not members and do not pay it.
-  if (!member.isVisitor) {
+  // The member and the money taken for them are written together, so neither
+  // exists without the other. Member codes are numbered across every gym, so
+  // two members added at the same moment can draw the same one: the database
+  // refuses the second, which simply draws again.
+  let created;
+  for (let attempt = 0; ; attempt += 1) {
+    const memberCode = await generateMemberCode(attempt);
+    const code = givenCode || await generateAccessCode(gymId);
     try {
-      const gym = await prisma.gym.findUnique({
-        where: { id: req.user.gymId },
-        select: { registrationFee: true, registrationFeeRequired: true },
+      created = await prisma.$transaction(async (tx) => {
+        const member = await tx.member.create({
+          data: { ...data, memberCode, accessCode: code },
+          include: { package: { select: { id: true, name: true } } },
+        });
+        let payment = null;
+        if (chargesFee) {
+          payment = await tx.payment.create({
+            data: {
+              memberId: member.id, gymId, staffId: req.user.id,
+              amount: fee, method: toPaymentMethod(req.body.regFeeMethod), type: 'registration', note: 'Registration fee',
+              // Every payment carries a reference. A registration fee leaves the
+              // membership balance untouched, so "balance after" is what they owe
+              // on the membership (0 when nothing is due, never blank).
+              reference: generatePaymentRef(),
+              balanceAfter: owes,
+            },
+          });
+        } else if (isVisitor) {
+          // A visitor's first payment is a pass purchase, so it leaves the
+          // balance as created (the unpaid part of the bundle)
+          payment = await tx.payment.create({
+            data: {
+              memberId: member.id, gymId, staffId: req.user.id,
+              amount: firstAmount, method: toPaymentMethod(firstPayment.method),
+              type: 'product', note: firstPayment.description || 'Visitor bundle',
+              reference: generatePaymentRef(), balanceAfter: owes,
+            },
+          });
+        }
+        return { member, payment };
       });
-      const fee = Number(gym?.registrationFee) || 0;
-      if (gym?.registrationFeeRequired && fee > 0) {
-        const regFeeMethod = toPaymentMethod(req.body.regFeeMethod);
-        const payment = await prisma.payment.create({
-          data: {
-            memberId: member.id, gymId: req.user.gymId, staffId: req.user.id,
-            amount: fee, method: regFeeMethod, type: 'registration', note: 'Registration fee',
-            // Every payment carries a reference. A registration fee leaves the
-            // membership balance untouched, so "balance after" is what they owe
-            // on the membership (0 when nothing is due, never blank).
-            reference: generatePaymentRef(),
-            balanceAfter: Number(member.balance) || 0,
-          },
-        });
-        await prisma.member.update({ where: { id: member.id }, data: { regFeeDate: new Date() } }).catch(() => {});
-        logActivity(req, {
-          category: 'money', action: 'payment.recorded',
-          summary: `Collected the registration fee of ${money(fee)} from ${fullName(member)}`,
-          target: { type: 'member', id: member.id }, details: { type: 'registration' },
-        });
-        sendPaymentReceipt(payment, member, req.user.gymId).catch(err => console.error('Reg fee receipt email failed:', err.message));
-      }
+      break;
     } catch (err) {
-      console.error('Registration fee payment failed:', err.message);
+      if (err.code === 'P2002' && attempt < 8) continue;
+      throw err;
     }
   }
+  const { member, payment } = created;
 
-  // A visitor's first payment is saved with them, so one never exists without
-  // the other. It is a pass purchase, so it leaves the balance as created (the
-  // unpaid part of the bundle), which is what it records as the balance after.
-  if (member.isVisitor) {
-    try {
-      const payment = await prisma.payment.create({
-        data: {
-          memberId: member.id, gymId: req.user.gymId, staffId: req.user.id,
-          amount: Number(firstPayment.amount), method: toPaymentMethod(firstPayment.method),
-          type: 'product', note: firstPayment.description || 'Visitor bundle',
-          reference: generatePaymentRef(), balanceAfter: Number(member.balance) || 0,
-        },
-      });
-      logActivity(req, {
-        category: 'money', action: 'payment.recorded',
-        summary: `Collected ${money(payment.amount)} from new visitor ${fullName(member)}`,
-        target: { type: 'member', id: member.id }, details: { type: 'product' },
-      });
-      sendPaymentReceipt(payment, member, req.user.gymId).catch(err => console.error('Visitor receipt email failed:', err.message));
-    } catch (err) {
-      console.error('Visitor first payment failed:', err.message);
-    }
+  if (payment) {
+    logActivity(req, {
+      category: 'money', action: 'payment.recorded',
+      summary: chargesFee
+        ? `Collected the registration fee of ${money(fee)} from ${fullName(member)}`
+        : `Collected ${money(payment.amount)} from new visitor ${fullName(member)}`,
+      target: { type: 'member', id: member.id }, details: { type: payment.type },
+    });
+    sendPaymentReceipt(payment, member, gymId).catch(err => console.error('First payment receipt email failed:', err.message));
   }
 
-  prisma.notification.create({
+  bestEffort(prisma.notification.create({
     data: {
-      gymId: req.user.gymId,
+      gymId,
       title: member.isVisitor ? 'New Visitor Registered' : 'New Member Joined',
       body: `${member.firstName} ${member.lastName} has ${member.isVisitor ? 'been registered as a visitor' : 'joined the gym'}.`,
       type: 'signup',
     },
-  }).catch(() => {});
+  }), 'New member notification');
 
   // Welcome email with their member ID and check-in code - fire and forget
-  sendMemberWelcome(member, req.user.gymId)
+  sendMemberWelcome(member, gymId)
     .catch(err => console.error('Member welcome email failed:', err.message));
 
   logActivity(req, {
@@ -394,13 +406,13 @@ async function update(req, res) {
   // The renew flow asks us to tell the member their membership was renewed.
   // Best-effort, never blocks the save.
   if (req.body._notify === 'renew_membership') {
-    sendMembershipUpdate(member, 'renew_membership', req.user.gymId).catch(() => {});
+    bestEffort(sendMembershipUpdate(member, 'renew_membership', req.user.gymId), 'Renewal email');
   }
 
   let packageNames = {};
   if ('packageId' in safeData && (safeData.packageId || null) !== (existing.packageId || null)) {
     const ids = [existing.packageId, safeData.packageId].filter(Boolean);
-    const pkgs = await prisma.package.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }).catch(() => []);
+    const pkgs = await prisma.package.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }).then(rows => rows, err => { console.error('Reading package names failed:', err.message); return []; });
     packageNames = Object.fromEntries(pkgs.map(p => [p.id, p.name]));
   }
   const changes = changesBetween(existing, safeData, MEMBER_FIELDS, {

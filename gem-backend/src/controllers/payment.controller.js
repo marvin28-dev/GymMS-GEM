@@ -1,12 +1,9 @@
 const prisma = require('../utils/prisma');
 const { sendPaymentReceipt } = require('../utils/memberEmail');
 const { logActivity, money } = require('../utils/activityLog');
+const { bestEffort } = require('../utils/bestEffort');
 
-function generateRef() {
-  const ts = Date.now().toString(36).toUpperCase();
-  const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
-  return `TXN-${ts}-${rand}`;
-}
+const { generatePaymentRef } = require('../utils/paymentRef');
 
 const { toPaymentMethod } = require('../utils/paymentMethod');
 
@@ -41,80 +38,58 @@ async function create(req, res) {
   if (typeof memberId !== 'string' || !memberId.trim()) {
     return res.status(400).json({ error: 'Choose the member who is paying.', field: 'memberId' });
   }
-  const member = await prisma.member.findFirst({
-    where: { id: memberId, gymId: req.user.gymId },
-    select: { id: true, balance: true, firstName: true, lastName: true },
-  });
-  if (!member) return res.status(404).json({ error: 'Member not found' });
-
-  const payAmount      = parseFloat(amount) || 0;
-  const paymentType    = TYPE_MAP[type] || 'other';
-  const isRegFee       = paymentType === 'registration';
+  const payAmount = Number(amount);
+  if (amount === null || amount === '' || !Number.isFinite(payAmount) || payAmount <= 0) {
+    return res.status(400).json({ error: 'Enter an amount above zero.', field: 'amount' });
+  }
+  const paymentType = TYPE_MAP[type] || 'other';
   // A product/pass purchase (day pass, visitor bundle, shop item) is its own
   // transaction - it never pays down the member's membership dues. Only
   // membership and miscellaneous ("other") payments reduce the balance;
   // registration fees are collected separately too.
-  const skipBalance    = isRegFee || paymentType === 'product';
-  const currentBalance = member.balance || 0;
-  const newBalance     = skipBalance ? currentBalance : Math.max(0, currentBalance - payAmount);
-  const ref            = reference || generateRef();
-
-  if (!(payAmount > 0)) return res.status(400).json({ error: 'Enter an amount above zero.' });
+  const skipBalance = paymentType === 'registration' || paymentType === 'product';
   // pendingCharge is the price of what is being bought in this transaction that
   // is not on the account yet (a visitor bundle, a pass). A payment can never be
   // more than it, and whatever is left of it is added to what the member owes,
   // which is the balance this payment leaves them on.
   const pendingCharge = req.body.pendingCharge != null ? Math.max(0, Number(req.body.pendingCharge) || 0) : null;
   if (pendingCharge != null && payAmount > pendingCharge) {
-    return res.status(400).json({ error: `Cannot collect more than the ${money(pendingCharge)} required.` });
+    return res.status(400).json({ error: `Cannot collect more than the ${money(pendingCharge)} required.`, field: 'amount' });
   }
-  // A payment towards what the member owes can't be more than they owe.
-  if (req.body.towardBalance && !skipBalance && payAmount > currentBalance) {
-    return res.status(400).json({ error: `Cannot collect more than the ${money(currentBalance)} owed.` });
-  }
-  const balanceAfter = pendingCharge != null ? currentBalance + (pendingCharge - payAmount) : newBalance;
+  const ref = reference ? String(reference).slice(0, 60) : generatePaymentRef();
 
-  let payment;
-  try {
-    payment = await prisma.payment.create({
-      data: {
-        memberId,
-        gymId:   req.user.gymId,
-        staffId: req.user.id,
-        amount:  payAmount,
-        method:  toPaymentMethod(method),
-        type:    paymentType,
-        note:    description || note || null,
-      },
-    });
-  } catch (err) {
-    console.error('Payment create failed:', err.message);
-    return res.status(500).json({ error: 'Failed to create payment' });
-  }
-
-  // Save reference + balanceAfter via raw SQL (bypasses stale Prisma client)
-  try {
-    await prisma.$executeRawUnsafe(
-      `UPDATE "Payment" SET "reference" = $1, "balanceAfter" = $2 WHERE "id" = $3`,
-      ref, balanceAfter, payment.id,
-    );
-    payment.reference    = ref;
-    payment.balanceAfter = balanceAfter;
-  } catch (rawErr) {
-    console.error('Payment raw update failed:', rawErr.message);
-  }
-
-  // Only update member balance for payments that pay down dues
-  if (!skipBalance) {
-    try {
-      await prisma.member.update({
-        where: { id: memberId },
-        data:  { balance: newBalance },
-      });
-    } catch (err) {
-      console.error('Member balance update failed:', err.message);
+  // The payment and the balance it leaves are written together, with the
+  // member's row locked: two desks paying for one member at once take turns,
+  // each reading what the other left. Read and written separately, four of
+  // five payments taken at the same moment came off nobody's debt.
+  const outcome = await prisma.$transaction(async (tx) => {
+    const [member] = await tx.$queryRaw`SELECT "id", "balance", "firstName", "lastName" FROM "Member" WHERE "id" = ${memberId} AND "gymId" = ${req.user.gymId} FOR UPDATE`;
+    if (!member) return { status: 404, body: { error: 'Member not found' } };
+    const currentBalance = Number(member.balance) || 0;
+    // A payment towards what the member owes can't be more than they owe.
+    if (req.body.towardBalance && !skipBalance && payAmount > currentBalance) {
+      return { status: 400, body: { error: `Cannot collect more than the ${money(currentBalance)} owed.`, field: 'amount' } };
     }
-  }
+    const newBalance = skipBalance ? currentBalance : Math.max(0, currentBalance - payAmount);
+    const payment = await tx.payment.create({
+      data: {
+        memberId: member.id,
+        gymId: req.user.gymId,
+        staffId: req.user.id,
+        amount: payAmount,
+        method: toPaymentMethod(method),
+        type: paymentType,
+        note: description || note || null,
+        reference: ref,
+        balanceAfter: pendingCharge != null ? currentBalance + (pendingCharge - payAmount) : newBalance,
+      },
+      include: { staff: { select: { id: true, firstName: true, lastName: true } } },
+    });
+    if (!skipBalance) await tx.member.update({ where: { id: member.id }, data: { balance: newBalance } });
+    return { payment, member, newBalance };
+  });
+  if (outcome.status) return res.status(outcome.status).json(outcome.body);
+  const { payment, member, newBalance } = outcome;
 
   const memberName = `${member.firstName || ''} ${member.lastName || ''}`.trim() || 'a member';
   logActivity(req, {
@@ -123,14 +98,14 @@ async function create(req, res) {
     target: { type: 'member', id: memberId },
     details: { reference: ref, type: paymentType, ...(skipBalance ? {} : { balanceAfter: money(newBalance) }) },
   });
-  prisma.notification.create({
+  bestEffort(prisma.notification.create({
     data: {
       gymId: req.user.gymId,
       title: 'Payment Received',
       body: `${money(payAmount)} received from ${memberName}.`,
       type: 'payment',
     },
-  }).catch(() => {});
+  }), 'Payment notification');
 
   // Email the member their receipt - never block the response on it. Skipped
   // when notify:false (the caller sends it later, once the action is confirmed).
@@ -144,16 +119,7 @@ async function create(req, res) {
       .catch(err => console.error('Payment receipt email failed:', err.message));
   }
 
-  // Re-fetch with staff included so the client gets recordedBy immediately
-  try {
-    const full = await prisma.payment.findUnique({
-      where: { id: payment.id },
-      include: { staff: { select: { id: true, firstName: true, lastName: true } } },
-    });
-    return res.status(201).json(full);
-  } catch {
-    return res.status(201).json(payment);
-  }
+  res.status(201).json(payment);
 }
 
 // Send the receipt for a payment that was collected silently (notify:false),
@@ -185,17 +151,18 @@ async function remove(req, res) {
   const payment = await prisma.payment.findFirst({ where: { id, gymId: req.user.gymId } });
   if (!payment) return res.status(404).json({ error: 'Payment not found' });
 
-  if (payment.type === 'membership' && payment.memberId) {
-    try {
-      const m = await prisma.member.findUnique({ where: { id: payment.memberId }, select: { balance: true } });
-      if (m) await prisma.member.update({ where: { id: payment.memberId }, data: { balance: (m.balance || 0) + (payment.amount || 0) } });
-    } catch (e) { console.error('Balance restore on refund failed:', e.message); }
-  }
-
+  // The payment goes and its amount goes back on the debt in one step, added
+  // in the database: two undone at once both count, and a payment removed by
+  // someone else in the meantime is not put back twice.
   try {
-    await prisma.payment.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      const { count } = await tx.payment.deleteMany({ where: { id: payment.id, gymId: req.user.gymId } });
+      if (count && payment.type === 'membership' && payment.memberId) {
+        await tx.member.update({ where: { id: payment.memberId }, data: { balance: { increment: payment.amount || 0 } } });
+      }
+    });
   } catch (e) {
-    console.error('Payment delete failed:', e.message);
+    console.error('Payment removal failed:', e.message);
     return res.status(500).json({ error: 'Could not remove the payment.' });
   }
 
