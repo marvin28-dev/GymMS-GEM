@@ -38,6 +38,9 @@ async function create(req, res) {
   // action itself is confirmed, via POST /payments/:id/receipt.
   const notify = req.body.notify !== false;
 
+  if (typeof memberId !== 'string' || !memberId.trim()) {
+    return res.status(400).json({ error: 'Choose the member who is paying.', field: 'memberId' });
+  }
   const member = await prisma.member.findFirst({
     where: { id: memberId, gymId: req.user.gymId },
     select: { id: true, balance: true, firstName: true, lastName: true },

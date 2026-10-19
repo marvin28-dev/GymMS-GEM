@@ -1,5 +1,6 @@
 const prisma = require('../utils/prisma');
 const { sendMembershipUpdate } = require('../utils/memberEmail');
+const { bestEffort } = require('../utils/bestEffort');
 
 // ── Actions a manager can be asked to approve ─────────────────────────────────
 // Each returns the Prisma `data` to apply to the member. One place decides what
@@ -13,22 +14,40 @@ const addDays = (base, n) => {
   return d;
 };
 
+// A cancelled or deactivated membership is over until it is renewed
+const ENDED = ['cancelled', 'deactivated'];
+
+// Each action says what it does to a member, and when it does not fit the
+// member as they stand: freezing twice compounded the dates, and an "unfreeze"
+// of a cancelled member reactivated it. The screens only offer what fits, but a
+// request raised earlier can be approved after the member has changed.
 const ACTIONS = {
   extend_membership: {
-    summary: (m, p) => `Extend ${name(m)}'s membership by ${Number(p.days) || 0} days`,
-    apply: (m, p) => ({ endDate: addDays(m.endDate, Number(p.days) || 0), status: 'active' }),
+    days: true,
+    summary: (m, p) => `Extend ${name(m)}'s membership by ${p.days} days`,
+    refuse: (m) => (m.isVisitor ? `${name(m)} is a visitor: buy them passes instead.`
+      : ENDED.includes(m.status) ? `${name(m)}'s membership is ${m.status}. Renew it instead.` : null),
+    // A frozen membership stays frozen; the days are kept for when it resumes
+    apply: (m, p) => (m.status === 'frozen'
+      ? { endDate: addDays(m.endDate, p.days), ...(m.preFreezEndDate ? { preFreezEndDate: addDays(m.preFreezEndDate, p.days) } : {}) }
+      : { endDate: addDays(m.endDate, p.days), status: m.status === 'pending' ? 'pending' : 'active' }),
   },
   freeze_membership: {
-    summary: (m, p) => `Freeze ${name(m)}'s membership for ${Number(p.days) || 0} days`,
+    days: true,
+    summary: (m, p) => `Freeze ${name(m)}'s membership for ${p.days} days`,
+    refuse: (m) => (m.isVisitor ? `${name(m)} is a visitor and has no membership to freeze.`
+      : m.status === 'frozen' ? `${name(m)}'s membership is already frozen.`
+        : ENDED.includes(m.status) ? `${name(m)}'s membership is ${m.status}, so there is nothing to freeze.` : null),
     apply: (m, p) => ({
       preFreezEndDate: m.endDate || null,
       freezeStartDate: p.startDate ? new Date(p.startDate) : startOfToday(),
-      endDate: addDays(m.endDate, Number(p.days) || 0),
+      endDate: addDays(m.endDate, p.days),
       status: 'frozen',
     }),
   },
   unfreeze_membership: {
     summary: (m) => `Unfreeze ${name(m)}'s membership`,
+    refuse: (m) => (m.status === 'frozen' ? null : `${name(m)}'s membership is not frozen.`),
     apply: (m) => {
       const frozenSince = m.freezeStartDate ? new Date(m.freezeStartDate) : null;
       const daysFrozen = frozenSince ? Math.max(0, Math.round((startOfToday() - frozenSince) / DAY)) : 0;
@@ -38,20 +57,45 @@ const ACTIONS = {
   },
   cancel_membership: {
     summary: (m) => `Cancel ${name(m)}'s membership`,
+    refuse: (m) => (m.isVisitor ? `${name(m)} is a visitor and has no membership to cancel.`
+      : ENDED.includes(m.status) ? `${name(m)}'s membership is already ${m.status}.` : null),
     // A cancelled membership is distinct from a staff-deactivated account: the
     // person can still drop in on a paid day pass until they renew.
     apply: () => ({ status: 'cancelled' }),
   },
   convert_to_visitor: {
     summary: (m) => `Convert ${name(m)} to a visitor`,
+    refuse: (m) => (m.isVisitor ? `${name(m)} is already a visitor.` : null),
     apply: () => ({ isVisitor: true, status: 'visitor', packageId: null, endDate: null, passesTotal: 0, passesRemaining: 0 }),
   },
 };
 
 function name(m) { return `${m?.firstName || ''} ${m?.lastName || ''}`.trim(); }
 const isManagement = (role) => role === 'general_manager' || role === 'manager';
+const isId = (v) => typeof v === 'string' && v.trim() !== '';
+
+// The days and dates an action carries: { params } or { error, field }
+function readParams(action, raw) {
+  const given = raw && typeof raw === 'object' ? raw : {};
+  const params = { ...given };
+  if (ACTIONS[action].days) {
+    const days = Number(given.days);
+    if (given.days === null || given.days === '' || !Number.isInteger(days) || days < 1 || days > 3650) {
+      return { error: 'Enter a number of whole days between 1 and 3650.', field: 'days' };
+    }
+    params.days = days;
+  }
+  if (given.startDate !== undefined && given.startDate !== null && given.startDate !== '') {
+    const text = String(given.startDate);
+    if (!/^\d{4}-\d{2}-\d{2}/.test(text) || Number.isNaN(new Date(text).getTime())) {
+      return { error: 'The start date is not a valid date.', field: 'startDate' };
+    }
+  }
+  return { params };
+}
 
 async function getMember(gymId, idOrCode) {
+  if (!isId(idOrCode)) return null;
   return prisma.member.findFirst({ where: { gymId, OR: [{ id: idOrCode }, { memberCode: idOrCode }] } });
 }
 
@@ -60,9 +104,9 @@ async function notifyManagers(gymId, title, body, link) {
     where: { gymId, isActive: true, role: { in: ['general_manager', 'manager'] } },
     select: { id: true },
   });
-  await Promise.all(managers.map(m => prisma.notification.create({
+  await Promise.all(managers.map(m => bestEffort(prisma.notification.create({
     data: { gymId, staffId: m.id, title, body, type: 'system', link },
-  }).catch(() => {})));
+  }), 'Manager notification')));
 }
 
 // Apply an action to a member and return the fresh record.
@@ -76,39 +120,52 @@ async function runAction(member, action, params, gymId) {
       const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { settings: true } });
       const fee = Number(gym?.settings?.freeze?.fee) || 0;
       if (fee > 0) {
-        data.balance = (member.balance || 0) + fee;
+        // Added in the database, so a payment taken at the same moment is not lost
+        data.balance = { increment: fee };
         data.freezeFeeLastChargedAt = new Date();
       }
     } catch (e) { console.error('Freeze fee charge failed:', e.message); }
   }
   const updated = await prisma.member.update({ where: { id: member.id }, data });
   // Tell the member their membership changed. Best-effort: never block the action.
-  sendMembershipUpdate(updated, action, gymId).catch(() => {});
+  bestEffort(sendMembershipUpdate(updated, action, gymId), 'Membership change email');
   return updated;
 }
 
 // ── A manager (or GM) doing the change directly, no request needed ────────────
+// The member and the action's details, checked; or the refusal to send back
+async function prepare(gymId, memberId, action, rawParams) {
+  if (!ACTIONS[action]) return { status: 400, body: { error: 'Unknown action' } };
+  if (!isId(memberId)) return { status: 400, body: { error: 'Choose a member.', field: 'memberId' } };
+  const read = readParams(action, rawParams);
+  if (read.error) return { status: 400, body: { error: read.error, field: read.field } };
+  const member = await getMember(gymId, memberId);
+  if (!member) return { status: 404, body: { error: 'Member not found' } };
+  const refusal = ACTIONS[action].refuse(member);
+  if (refusal) return { status: 409, body: { error: refusal } };
+  return { member, params: read.params };
+}
+
 async function applyDirect(req, res) {
   if (!isManagement(req.user.role)) return res.status(403).json({ error: 'Only a manager can do this directly.' });
   const { memberId, action, params } = req.body;
-  if (!ACTIONS[action]) return res.status(400).json({ error: 'Unknown action' });
-  const member = await getMember(req.user.gymId, memberId);
-  if (!member) return res.status(404).json({ error: 'Member not found' });
-  const updated = await runAction(member, action, params, req.user.gymId);
+  const ready = await prepare(req.user.gymId, memberId, action, params);
+  if (!ready.member) return res.status(ready.status).json(ready.body);
+  const updated = await runAction(ready.member, action, ready.params, req.user.gymId);
   res.json({ member: updated });
 }
 
 // ── The front desk asking a manager to approve a change ───────────────────────
 async function create(req, res) {
-  const { memberId, action, params, note } = req.body;
-  if (!ACTIONS[action]) return res.status(400).json({ error: 'Unknown action' });
-  if (!note || !String(note).trim()) return res.status(400).json({ error: 'A note is required so the manager knows why.' });
-  const member = await getMember(req.user.gymId, memberId);
-  if (!member) return res.status(404).json({ error: 'Member not found' });
+  const { memberId, action, note } = req.body;
+  if (ACTIONS[action] && (!note || !String(note).trim())) return res.status(400).json({ error: 'A note is required so the manager knows why.' });
+  const ready = await prepare(req.user.gymId, memberId, action, req.body.params);
+  if (!ready.member) return res.status(ready.status).json(ready.body);
+  const { member, params } = ready;
 
-  const requester = await prisma.staff.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } }).catch(() => null);
+  const requester = await bestEffort(prisma.staff.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } }), 'Reading the requester');
   const requestedByName = requester ? `${requester.firstName || ''} ${requester.lastName || ''}`.trim() : '';
-  const summary = ACTIONS[action].summary(member, params || {});
+  const summary = ACTIONS[action].summary(member, params);
 
   // One request per member at a time: the next waits until a manager has
   // approved or declined this one. Checked and written in one serializable
@@ -128,7 +185,7 @@ async function create(req, res) {
           memberId: member.id,
           memberName: name(member),
           action,
-          params: JSON.stringify(params || {}),
+          params: JSON.stringify(params),
           summary,
           note: String(note).trim(),
           status: 'pending',
@@ -141,7 +198,7 @@ async function create(req, res) {
     // Two requests racing: the database refuses one of them, with an error
     // whose code varies. Looking again finds the request that won.
     if (!err.waiting) {
-      err.waiting = await prisma.approvalRequest.findFirst({ where: { gymId: req.user.gymId, memberId: member.id, status: 'pending' } }).catch(() => null);
+      err.waiting = await bestEffort(prisma.approvalRequest.findFirst({ where: { gymId: req.user.gymId, memberId: member.id, status: 'pending' } }), 'Finding the waiting request');
     }
     if (err.waiting) {
       return res.status(409).json({
@@ -155,26 +212,24 @@ async function create(req, res) {
   // A task for the managers' own list + badge, plus a notification that deep-links
   // to the member so they can approve it there.
   const link = `/members/${member.id}`;
-  let taskId = null;
-  try {
-    const task = await prisma.task.create({
-      data: {
-        gymId: req.user.gymId,
-        title: `Approval needed: ${summary}`,
-        description: `${requestedByName || 'The front desk'} asks to ${summary.toLowerCase()}. Reason: ${String(note).trim()}. Open ${name(member)}'s profile to approve or decline.`,
-        category: 'Approval',
-        assignedGroup: 'management',
-        status: 'todo',
-        dueDate: new Date(),
-        createdById: req.user.id,
-      },
-    });
-    taskId = task.id;
-    await prisma.approvalRequest.update({ where: { id: request.id }, data: { taskId } });
-  } catch (e) { /* the request still stands without the task */ }
+  // The request stands even if its task cannot be made
+  const task = await bestEffort(prisma.task.create({
+    data: {
+      gymId: req.user.gymId,
+      title: `Approval needed: ${summary}`,
+      description: `${requestedByName || 'The front desk'} asks to ${summary.toLowerCase()}. Reason: ${String(note).trim()}. Open ${name(member)}'s profile to approve or decline.`,
+      category: 'Approval',
+      assignedGroup: 'management',
+      status: 'todo',
+      dueDate: new Date(),
+      createdById: req.user.id,
+    },
+  }), 'Approval task');
+  const taskId = task?.id || null;
+  if (taskId) await bestEffort(prisma.approvalRequest.update({ where: { id: request.id }, data: { taskId } }), 'Linking the approval task');
 
-  await notifyManagers(req.user.gymId, 'Approval needed',
-    `${requestedByName || 'The front desk'}: ${summary}. Reason: ${String(note).trim()}`, link).catch(() => {});
+  await bestEffort(notifyManagers(req.user.gymId, 'Approval needed',
+    `${requestedByName || 'The front desk'}: ${summary}. Reason: ${String(note).trim()}`, link), 'Approval notification');
 
   res.status(201).json({ ...request, taskId });
 }
@@ -186,48 +241,72 @@ async function listForMember(req, res) {
   const member = await getMember(req.user.gymId, memberId);
   if (!member) return res.status(404).json({ error: 'Member not found' });
   const where = { gymId: req.user.gymId, memberId: member.id };
-  if (status) where.status = status;
+  if (status) where.status = String(status);
   const requests = await prisma.approvalRequest.findMany({ where, orderBy: { createdAt: 'desc' } });
   res.json(requests);
+}
+
+const ALREADY_DEALT_WITH = { error: 'This request has already been dealt with.' };
+
+// Moves a waiting request on, only if it is still waiting. The check and the
+// change are one statement, so two managers answering at once cannot both win.
+async function claim(request, data) {
+  const { count } = await prisma.approvalRequest.updateMany({ where: { id: request.id, status: 'pending' }, data });
+  return count === 1;
 }
 
 async function resolve(req, res, approve) {
   if (!isManagement(req.user.role)) return res.status(403).json({ error: 'Only a manager can approve requests.' });
   const request = await prisma.approvalRequest.findFirst({ where: { id: req.params.id, gymId: req.user.gymId } });
   if (!request) return res.status(404).json({ error: 'Request not found' });
-  if (request.status !== 'pending') return res.status(400).json({ error: 'This request has already been dealt with.' });
+  if (request.status !== 'pending') return res.status(400).json(ALREADY_DEALT_WITH);
+
+  let member = null;
+  let params = {};
+  if (approve) {
+    if (!ACTIONS[request.action]) return res.status(400).json({ error: 'Unknown action' });
+    try { params = JSON.parse(request.params || '{}'); } catch { params = null; }
+    const read = params && readParams(request.action, params);
+    if (!read || read.error) return res.status(409).json({ error: 'The details of this request cannot be read. Decline it and ask for it again.' });
+    params = read.params;
+    member = await getMember(req.user.gymId, request.memberId);
+    if (!member) return res.status(404).json({ error: 'Member not found' });
+    // The member may have changed since the desk asked
+    const refusal = ACTIONS[request.action].refuse(member);
+    if (refusal) return res.status(409).json({ error: `${refusal} Decline this request instead.` });
+  }
+
+  const outcome = { status: approve ? 'approved' : 'rejected', resolvedById: req.user.id, resolvedNote: req.body.note || null, resolvedAt: new Date() };
+  if (!(await claim(request, outcome))) return res.status(400).json(ALREADY_DEALT_WITH);
 
   let updatedMember = null;
   if (approve) {
-    const member = await getMember(req.user.gymId, request.memberId);
-    if (!member) return res.status(404).json({ error: 'Member not found' });
-    let params = {};
-    try { params = JSON.parse(request.params || '{}'); } catch {}
-    if (!ACTIONS[request.action]) return res.status(400).json({ error: 'Unknown action' });
-    updatedMember = await runAction(member, request.action, params, req.user.gymId);
+    try {
+      updatedMember = await runAction(member, request.action, params, req.user.gymId);
+    } catch (err) {
+      // Nothing was changed, so the request goes back to waiting
+      await prisma.approvalRequest.update({ where: { id: request.id }, data: { status: 'pending', resolvedById: null, resolvedNote: null, resolvedAt: null } });
+      throw err;
+    }
   }
 
-  await prisma.approvalRequest.update({
-    where: { id: request.id },
-    data: { status: approve ? 'approved' : 'rejected', resolvedById: req.user.id, resolvedNote: req.body?.note || null, resolvedAt: new Date() },
-  });
   if (request.taskId) {
-    await prisma.task.update({ where: { id: request.taskId }, data: { status: 'done' } }).catch(() => {});
+    await bestEffort(prisma.task.update({ where: { id: request.taskId }, data: { status: 'done' } }), 'Closing the approval task');
   }
   // Tell whoever asked.
   if (request.requestedById) {
-    await prisma.notification.create({
+    await bestEffort(prisma.notification.create({
       data: {
         gymId: req.user.gymId,
         staffId: request.requestedById,
         title: approve ? 'Request approved' : 'Request declined',
-        body: `${request.summary} was ${approve ? 'approved' : 'declined'}.${req.body?.note ? ` Note: ${req.body.note}` : ''}`,
+        body: `${request.summary} was ${approve ? 'approved' : 'declined'}.${req.body.note ? ` Note: ${req.body.note}` : ''}`,
         type: 'system',
         link: `/members/${request.memberId}`,
       },
-    }).catch(() => {});
+    }), 'Approval answer notification');
   }
-  res.json({ request: { ...request, status: approve ? 'approved' : 'rejected' }, member: updatedMember });
+  res.json({ request: { ...request, status: outcome.status }, member: updatedMember });
 }
 
 // Whoever sent a request can take it back while it is still waiting (a
@@ -236,15 +315,14 @@ async function resolve(req, res, approve) {
 async function cancel(req, res) {
   const request = await prisma.approvalRequest.findFirst({ where: { id: req.params.id, gymId: req.user.gymId } });
   if (!request) return res.status(404).json({ error: 'Request not found' });
-  if (request.status !== 'pending') return res.status(400).json({ error: 'This request has already been dealt with.' });
+  if (request.status !== 'pending') return res.status(400).json(ALREADY_DEALT_WITH);
   if (request.requestedById !== req.user.id && !isManagement(req.user.role)) {
     return res.status(403).json({ error: 'Only the person who sent this request can cancel it.' });
   }
-  await prisma.approvalRequest.update({
-    where: { id: request.id },
-    data: { status: 'cancelled', resolvedById: req.user.id, resolvedAt: new Date() },
-  });
-  if (request.taskId) await prisma.task.delete({ where: { id: request.taskId } }).catch(() => {});
+  if (!(await claim(request, { status: 'cancelled', resolvedById: req.user.id, resolvedAt: new Date() }))) {
+    return res.status(400).json(ALREADY_DEALT_WITH);
+  }
+  if (request.taskId) await bestEffort(prisma.task.delete({ where: { id: request.taskId } }), 'Removing the approval task');
   res.json({ request: { ...request, status: 'cancelled' } });
 }
 
