@@ -2,11 +2,37 @@ const crypto = require('crypto');
 const prisma = require('../utils/prisma');
 const { refuseAssignees } = require('../utils/assignees');
 const { logActivity } = require('../utils/activityLog');
+const { bestEffort } = require('../utils/bestEffort');
 const { membershipEnded, localNow, toMinutes } = require('../utils/membership');
 const createId = () => crypto.randomBytes(12).toString('hex');
 
 const parseStaffIds = (raw) => { try { return JSON.parse(raw || '[]'); } catch { return []; } };
 const FITNESS_ROLES = ['trainer', 'instructor', 'coach'];
+const REPEATS = ['None', 'Daily', 'Weekly', 'Monthly'];
+const DAY_MS = 86400000;
+// A series is written out entry by entry, so it is kept to a year at a time
+const MAX_SERIES_DAYS = 366;
+
+// A day as the forms send it ("2026-10-21"), or null when it cannot be read
+const readDate = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}/.test(String(value || ''))) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+// The people put on an entry, as the form sends them: a list, or that list as
+// JSON. undefined when nothing was sent, null when it cannot be read.
+function readStaffIds(raw) {
+  if (raw === undefined) return undefined;
+  if (raw === null || raw === '') return [];
+  let list = raw;
+  if (typeof raw === 'string') {
+    try { list = JSON.parse(raw); } catch { return null; }
+  }
+  if (!Array.isArray(list) || list.some(id => typeof id !== 'string' && typeof id !== 'number')) return null;
+  return list.map(String);
+}
+const BAD_STAFF = { error: 'The list of staff could not be read.', field: 'staffIds' };
 const hhmm = (mins) => `${String(Math.floor(mins / 60) % 24).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
 
 // When an entry starts and ends, in minutes into its day. The end is stored as
@@ -137,17 +163,33 @@ async function getAll(req, res) {
 
 async function create(req, res) {
   const { title, date, time, duration, instructorId, staffIds, location, spots, color, description, repeat, repeatUntil, category, memberId, tz } = req.body;
-  if (!title || !date) return res.status(400).json({ error: 'title and date are required' });
+  if (!String(title || '').trim()) return res.status(400).json({ error: 'Give it a title.', field: 'title' });
+  const first = readDate(date);
+  if (!first) return res.status(400).json({ error: 'Choose the date.', field: 'date' });
   const past = inThePast(date, time, tz);
   if (past) return res.status(400).json(past);
+
+  // A series runs from the first date to the last, at most a year. Without
+  // these checks an unreadable last date looped forever and ran the server
+  // out of memory.
+  if (repeat && !REPEATS.includes(repeat)) return res.status(400).json({ error: 'Choose how often it repeats.', field: 'repeat' });
+  const isRecurring = !!repeat && repeat !== 'None' && !!repeatUntil;
+  let until = null;
+  if (isRecurring) {
+    until = readDate(repeatUntil);
+    if (!until) return res.status(400).json({ error: 'Choose the last date it repeats on.', field: 'repeatUntil' });
+    if (until < first) return res.status(400).json({ error: 'The last date has to be on or after the first.', field: 'repeatUntil' });
+    if (until - first > MAX_SERIES_DAYS * DAY_MS) return res.status(400).json({ error: 'A repeating entry can run for up to a year. Book the next year separately.', field: 'repeatUntil' });
+  }
+
   const badMember = await refuseMember(req, memberId);
   if (badMember) return res.status(400).json({ error: badMember, field: 'memberId' });
 
-  const ids = Array.isArray(staffIds) ? staffIds : (staffIds ? JSON.parse(staffIds) : []);
+  const ids = readStaffIds(staffIds) ?? (staffIds === undefined ? [] : null);
+  if (!ids) return res.status(400).json(BAD_STAFF);
   const primaryId = instructorId || ids[0] || null;
   const refusal = await refuseAssignees(req.user.gymId, [...ids, primaryId]);
   if (refusal) return res.status(400).json({ error: refusal });
-  const isRecurring = repeat && repeat !== 'None' && repeatUntil;
   const seriesId = isRecurring ? createId() : null;
 
   // Anything a trainer or the front desk puts on the calendar is their own
@@ -161,7 +203,7 @@ async function create(req, res) {
     gymId: req.user.gymId,
     createdById: req.user.id,
     isPrivate,
-    title,
+    title: String(title).trim(),
     time,
     duration,
     instructorId: primaryId,
@@ -177,15 +219,13 @@ async function create(req, res) {
     memberId:     memberId || null,
   };
 
-  const dates = [new Date(date)];
+  const dates = [first];
   if (isRecurring) {
-    const until = new Date(repeatUntil);
-    let current = new Date(date);
-    while (true) {
+    const current = new Date(first);
+    for (;;) {
       if (repeat === 'Daily')        current.setDate(current.getDate() + 1);
       else if (repeat === 'Weekly')  current.setDate(current.getDate() + 7);
-      else if (repeat === 'Monthly') current.setMonth(current.getMonth() + 1);
-      else break;
+      else                           current.setMonth(current.getMonth() + 1);
       if (current > until) break;
       dates.push(new Date(current));
     }
@@ -236,7 +276,7 @@ async function tellTheAssigned({ gymId, createdById, ids, events, title, time })
       eventId: event.id,
     })),
   }).then(() => true).catch((err) => { console.error('Calendar invite tasks failed:', err.message); return false; });
-  await prisma.notification.createMany({
+  await bestEffort(prisma.notification.createMany({
     data: pairs.map(({ event, person }) => ({
       gymId,
       staffId: person.id,
@@ -247,7 +287,7 @@ async function tellTheAssigned({ gymId, createdById, ids, events, title, time })
       // person's tasks live on, which differs by role.
       ...(made ? {} : { link: '/calendar' }),
     })),
-  }).catch(() => {});
+  }), 'Calendar invite notifications');
 }
 
 // A private entry answers to the person who wrote it. Everything else on the
@@ -262,6 +302,34 @@ function refuseEvent(event, user) {
   return MANAGEMENT_ROLES.includes(user.role) ? null : 'Only a manager can change the gym calendar.';
 }
 
+// What an update may change. Which gym, whose entry and which series it belongs
+// to are the server's to say: the request body used to go to the database whole.
+const EDITABLE = ['title', 'date', 'time', 'duration', 'location', 'spots', 'color', 'description', 'category', 'memberId', 'repeat', 'repeatUntil'];
+const TEXT_FIELDS = ['time', 'duration', 'location', 'color', 'description', 'memberId', 'repeat', 'repeatUntil'];
+
+// The fields of an update, checked: { data } or { error, field }
+function readChanges(body) {
+  const data = {};
+  for (const key of EDITABLE) if (body[key] !== undefined) data[key] = body[key];
+  for (const key of TEXT_FIELDS) {
+    if (data[key] !== undefined && data[key] !== null && typeof data[key] !== 'string') return { error: `The ${key} could not be read.`, field: key };
+  }
+  if (data.title !== undefined) {
+    data.title = String(data.title || '').trim();
+    if (!data.title) return { error: 'Give it a title.', field: 'title' };
+  }
+  if (data.date !== undefined && !readDate(data.date)) return { error: 'Choose the date.', field: 'date' };
+  if (data.repeat && !REPEATS.includes(data.repeat)) return { error: 'Choose how often it repeats.', field: 'repeat' };
+  if (data.repeatUntil && !readDate(data.repeatUntil)) return { error: 'Choose the last date it repeats on.', field: 'repeatUntil' };
+  if (data.spots !== undefined && data.spots !== null) {
+    const spots = Number(data.spots);
+    if (!Number.isInteger(spots) || spots < 0) return { error: 'Spots must be a whole number.', field: 'spots' };
+    data.spots = spots;
+  }
+  if (data.category !== undefined) data.category = data.category ? String(data.category).slice(0, 40) : null;
+  return { data };
+}
+
 async function update(req, res) {
   const existing = await prisma.calendarEvent.findFirst({
     where: { id: req.params.id, gymId: req.user.gymId },
@@ -270,53 +338,65 @@ async function update(req, res) {
   const notYours = refuseEvent(existing, req.user);
   if (notYours) return res.status(403).json({ error: notYours });
 
-  const { gymId: _g, id: _id, staffIds, instructorId, isPrivate: _p, createdById: _c, tz, member: _m, responses: _r, assignedStaff: _a, instructor: _i, ...safeData } = req.body;
+  const { staffIds, instructorId, tz } = req.body;
+  const read = readChanges(req.body);
+  if (read.error) return res.status(400).json({ error: read.error, field: read.field });
+  const data = read.data;
+
   // Moving an entry into the past is refused, the same as booking one there
-  const newDay = safeData.date ? String(safeData.date).slice(0, 10) : existing.date.toISOString().slice(0, 10);
-  const newTime = safeData.time !== undefined ? safeData.time : existing.time;
+  const newDay = data.date ? String(data.date).slice(0, 10) : existing.date.toISOString().slice(0, 10);
+  const newTime = data.time !== undefined ? data.time : existing.time;
   if (newDay !== existing.date.toISOString().slice(0, 10) || (newTime || '') !== (existing.time || '')) {
     const past = inThePast(newDay, newTime, tz);
     if (past) return res.status(400).json(past);
   }
-  if (safeData.memberId !== undefined && safeData.memberId !== existing.memberId) {
-    const badMember = await refuseMember(req, safeData.memberId);
+  if (data.memberId !== undefined && data.memberId !== existing.memberId) {
+    const badMember = await refuseMember(req, data.memberId);
     if (badMember) return res.status(400).json({ error: badMember, field: 'memberId' });
   }
-  if (safeData.date) safeData.date = new Date(safeData.date);
+  if (data.date) data.date = readDate(data.date);
 
-  const ids = Array.isArray(staffIds) ? staffIds : (staffIds ? JSON.parse(staffIds) : []);
-  const primaryId = instructorId !== undefined ? (instructorId || ids[0] || null) : (ids[0] || null);
-  // Only people newly added are checked, so a class whose instructor has since
-  // been deactivated can still be moved or renamed.
-  let before = [];
-  try { before = JSON.parse(existing.staffIds || '[]'); } catch { before = []; }
+  // The people on it change only when the request says who they are now. An
+  // update that did not mention them used to take everyone off.
+  const before = parseStaffIds(existing.staffIds).map(String);
   const already = new Set([existing.instructorId, ...before].filter(Boolean).map(String));
-  const refusal = await refuseAssignees(req.user.gymId, [...ids, primaryId].filter(id => id && !already.has(String(id))));
-  if (refusal) return res.status(400).json({ error: refusal });
-  safeData.staffIds = JSON.stringify(ids);
-  safeData.instructorId = primaryId;
+  const staffSent = staffIds !== undefined || instructorId !== undefined;
+  let ids = before;
+  let primaryId = existing.instructorId || null;
+  if (staffSent) {
+    if (staffIds !== undefined) {
+      ids = readStaffIds(staffIds);
+      if (!ids) return res.status(400).json(BAD_STAFF);
+    }
+    primaryId = instructorId !== undefined ? (instructorId || ids[0] || null) : (ids[0] || null);
+    // Only people newly added are checked, so a class whose instructor has since
+    // been deactivated can still be moved or renamed.
+    const refusal = await refuseAssignees(req.user.gymId, [...ids, primaryId].filter(id => id && !already.has(String(id))));
+    if (refusal) return res.status(400).json({ error: refusal });
+    data.staffIds = JSON.stringify(ids);
+    data.instructorId = primaryId;
+  }
 
   const event = await prisma.calendarEvent.update({
     where: { id: req.params.id },
-    data: safeData,
+    data,
     include: { instructor: { select: { id: true, firstName: true, lastName: true } } },
   });
 
   // Whoever is new to the class gets the same invite a person named at
   // creation would have; whoever was taken off it loses the invite, so it
   // cannot still be sitting there to accept for a class they are no longer on.
-  const wasPrivate = existing.isPrivate;
-  const nowIds = new Set([...ids, primaryId].filter(Boolean).map(String));
-  if (!event.isPrivate) {
-    const addedIds = wasPrivate ? [...nowIds] : [...nowIds].filter(id => !already.has(id));
-    if (addedIds.length) {
+  if (staffSent) {
+    const nowIds = new Set([...ids, primaryId].filter(Boolean).map(String));
+    const addedIds = [...nowIds].filter(id => !already.has(id));
+    if (!event.isPrivate && addedIds.length) {
       await tellTheAssigned({ gymId: req.user.gymId, createdById: req.user.id, ids: addedIds, events: [event], title: event.title, time: event.time })
         .catch(err => console.error('Calendar assignment tasks failed:', err.message));
     }
-  }
-  const removedIds = [...already].filter(id => !nowIds.has(id) || event.isPrivate);
-  if (removedIds.length) {
-    prisma.task.deleteMany({ where: { eventId: event.id, assignedToId: { in: removedIds } } }).catch(() => {});
+    const removedIds = [...already].filter(id => !nowIds.has(id) || event.isPrivate);
+    if (removedIds.length) {
+      await bestEffort(prisma.task.deleteMany({ where: { eventId: event.id, assignedToId: { in: removedIds } } }), 'Removing calendar invites');
+    }
   }
 
   res.json(event);

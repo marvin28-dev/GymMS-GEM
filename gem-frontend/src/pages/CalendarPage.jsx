@@ -236,6 +236,7 @@ export default function CalendarPage() {
     if (moved && form.date && form.date < today) e.date = t('calendar.notInPast');
     else if (moved && form.date === today && form.startTime && toMin(form.startTime) <= nowMin()) e.startTime = t('calendar.timePassed');
     if (form.repeat !== 'None' && !form.repeatUntil) e.repeatUntil = t('calendar.repeatUntilRequired');
+    else if (form.repeat !== 'None' && form.date && form.repeatUntil > addDaysStr(form.date, 366)) e.repeatUntil = t('calendar.repeatUntilMaxYear');
     if (Object.keys(e).length) { setErrors(e); revealFirstError(); return; }
 
     const clientName = pickedClient ? `${pickedClient.firstName || ''} ${pickedClient.lastName || ''}`.trim() : '';
@@ -669,7 +670,7 @@ export default function CalendarPage() {
           {form.repeat !== 'None' && (
             <div>
               <label style={labelStyle}>{t('calendar.repeatUntil')}</label>
-              <input type="date" style={{ ...inputStyle, borderColor: errors.repeatUntil ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.repeatUntil} min={form.date || today} onChange={e => setF({ repeatUntil: e.target.value })} />
+              <input type="date" style={{ ...inputStyle, borderColor: errors.repeatUntil ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.repeatUntil} min={form.date || today} max={addDaysStr(form.date || today, 366)} onChange={e => setF({ repeatUntil: e.target.value })} />
               {err('repeatUntil')}
             </div>
           )}
