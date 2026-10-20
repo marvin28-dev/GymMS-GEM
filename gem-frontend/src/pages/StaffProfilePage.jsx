@@ -10,7 +10,6 @@ import RowMenu from '../components/ui/RowMenu';
 import Avatar from '../components/ui/Avatar';
 import Modal from '../components/ui/Modal';
 import LoadFailed from '../components/ui/LoadFailed';
-import ConfirmModal from '../components/ui/ConfirmModal';
 import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import { canManage as outranks, canSeePrivateFields } from '../utils/hierarchy';
 import GemInput from '../components/ui/GemInput';
@@ -2069,7 +2068,7 @@ export default function StaffProfilePage() {
           </div>
         </Modal>
 
-        <ConfirmModal open={showDeactivateConfirm} title={t('staff.deactivateTitle')} message={t('staff.deactivateMsg', { name: memberData.name })} onCancel={() => setShowDeactivateConfirm(false)} onConfirm={() => { deactivate(); setShowDeactivateConfirm(false); }} danger />
+        <ManagerAuthModal open={showDeactivateConfirm} onClose={() => setShowDeactivateConfirm(false)} onVerified={() => { deactivate(); setShowDeactivateConfirm(false); }} action={t('staff.deactivateAction', { name: memberData.name })} danger />
         <ManagerAuthModal open={showReactivateAuth} onClose={() => setShowReactivateAuth(false)} onVerified={() => { reactivate(); setShowReactivateAuth(false); }} action={t('staff.reactivateAction')} />
         <ManagerAuthModal open={showNewCodeAuth} usePassword={isSelf} onClose={() => setShowNewCodeAuth(false)} onVerified={issueNewCode} action={t('staff.newCodeAction')} />
         <ManagerAuthModal open={showCodeAuthModal} usePassword={isSelf} onClose={() => setShowCodeAuthModal(false)} onVerified={() => { setShowCodeAuthModal(false); revealCode(); }} action={t('staff.viewCodeAction')} />
@@ -3291,7 +3290,7 @@ export default function StaffProfilePage() {
         open={showDeactivateConfirm}
         onClose={() => setShowDeactivateConfirm(false)}
         onConfirm={() => { deactivate(); setShowDeactivateConfirm(false); }}
-        action={`Deactivate ${memberData.name}'s account`}
+        action={t('staff.deactivateAction', { name: memberData.name })}
         danger
       />
 

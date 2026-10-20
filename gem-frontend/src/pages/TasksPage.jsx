@@ -501,7 +501,7 @@ export default function TasksPage() {
           open={!!deleteTask}
           title={t('tasks.deleteTask')}
           message={`${t('tasks.deleteConfirm')} "${deleteTask?.title}"? ${t('tasks.cannotUndo')}`}
-          onCancel={() => setDeleteTask(null)}
+          onClose={() => setDeleteTask(null)}
           onConfirm={handleDelete}
           danger
         />
