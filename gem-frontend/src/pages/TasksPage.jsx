@@ -17,6 +17,7 @@ import { TASK_CATEGORIES, categoryColor, categoryLabel, normalizeCategory } from
 import { assignFields, assignValue } from '../utils/departments';
 import { taskNeedsAttention } from '../utils/attention';
 import { softAll } from '../utils/loadAll';
+import { serverFieldError } from '../utils/formErrors';
 import { gymCache } from '../utils/gymCache';
 import { SkeletonCards } from '../components/Skeleton';
 import TaskAssigneeField from '../components/TaskAssigneeField';
@@ -151,8 +152,9 @@ export default function TasksPage() {
         setShowModal(false);
       }
     } catch (err) {
-      console.error(err);
-      setErrors({ title: t('tasks.saveFailed') });
+      // The server's own reason, under its field when it names one
+      const se = serverFieldError(err, t('tasks.saveFailed'));
+      setErrors({ [se.field || '_form']: se.message });
     } finally {
       setSaving(false);
     }
@@ -486,6 +488,7 @@ export default function TasksPage() {
                   </select>
                   {errors.category && <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{errors.category}</span>}
                 </div>
+                {errors._form && <div role="alert" data-field-error style={{ fontSize: 12.5, color: 'var(--accent-red)', fontFamily: 'DM Sans', lineHeight: 1.5 }}>{errors._form}</div>}
                 <button onClick={() => handleSave(false)} disabled={saving} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 10, padding: '13px', fontSize: 14, fontWeight: 700, color: '#0a0a0f', cursor: 'pointer', fontFamily: 'DM Sans', marginTop: 4 }}>
                   {saving ? t('tasks.savingTask') : editingTask ? t('common.saveChanges') : t('tasks.addTask')}
                 </button>
@@ -666,6 +669,7 @@ export default function TasksPage() {
               {errors.category && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.category}</div>}
             </div>
           </div>
+          {errors._form && <div role="alert" data-field-error style={{ fontSize: 12.5, color: 'var(--accent-red)', fontFamily: 'DM Sans', lineHeight: 1.5 }}>{errors._form}</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
             <button style={secondaryBtn} onClick={() => setShowModal(false)} disabled={saving}>{t('common.cancel')}</button>
             {!editingTask && <button style={{ ...secondaryBtn, opacity: saving ? 0.6 : 1 }} onClick={() => handleSave(true)} disabled={saving}>{t('tasks.saveAndAddAnother')}</button>}
