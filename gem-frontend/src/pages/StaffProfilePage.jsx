@@ -76,6 +76,12 @@ const ROLE_KEYS = {
   coach: 'coach', 'Coach': 'coach',
   other: 'roleOther', 'Other': 'roleOther',
 };
+// The roles the edit form offers, by the value stored on the record. Older
+// coach and instructor records show as trainer until someone changes them.
+const EDITABLE_ROLES = ['manager', 'front_desk', 'trainer', 'other'];
+const roleChoice = (role) => (['coach', 'instructor'].includes(role) ? 'trainer' : role);
+// One list of note categories for both layouts
+const NOTE_CATEGORIES = ['General', 'Performance', 'Warning', 'Commendation', 'Health', 'Financial', 'Other'];
 
 function compressImage(dataUrl, maxW = 1000, maxH = 1000, quality = 0.82) {
   return new Promise(resolve => {
@@ -791,7 +797,8 @@ export default function StaffProfilePage() {
 
   // Tasks assigned to this person that are still open - the Tasks tab shows a
   // count so a manager can see at a glance that they have work waiting.
-  const attentionCount = localTasks.filter(tk => tk._personal && (tk.status || 'Pending') !== 'Done').length;
+  // Still to do: an answered calendar invite (accepted or declined) is settled
+  const attentionCount = localTasks.filter(tk => tk._personal && ['Pending', 'In Progress'].includes(tk.status || 'Pending')).length;
 
   // The person's calendar as a dated agenda, grouped by day and split into
   // what is still to come and what has passed. Shared by both layouts.
@@ -1013,11 +1020,22 @@ export default function StaffProfilePage() {
             {memberData.photoIdData && (
               <button
                 type="button"
-                onClick={() => {
-                  const a = document.createElement('a');
-                  a.href = memberData.photoIdData;
-                  a.download = `${memberData.name.replace(/\s+/g, '_')}_PhotoID`;
-                  a.click();
+                onClick={async () => {
+                  // A file on another site (Cloudinary) is not downloaded by a plain
+                  // link, which opened it in this tab instead, so it is fetched first;
+                  // if that is refused it opens in a new tab
+                  const src = memberData.photoIdData;
+                  try {
+                    const blob = await (await fetch(src)).blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${memberData.name.replace(/\s+/g, '_')}_PhotoID`;
+                    a.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                  } catch {
+                    window.open(src, '_blank', 'noopener');
+                  }
                 }}
                 style={{ ...secondaryBtn, padding: '6px 12px', gap: 4, flexShrink: 0 }}
                 title={t('staff.downloadPhotoId')}
@@ -2217,7 +2235,7 @@ export default function StaffProfilePage() {
               </>
             ) : (
               <>
-                <GemSelect label={t('staff.role')} value={editForm.role || ''} onChange={e => setEF('role', e.target.value)} options={['Manager','Front Desk','Trainer','Other'].map(r => ({ value: r, label: r }))} />
+                <GemSelect label={t('staff.role')} value={roleChoice(editForm.role) || ''} onChange={e => setEF('role', e.target.value)} options={EDITABLE_ROLES.map(r => ({ value: r, label: t(`staff.${ROLE_KEYS[r]}`) }))} />
               </>
             )}
             <div style={{ gridColumn: '1 / -1' }}>
@@ -2277,7 +2295,7 @@ export default function StaffProfilePage() {
         <ManagerAuthModal open={showEditAuth} onClose={() => setShowEditAuth(false)} onVerified={() => { setShowEditAuth(false); openEditForm(); }} action={t('staff.editProfileAction')} />
         <Modal open={showNoteModal} onClose={() => setShowNoteModal(false)} title={t('staff.addNote')} maxWidth={480}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <GemSelect label={t('staff.categoryLabel')} value={noteCategory} onChange={e => setNoteCategory(e.target.value)} options={['General','Performance','Warning','Commendation'].map(c => ({ value: c, label: c }))} />
+            <GemSelect label={t('staff.categoryLabel')} value={noteCategory} onChange={e => setNoteCategory(e.target.value)} options={NOTE_CATEGORIES.map(c => ({ value: c, label: c }))} />
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6, fontFamily: 'DM Sans' }}>{t('staff.noteLabel')}</label>
               <textarea value={noteText} onChange={e => setNoteText(e.target.value)} style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 12px', fontSize: 14, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', minHeight: 100, resize: 'vertical', boxSizing: 'border-box' }} />
@@ -3215,8 +3233,8 @@ export default function StaffProfilePage() {
             </>
           ) : (
             <>
-              <GemSelect label={t('staff.role')} value={editForm.role || ''} onChange={e => setEF('role', e.target.value)}
-                options={['Manager','Front Desk','Trainer','Other'].map(r => ({ value: r, label: r }))} />
+              <GemSelect label={t('staff.role')} value={roleChoice(editForm.role) || ''} onChange={e => setEF('role', e.target.value)}
+                options={EDITABLE_ROLES.map(r => ({ value: r, label: t(`staff.${ROLE_KEYS[r]}`) }))} />
             </>
           )}
           <div style={{ gridColumn: '1 / -1' }}>
@@ -3685,7 +3703,7 @@ export default function StaffProfilePage() {
             <textarea style={{ ...inputStyle, minHeight: 100, resize: 'vertical' }} value={noteText} onChange={e => setNoteText(e.target.value)} placeholder={t('staff.enterNote')} />
           </div>
           <GemSelect label={t('staff.categoryLabel')} value={noteCategory} onChange={e => setNoteCategory(e.target.value)}
-            options={['General','Performance','Health','Financial','Other'].map(c => ({ value: c, label: c }))} />
+            options={NOTE_CATEGORIES.map(c => ({ value: c, label: c }))} />
           {noteError && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{noteError}</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button style={secondaryBtn} onClick={() => setShowNoteModal(false)}>{t('common.cancel')}</button>
