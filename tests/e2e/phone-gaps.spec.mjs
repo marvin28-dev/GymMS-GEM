@@ -154,3 +154,23 @@ test('a paystub can be viewed and settled on a phone', async ({ page }) => {
   await settle.getByRole('button').last().click();
   await expect.poll(async () => (await call('GET', `/payroll/staff/${staff.id}`, { token: owner.token })).find(r => r.id === record.id)?.status).toBe('paid');
 });
+
+// F-109
+test("a staff member's task can be opened and marked done from their profile on a phone", async ({ page }) => {
+  const owner = await registerGym();
+  const staff = await addStaff(owner, { firstName: 'Tobi', lastName: 'Tasked' });
+  const task = await call('POST', '/tasks', {
+    token: owner.token,
+    body: { title: 'Profile phone task', assignedToId: staff.id, dueDate: new Date(Date.now() + 2 * 864e5).toISOString().slice(0, 10), category: 'Front Desk', priority: 'Medium' },
+  });
+  await signIn(page, owner);
+  await page.goto(`/staff/${staff.id}`);
+  await page.getByRole('button', { name: 'Tasks' }).first().click();
+  await page.getByText('Profile phone task').first().click();
+  const details = page.getByRole('dialog', { name: 'Task Details' });
+  await expect(details).toBeVisible();
+  await details.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Mark as Done' }).click();
+
+  await expect.poll(async () => (await call('GET', '/tasks', { token: owner.token })).find(tk => tk.id === task.id)?.status).toBe('Done');
+});

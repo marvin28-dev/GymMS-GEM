@@ -1495,6 +1495,193 @@ export default function StaffProfilePage() {
   const actionError = photoError || statusError;
 
   // ── Mobile layout ──────────────────────────────────────────────────────────
+  // A task's details and Mark as done: drawn by both layouts, since the phone's
+  // task list opens them too (F-109)
+  const taskDialogs = (
+    <>
+      {/* ── Complete Task Modal ───────────────────────────────────────────── */}
+      <Modal open={!!doneTask} onClose={() => { setDoneTask(null); setDoneNote(''); setTaskError(''); }} title={t('staff.completeTask')} maxWidth={460}>
+        {doneTask && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{doneTask.title}</div>
+              {doneTask.dueDate && (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, fontFamily: 'JetBrains Mono, monospace' }}>
+                  {t('staff.taskDueDateCol')}: {String(doneTask.dueDate).slice(0, 10)}
+                </div>
+              )}
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('staff.completionNote')}</label>
+              <textarea
+                value={doneNote}
+                onChange={e => setDoneNote(e.target.value)}
+                autoFocus
+                placeholder={t('staff.completionNotePh')}
+                style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 12px', fontSize: 14, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', minHeight: 90, resize: 'vertical' }}
+              />
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>{t('staff.completionNoteHint')}</div>
+            </div>
+            {taskError && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{taskError}</div>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button style={secondaryBtn} onClick={() => { setDoneTask(null); setDoneNote(''); setTaskError(''); }}>{t('common.cancel')}</button>
+              <button style={{ ...primaryBtn, opacity: taskBusy ? 0.6 : 1 }} disabled={taskBusy} onClick={confirmTaskDone}>
+                {taskBusy ? t('staff.saving') : t('staff.markDoneBtn')}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Task Detail Modal ─────────────────────────────────────────────── */}
+      <Modal open={!!viewingTask} onClose={() => { setViewingTask(null); setCompletingInline(false); setDoneNote(''); setTaskError(''); }} title={t('staff.taskDetails')} maxWidth={520}>
+        {viewingTask && (() => {
+          const pc = PRIORITY_COLORS[viewingTask.priority] || PRIORITY_COLORS.Medium;
+          const age = taskAgeDays(viewingTask);
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{viewingTask.title}</div>
+                {viewingTask.description && (
+                  <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, margin: '8px 0 0' }}>{viewingTask.description}</p>
+                )}
+              </div>
+
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {[
+                  [t('tasks.priority'), <span key="p" style={{ ...pc, fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 4 }}>{viewingTask.priority}</span>],
+                  [t('common.status'), <StatusBadge key="s" status={(viewingTask.status || 'pending').toLowerCase()} />],
+                  [t('tasks.assignedTo'), viewingTask.assignedTo || ''],
+                  [t('staff.taskDueDateCol'), viewingTask.dueDate ? String(viewingTask.dueDate).slice(0, 10) : ''],
+                  [t('tasks.createdBy'), viewingTask.createdBySystem ? t('tasks.createdBySystem') : (viewingTask.createdBy || '')],
+                  [t('staff.taskAge'), age === null ? '' : (age === 0 ? t('staff.ageToday') : t('staff.ageDaysAgo', { count: age }))],
+                ].filter(([, v]) => v !== '' && v !== null && v !== undefined).map(([label, value]) => (
+                  <div key={label} style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 5 }}>{label}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {viewingTask.notes && (
+                <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 5 }}>{t('tasks.notesLabel')}</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{viewingTask.notes}</div>
+                </div>
+              )}
+
+              {isCalInvite(viewingTask) ? (
+                canRespondInvite(viewingTask) ? (
+                  <div>
+                    <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('calendar.awaitingResponse')}</label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {[['Accepted', t('calendar.accept'), 'var(--accent-green)', 'var(--accent-green-dim)'], ['Declined', t('calendar.decline'), 'var(--accent-red)', 'var(--accent-red-dim)']].map(([v, l, col, border]) => {
+                        const active = (viewingTask.status || 'Pending') === v;
+                        return (
+                          <button key={v} disabled={taskBusy}
+                            onClick={() => changeTaskStatus(viewingTask.id, v)}
+                            style={{
+                              flex: 1, cursor: taskBusy ? 'default' : 'pointer', borderRadius: 9, padding: '9px 10px',
+                              fontSize: 12, fontWeight: 600, fontFamily: 'DM Sans',
+                              background: active ? border : 'var(--bg-elevated)',
+                              border: `1px solid ${active ? col : 'var(--border-subtle)'}`,
+                              color: active ? col : 'var(--text-secondary)',
+                              opacity: taskBusy ? 0.6 : 1,
+                            }}>
+                            {l}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
+                    {t('tasks.onlyInviteeCanRespond')}
+                  </div>
+                )
+              ) : canUpdateTasks ? (
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('staff.updateStatus')}</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {[['Pending', t('tasks.statusPending')], ['In Progress', t('tasks.statusInProgress')], ['Done', t('tasks.statusDone')]].map(([v, l]) => {
+                      const active = completingInline ? v === 'Done' : (viewingTask.status || 'Pending') === v;
+                      return (
+                        <button key={v} disabled={taskBusy}
+                          onClick={() => {
+                            if (v === 'Done') {
+                              // Reveal the note field here rather than stacking a second dialog
+                              setCompletingInline(true);
+                              setDoneNote(viewingTask.notes || '');
+                            } else {
+                              setCompletingInline(false);
+                              changeTaskStatus(viewingTask.id, v);
+                            }
+                          }}
+                          style={{
+                            flex: 1, cursor: taskBusy ? 'default' : 'pointer', borderRadius: 9, padding: '9px 10px',
+                            fontSize: 12, fontWeight: 600, fontFamily: 'DM Sans',
+                            background: active ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)',
+                            border: `1px solid ${active ? 'rgba(201,169,110,0.45)' : 'var(--border-subtle)'}`,
+                            color: active ? 'var(--accent-gold)' : 'var(--text-secondary)',
+                            opacity: taskBusy ? 0.6 : 1,
+                          }}>
+                          {l}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {completingInline && (
+                    <div style={{ marginTop: 14 }}>
+                      <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('staff.completionNote')}</label>
+                      <textarea
+                        value={doneNote}
+                        onChange={e => setDoneNote(e.target.value)}
+                        autoFocus
+                        placeholder={t('staff.completionNotePh')}
+                        style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 12px', fontSize: 14, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', minHeight: 84, resize: 'vertical' }}
+                      />
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>{t('staff.completionNoteHint')}</div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
+                  {t('tasks.onlyAssigneeCanComplete')}
+                </div>
+              )}
+
+              {taskError && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{taskError}</div>}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                {completingInline ? (
+                  <>
+                    <button style={secondaryBtn} onClick={() => { setCompletingInline(false); setDoneNote(''); }}>
+                      {t('common.cancel')}
+                    </button>
+                    <button
+                      style={{ ...primaryBtn, opacity: taskBusy ? 0.6 : 1 }}
+                      disabled={taskBusy}
+                      onClick={async () => {
+                        if (!await changeTaskStatus(viewingTask.id, 'Done', doneNote)) return;
+                        setCompletingInline(false);
+                        setDoneNote('');
+                        setViewingTask(null);
+                      }}
+                    >
+                      {taskBusy ? t('staff.saving') : t('staff.markDoneBtn')}
+                    </button>
+                  </>
+                ) : (
+                  <button style={secondaryBtn} onClick={() => setViewingTask(null)}>{t('staff.close')}</button>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
+    </>
+  );
+
   if (isMobile) {
     const rk = ROLE_KEYS[memberData.role]; const roleLabel = rk ? t(`staff.${rk}`) : ((memberData.role || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
     const isActive = memberData.status !== 'inactive';
@@ -2242,6 +2429,7 @@ export default function StaffProfilePage() {
             </div>
           </div>
         </Modal>
+        {taskDialogs}
       </div>
     );
   }
@@ -3309,186 +3497,7 @@ export default function StaffProfilePage() {
         action={t('staff.editProfileAction')}
       />
 
-      {/* ── Complete Task Modal ───────────────────────────────────────────── */}
-      <Modal open={!!doneTask} onClose={() => { setDoneTask(null); setDoneNote(''); setTaskError(''); }} title={t('staff.completeTask')} maxWidth={460}>
-        {doneTask && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '12px 14px' }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{doneTask.title}</div>
-              {doneTask.dueDate && (
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, fontFamily: 'JetBrains Mono, monospace' }}>
-                  {t('staff.taskDueDateCol')}: {String(doneTask.dueDate).slice(0, 10)}
-                </div>
-              )}
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('staff.completionNote')}</label>
-              <textarea
-                value={doneNote}
-                onChange={e => setDoneNote(e.target.value)}
-                autoFocus
-                placeholder={t('staff.completionNotePh')}
-                style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 12px', fontSize: 14, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', minHeight: 90, resize: 'vertical' }}
-              />
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>{t('staff.completionNoteHint')}</div>
-            </div>
-            {taskError && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{taskError}</div>}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button style={secondaryBtn} onClick={() => { setDoneTask(null); setDoneNote(''); setTaskError(''); }}>{t('common.cancel')}</button>
-              <button style={{ ...primaryBtn, opacity: taskBusy ? 0.6 : 1 }} disabled={taskBusy} onClick={confirmTaskDone}>
-                {taskBusy ? t('staff.saving') : t('staff.markDoneBtn')}
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* ── Task Detail Modal ─────────────────────────────────────────────── */}
-      <Modal open={!!viewingTask} onClose={() => { setViewingTask(null); setCompletingInline(false); setDoneNote(''); setTaskError(''); }} title={t('staff.taskDetails')} maxWidth={520}>
-        {viewingTask && (() => {
-          const pc = PRIORITY_COLORS[viewingTask.priority] || PRIORITY_COLORS.Medium;
-          const age = taskAgeDays(viewingTask);
-          return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{viewingTask.title}</div>
-                {viewingTask.description && (
-                  <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, margin: '8px 0 0' }}>{viewingTask.description}</p>
-                )}
-              </div>
-
-              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                {[
-                  [t('tasks.priority'), <span key="p" style={{ ...pc, fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 4 }}>{viewingTask.priority}</span>],
-                  [t('common.status'), <StatusBadge key="s" status={(viewingTask.status || 'pending').toLowerCase()} />],
-                  [t('tasks.assignedTo'), viewingTask.assignedTo || ''],
-                  [t('staff.taskDueDateCol'), viewingTask.dueDate ? String(viewingTask.dueDate).slice(0, 10) : ''],
-                  [t('tasks.createdBy'), viewingTask.createdBySystem ? t('tasks.createdBySystem') : (viewingTask.createdBy || '')],
-                  [t('staff.taskAge'), age === null ? '' : (age === 0 ? t('staff.ageToday') : t('staff.ageDaysAgo', { count: age }))],
-                ].filter(([, v]) => v !== '' && v !== null && v !== undefined).map(([label, value]) => (
-                  <div key={label} style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 5 }}>{label}</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{value}</div>
-                  </div>
-                ))}
-              </div>
-
-              {viewingTask.notes && (
-                <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 5 }}>{t('tasks.notesLabel')}</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{viewingTask.notes}</div>
-                </div>
-              )}
-
-              {isCalInvite(viewingTask) ? (
-                canRespondInvite(viewingTask) ? (
-                  <div>
-                    <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('calendar.awaitingResponse')}</label>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      {[['Accepted', t('calendar.accept'), 'var(--accent-green)', 'var(--accent-green-dim)'], ['Declined', t('calendar.decline'), 'var(--accent-red)', 'var(--accent-red-dim)']].map(([v, l, col, border]) => {
-                        const active = (viewingTask.status || 'Pending') === v;
-                        return (
-                          <button key={v} disabled={taskBusy}
-                            onClick={() => changeTaskStatus(viewingTask.id, v)}
-                            style={{
-                              flex: 1, cursor: taskBusy ? 'default' : 'pointer', borderRadius: 9, padding: '9px 10px',
-                              fontSize: 12, fontWeight: 600, fontFamily: 'DM Sans',
-                              background: active ? border : 'var(--bg-elevated)',
-                              border: `1px solid ${active ? col : 'var(--border-subtle)'}`,
-                              color: active ? col : 'var(--text-secondary)',
-                              opacity: taskBusy ? 0.6 : 1,
-                            }}>
-                            {l}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
-                    {t('tasks.onlyInviteeCanRespond')}
-                  </div>
-                )
-              ) : canUpdateTasks ? (
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('staff.updateStatus')}</label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {[['Pending', t('tasks.statusPending')], ['In Progress', t('tasks.statusInProgress')], ['Done', t('tasks.statusDone')]].map(([v, l]) => {
-                      const active = completingInline ? v === 'Done' : (viewingTask.status || 'Pending') === v;
-                      return (
-                        <button key={v} disabled={taskBusy}
-                          onClick={() => {
-                            if (v === 'Done') {
-                              // Reveal the note field here rather than stacking a second dialog
-                              setCompletingInline(true);
-                              setDoneNote(viewingTask.notes || '');
-                            } else {
-                              setCompletingInline(false);
-                              changeTaskStatus(viewingTask.id, v);
-                            }
-                          }}
-                          style={{
-                            flex: 1, cursor: taskBusy ? 'default' : 'pointer', borderRadius: 9, padding: '9px 10px',
-                            fontSize: 12, fontWeight: 600, fontFamily: 'DM Sans',
-                            background: active ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)',
-                            border: `1px solid ${active ? 'rgba(201,169,110,0.45)' : 'var(--border-subtle)'}`,
-                            color: active ? 'var(--accent-gold)' : 'var(--text-secondary)',
-                            opacity: taskBusy ? 0.6 : 1,
-                          }}>
-                          {l}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {completingInline && (
-                    <div style={{ marginTop: 14 }}>
-                      <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('staff.completionNote')}</label>
-                      <textarea
-                        value={doneNote}
-                        onChange={e => setDoneNote(e.target.value)}
-                        autoFocus
-                        placeholder={t('staff.completionNotePh')}
-                        style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 12px', fontSize: 14, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', minHeight: 84, resize: 'vertical' }}
-                      />
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>{t('staff.completionNoteHint')}</div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
-                  {t('tasks.onlyAssigneeCanComplete')}
-                </div>
-              )}
-
-              {taskError && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{taskError}</div>}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                {completingInline ? (
-                  <>
-                    <button style={secondaryBtn} onClick={() => { setCompletingInline(false); setDoneNote(''); }}>
-                      {t('common.cancel')}
-                    </button>
-                    <button
-                      style={{ ...primaryBtn, opacity: taskBusy ? 0.6 : 1 }}
-                      disabled={taskBusy}
-                      onClick={async () => {
-                        if (!await changeTaskStatus(viewingTask.id, 'Done', doneNote)) return;
-                        setCompletingInline(false);
-                        setDoneNote('');
-                        setViewingTask(null);
-                      }}
-                    >
-                      {taskBusy ? t('staff.saving') : t('staff.markDoneBtn')}
-                    </button>
-                  </>
-                ) : (
-                  <button style={secondaryBtn} onClick={() => setViewingTask(null)}>{t('staff.close')}</button>
-                )}
-              </div>
-            </div>
-          );
-        })()}
-      </Modal>
+      {taskDialogs}
 
       {/* ── Bonus / Deduction Modal ───────────────────────────────────────── */}
       <Modal open={showAdjModal} onClose={() => setShowAdjModal(false)}
