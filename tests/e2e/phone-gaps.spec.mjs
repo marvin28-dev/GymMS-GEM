@@ -91,7 +91,7 @@ test('a package can be viewed, edited and deleted on a phone', async ({ page }) 
   await page.keyboard.press('Escape');
 
   await packageMenu(page, 'Phone Plan', 'Edit');
-  await page.locator('input[type="text"]').first().fill('Phone Plan Plus');
+  await page.getByRole('dialog', { name: 'Edit Package' }).getByPlaceholder('e.g. Premium 12M').fill('Phone Plan Plus');
   await page.getByRole('button', { name: 'Save Changes' }).click();
   await page.getByPlaceholder('••••').fill(owner.accessCode);
   await page.getByRole('button', { name: 'Authorize' }).click();
@@ -200,4 +200,22 @@ test('a payment can be added on a phone, for the member it was taken from', asyn
   await form.getByRole('button', { name: 'Save Payment' }).click();
 
   await expect.poll(async () => (await call('GET', '/payments', { token: owner.token })).some(p => p.memberId === member.id && Number(p.amount) === 5000)).toBe(true);
+});
+
+// F-110
+test('a package added on a phone keeps the duration in the unit chosen', async ({ page }) => {
+  const owner = await registerGym();
+  await signIn(page, owner);
+  await page.goto('/packages');
+  await page.getByTitle('Add Package').click();
+  const form = page.getByRole('dialog', { name: 'Add Package' });
+  await form.getByPlaceholder('e.g. Premium 12M').fill('Thirty Days');
+  const numbers = form.locator('input[type="number"]');
+  await numbers.nth(0).fill('20000');
+  await numbers.nth(1).fill('2000');
+  await form.locator('select', { has: page.locator('option[value="Days"]') }).selectOption('Days');
+  await numbers.nth(2).fill('30');
+  await form.getByRole('button', { name: 'Add Package' }).click();
+
+  await expect.poll(async () => (await call('GET', '/packages', { token: owner.token })).find(p => p.name === 'Thirty Days')?.durationDays).toBe(30);
 });

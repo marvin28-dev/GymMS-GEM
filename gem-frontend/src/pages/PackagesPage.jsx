@@ -223,9 +223,111 @@ export default function PackagesPage() {
 
   // ── Mobile layout ────────────────────────────────────────────────────────────
   // Drawn by both layouts: on a phone their buttons used to do nothing,
-  // because only the desktop drew them (F-109)
+  // because only the desktop drew them (F-109). The phone had its own add
+  // sheet whose "Duration (Days)" was saved as months (F-110).
   const sharedDialogs = (
     <>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editingPkg ? t('packages.editPackage') : t('packages.addPackage')}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.packageName')} *</label>
+              <input style={{ ...inputStyle, borderColor: errors.name ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Premium 12M" />
+              {errors.name && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.name}</div>}
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.code')}</label>
+              <input style={inputStyle} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="e.g. PKG-P12" />
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.description')}</label>
+            <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+          </div>
+          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.price')} *</label>
+              <input type="number" min="0" style={{ ...inputStyle, borderColor: errors.price ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00" />
+              {errors.price && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.price}</div>}
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.dayPassPrice')} *</label>
+              <input type="number" min="0" style={{ ...inputStyle, borderColor: errors.dayPassPrice ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.dayPassPrice} onChange={e => setForm(f => ({ ...f, dayPassPrice: e.target.value }))} placeholder="0.00" />
+              {errors.dayPassPrice && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.dayPassPrice}</div>}
+            </div>
+          </div>
+          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.durationType')}</label>
+              <select style={inputStyle} value={form.durationType} onChange={e => setForm(f => ({ ...f, durationType: e.target.value }))}>
+                {[['Days', t('packages.durationDayOpt')],['Weeks', t('packages.durationWeekOpt')],['Months', t('packages.durationMonthOpt')],['Year', t('packages.durationYearOpt')]].map(([val,label]) => <option key={val} value={val}>{label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.durationValue')}</label>
+              <input type="number" min="0" style={inputStyle} value={form.durationValue} onChange={e => setForm(f => ({ ...f, durationValue: e.target.value }))} placeholder="e.g. 12" />
+            </div>
+          </div>
+          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.sessionLimit')}</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {form.sessionLimit === 'Unlimited' ? (
+                  <div style={{ ...inputStyle, color: 'var(--text-muted)', fontStyle: 'italic', cursor: 'default', userSelect: 'none' }}>{t('packages.unlimited')}</div>
+                ) : (
+                  <input type="number" min="1" style={inputStyle} value={form.sessionLimit} onChange={e => setForm(f => ({ ...f, sessionLimit: e.target.value }))} placeholder="e.g. 20" />
+                )}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', width: 'fit-content' }}>
+                  <input
+                    type="checkbox"
+                    checked={form.sessionLimit === 'Unlimited'}
+                    onChange={e => setForm(f => ({ ...f, sessionLimit: e.target.checked ? 'Unlimited' : '' }))}
+                    style={{ accentColor: 'var(--accent-gold)', width: 14, height: 14 }}
+                  />
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{t('packages.unlimitedSessions')}</span>
+                </label>
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.access')}</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 12px' }}>
+                {accessTypeOptions.map(opt => {
+                  const checked = form.accessType.includes(opt);
+                  return (
+                    <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: checked ? 'var(--text-primary)' : 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => setForm(f => ({
+                          ...f,
+                          accessType: checked
+                            ? f.accessType.filter(a => a !== opt)
+                            : [...f.accessType, opt],
+                        }))}
+                        style={{ accentColor: 'var(--accent-gold)', width: 14, height: 14, flexShrink: 0 }}
+                      />
+                      {opt}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.status')}</label>
+            <select style={inputStyle} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+              <option value="active">{t('packages.active')}</option>
+              <option value="inactive">{t('packages.inactive')}</option>
+            </select>
+          </div>
+          {errors._form && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{errors._form}</div>}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
+            <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
+            {!editingPkg && <button style={secondaryBtn} onClick={() => handleSave(true)}>{t('tasks.saveAndAddAnother')}</button>}
+            <button style={primaryBtn} onClick={() => handleSave(false)}>{editingPkg ? t('common.saveChanges') : t('packages.addPackage')}</button>
+          </div>
+        </div>
+      </Modal>
       {/* Package Profile Modal */}
       {profilePkg && (() => {
         const subscriberCount = membersList.filter(m => m.packageId === profilePkg.id).length;
@@ -450,35 +552,6 @@ export default function PackagesPage() {
 
         {canPrice && <FAB onClick={tab === 'member' ? openAdd : () => { setVForm(emptyVisitorForm); setEditingVPkg(null); setVErrors({}); setShowVModal(true); }} label={tab === 'member' ? t('packages.addPackage') : t('packages.addBundle')} />}
 
-        {showModal && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end' }}>
-            <div style={{ background: 'var(--bg-secondary)', borderRadius: '20px 20px 0 0', width: '100%', maxHeight: '88vh', overflowY: 'auto', padding: '20px 20px 40px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'Manrope', color: 'var(--text-primary)' }}>{editingPkg ? t('packages.editPackage') : t('packages.addPackage')}</span>
-                <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {[
-                  { label: `${t('packages.packageName')} *`, key: 'name', type: 'text', error: errors.name },
-                  { label: `${t('packages.price')} *`, key: 'price', type: 'number', error: errors.price },
-                  { label: `${t('packages.dayPassPrice')} *`, key: 'dayPassPrice', type: 'number', error: errors.dayPassPrice },
-                  { label: t('packages.durationDays'), key: 'durationValue', type: 'number' },
-                  { label: t('common.description'), key: 'description', type: 'text' },
-                ].map(({ label, key, type, error }) => (
-                  <div key={key}>
-                    <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{label}</label>
-                    <input type={type} value={form[key] || ''} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} style={{ width: '100%', background: 'var(--bg-elevated)', border: `1px solid ${error ? 'var(--accent-red)' : 'var(--border-subtle)'}`, borderRadius: 10, padding: '10px 14px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', boxSizing: 'border-box' }} />
-                    {error && <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{error}</span>}
-                  </div>
-                ))}
-                {errors._form && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{errors._form}</div>}
-                <button onClick={() => handleSave(false)} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 10, padding: '13px', fontSize: 14, fontWeight: 700, color: '#0a0a0f', cursor: 'pointer', fontFamily: 'DM Sans', marginTop: 4 }}>
-                  {editingPkg ? t('common.saveChanges') : t('packages.addPackage')}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
         {sharedDialogs}
       </div>
     );
@@ -608,107 +681,6 @@ export default function PackagesPage() {
         </div>
       )}
 
-      <Modal open={showModal} onClose={() => setShowModal(false)} title={editingPkg ? t('packages.editPackage') : t('packages.addPackage')}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.packageName')} *</label>
-              <input style={{ ...inputStyle, borderColor: errors.name ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Premium 12M" />
-              {errors.name && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.name}</div>}
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.code')}</label>
-              <input style={inputStyle} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="e.g. PKG-P12" />
-            </div>
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.description')}</label>
-            <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
-          </div>
-          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.price')} *</label>
-              <input type="number" min="0" style={{ ...inputStyle, borderColor: errors.price ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00" />
-              {errors.price && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.price}</div>}
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.dayPassPrice')} *</label>
-              <input type="number" min="0" style={{ ...inputStyle, borderColor: errors.dayPassPrice ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.dayPassPrice} onChange={e => setForm(f => ({ ...f, dayPassPrice: e.target.value }))} placeholder="0.00" />
-              {errors.dayPassPrice && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.dayPassPrice}</div>}
-            </div>
-          </div>
-          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.durationType')}</label>
-              <select style={inputStyle} value={form.durationType} onChange={e => setForm(f => ({ ...f, durationType: e.target.value }))}>
-                {[['Days', t('packages.durationDayOpt')],['Weeks', t('packages.durationWeekOpt')],['Months', t('packages.durationMonthOpt')],['Year', t('packages.durationYearOpt')]].map(([val,label]) => <option key={val} value={val}>{label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.durationValue')}</label>
-              <input type="number" min="0" style={inputStyle} value={form.durationValue} onChange={e => setForm(f => ({ ...f, durationValue: e.target.value }))} placeholder="e.g. 12" />
-            </div>
-          </div>
-          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.sessionLimit')}</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {form.sessionLimit === 'Unlimited' ? (
-                  <div style={{ ...inputStyle, color: 'var(--text-muted)', fontStyle: 'italic', cursor: 'default', userSelect: 'none' }}>{t('packages.unlimited')}</div>
-                ) : (
-                  <input type="number" min="1" style={inputStyle} value={form.sessionLimit} onChange={e => setForm(f => ({ ...f, sessionLimit: e.target.value }))} placeholder="e.g. 20" />
-                )}
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', width: 'fit-content' }}>
-                  <input
-                    type="checkbox"
-                    checked={form.sessionLimit === 'Unlimited'}
-                    onChange={e => setForm(f => ({ ...f, sessionLimit: e.target.checked ? 'Unlimited' : '' }))}
-                    style={{ accentColor: 'var(--accent-gold)', width: 14, height: 14 }}
-                  />
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{t('packages.unlimitedSessions')}</span>
-                </label>
-              </div>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.access')}</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 12px' }}>
-                {accessTypeOptions.map(opt => {
-                  const checked = form.accessType.includes(opt);
-                  return (
-                    <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: checked ? 'var(--text-primary)' : 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => setForm(f => ({
-                          ...f,
-                          accessType: checked
-                            ? f.accessType.filter(a => a !== opt)
-                            : [...f.accessType, opt],
-                        }))}
-                        style={{ accentColor: 'var(--accent-gold)', width: 14, height: 14, flexShrink: 0 }}
-                      />
-                      {opt}
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.status')}</label>
-            <select style={inputStyle} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
-              <option value="active">{t('packages.active')}</option>
-              <option value="inactive">{t('packages.inactive')}</option>
-            </select>
-          </div>
-          {errors._form && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{errors._form}</div>}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
-            <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
-            {!editingPkg && <button style={secondaryBtn} onClick={() => handleSave(true)}>{t('tasks.saveAndAddAnother')}</button>}
-            <button style={primaryBtn} onClick={() => handleSave(false)}>{editingPkg ? t('common.saveChanges') : t('packages.addPackage')}</button>
-          </div>
-        </div>
-      </Modal>
 
       {sharedDialogs}
     </div>
