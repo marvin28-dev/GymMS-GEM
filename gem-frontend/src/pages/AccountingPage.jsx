@@ -25,6 +25,13 @@ import { revenueOf } from '../utils/revenue';
 import { getAll as getSales } from '../services/sales.service';
 import { useGymSettings } from '../hooks/useGymSettings';
 import { enabledMethods, canonicalMethod, PAYMENT_METHODS } from '../utils/paymentMethods';
+import { roleName } from '../utils/roleNames';
+
+// One list of expense categories for every form, filter and breakdown. Entries
+// made on the old phone form may carry Equipment or Marketing; they still show.
+const EXPENSE_CATEGORIES = ['Utilities', 'Rent', 'Maintenance', 'Salaries', 'Supplies', 'Other'];
+const EXPENSE_COLORS = { Utilities: '#60a5fa', Rent: '#fbbf24', Maintenance: '#f97316', Salaries: '#a78bfa', Supplies: '#34d399', Other: '#9ca3af', Equipment: '#fb923c', Marketing: '#4ade80' };
+const categoriesIn = (list) => [...new Set([...EXPENSE_CATEGORIES, ...list.map(e => e.category).filter(Boolean)])];
 import { softAll } from '../utils/loadAll';
 import { escapeHtml, getGymInfo, openPrintWindow, safeImageSrc } from '../utils/receipt';
 import { gymCache } from '../utils/gymCache';
@@ -415,7 +422,10 @@ export default function AccountingPage() {
   }).reduce((s, e) => s + Number(e.amount || 0), 0);
 
   const periodNet = periodRevenue - periodExpensesAmt;
-  const periodOutstanding = paymentsList.filter(p => p.status === 'Pending').reduce((s, p) => s + (p.amount || 0), 0);
+  // What members owe now (payments carry no status, so a sum of "pending" ones was always 0)
+  const periodOutstanding = membersList.reduce((s, m) => s + Math.max(0, Number(m.balance) || 0), 0);
+  // A payment method by name, never the stored code (mobile_money)
+  const methodName = (code) => { const m = PAYMENT_METHODS.find(x => x.api === code || x.key === canonicalMethod(code)); return m ? t(m.labelKey) : (code || '-'); };
   const periodFilteredExpenses = expenses.filter(e => {
     const d = e.date ? String(e.date).slice(0, 10) : '';
     return d >= periodRange.from && d <= periodRange.to;
@@ -724,7 +734,7 @@ export default function AccountingPage() {
   };
 
   const expenseCategoryBreakdown = (() => {
-    const cats = ['Utilities', 'Rent', 'Maintenance', 'Salaries', 'Supplies', 'Other'];
+    const cats = categoriesIn(periodFilteredExpenses);
     const rows = cats.map(cat => ({ label: cat, amount: periodFilteredExpenses.filter(e => e.category === cat).reduce((s, e) => s + Number(e.amount || 0), 0) })).filter(r => r.amount > 0);
     const total = rows.reduce((s, r) => s + r.amount, 0);
     return rows.map(r => ({ ...r, pct: total > 0 ? Math.round((r.amount / total) * 100) : 0 }));
@@ -837,7 +847,7 @@ export default function AccountingPage() {
                       : { staffId: '', payMonth: '' }),
                   }));
                 }}>
-                {['Utilities', 'Rent', 'Maintenance', 'Salaries', 'Supplies', 'Other'].map(c => <option key={c}>{c}</option>)}
+                {(EXPENSE_CATEGORIES.includes(form.category) || !form.category ? EXPENSE_CATEGORIES : [...EXPENSE_CATEGORIES, form.category]).map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
             {!isSalaryEntry && (
@@ -985,7 +995,7 @@ export default function AccountingPage() {
                 [t('common.amount'), formatMoney(Number(viewingExpense.amount))],
                 [t('common.date'), viewingExpense.date ? fmtDate(viewingExpense.date) : '-'],
                 [t('reports.paidTo'), viewingExpense.paidTo || '-'],
-                [t('reports.method'), viewingExpense.method || '-'],
+                [t('reports.method'), methodName(viewingExpense.method)],
                 [t('reports.recordedBy'), viewingExpense.recordedBy || '-'],
                 // Who put it in GEM, and when: taken from whoever was signed in
                 [t('reports.createdBy'), viewingExpense.createdByName
@@ -1052,7 +1062,7 @@ export default function AccountingPage() {
                     <div class="field"><label>${escapeHtml(t('common.amount'))}</label><span style="color:#dc2626">${escapeHtml(formatMoney(Number(exp.amount)))}</span></div>
                     <div class="field"><label>${escapeHtml(t('common.date'))}</label><span>${escapeHtml(fmtDate(exp.date))}</span></div>
                     <div class="field"><label>${escapeHtml(t('reports.paidTo'))}</label><span>${escapeHtml(exp.paidTo || '-')}</span></div>
-                    <div class="field"><label>${escapeHtml(t('sales.paymentMethod'))}</label><span>${escapeHtml(exp.method || '-')}</span></div>
+                    <div class="field"><label>${escapeHtml(t('sales.paymentMethod'))}</label><span>${escapeHtml(methodName(exp.method))}</span></div>
                     <div class="field"><label>${escapeHtml(t('reports.recordedBy'))}</label><span>${escapeHtml(exp.recordedBy || '-')}</span></div>
                   </div>
                   ${(exp.note || exp.notes) ? `<div class="notes-box"><strong>${escapeHtml(t('common.notes'))}:</strong> ${escapeHtml(exp.note || exp.notes)}</div>` : ''}
@@ -1166,7 +1176,7 @@ export default function AccountingPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                   <div>
                     <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{editingPaystub.staffName}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{editingPaystub.role} · {editingPaystub.month}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{roleName(editingPaystub.role, t)} · {editingPaystub.month}</div>
                   </div>
                   <StatusPill status={editingPaystub.status} />
                 </div>
@@ -1342,7 +1352,7 @@ export default function AccountingPage() {
   );
 
   if (isMobile) {
-    const EXPENSE_CATS = { Utilities: '#60a5fa', Salaries: '#a78bfa', Equipment: '#f97316', Marketing: '#4ade80', Rent: '#fbbf24', Other: '#9ca3af' };
+    const EXPENSE_CATS = EXPENSE_COLORS;
     const SOURCES = [
       { key: 'Social Media', label: 'Social Media', color: '#818cf8' },
       { key: 'Friend',       label: 'Referral',     color: '#34d399' },
@@ -1473,7 +1483,7 @@ export default function AccountingPage() {
             {/* Category filter (non-FD tabs) */}
             {activeTab !== 'Front Desk Expenses' && (
               <div style={{ padding: '0 16px 10px', display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
-                {['All Categories', 'Utilities', 'Rent', 'Maintenance', 'Salaries', 'Supplies', 'Other'].map(c =>
+                {['All Categories', ...categoriesIn(expenses)].map(c =>
                   chip(c, categoryFilter === c, () => setCategoryFilter(c))
                 )}
               </div>
@@ -1554,7 +1564,7 @@ export default function AccountingPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{p.staffName}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2 }}>{p.role}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2 }}>{roleName(p.role, t)}</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>{formatMoney(p.grossPay)}</div>
@@ -1783,7 +1793,7 @@ export default function AccountingPage() {
               ) : (
                 <select style={{ ...inputStyle, width: 160, margin: '8px 0' }} value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
                   <option value="All Categories">{t('reports.allCategories')}</option>
-                  {['Utilities', 'Rent', 'Maintenance', 'Salaries', 'Supplies', 'Other'].map(c => <option key={c} value={c}>{c}</option>)}
+                  {categoriesIn(expenses).map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               )}
             </div>
@@ -1809,7 +1819,7 @@ export default function AccountingPage() {
                       </td>
                       <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 600, color: 'var(--accent-red)' }}>{formatMoney(Number(exp.amount))}</td>
                       <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>{exp.paidTo || exp.submittedBy || '-'}</td>
-                      <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-muted)' }}>{exp.method || exp.paymentMethod || '-'}</td>
+                      <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-muted)' }}>{methodName(exp.method || exp.paymentMethod)}</td>
                       <td style={{ padding: '12px 20px' }}>
                         {/* Everything in All/Operations is already in the books -
                             reviewing happens on the Front Desk Expenses tab, so
@@ -1923,7 +1933,7 @@ export default function AccountingPage() {
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-hover)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{p.staffName}</td>
-                      <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>{p.role}</td>
+                      <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>{roleName(p.role, t)}</td>
                       <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-primary)' }}>{formatMoney(p.basicPay)}</td>
                       <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--accent-green)' }}>+{formatMoney(p.allowances)}</td>
                       <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--accent-red)' }}>-{formatMoney(p.deductions)}</td>
