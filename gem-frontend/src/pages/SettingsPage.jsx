@@ -183,6 +183,9 @@ export default function SettingsPage() {
   const [gymSchedule, setGymSchedule] = useState(defaultSchedule);
   const [gymSaving, setGymSaving] = useState(false);
   const [gymSaved, setGymSaved] = useState(false);
+  // A refused save says why beside its Save button (F-120)
+  const [gymSaveError, setGymSaveError] = useState('');
+  const [regFeeSaveError, setRegFeeSaveError] = useState('');
   // The last-saved profile, so an edit can be reverted field-for-field.
   const [pristineGym, setPristineGym] = useState(null);
   const GYM_KEYS = ['name', 'email', 'phone', 'altPhone', 'address', 'city', 'province', 'country', 'postal', 'website', 'facebook', 'instagram', 'twitter'];
@@ -274,6 +277,7 @@ export default function SettingsPage() {
 
   const saveGymProfile = async () => {
     setGymSaving(true);
+    setGymSaveError('');
     try {
       const res = await updateMyGym({
         name: gymProfile.name,
@@ -301,7 +305,7 @@ export default function SettingsPage() {
       snapshotGym();
       setGymSaved(true);
       setTimeout(() => setGymSaved(false), 2500);
-    } catch (err) { console.error(err); }
+    } catch (err) { setGymSaveError(err?.response?.data?.error || t('settings.saveFailed')); }
     setGymSaving(false);
   };
 
@@ -318,6 +322,7 @@ export default function SettingsPage() {
   const setRegFee = (k, v) => setRegFeeSettings(s => ({ ...s, [k]: v }));
   const saveRegFee = async () => {
     setRegFeeSaving(true);
+    setRegFeeSaveError('');
     try {
       await updateMyGym({
         registrationFeeRequired: regFeeSettings.required,
@@ -332,7 +337,7 @@ export default function SettingsPage() {
       snapshotRegFee();
       setRegFeeSaved(true);
       setTimeout(() => setRegFeeSaved(false), 2500);
-    } catch (err) { console.error(err); }
+    } catch (err) { setRegFeeSaveError(err?.response?.data?.error || t('settings.saveFailed')); }
     setRegFeeSaving(false);
   };
 
@@ -967,7 +972,8 @@ export default function SettingsPage() {
                     </div>
                   ))}
                 </div>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', paddingTop: 8 }}>
+                  {gymSaveError && <span role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', marginRight: 'auto', fontFamily: 'DM Sans' }}>{gymSaveError}</span>}
                   {gymSaved && (
                     <span style={{ fontSize: 12, color: 'var(--accent-green)', display: 'flex', alignItems: 'center', gap: 4 }}>
                       ✓ {t('settings.savedSuccessfully')}
@@ -1269,6 +1275,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+                  {regFeeSaveError && <span role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', marginRight: 'auto', fontFamily: 'DM Sans' }}>{regFeeSaveError}</span>}
                   {regFeeSaved && (
                     <span style={{ fontSize: 12, color: 'var(--accent-green)', display: 'flex', alignItems: 'center', gap: 4 }}>
                       ✓ {t('settings.savedSuccessfully')}
