@@ -190,3 +190,33 @@ test('the desk program panel names its views in full', async ({ page }) => {
   for (const name of ['Jour', 'Sem.', 'Mois']) await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Moi', exact: true })).toHaveCount(0);
 });
+
+test('in French, a staff profile\'s pay screens and dialogs are French', async ({ page }) => staffPayInFrench(page, false));
+test('in French on a phone, a staff profile\'s pay screens and dialogs are French', async ({ page }) => staffPayInFrench(page, true));
+
+async function staffPayInFrench(page, phone) {
+  if (phone) await page.setViewportSize({ width: 390, height: 844 });
+  const owner = await registerGym();
+  const staff = await addStaff(owner, { firstName: 'Paul', lastName: 'Paie', salary: 150000 });
+  await call('POST', '/pay-adjustments', { token: owner.token, body: { staffId: staff.id, kind: 'bonus', label: 'Indemnité', amount: 10000, recurring: true } });
+  await inFrench(page);
+  await signIn(page, owner);
+  await page.goto(`/staff/${staff.id}`);
+  await page.getByRole('button', { name: 'Salaire & Revenus' }).first().click();
+  await expect(page.getByText('Indemnité').locator('xpath=..')).toContainText('Chaque mois');
+  await expect(page.getByText('Aucune déduction', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Ajouter', exact: true }).first().click();
+  const adj = page.getByRole('dialog', { name: 'Ajouter une prime' });
+  await expect(adj.getByText('Fréquence')).toBeVisible();
+  await expect(adj.getByText('Cette paie', { exact: true })).toBeVisible();
+  await expect(adj.getByPlaceholder('ex. Indemnité de transport')).toBeVisible();
+  await adj.getByRole('button', { name: 'Annuler' }).click();
+
+  await page.getByRole('button', { name: 'Émettre la paie' }).first().click();
+  const pay = page.getByRole('dialog', { name: 'Émettre la paie' });
+  const month = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  await expect(pay.locator('option', { hasText: month })).toBeAttached();
+  await expect(pay.getByRole('button', { name: 'Confirmer et enregistrer' })).toBeVisible();
+  await expect(page.getByText(/Issue Pay|Every month|How often/)).toHaveCount(0);
+}

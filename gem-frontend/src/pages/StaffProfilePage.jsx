@@ -29,7 +29,8 @@ import {
 import { getMyGym } from '../services/gym.service';
 import { notifyDataChanged } from '../utils/events';
 import api from '../services/api';
-import { fmtDate, fmtTime, todayStr as getToday, dayStr, ordinalDay } from '../utils/date';
+import { fmtDate, fmtTime, todayStr as getToday, dayStr, ordinalDay, getDateLocale, payMonthText } from '../utils/date';
+import { roleName } from '../utils/roleNames';
 import { digitsOnly } from '../utils/number';
 import { downloadPaystubPdf } from '../utils/paystubPdf';
 import { useSetupStatus } from '../hooks/useSetupStatus';
@@ -82,6 +83,7 @@ const EDITABLE_ROLES = ['manager', 'front_desk', 'trainer', 'other'];
 const roleChoice = (role) => (['coach', 'instructor'].includes(role) ? 'trainer' : role);
 // One list of note categories for both layouts
 const NOTE_CATEGORIES = ['General', 'Performance', 'Warning', 'Commendation', 'Health', 'Financial', 'Other'];
+const noteCategoryName = (c, t) => (NOTE_CATEGORIES.includes(c) ? t(`staff.noteCat${c}`) : c);
 
 function compressImage(dataUrl, maxW = 1000, maxH = 1000, quality = 0.82) {
   return new Promise(resolve => {
@@ -122,8 +124,8 @@ function EmptyState({ icon: Icon, title, hint }) {
   );
 }
 const ADJ_KINDS = [
-  { kind: 'bonus', title: 'Bonuses', sign: '+', color: 'var(--accent-green)', empty: 'No bonuses' },
-  { kind: 'deduction', title: 'Deductions', sign: '-', color: 'var(--accent-red)', empty: 'No deductions' },
+  { kind: 'bonus', titleKey: 'staff.adjBonuses', sign: '+', color: 'var(--accent-green)', emptyKey: 'staff.adjNoBonuses' },
+  { kind: 'deduction', titleKey: 'staff.adjDeductions', sign: '-', color: 'var(--accent-red)', emptyKey: 'staff.adjNoDeductions' },
 ];
 const adjIconBtn = { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 5, borderRadius: 6, display: 'inline-flex', alignItems: 'center' };
 
@@ -144,6 +146,8 @@ const TABS = ['Details', 'Tasks Assigned', 'Schedule', 'Calendar', 'Clients', 'P
 const TAB_KEYS = ['staff.tabDetails', 'staff.tabTasks', 'staff.tabSchedule', 'staff.tabCalendar', 'staff.tabClients', 'staff.tabPayEarnings', 'staff.tabNotes'];
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const DAY_KEYS = ['common.monday', 'common.tuesday', 'common.wednesday', 'common.thursday', 'common.friday', 'common.saturday', 'common.sunday'];
+const PRIORITY_KEYS = { High: 'tasks.priorityHigh', Medium: 'tasks.priorityMedium', Low: 'tasks.priorityLow' };
+const priorityName = (p, t) => (PRIORITY_KEYS[p] ? t(PRIORITY_KEYS[p]) : p);
 const PRIORITY_COLORS = {
   High:   { bg: 'var(--accent-red-dim)',    color: 'var(--accent-red)' },
   Medium: { bg: 'var(--accent-yellow-dim)', color: 'var(--accent-yellow)' },
@@ -171,7 +175,7 @@ function weekOptions(count = 8) {
   return Array.from({ length: count }, (_, i) => {
     const start = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i * 7);
     const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
-    const month = (d) => d.toLocaleDateString('en-GB', { month: 'short' });
+    const month = (d) => d.toLocaleDateString(getDateLocale(), { month: 'short' });
     // Only repeat the month when the week straddles two of them
     const label = start.getMonth() === end.getMonth()
       ? `${start.getDate()} - ${end.getDate()} ${month(end)}`
@@ -183,9 +187,11 @@ function weekOptions(count = 8) {
 const MOCK_PAY_HISTORY = [];
 
 const StatusPill = ({ status }) => {
+  const { t } = useLanguage();
   const map = { paid: { bg: 'rgba(34,197,94,0.15)', color: '#22c55e' }, issued: { bg: 'rgba(201,169,110,0.15)', color: '#c9a96e' }, draft: { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' } };
+  const names = { paid: t('reports.paidLabel'), issued: t('reports.issuedLabel'), draft: t('staff.payDraft') };
   const s = map[status] || map.draft;
-  return <span style={{ background: s.bg, color: s.color, fontSize: 11, padding: '3px 8px', borderRadius: 4, fontWeight: 600, textTransform: 'capitalize' }}>{status}</span>;
+  return <span style={{ background: s.bg, color: s.color, fontSize: 11, padding: '3px 8px', borderRadius: 4, fontWeight: 600, textTransform: 'capitalize' }}>{names[status] || status}</span>;
 };
 
 export default function StaffProfilePage() {
@@ -911,38 +917,38 @@ export default function StaffProfilePage() {
       return {
         key: 'paid', amount: record.amount, handOver: record.netAmount,
         line: record.paidAt
-          ? `${activePayMonth} paid ${fmtDate(record.paidAt, { day: 'numeric', month: 'short' })}`
-          : `${activePayMonth} paid`,
+          ? t('staff.payLinePaidOn', { month: payMonthText(activePayMonth), date: fmtDate(record.paidAt, { day: 'numeric', month: 'short' }) })
+          : t('staff.payLinePaid', { month: payMonthText(activePayMonth) }),
       };
     }
     if (record) {
       return {
         key: 'issued', amount: record.amount, handOver: record.netAmount,
-        line: `${activePayMonth} issued, awaiting payment`,
+        line: t('staff.payLineIssued', { month: payMonthText(activePayMonth) }),
       };
     }
     // The pay day job skips deactivated accounts, so there is nothing to count down to
     if (memberData?.status === 'inactive' || memberData?.isActive === false) {
-      return { key: 'inactive', amount: estimatedNetPay, line: 'Account deactivated, so pay is not issued automatically' };
+      return { key: 'inactive', amount: estimatedNetPay, line: t('staff.payLineInactive') };
     }
     if (!(salary > 0)) {
-      return { key: 'nosalary', amount: 0, line: 'No salary set' };
+      return { key: 'nosalary', amount: 0, line: t('staff.payLineNoSalary') };
     }
     if (!dueDate) {
-      return { key: 'nodueday', amount: estimatedNetPay, line: `${activePayMonth}: no pay day set` };
+      return { key: 'nodueday', amount: estimatedNetPay, line: t('staff.payLineNoPayDay', { month: payMonthText(activePayMonth) }) };
     }
     if (daysAway > 0) {
       return {
         key: 'upcoming', amount: estimatedNetPay,
-        line: daysAway === 1 ? `Due tomorrow, ${on}` : `Due in ${daysAway} days, ${on}`,
+        line: daysAway === 1 ? t('staff.payLineTomorrow', { date: on }) : t('staff.payLineInDays', { n: daysAway, date: on }),
       };
     }
     if (daysAway === 0) {
-      return { key: 'due', urgent: true, amount: estimatedNetPay, line: `Due today, ${on}` };
+      return { key: 'due', urgent: true, amount: estimatedNetPay, line: t('staff.payLineToday', { date: on }) };
     }
     return {
       key: 'overdue', urgent: true, amount: estimatedNetPay,
-      line: `Overdue since ${on}`,
+      line: t('staff.payLineOverdue', { date: on }),
     };
   })();
 
@@ -1168,7 +1174,7 @@ export default function StaffProfilePage() {
   const saveNote = async () => {
     if (!noteText.trim() || noteSaving) return;
     const auth = getAuth()?.user || {};
-    const author = [auth.firstName, auth.lastName].filter(Boolean).join(' ') || 'Manager';
+    const author = [auth.firstName, auth.lastName].filter(Boolean).join(' ') || roleName(getRole(), t);
     const newNote = { id: Date.now(), date: getToday(), content: noteText, createdBy: author, category: noteCategory };
     const updated = [...notes, newNote];
     setNoteSaving(true);
@@ -1227,7 +1233,7 @@ export default function StaffProfilePage() {
   const saveAdjustment = async () => {
     setAdjError('');
     const amount = Number(adjForm.amount);
-    if (!adjForm.label.trim() || !amount) { setAdjError('Enter a label and an amount.'); return; }
+    if (!adjForm.label.trim() || !amount) { setAdjError(t('staff.adjMissing')); return; }
     // A one-off item can only target the paycheck being worked on now.
     const month = adjForm.recurring ? undefined : activePayMonth;
     try {
@@ -1243,7 +1249,7 @@ export default function StaffProfilePage() {
       setAdjustments(prev => [res.data, ...prev]);
       setShowAdjModal(false);
     } catch (err) {
-      setAdjError(err?.response?.data?.error || 'Could not save this item.');
+      setAdjError(err?.response?.data?.error || t('staff.adjSaveFailed'));
     }
   };
 
@@ -1352,11 +1358,11 @@ export default function StaffProfilePage() {
 
   const confirmIssuePay = async () => {
     setPayError('');
-    if (!issuePayForm.month) { setPayError('Choose the pay period.'); return; }
-    if (payPreview?.month !== issuePayForm.month) { setPayError('Still working out the pay. Try again in a moment.'); return; }
+    if (!issuePayForm.month) { setPayError(t('staff.choosePayPeriod')); return; }
+    if (payPreview?.month !== issuePayForm.month) { setPayError(t('staff.payStillWorking')); return; }
     const short = payPreview?.month === issuePayForm.month ? (payPreview.shortfall || 0) : 0;
     if (short > 0) {
-      setPayError(`Deductions for ${issuePayForm.month} are ${formatMoney(short)} more than the pay. Reduce or remove a deduction, then issue the pay.`);
+      setPayError(t('reports.payShortfall', { month: payMonthText(issuePayForm.month), amount: formatMoney(short) }));
       return;
     }
     try {
@@ -1371,7 +1377,7 @@ export default function StaffProfilePage() {
       setAdjustments(prev => prev.filter(a => a.recurring || a.month !== issuePayForm.month));
       setShowIssuePayModal(false);
     } catch (err) {
-      setPayError(err?.response?.data?.error || 'Could not record this payment.');
+      setPayError(err?.response?.data?.error || t('staff.payRecordFailed'));
     }
   };
 
@@ -1581,7 +1587,7 @@ export default function StaffProfilePage() {
 
               <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 {[
-                  [t('tasks.priority'), <span key="p" style={{ ...pc, fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 4 }}>{viewingTask.priority}</span>],
+                  [t('tasks.priority'), <span key="p" style={{ ...pc, fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 4 }}>{priorityName(viewingTask.priority, t)}</span>],
                   [t('common.status'), <StatusBadge key="s" status={(viewingTask.status || 'pending').toLowerCase()} />],
                   [t('tasks.assignedTo'), assigneeName(viewingTask, t)],
                   [t('staff.taskDueDateCol'), viewingTask.dueDate ? String(viewingTask.dueDate).slice(0, 10) : ''],
@@ -1948,7 +1954,7 @@ export default function StaffProfilePage() {
                   style={{ textAlign: 'left', width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '13px 14px', cursor: 'pointer', fontFamily: 'DM Sans' }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>{tk.title}</div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: pc.bg, color: pc.color, fontWeight: 600 }}>{tk.priority}</span>
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: pc.bg, color: pc.color, fontWeight: 600 }}>{priorityName(tk.priority, t)}</span>
                     {tk.dueDate && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>{String(tk.dueDate).slice(0, 10)}</span>}
                     <StatusBadge status={(tk.status || 'pending').toLowerCase()} />
                     {age !== null && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{age === 0 ? t('staff.ageToday') : t('staff.ageDaysAgo', { count: age })}</span>}
@@ -2070,31 +2076,31 @@ export default function StaffProfilePage() {
                   <div key={g.kind} style={{ borderTop: gi === 1 ? '1px solid var(--border-subtle)' : 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px 10px' }}>
                       <span style={{ width: 6, height: 6, borderRadius: 999, background: g.color, flexShrink: 0 }} />
-                      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{g.title}</span>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{t(g.titleKey)}</span>
                       <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums', color: total ? g.color : 'var(--text-muted)' }}>
                         {total ? `${g.sign}${formatMoney(total)}` : '-'}
                       </span>
                       {canEditPayroll && (
                         <button onClick={() => openAdjModal(g.kind)} style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 7, padding: '5px 9px', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
-                          <Plus size={11} /> Add
+                          <Plus size={11} /> {t('common.add')}
                         </button>
                       )}
                     </div>
                     {items.length === 0 ? (
-                      <div style={{ padding: '4px 14px 14px', fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{g.empty}</div>
+                      <div style={{ padding: '4px 14px 14px', fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t(g.emptyKey)}</div>
                     ) : items.map(a => {
                       return (
                         <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderTop: '1px solid var(--border-subtle)' }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'DM Sans', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.label}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2 }}>{a.recurring ? 'Every month' : 'This paycheck only'}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2 }}>{a.recurring ? t('staff.adjEveryMonth') : t('staff.adjThisPaycheckOnly')}</div>
                             {adjRemoveError?.id === a.id && <div role="alert" style={{ fontSize: 11.5, color: 'var(--accent-red)', marginTop: 4, lineHeight: 1.4 }}>{adjRemoveError.text}</div>}
                           </div>
                           <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums', flexShrink: 0, color: g.color }}>
                             {formatMoney(a.amount)}
                           </span>
                           {canEditPayroll && (
-                            <button onClick={() => deleteAdjustment(a)} style={adjIconBtn} aria-label="Remove item"><Trash2 size={14} /></button>
+                            <button onClick={() => deleteAdjustment(a)} style={adjIconBtn} aria-label={t('staff.removeItem')}><Trash2 size={14} /></button>
                           )}
                         </div>
                       );
@@ -2121,7 +2127,7 @@ export default function StaffProfilePage() {
                 </div>
                 {payShortfall > 0 && (
                   <div style={{ fontSize: 11.5, color: 'var(--accent-red)', fontWeight: 600, width: '100%' }}>
-                    Deductions exceed pay by {formatMoney(payShortfall)}. This pay will not be issued until a deduction is reduced.
+                    {t('staff.payShortfallLine', { amount: formatMoney(payShortfall) })}
                   </div>
                 )}
               </div>
@@ -2130,20 +2136,20 @@ export default function StaffProfilePage() {
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>Pay History</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{t('staff.payHistory')}</span>
                 </div>
                 {canEditPayroll && salary > 0 && (
                   <button onClick={handleIssuePay} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#0a0a0f', fontFamily: 'DM Sans' }}>
-                    Issue Pay
+                    {t('reports.issuePay')}
                   </button>
                 )}
               </div>
               {payRecords.length === 0 ? (
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans', textAlign: 'center', padding: '12px 0' }}>No pay records yet</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans', textAlign: 'center', padding: '12px 0' }}>{t('staff.noPayRecordsTitle')}</div>
               ) : payRecords.map((r, i) => (
                 <div key={i} style={{ padding: '8px 0', borderBottom: i < payRecords.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{r.month}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{payMonthText(r.month)}</span>
                     <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-gold)', fontFamily: 'JetBrains Mono, monospace' }}>{formatMoney(r.amount)}</span>
                   </div>
                   {r.note && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2 }}>{r.note}</div>}
@@ -2205,7 +2211,7 @@ export default function StaffProfilePage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
                     <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-muted)' }}>{n.date}</span>
-                    <span style={{ background: 'var(--accent-blue-dim)', color: 'var(--accent-blue)', fontSize: 10, padding: '2px 6px', borderRadius: 4, fontFamily: 'DM Sans' }}>{n.category}</span>
+                    <span style={{ background: 'var(--accent-blue-dim)', color: 'var(--accent-blue)', fontSize: 10, padding: '2px 6px', borderRadius: 4, fontFamily: 'DM Sans' }}>{noteCategoryName(n.category, t)}</span>
                   </div>
                   <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{n.createdBy}</span>
                 </div>
@@ -2220,7 +2226,7 @@ export default function StaffProfilePage() {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginBottom: 20 }}>
             <input ref={editPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleEditPhotoChange} />
             <div onClick={() => editPhotoRef.current?.click()} style={{ width: 72, height: 72, borderRadius: '50%', border: `2px dashed ${editForm.photoData ? 'var(--accent-gold)' : 'var(--border)'}`, background: 'var(--bg-elevated)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-              {editForm.photoData ? <img src={editForm.photoData} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Profile" /> : <Camera size={24} color="var(--text-muted)" />}
+              {editForm.photoData ? <img src={editForm.photoData} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={t('members.profilePhoto')} /> : <Camera size={24} color="var(--text-muted)" />}
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -2295,7 +2301,7 @@ export default function StaffProfilePage() {
         <ManagerAuthModal open={showEditAuth} onClose={() => setShowEditAuth(false)} onVerified={() => { setShowEditAuth(false); openEditForm(); }} action={t('staff.editProfileAction')} />
         <Modal open={showNoteModal} onClose={() => setShowNoteModal(false)} title={t('staff.addNote')} maxWidth={480}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <GemSelect label={t('staff.categoryLabel')} value={noteCategory} onChange={e => setNoteCategory(e.target.value)} options={NOTE_CATEGORIES.map(c => ({ value: c, label: c }))} />
+            <GemSelect label={t('staff.categoryLabel')} value={noteCategory} onChange={e => setNoteCategory(e.target.value)} options={NOTE_CATEGORIES.map(c => ({ value: c, label: noteCategoryName(c, t) }))} />
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6, fontFamily: 'DM Sans' }}>{t('staff.noteLabel')}</label>
               <textarea value={noteText} onChange={e => setNoteText(e.target.value)} style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 12px', fontSize: 14, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', minHeight: 100, resize: 'vertical', boxSizing: 'border-box' }} />
@@ -2306,19 +2312,19 @@ export default function StaffProfilePage() {
         </Modal>
         {/* ── Bonus / Deduction Modal (mobile) ────────────────────────────── */}
         <Modal open={showAdjModal} onClose={() => setShowAdjModal(false)}
-          title={adjForm.kind === 'bonus' ? 'Add Bonus' : 'Add Deduction'} maxWidth={460}>
+          title={adjForm.kind === 'bonus' ? t('staff.addBonus') : t('staff.addDeduction')} maxWidth={460}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <GemInput label="Label" required value={adjForm.label}
+            <GemInput label={t('staff.adjLabel')} required value={adjForm.label}
               onChange={e => setAdjForm(f => ({ ...f, label: e.target.value }))}
-              placeholder={adjForm.kind === 'bonus' ? 'e.g. Transport allowance' : 'e.g. Salary advance repayment'} />
-            <GemInput label={`Amount (${getCurrencySymbol()})`} required type="number" min="0" value={adjForm.amount}
+              placeholder={adjForm.kind === 'bonus' ? t('staff.bonusPh') : t('staff.deductionPh')} />
+            <GemInput label={`${t('common.amount')} (${getCurrencySymbol()})`} required type="number" min="0" value={adjForm.amount}
               onChange={e => setAdjForm(f => ({ ...f, amount: e.target.value }))} />
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>How often</label>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('staff.howOften')}</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 {[
-                  { value: true, title: 'Every month', sub: 'Applies to every pay period until stopped' },
-                  { value: false, title: 'This paycheck', sub: `Applies to ${activePayMonth} only` },
+                  { value: true, title: t('staff.adjEveryMonth'), sub: t('staff.adjEveryMonthSub') },
+                  { value: false, title: t('staff.adjThisPaycheck'), sub: t('staff.adjThisPaycheckSub', { month: payMonthText(activePayMonth) }) },
                 ].map(opt => {
                   const active = adjForm.recurring === opt.value;
                   return (
@@ -2336,12 +2342,12 @@ export default function StaffProfilePage() {
                 })}
               </div>
             </div>
-            <GemInput label="Note (optional)" value={adjForm.note}
+            <GemInput label={t('staff.noteOptionalLabel')} value={adjForm.note}
               onChange={e => setAdjForm(f => ({ ...f, note: e.target.value }))} />
             {adjError && <div style={{ fontSize: 12, color: 'var(--accent-red)' }}>{adjError}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
               <button style={{ ...secondaryBtn, flex: 1, justifyContent: 'center', padding: '11px' }} onClick={() => setShowAdjModal(false)}>{t('common.cancel')}</button>
-              <button style={{ ...primaryBtn, flex: 1, justifyContent: 'center', padding: '11px' }} onClick={saveAdjustment}>Save</button>
+              <button style={{ ...primaryBtn, flex: 1, justifyContent: 'center', padding: '11px' }} onClick={saveAdjustment}>{t('common.save')}</button>
             </div>
           </div>
         </Modal>
@@ -2435,20 +2441,20 @@ export default function StaffProfilePage() {
         })()}
 
         {/* ── Issue Pay Modal (mobile) ────────────────────────────────────── */}
-        <Modal open={showIssuePayModal} onClose={() => setShowIssuePayModal(false)} title="Issue Pay" maxWidth={440}>
+        <Modal open={showIssuePayModal} onClose={() => setShowIssuePayModal(false)} title={t('reports.issuePay')} maxWidth={440}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <GemSelect label="Pay Period" required value={issuePayForm.month}
+            <GemSelect label={t('reports.payPeriod')} required value={issuePayForm.month}
             onChange={async e => {
               const month = e.target.value;
               setPayError('');
               setIssuePayForm(f => ({ ...f, month }));
               await loadPayPreview(month);
             }}
-            options={unpaidMonthOptions.map(m => ({ value: m, label: m }))} />
+            options={unpaidMonthOptions.map(m => ({ value: m, label: payMonthText(m) }))} />
             {renderPaySummary()}
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Notes (optional)</label>
-              <textarea style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '10px 12px', fontSize: 14, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', minHeight: 80, resize: 'vertical', boxSizing: 'border-box' }} value={issuePayForm.note} onChange={e => setIssuePayForm(f => ({ ...f, note: e.target.value }))} placeholder="e.g. Includes performance bonus, deducted 2 sick days..." />
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('staff.notesOptional')}</label>
+              <textarea style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '10px 12px', fontSize: 14, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', minHeight: 80, resize: 'vertical', boxSizing: 'border-box' }} value={issuePayForm.note} onChange={e => setIssuePayForm(f => ({ ...f, note: e.target.value }))} placeholder={t('staff.issuePayNotePh')} />
             </div>
             {payError && (
               <div role="alert" style={{ fontSize: 12.5, lineHeight: 1.45, color: 'var(--accent-red)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>
@@ -2457,7 +2463,7 @@ export default function StaffProfilePage() {
             )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '9px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }} onClick={() => setShowIssuePayModal(false)}>{t('common.cancel')}</button>
-              <button style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 8, padding: '9px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#0a0a0f', fontFamily: 'DM Sans' }} onClick={confirmIssuePay}>Confirm & Record</button>
+              <button style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 8, padding: '9px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#0a0a0f', fontFamily: 'DM Sans' }} onClick={confirmIssuePay}>{t('staff.confirmRecord')}</button>
             </div>
           </div>
         </Modal>
@@ -2810,7 +2816,7 @@ export default function StaffProfilePage() {
                           </td>
                           <td style={{ padding: '12px 20px', fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-secondary)' }}>{tk.dueDate ? String(tk.dueDate).slice(0, 10) : ''}</td>
                           <td style={{ padding: '12px 20px' }}>
-                            <span style={{ ...pc, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 4 }}>{tk.priority}</span>
+                            <span style={{ ...pc, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 4 }}>{priorityName(tk.priority, t)}</span>
                           </td>
                           <td style={{ padding: '12px 20px' }}><StatusBadge status={(tk.status || 'pending').toLowerCase()} /></td>
                           <td style={{ padding: '12px 20px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
@@ -2974,31 +2980,31 @@ export default function StaffProfilePage() {
                   <div key={g.kind} style={{ borderLeft: gi === 1 ? '1px solid var(--border-subtle)' : 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 18px 12px' }}>
                       <span style={{ width: 6, height: 6, borderRadius: 999, background: g.color, flexShrink: 0 }} />
-                      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--text-secondary)' }}>{g.title}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--text-secondary)' }}>{t(g.titleKey)}</span>
                       <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums', color: total ? g.color : 'var(--text-muted)' }}>
                         {total ? `${g.sign}${formatMoney(total)}` : '-'}
                       </span>
                       {canEditPayroll && (
                         <button style={{ ...secondaryBtn, padding: '4px 9px', fontSize: 11 }} onClick={() => openAdjModal(g.kind)}>
-                          <Plus size={11} /> Add
+                          <Plus size={11} /> {t('common.add')}
                         </button>
                       )}
                     </div>
                     {items.length === 0 ? (
-                      <div style={{ padding: '14px 18px 20px', fontSize: 12.5, color: 'var(--text-muted)' }}>{g.empty}</div>
+                      <div style={{ padding: '14px 18px 20px', fontSize: 12.5, color: 'var(--text-muted)' }}>{t(g.emptyKey)}</div>
                     ) : items.map((a, i) => {
                       return (
                         <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', borderTop: '1px solid var(--border-subtle)', background: i % 2 ? 'transparent' : 'transparent' }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.label}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{a.recurring ? 'Every month' : 'This paycheck only'}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{a.recurring ? t('staff.adjEveryMonth') : t('staff.adjThisPaycheckOnly')}</div>
                             {adjRemoveError?.id === a.id && <div role="alert" style={{ fontSize: 11.5, color: 'var(--accent-red)', marginTop: 4, lineHeight: 1.4 }}>{adjRemoveError.text}</div>}
                           </div>
                           <span style={{ flexShrink: 0, fontSize: 13, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums', color: g.color }}>
                             {formatMoney(a.amount)}
                           </span>
                           {canEditPayroll && (
-                            <button onClick={() => deleteAdjustment(a)} title="Remove" style={adjIconBtn}><Trash2 size={13} /></button>
+                            <button onClick={() => deleteAdjustment(a)} title={t('members.remove')} style={adjIconBtn}><Trash2 size={13} /></button>
                           )}
                         </div>
                       );
@@ -3028,7 +3034,7 @@ export default function StaffProfilePage() {
               </div>
               {payShortfall > 0 && (
                 <div style={{ width: '100%', fontSize: 11.5, fontWeight: 600, color: 'var(--accent-red)' }}>
-                  Deductions exceed pay by {formatMoney(payShortfall)}. This pay will not be issued until a deduction is reduced.
+                  {t('staff.payShortfallLine', { amount: formatMoney(payShortfall) })}
                 </div>
               )}
             </div>
@@ -3042,14 +3048,14 @@ export default function StaffProfilePage() {
               </div>
               {canEditPayroll && salary > 0 && (
                 <button onClick={handleIssuePay} style={{ ...primaryBtn, padding: '6px 16px', fontSize: 12 }}>
-                  Issue Pay
+                  {t('reports.issuePay')}
                 </button>
               )}
             </div>
             <div className="gem-table-scroll"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Month', 'Amount', 'Notes', 'Issued On', 'Status', ''].map((h, i) => (
+                  {[t('reports.month'), t('common.amount'), t('common.notes'), t('staff.issuedOn'), t('common.status'), ''].map((h, i) => (
                     <th key={h || `col${i}`} style={{ padding: '10px 20px', textAlign: 'left', fontSize: 10, textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -3062,7 +3068,7 @@ export default function StaffProfilePage() {
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-hover)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     onClick={() => { setSelectedPaystub(p); setShowPaystubView(true); }}>
-                    <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{p.month}</td>
+                    <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{payMonthText(p.month)}</td>
                     <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 700, color: 'var(--accent-gold)', fontFamily: 'JetBrains Mono, monospace' }}>
                       {formatMoney(p.grossPay)}
                       {p.netPay !== p.grossPay && (
@@ -3070,7 +3076,7 @@ export default function StaffProfilePage() {
                       )}
                     </td>
                     <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)', maxWidth: 240 }}>{p.note || ''}</td>
-                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>{p.issuedAt ? new Date(p.issuedAt).toLocaleDateString() : ''}</td>
+                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>{p.issuedAt ? fmtDate(p.issuedAt) : ''}</td>
                     <td style={{ padding: '12px 20px' }}><StatusPill status={p.status} /></td>
                     <td style={{ padding: '12px 20px', textAlign: 'right' }}>
                       <span onClick={e => e.stopPropagation()}>
@@ -3088,7 +3094,7 @@ export default function StaffProfilePage() {
                   <tr>
                     <td colSpan={6} style={{ padding: '12px 20px' }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', gap: 10 }}>
-                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Total paid (YTD)</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('staff.totalPaidYtd')}</span>
                         <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-gold)', fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>
                           {formatMoney(payHistory.reduce((s, p) => s + p.grossPay, 0))}
                         </span>
@@ -3144,9 +3150,9 @@ export default function StaffProfilePage() {
                               Review
                             </button>
                           ) : (
-                            <span style={{ fontSize: 11, color: 'var(--accent-yellow)' }}>Awaiting review</span>
+                            <span style={{ fontSize: 11, color: 'var(--accent-yellow)' }}>{t('reports.awaitingReview')}</span>
                           )) : tc.approvalStatus === 'rejected' ? (
-                            <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>Rejected</span>
+                            <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{t('common.rejected')}</span>
                           ) : tc.approvedBy ? (
                             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Approved by {tc.approvedBy.firstName}</span>
                           ) : null}
@@ -3181,9 +3187,9 @@ export default function StaffProfilePage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span style={{ fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-muted)' }}>{n.date}</span>
-                    <span style={{ background: 'var(--accent-blue-dim)', color: 'var(--accent-blue)', fontSize: 10, padding: '2px 6px', borderRadius: 4 }}>{n.category}</span>
+                    <span style={{ background: 'var(--accent-blue-dim)', color: 'var(--accent-blue)', fontSize: 10, padding: '2px 6px', borderRadius: 4 }}>{noteCategoryName(n.category, t)}</span>
                   </div>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>by {n.createdBy}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('staff.noteBy', { name: n.createdBy })}</span>
                 </div>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>{n.content}</p>
               </div>
@@ -3210,7 +3216,7 @@ export default function StaffProfilePage() {
             onMouseLeave={e => e.currentTarget.style.borderColor = editForm.photoData ? 'var(--accent-gold)' : 'var(--border)'}
           >
             {editForm.photoData
-              ? <img src={editForm.photoData} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Profile" />
+              ? <img src={editForm.photoData} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={t('members.profilePhoto')} />
               : <Camera size={28} color="var(--text-muted)" />
             }
           </div>
@@ -3363,7 +3369,7 @@ export default function StaffProfilePage() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('staff.payPeriod')}</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent-gold)' }}>{month}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent-gold)' }}>{payMonthText(month)}</div>
                     <StatusPill status={selectedPaystub.status} />
                   </div>
                 </div>
@@ -3442,12 +3448,12 @@ export default function StaffProfilePage() {
               {/* Net Pay */}
               <div style={{ background: 'linear-gradient(135deg, rgba(201,169,110,0.15), rgba(201,169,110,0.05))', border: '1px solid var(--accent-gold-dim)', borderRadius: 12, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{t('staff.netPayLabel')} : {month}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{t('staff.netPayLabel')} : {payMonthText(month)}</div>
                   <div style={{ fontSize: 28, fontWeight: 700, fontFamily: 'Manrope, sans-serif', color: 'var(--accent-gold)' }}>{formatMoney(netPay)}</div>
                 </div>
                 <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--text-muted)' }}>
-                  <div>{formatMoney(grossPay)} earnings</div>
-                  <div>− {formatMoney(totalDeds)} deductions</div>
+                  <div>{t('staff.earningsAmount', { amount: formatMoney(grossPay) })}</div>
+                  <div>{t('staff.deductionsAmount', { amount: formatMoney(totalDeds) })}</div>
                 </div>
               </div>
 
@@ -3491,7 +3497,7 @@ export default function StaffProfilePage() {
         open={showCodeAuthModal} usePassword={isSelf}
         onClose={() => setShowCodeAuthModal(false)}
         onConfirm={() => { setShowCodeAuthModal(false); revealCode(); }}
-        action={`View access code for ${memberData.name}`}
+        action={t('staff.viewCodeFor', { name: memberData.name })}
       />
 
       {/* ── A new access code: your password for your own, your code for anyone else's */}
@@ -3502,7 +3508,7 @@ export default function StaffProfilePage() {
         open={showSalaryAuthModal}
         onClose={() => setShowSalaryAuthModal(false)}
         onConfirm={() => { setSalaryInput(String(salary)); setPayDayInput(payDay); setShowSalaryEdit(true); setShowSalaryAuthModal(false); }}
-        action={`Change ${memberData.name}'s ${isPartTime ? 'hourly rate' : 'salary'}`}
+        action={t(isPartTime ? 'staff.changeRateFor' : 'staff.changeSalaryFor', { name: memberData.name })}
       />
 
       {/* ── Deactivate. requires manager PIN ────────────────────────────── */}
@@ -3519,7 +3525,7 @@ export default function StaffProfilePage() {
         open={showReactivateAuth}
         onClose={() => setShowReactivateAuth(false)}
         onConfirm={() => { reactivate(); setShowReactivateAuth(false); }}
-        action={`Reactivate ${memberData.name}'s account`}
+        action={t('staff.reactivateFor', { name: memberData.name })}
       />
 
       <ManagerAuthModal
@@ -3533,20 +3539,20 @@ export default function StaffProfilePage() {
 
       {/* ── Bonus / Deduction Modal ───────────────────────────────────────── */}
       <Modal open={showAdjModal} onClose={() => setShowAdjModal(false)}
-        title={adjForm.kind === 'bonus' ? 'Add Bonus' : 'Add Deduction'} maxWidth={460}>
+        title={adjForm.kind === 'bonus' ? t('staff.addBonus') : t('staff.addDeduction')} maxWidth={460}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <GemInput label="Label" required value={adjForm.label}
+          <GemInput label={t('staff.adjLabel')} required value={adjForm.label}
             onChange={e => setAdjForm(f => ({ ...f, label: e.target.value }))}
-            placeholder={adjForm.kind === 'bonus' ? 'e.g. Transport allowance' : 'e.g. Salary advance repayment'} />
-          <GemInput label={`Amount (${getCurrencySymbol()})`} required type="number" min="0" value={adjForm.amount}
+            placeholder={adjForm.kind === 'bonus' ? t('staff.bonusPh') : t('staff.deductionPh')} />
+          <GemInput label={`${t('common.amount')} (${getCurrencySymbol()})`} required type="number" min="0" value={adjForm.amount}
             onChange={e => setAdjForm(f => ({ ...f, amount: e.target.value }))} />
 
           <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>How often</label>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('staff.howOften')}</label>
             <div style={{ display: 'flex', gap: 8 }}>
               {[
-                { value: true, title: 'Every month', sub: 'Applies to every pay period until stopped' },
-                { value: false, title: 'This paycheck', sub: `Applies to ${activePayMonth} only` },
+                { value: true, title: t('staff.adjEveryMonth'), sub: t('staff.adjEveryMonthSub') },
+                { value: false, title: t('staff.adjThisPaycheck'), sub: t('staff.adjThisPaycheckSub', { month: payMonthText(activePayMonth) }) },
               ].map(opt => {
                 const active = adjForm.recurring === opt.value;
                 return (
@@ -3566,33 +3572,33 @@ export default function StaffProfilePage() {
           </div>
 
 
-          <GemInput label="Note (optional)" value={adjForm.note}
+          <GemInput label={t('staff.noteOptionalLabel')} value={adjForm.note}
             onChange={e => setAdjForm(f => ({ ...f, note: e.target.value }))} />
 
           {adjError && <div style={{ fontSize: 12, color: 'var(--accent-red)' }}>{adjError}</div>}
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button style={secondaryBtn} onClick={() => setShowAdjModal(false)}>{t('common.cancel')}</button>
-            <button style={primaryBtn} onClick={saveAdjustment}>Save</button>
+            <button style={primaryBtn} onClick={saveAdjustment}>{t('common.save')}</button>
           </div>
         </div>
       </Modal>
 
       {/* ── Issue Pay Modal ───────────────────────────────────────────────── */}
-      <Modal open={showIssuePayModal} onClose={() => setShowIssuePayModal(false)} title="Issue Pay" maxWidth={440}>
+      <Modal open={showIssuePayModal} onClose={() => setShowIssuePayModal(false)} title={t('reports.issuePay')} maxWidth={440}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <GemSelect label="Pay Period" required value={issuePayForm.month}
+          <GemSelect label={t('reports.payPeriod')} required value={issuePayForm.month}
             onChange={async e => {
               const month = e.target.value;
               setPayError('');
               setIssuePayForm(f => ({ ...f, month }));
               await loadPayPreview(month);
             }}
-            options={unpaidMonthOptions.map(m => ({ value: m, label: m }))} />
+            options={unpaidMonthOptions.map(m => ({ value: m, label: payMonthText(m) }))} />
           {renderPaySummary()}
           <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Notes (optional)</label>
-            <textarea style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }} value={issuePayForm.note} onChange={e => setIssuePayForm(f => ({ ...f, note: e.target.value }))} placeholder="e.g. Includes performance bonus, deducted 2 sick days..." />
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('staff.notesOptional')}</label>
+            <textarea style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }} value={issuePayForm.note} onChange={e => setIssuePayForm(f => ({ ...f, note: e.target.value }))} placeholder={t('staff.issuePayNotePh')} />
           </div>
           {payError && (
             <div role="alert" style={{ fontSize: 12.5, lineHeight: 1.45, color: 'var(--accent-red)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>
@@ -3601,7 +3607,7 @@ export default function StaffProfilePage() {
           )}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button style={secondaryBtn} onClick={() => setShowIssuePayModal(false)}>{t('common.cancel')}</button>
-            <button style={primaryBtn} onClick={confirmIssuePay}>Confirm & Record</button>
+            <button style={primaryBtn} onClick={confirmIssuePay}>{t('staff.confirmRecord')}</button>
           </div>
         </div>
       </Modal>
@@ -3703,7 +3709,7 @@ export default function StaffProfilePage() {
             <textarea style={{ ...inputStyle, minHeight: 100, resize: 'vertical' }} value={noteText} onChange={e => setNoteText(e.target.value)} placeholder={t('staff.enterNote')} />
           </div>
           <GemSelect label={t('staff.categoryLabel')} value={noteCategory} onChange={e => setNoteCategory(e.target.value)}
-            options={NOTE_CATEGORIES.map(c => ({ value: c, label: c }))} />
+            options={NOTE_CATEGORIES.map(c => ({ value: c, label: noteCategoryName(c, t) }))} />
           {noteError && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{noteError}</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button style={secondaryBtn} onClick={() => setShowNoteModal(false)}>{t('common.cancel')}</button>
