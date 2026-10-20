@@ -51,3 +51,21 @@ test('the phone asks for the manager\'s code to deactivate, and can be cancelled
   await page.getByRole('button', { name: 'Authorize' }).click();
   await expect.poll(async () => (await call('GET', `/staff/${staff.id}`, { token: owner.token })).isActive).toBe(false);
 });
+
+// F-109
+test('a task can be marked done on a phone', async ({ page }) => {
+  const owner = await registerGym();
+  const task = await call('POST', '/tasks', {
+    token: owner.token,
+    body: { title: 'Finish on the phone', assignedGroup: 'management', dueDate: new Date(Date.now() + 2 * 864e5).toISOString().slice(0, 10), category: 'Front Desk', priority: 'Medium' },
+  });
+  await signIn(page, owner);
+  await page.goto('/tasks');
+  await page.getByText('Finish on the phone').first().click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Done', exact: true }).click();
+  const done = page.getByRole('dialog', { name: 'Mark as Done' });
+  await expect(done).toBeVisible();
+  await done.getByRole('button', { name: /Mark Done/i }).click();
+
+  await expect.poll(async () => (await call('GET', '/tasks', { token: owner.token })).find(tk => tk.id === task.id)?.status).toBe('Done');
+});

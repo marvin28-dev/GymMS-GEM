@@ -321,6 +321,33 @@ export default function TasksPage() {
     </Modal>
   );
 
+  // Mark as done, with its completion note: drawn by both layouts
+  const doneModal = (
+    <Modal open={!!doneTask} onClose={() => { setDoneTask(null); setDoneNote(''); }} title={t('tasks.markAsDone')}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+          {t('tasks.markingComplete')} <strong style={{ color: 'var(--text-primary)' }}>{doneTask?.title}</strong> {t('tasks.asComplete')}
+        </p>
+        <div>
+          <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('tasks.completionNotes')} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({t('common.optional')})</span></label>
+          <textarea
+            style={{ ...inputStyle, minHeight: 90, resize: 'vertical' }}
+            value={doneNote}
+            onChange={e => setDoneNote(e.target.value)}
+            placeholder={t('tasks.completionNotesPh')}
+            autoFocus
+          />
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
+          <button style={secondaryBtn} onClick={() => { setDoneTask(null); setDoneNote(''); }}>{t('common.cancel')}</button>
+          <button style={{ ...primaryBtn, background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff' }} onClick={handleConfirmDone}>
+            <Check size={13} /> {t('tasks.markDone')}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+
   if (isMobile) {
     const STATUS_CHIPS = [
       ['All', t('tasks.statusAll')],
@@ -506,6 +533,7 @@ export default function TasksPage() {
           danger
         />
         {viewModal}
+        {doneModal}
       </div>
     );
   }
@@ -683,30 +711,7 @@ export default function TasksPage() {
 
       {/* View task → then edit / delete / mark done from inside */}
       {viewModal}
-
-      <Modal open={!!doneTask} onClose={() => { setDoneTask(null); setDoneNote(''); }} title={t('tasks.markAsDone')}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
-            {t('tasks.markingComplete')} <strong style={{ color: 'var(--text-primary)' }}>{doneTask?.title}</strong> {t('tasks.asComplete')}
-          </p>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('tasks.completionNotes')} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({t('common.optional')})</span></label>
-            <textarea
-              style={{ ...inputStyle, minHeight: 90, resize: 'vertical' }}
-              value={doneNote}
-              onChange={e => setDoneNote(e.target.value)}
-              placeholder={t('tasks.completionNotesPh')}
-              autoFocus
-            />
-          </div>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
-            <button style={secondaryBtn} onClick={() => { setDoneTask(null); setDoneNote(''); }}>{t('common.cancel')}</button>
-            <button style={{ ...primaryBtn, background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff' }} onClick={handleConfirmDone}>
-              <Check size={13} /> {t('tasks.markDone')}
-            </button>
-          </div>
-        </div>
-      </Modal>
+      {doneModal}
     </div>
   );
 }
