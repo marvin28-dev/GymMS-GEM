@@ -526,24 +526,25 @@ function CheckInModal({ open, onClose, membersList = [], onCheckedIn }) {
   const [visitorCodeOpen, setVisitorCodeOpen] = useState(false);
   const [codeInput, setCodeInput] = useState('');
   const [codeError, setCodeError] = useState('');
+  const [pickedId, setPickedId] = useState(null);
 
+  // A member's own code or member ID names one person. A name or a phone can
+  // match several (two John Smiths, "Ann" and Anna), so every match is offered
+  // and the staff pick, as on the Attendance page and the desk (F-113).
   const trimmed = search.trim();
   const lower = trimmed.toLowerCase();
-  const found = trimmed.length >= 1
-    ? membersList.find(m =>
-        m.accessCode === trimmed ||
-        m.memberCode === trimmed ||
-        `${m.firstName} ${m.lastName}`.toLowerCase().includes(lower) ||
-        (m.phone || '').toLowerCase().includes(lower)
-      )
-    : null;
+  const exact = trimmed ? membersList.find(m => m.accessCode === trimmed || m.memberCode === trimmed) : null;
+  const matches = !trimmed || exact ? [] : membersList.filter(m =>
+    `${m.firstName} ${m.lastName}`.toLowerCase().includes(lower) ||
+    (m.phone || '').toLowerCase().includes(lower));
+  const found = exact || (matches.length === 1 ? matches[0] : matches.find(m => m.id === pickedId)) || null;
   const foundByCode = !!(found && found.accessCode === trimmed);
 
   const hasPhoto = !!(found?.photo);
   const isVisitorFound = !!(found && (found.isVisitor || found.status === 'visitor'));
   const needsCodeVerify = !!(found && !foundByCode && !isVisitorFound && !hasPhoto);
 
-  const handleClose = () => { setSearch(''); setCheckedIn(false); setError(''); setCodeInput(''); setCodeError(''); onClose(); };
+  const handleClose = () => { setSearch(''); setPickedId(null); setCheckedIn(false); setError(''); setCodeInput(''); setCodeError(''); onClose(); };
 
   const doCheckIn = async () => {
     if (!found) return;
@@ -587,12 +588,37 @@ function CheckInModal({ open, onClose, membersList = [], onCheckedIn }) {
         <input
           autoFocus
           value={search}
-          onChange={e => { setSearch(e.target.value); setCheckedIn(false); setError(''); }}
+          onChange={e => { setSearch(e.target.value); setPickedId(null); setCheckedIn(false); setError(''); }}
           placeholder={t('frontDesk.searchPlaceholderCheckin')}
           style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '11px 14px', fontSize: 14, color: 'var(--text-primary)', fontFamily: 'DM Sans, sans-serif', outline: 'none', boxSizing: 'border-box' }}
           onFocus={e => e.target.style.borderColor = 'var(--accent-gold)'}
           onBlur={e => e.target.style.borderColor = 'var(--border-subtle)'}
         />
+
+        {!found && matches.length > 1 && (
+          <div data-match-list style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ padding: '9px 14px', fontSize: 11, fontWeight: 600, letterSpacing: 0.8, textTransform: 'uppercase', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)' }}>{t('attendance.pickOne', { n: matches.length })}</div>
+            {matches.slice(0, 8).map((m, i) => (
+              <button key={m.id} type="button" onClick={() => setPickedId(m.id)}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'transparent', border: 'none', borderTop: i ? '1px solid var(--border-subtle)' : 'none', cursor: 'pointer', textAlign: 'left', color: 'var(--text-primary)', fontFamily: 'DM Sans' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                {m.photo ? <img src={m.photo} alt="" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} /> : <Avatar firstName={m.firstName} lastName={m.lastName} avatarColor={m.avatarColor} size={34} />}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.firstName} {m.lastName}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{[m.package?.name, m.memberCode].filter(Boolean).join(' · ') || '-'}</div>
+                </div>
+                <MemberStatusTags member={m} typeOnly />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {found && matches.length > 1 && !checkedIn && (
+          <button type="button" onClick={() => setPickedId(null)} style={{ alignSelf: 'flex-start', marginTop: -8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12, color: 'var(--accent-gold)', fontFamily: 'DM Sans' }}>
+            {t('attendance.seeAllMatches', { n: matches.length })}
+          </button>
+        )}
 
         {found && (
           <div
