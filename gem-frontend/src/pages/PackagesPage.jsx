@@ -7,6 +7,7 @@ import FAB from '../components/FAB';
 import { useLanguage } from '../contexts/LanguageContext';
 import Modal from '../components/ui/Modal';
 import { ACCESS_TYPES_KEY, DEFAULT_ACCESS_TYPES } from './SettingsPage';
+import { useGymSettings, legacyList } from '../hooks/useGymSettings';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -35,9 +36,9 @@ export default function PackagesPage() {
   const setup = useSetupStatus();
   // Only the owner prices the gym. Everyone else reads.
   const canPrice = getRole() === 'general_manager';
-  const [accessTypeOptions, setAccessTypeOptions] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(ACCESS_TYPES_KEY) || 'null') || DEFAULT_ACCESS_TYPES; } catch { return DEFAULT_ACCESS_TYPES; }
-  });
+  // The gym's list, set in Settings
+  const gymSettings = useGymSettings();
+  const accessTypeOptions = gymSettings.accessTypes || legacyList(ACCESS_TYPES_KEY) || DEFAULT_ACCESS_TYPES;
 
   // Cache the last packages this account saw, scoped per gym so accounts never
   // share. A page that has been open before shows those at once and refreshes

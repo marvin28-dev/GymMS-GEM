@@ -6,6 +6,10 @@ export const getGymByCode = (code) =>
 export const getMyGym = () =>
   api.get('/gyms/me');
 
+// The shop's product categories, kept on the gym (the desk may change them)
+export const setProductCategories = (categories) =>
+  api.put('/gyms/me/product-categories', { categories });
+
 export const updateMyGym = (data) =>
   api.patch('/gyms/me', data);
 

@@ -31,7 +31,19 @@ function merge(settings) {
     expenseLimit: s.expenseLimit > 0 ? s.expenseLimit : DEFAULTS.expenseLimit,
     // What freezing a membership costs, and how often it is charged again
     freeze: { fee: Math.max(0, Number(s.freeze?.fee) || 0), intervalDays: Math.max(0, Number(s.freeze?.intervalDays) || 0) },
+    // null until the gym has saved its own list
+    accessTypes: Array.isArray(s.accessTypes) ? s.accessTypes : null,
+    productCategories: Array.isArray(s.productCategories) ? s.productCategories : null,
   };
+}
+
+// A list one browser kept before it moved to the gym. It is only the starting
+// point until the gym saves its own, so nobody loses the names they had.
+export function legacyList(key) {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) || 'null');
+    return Array.isArray(v) && v.length ? v : null;
+  } catch { return null; }
 }
 
 function load(force) {

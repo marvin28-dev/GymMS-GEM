@@ -31,7 +31,8 @@ import { getAll as getProducts, create as createProduct, update as updateProduct
 import { getAll as getSales, create as createSale } from '../services/sales.service';
 import { SkeletonCards, SkeletonTableRows } from '../components/Skeleton';
 import { gymCache } from '../utils/gymCache';
-import { useGymSettings } from '../hooks/useGymSettings';
+import { useGymSettings, legacyList } from '../hooks/useGymSettings';
+import { setProductCategories as saveProductCategories } from '../services/gym.service';
 import { enabledMethods, PAYMENT_METHODS, canonicalMethod } from '../utils/paymentMethods';
 import { suggestProductCode } from '../utils/productCode';
 import { digitsOnly } from '../utils/number';
@@ -308,7 +309,8 @@ const DEFAULT_CATEGORIES = ['Supplements', 'Accessories', 'Snacks', 'Drinks', 'E
 export default function SalesPage() {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
-  const methods = enabledMethods(useGymSettings());
+  const gymSettings = useGymSettings();
+  const methods = enabledMethods(gymSettings);
   // Show the last products and sales at once and refresh quietly; a first-ever
   // visit falls back to the skeleton. See utils/gymCache.js.
   const cache = gymCache('sales');
@@ -324,9 +326,23 @@ export default function SalesPage() {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
   const [restockTarget, setRestockTarget] = useState(null);
-  const [categories, setCategories] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(CATS_KEY) || 'null') || DEFAULT_CATEGORIES; } catch { return DEFAULT_CATEGORIES; }
-  });
+  // The shop's categories are the gym's (F-127), plus any a product already uses
+  const [savedCategories, setSavedCategories] = useState(null);
+  const [productCategories, setProductCategories] = useState([]);
+  const [categoryError, setCategoryError] = useState('');
+  const baseCategories = savedCategories || gymSettings.productCategories || legacyList(CATS_KEY) || DEFAULT_CATEGORIES;
+  const categories = [...new Set([...baseCategories, ...productCategories])];
+  const saveCategories = async (list) => {
+    setCategoryError('');
+    try {
+      const res = await saveProductCategories(list);
+      setSavedCategories(res.data?.productCategories || list);
+      return true;
+    } catch (err) {
+      setCategoryError(err?.response?.data?.error || t('sales.saveFailed'));
+      return false;
+    }
+  };
   const [newCategory, setNewCategory] = useState('');
   const [authPending, setAuthPending] = useState(null);
 
@@ -336,10 +352,6 @@ export default function SalesPage() {
   const [discount, setDiscount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
 
-  useEffect(() => {
-    try { localStorage.setItem(CATS_KEY, JSON.stringify(categories)); } catch { /* storage off: categories still work for this visit */ }
-  }, [categories]);
-
   const [shopLoading, setShopLoading] = useState(() => !cache.has('products'));
 
   const loadShop = () => {
@@ -347,8 +359,7 @@ export default function SalesPage() {
       .then(res => {
         const list = res.data || [];
         setProducts(list); cache.write('products', list);
-        const cats = [...new Set(list.map(p => p.category).filter(Boolean))];
-        if (cats.length) setCategories(prev => [...new Set([...prev, ...cats])]);
+        setProductCategories([...new Set(list.map(p => p.category).filter(Boolean))]);
       })
       .catch(console.error);
     getSales(todayStr())
@@ -505,11 +516,10 @@ export default function SalesPage() {
     }
   };
 
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     const trimmed = newCategory.trim();
     if (!trimmed || categories.includes(trimmed)) return;
-    setCategories(cs => [...cs, trimmed]);
-    setNewCategory('');
+    if (await saveCategories([...baseCategories, trimmed])) setNewCategory('');
   };
 
   const handleRemoveCategory = (cat) => {
@@ -526,7 +536,7 @@ export default function SalesPage() {
         else setProducts(ps => ps.filter(p => p.id !== authPending.data.id));
       } catch (err) { setSaleError(err?.response?.data?.error || t('sales.saveFailed')); }
     } else {
-      setCategories(cs => cs.filter(c => c !== authPending.data));
+      await saveCategories(baseCategories.filter(c => c !== authPending.data));
     }
     setAuthPending(null);
   };
@@ -853,6 +863,7 @@ export default function SalesPage() {
             {t('common.add')}
           </button>
         </div>
+        {categoryError && <div role="alert" style={{ marginTop: 10, fontSize: 12.5, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{categoryError}</div>}
       </div>
 
       {/* Sales, one day at a time */}

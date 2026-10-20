@@ -3,6 +3,7 @@ import { CloudUpload, Save, Sun, Moon, Check, Palette, Plus, Trash2, Languages, 
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getMyGym, updateMyGym } from '../services/gym.service';
+import { legacyList, refreshGymSettings } from '../hooks/useGymSettings';
 import { getAuth, updateSessionGym } from '../utils/auth';
 import { COUNTRIES, countryByName } from '../utils/countries';
 import { getCurrencySymbol, CURRENCY_SYMBOLS, getCurrencyCode, formatMoney } from '../utils/currency';
@@ -426,6 +427,8 @@ export default function SettingsPage() {
   // A gym that could not be loaded says so: the forms stay empty and nothing
   // can be saved until it has (each Save compares against what was loaded)
   const [gymLoadFailed, setGymLoadFailed] = useState(false);
+  // Kept on the gym, so every account and computer reads one list (F-127)
+  const [accessTypes, setAccessTypes] = useState(() => legacyList(ACCESS_TYPES_KEY) || DEFAULT_ACCESS_TYPES);
   const [gymLoadTick, setGymLoadTick] = useState(0);
   useEffect(() => {
     // Only the latest load fills the form: an earlier answer arriving late
@@ -436,6 +439,7 @@ export default function SettingsPage() {
         const g = res.data;
         if (!g || !alive) return;
         setGymLoadFailed(false);
+        if (Array.isArray(g.settings?.accessTypes)) setAccessTypes(g.settings.accessTypes);
         setGymCode(g.code || '');
         // The gym record is the source of truth for the whole profile
         setLogoPreview(g.logo || null);
@@ -497,13 +501,19 @@ export default function SettingsPage() {
     ? <LoadFailed message={t('settings.loadFailed')} onRetry={() => setGymLoadTick(n => n + 1)} style={{ marginBottom: 16 }} />
     : null;
 
-  const [accessTypes, setAccessTypes] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(ACCESS_TYPES_KEY) || 'null') || DEFAULT_ACCESS_TYPES; } catch { return DEFAULT_ACCESS_TYPES; }
-  });
   const [newAccessType, setNewAccessType] = useState('');
-  const saveAccessTypes = (types) => {
+  const [accessTypesError, setAccessTypesError] = useState('');
+  const saveAccessTypes = async (types) => {
+    const before = accessTypes;
     setAccessTypes(types);
-    localStorage.setItem(ACCESS_TYPES_KEY, JSON.stringify(types));
+    setAccessTypesError('');
+    try {
+      await updateMyGym({ settings: { accessTypes: types } });
+      refreshGymSettings();
+    } catch (err) {
+      setAccessTypes(before);
+      setAccessTypesError(err?.response?.data?.error || t('settings.saveFailed'));
+    }
   };
   const addAccessType = () => {
     const val = newAccessType.trim();
@@ -775,22 +785,26 @@ export default function SettingsPage() {
                       {showGymCode && (
                         <button
                           onClick={async () => {
-                            try { await navigator.clipboard?.writeText(displayCode); } catch {}
-                            setCodeCopied(true);
+                            // "Copied" only when it was: a refused or missing clipboard says so
+                            let copied = false;
+                            try { if (navigator.clipboard) { await navigator.clipboard.writeText(displayCode); copied = true; } } catch { copied = false; }
+                            setCodeCopied(copied ? true : 'failed');
                             setTimeout(() => setCodeCopied(false), 1600);
                           }}
                           style={{
                             ...secondaryBtn, flexShrink: 0, padding: '0 16px',
                             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                             minWidth: 96, transition: 'all 0.18s',
-                            color: codeCopied ? '#22c55e' : 'var(--text-primary)',
-                            borderColor: codeCopied ? 'rgba(34,197,94,0.45)' : 'var(--border)',
-                            background: codeCopied ? 'rgba(34,197,94,0.1)' : 'var(--bg-card)',
+                            color: codeCopied === 'failed' ? 'var(--accent-red)' : codeCopied ? '#22c55e' : 'var(--text-primary)',
+                            borderColor: codeCopied === 'failed' ? 'rgba(248,113,113,0.45)' : codeCopied ? 'rgba(34,197,94,0.45)' : 'var(--border)',
+                            background: codeCopied === 'failed' ? 'var(--accent-red-dim)' : codeCopied ? 'rgba(34,197,94,0.1)' : 'var(--bg-card)',
                           }}
                         >
-                          {codeCopied
-                            ? <><Check size={14} strokeWidth={3} /> {t('settings.copied')}</>
-                            : t('settings.copy')}
+                          {codeCopied === 'failed'
+                            ? t('settings.copyFailed')
+                            : codeCopied
+                              ? <><Check size={14} strokeWidth={3} /> {t('settings.copied')}</>
+                              : t('settings.copy')}
                         </button>
                       )}
                       <button
@@ -1376,6 +1390,7 @@ export default function SettingsPage() {
                     />
                     <button style={primaryBtn} onClick={addAccessType}><Plus size={13} />{t('common.add')}</button>
                   </div>
+                  {accessTypesError && <div role="alert" style={{ marginTop: 8, fontSize: 12.5, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{accessTypesError}</div>}
                   <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>
                     {t('settings.accessTypesHint')}
                   </div>
