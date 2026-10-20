@@ -40,6 +40,7 @@ import { CountryField } from '../components/AddressInputs';
 import { serverFieldError, fieldErrorStyle, revealFirstError } from '../utils/formErrors';
 import { digitsOnly } from '../utils/number';
 import { softAll } from '../utils/loadAll';
+import { escapeHtml, openPrintWindow } from '../utils/receipt';
 
 const formatDate = (d) => fmtDate(d);
 
@@ -1679,11 +1680,13 @@ export default function MembersPage() {
     }
   };
 
+  // Every cell is escaped: the window shares the app's origin, and names,
+  // emails and addresses are typed by people (F-085).
   const printPDF = (headers, rows, title) => {
     const date = fmtDate(new Date(), { day: '2-digit', month: 'long', year: 'numeric' });
     const thStyle = 'padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888;border-bottom:2px solid #e5e7eb;white-space:nowrap';
     const tdStyle = 'padding:8px 12px;font-size:12px;color:#111;border-bottom:1px solid #f3f4f6;white-space:nowrap';
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
     <style>
       body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:32px;color:#111}
       h1{font-size:20px;font-weight:700;margin:0 0 4px}
@@ -1691,17 +1694,14 @@ export default function MembersPage() {
       table{width:100%;border-collapse:collapse}
       @media print{body{padding:16px}@page{margin:16mm}}
     </style></head><body>
-    <h1>${title}</h1>
-    <div class="sub">${t('common.generatedOn')} ${date} &nbsp;·&nbsp; ${rows.length} ${t('common.records')}</div>
+    <h1>${escapeHtml(title)}</h1>
+    <div class="sub">${escapeHtml(`${t('common.generatedOn')} ${date}`)} &nbsp;·&nbsp; ${escapeHtml(`${rows.length} ${t('common.records')}`)}</div>
     <table>
-      <thead><tr>${headers.map(h => `<th style="${thStyle}">${h}</th>`).join('')}</tr></thead>
-      <tbody>${rows.map((r, i) => `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9fafb'}">${r.map(c => `<td style="${tdStyle}">${c ?? '-'}</td>`).join('')}</tr>`).join('')}</tbody>
+      <thead><tr>${headers.map(h => `<th style="${thStyle}">${escapeHtml(h)}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map((r, i) => `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9fafb'}">${r.map(c => `<td style="${tdStyle}">${escapeHtml(c ?? '-')}</td>`).join('')}</tr>`).join('')}</tbody>
     </table>
-    <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}<\/script>
     </body></html>`;
-    const w = window.open('', '_blank');
-    w.document.write(html);
-    w.document.close();
+    openPrintWindow(html, { closeAfterPrint: true });
   };
 
   const handleExport = () => {

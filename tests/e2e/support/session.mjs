@@ -58,6 +58,20 @@ export async function addStaff(owner, { role = 'front_desk', password = 'Staff-p
   return { ...made, accessCode, password, token: session.token, user: session.user, gymCode: owner.gymCode };
 }
 
+// Print windows call the browser's print dialog, which a test cannot answer.
+// Windows the page opens get a print that does nothing, so the test can read
+// what was written into them.
+export async function stubPrinting(page) {
+  await page.addInitScript(() => {
+    const open = window.open;
+    window.open = (...args) => {
+      const win = open.apply(window, args);
+      if (win) win.print = () => {};
+      return win;
+    };
+  });
+}
+
 // Opens the app as this account: the session is put where the sign-in page
 // puts it, before the app's own code runs.
 export async function signIn(page, session) {

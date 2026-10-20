@@ -75,4 +75,27 @@ export function printReceiptDocument({ title, bodyHtml }) {
   return true;
 }
 
+// A picture address fit for an <img> in a printed document: a web address or
+// an embedded image, nothing that could run as code. Anything else is dropped.
+export function safeImageSrc(src) {
+  const value = String(src ?? '').trim();
+  if (/^https?:\/\//i.test(value)) return value;
+  if (/^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=\s]+$/i.test(value)) return value;
+  return '';
+}
+
+// Writes a finished document into a new window and prints it. The window shares
+// the app's origin, so every value placed in `html` must already be escaped.
+// A blocked pop-up returns false instead of throwing.
+export function openPrintWindow(html, { features = '', closeAfterPrint = false, delay = 400 } = {}) {
+  const win = window.open('', '_blank', features);
+  if (!win) return false;
+  win.document.write(html);
+  win.document.close();
+  if (closeAfterPrint) win.onafterprint = () => win.close();
+  win.focus();
+  setTimeout(() => win.print(), delay);
+  return true;
+}
+
 export { escapeHtml };

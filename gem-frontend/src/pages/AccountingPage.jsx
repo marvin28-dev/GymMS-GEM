@@ -27,6 +27,7 @@ import { useGymSettings } from '../hooks/useGymSettings';
 import { enabledMethods, canonicalMethod, PAYMENT_METHODS } from '../utils/paymentMethods';
 import { notifyDataChanged } from '../utils/events';
 import { softAll } from '../utils/loadAll';
+import { escapeHtml, getGymInfo, openPrintWindow, safeImageSrc } from '../utils/receipt';
 import { gymCache } from '../utils/gymCache';
 import { SkeletonCards } from '../components/Skeleton';
 
@@ -742,9 +743,11 @@ export default function AccountingPage() {
     return rows.map(r => ({ ...r, pct: total > 0 ? Math.round((r.amount / total) * 100) : 0 }));
   })();
 
+  // Everything placed in a print window is escaped: the window shares the app's
+  // origin, and titles, names and notes are typed by people (F-085).
   const handleExportOverview = () => {
-    const win = window.open('', '_blank', 'width=820,height=1000');
-    win.document.write(`<html><head><title>Financial Overview : ${period}</title><style>
+    const gymName = escapeHtml(getGymInfo().name);
+    openPrintWindow(`<html><head><meta charset="utf-8"><title>${escapeHtml(`${t('reports.financialOverview')} : ${period}`)}</title><style>
       body{font-family:Arial,sans-serif;padding:40px;color:#111;font-size:13px}
       h1{font-size:22px;margin-bottom:4px}
       .sub{color:#666;font-size:12px;margin-bottom:28px}
@@ -760,38 +763,35 @@ export default function AccountingPage() {
       .pct{font-size:11px;color:#999;margin-top:2px}
       .footer{margin-top:40px;font-size:11px;color:#bbb;text-align:center;border-top:1px solid #eee;padding-top:12px}
     </style></head><body>
-    <h1>GEM Fitness. ${t('reports.financialOverview')}</h1>
-    <div class="sub">${t('reports.periodLabel')}: <strong>${period}</strong> &nbsp;·&nbsp; ${t('reports.generatedLabel')} ${fmtDate(new Date(), { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+    <h1>${gymName}. ${escapeHtml(t('reports.financialOverview'))}</h1>
+    <div class="sub">${escapeHtml(t('reports.periodLabel'))}: <strong>${escapeHtml(period)}</strong> &nbsp;·&nbsp; ${escapeHtml(t('reports.generatedLabel'))} ${escapeHtml(fmtDate(new Date(), { day: '2-digit', month: 'short', year: 'numeric' }))}</div>
     <div class="cards">
-      <div class="card"><div class="card-label">${t('reports.totalRevenue')}</div><div class="card-value" style="color:#2563eb">${formatMoney(periodRevenue)}</div></div>
-      <div class="card"><div class="card-label">${t('reports.totalExpenditures')}</div><div class="card-value" style="color:#ef4444">${formatMoney(periodExpensesAmt)}</div></div>
-      <div class="card"><div class="card-label">${t('reports.netIncome')}</div><div class="card-value" style="color:${periodNet < 0 ? '#ef4444' : '#16a34a'}">${formatMoney(periodNet)}</div></div>
-      <div class="card"><div class="card-label">${t('reports.outstanding')}</div><div class="card-value" style="color:#ca8a04">${formatMoney(periodOutstanding)}</div></div>
+      <div class="card"><div class="card-label">${escapeHtml(t('reports.totalRevenue'))}</div><div class="card-value" style="color:#2563eb">${escapeHtml(formatMoney(periodRevenue))}</div></div>
+      <div class="card"><div class="card-label">${escapeHtml(t('reports.totalExpenditures'))}</div><div class="card-value" style="color:#ef4444">${escapeHtml(formatMoney(periodExpensesAmt))}</div></div>
+      <div class="card"><div class="card-label">${escapeHtml(t('reports.netIncome'))}</div><div class="card-value" style="color:${periodNet < 0 ? '#ef4444' : '#16a34a'}">${escapeHtml(formatMoney(periodNet))}</div></div>
+      <div class="card"><div class="card-label">${escapeHtml(t('reports.outstanding'))}</div><div class="card-value" style="color:#ca8a04">${escapeHtml(formatMoney(periodOutstanding))}</div></div>
     </div>
-    <h2>${t('reports.revenueBreakdown')}</h2>
-    ${paymentCategoryBreakdown.length === 0 ? `<p style="color:#999">${t('reports.noPaymentData')}</p>` : paymentCategoryBreakdown.map(r => `
+    <h2>${escapeHtml(t('reports.revenueBreakdown'))}</h2>
+    ${paymentCategoryBreakdown.length === 0 ? `<p style="color:#999">${escapeHtml(t('reports.noPaymentData'))}</p>` : paymentCategoryBreakdown.map(r => `
       <div class="row">
-        <div class="row-header"><span>${r.label}</span><span><strong>${formatMoney(r.amount)}</strong></span></div>
-        <div class="bar-bg"><div class="bar-fill" style="width:${r.pct}%;background:#c9a96e"></div></div>
-        <div class="pct">${r.pct}${t('reports.ofTotalRevenue')}</div>
+        <div class="row-header"><span>${escapeHtml(r.label)}</span><span><strong>${escapeHtml(formatMoney(r.amount))}</strong></span></div>
+        <div class="bar-bg"><div class="bar-fill" style="width:${Number(r.pct) || 0}%;background:#c9a96e"></div></div>
+        <div class="pct">${escapeHtml(`${r.pct}${t('reports.ofTotalRevenue')}`)}</div>
       </div>`).join('')}
-    <h2>${t('reports.expensesBreakdown')}</h2>
-    ${expenseCategoryBreakdown.length === 0 ? `<p style="color:#999">${t('reports.noExpenseData')}</p>` : expenseCategoryBreakdown.map(r => `
+    <h2>${escapeHtml(t('reports.expensesBreakdown'))}</h2>
+    ${expenseCategoryBreakdown.length === 0 ? `<p style="color:#999">${escapeHtml(t('reports.noExpenseData'))}</p>` : expenseCategoryBreakdown.map(r => `
       <div class="row">
-        <div class="row-header"><span>${r.label}</span><span><strong>${formatMoney(r.amount)}</strong></span></div>
-        <div class="bar-bg"><div class="bar-fill" style="width:${r.pct}%;background:#ef4444"></div></div>
-        <div class="pct">${r.pct}${t('reports.ofTotalExpenses')}</div>
+        <div class="row-header"><span>${escapeHtml(r.label)}</span><span><strong>${escapeHtml(formatMoney(r.amount))}</strong></span></div>
+        <div class="bar-bg"><div class="bar-fill" style="width:${Number(r.pct) || 0}%;background:#ef4444"></div></div>
+        <div class="pct">${escapeHtml(`${r.pct}${t('reports.ofTotalExpenses')}`)}</div>
       </div>`).join('')}
     <div class="footer">GEM Fitness Management System</div>
-    </body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 400);
+    </body></html>`, { features: 'width=820,height=1000' });
   };
 
   const handleExportPaystubs = () => {
-    const win = window.open('', '_blank', 'width=900,height=700');
-    win.document.write(`<html><head><title>Payroll : ${fmtMonth(paystubMonth)}</title><style>
+    const gymName = escapeHtml(getGymInfo().name);
+    openPrintWindow(`<html><head><meta charset="utf-8"><title>${escapeHtml(`${t('reports.payroll')} : ${fmtMonth(paystubMonth)}`)}</title><style>
       body{font-family:Arial,sans-serif;padding:40px;color:#111;font-size:13px}
       h1{font-size:22px;margin-bottom:4px}
       .sub{color:#666;font-size:12px;margin-bottom:24px}
@@ -801,30 +801,27 @@ export default function AccountingPage() {
       .total td{font-weight:700;background:#fafafa;border-top:2px solid #ddd}
       .footer{margin-top:32px;font-size:11px;color:#bbb;text-align:center;border-top:1px solid #eee;padding-top:12px}
     </style></head><body>
-    <h1>GEM Fitness. ${t('reports.paystubs')}</h1>
-    <div class="sub">${t('reports.monthLabel')}: <strong>${paystubMonth}</strong> &nbsp;·&nbsp; ${t('reports.generatedLabel')} ${fmtDate(new Date(), { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+    <h1>${gymName}. ${escapeHtml(t('reports.paystubs'))}</h1>
+    <div class="sub">${escapeHtml(t('reports.monthLabel'))}: <strong>${escapeHtml(paystubMonth)}</strong> &nbsp;·&nbsp; ${escapeHtml(t('reports.generatedLabel'))} ${escapeHtml(fmtDate(new Date(), { day: '2-digit', month: 'short', year: 'numeric' }))}</div>
     <table>
-      <thead><tr><th>${t('common.name')}</th><th>${t('staff.role')}</th><th>${t('reports.basicPay')}</th><th>${t('reports.allowances')}</th><th>${t('reports.deductions')}</th><th>${t('reports.netPay')}</th><th>${t('common.status')}</th></tr></thead>
+      <thead><tr>${[t('common.name'), t('staff.role'), t('reports.basicPay'), t('reports.allowances'), t('reports.deductions'), t('reports.netPay'), t('common.status')].map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
       <tbody>
         ${monthPaystubs.map(p => `<tr>
-          <td><strong>${p.staffName}</strong></td><td>${p.role}</td>
-          <td>${formatMoney(p.basicPay)}</td>
-          <td style="color:green">+${formatMoney(p.allowances)}</td>
-          <td style="color:red">-${formatMoney(p.deductions)}</td>
-          <td><strong>${formatMoney(p.netPay)}</strong></td>
-          <td style="text-transform:capitalize">${p.status}</td>
+          <td><strong>${escapeHtml(p.staffName)}</strong></td><td>${escapeHtml(p.role)}</td>
+          <td>${escapeHtml(formatMoney(p.basicPay))}</td>
+          <td style="color:green">+${escapeHtml(formatMoney(p.allowances))}</td>
+          <td style="color:red">-${escapeHtml(formatMoney(p.deductions))}</td>
+          <td><strong>${escapeHtml(formatMoney(p.netPay))}</strong></td>
+          <td style="text-transform:capitalize">${escapeHtml(p.status)}</td>
         </tr>`).join('')}
         <tr class="total">
-          <td colspan="5" style="text-align:right;padding-right:12px">${t('reports.totalPayrollLabel')}</td>
-          <td colspan="2">${formatMoney(totalPayroll)}</td>
+          <td colspan="5" style="text-align:right;padding-right:12px">${escapeHtml(t('reports.totalPayrollLabel'))}</td>
+          <td colspan="2">${escapeHtml(formatMoney(totalPayroll))}</td>
         </tr>
       </tbody>
     </table>
     <div class="footer">GEM Fitness Management System</div>
-    </body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 400);
+    </body></html>`, { features: 'width=900,height=700' });
   };
 
   // ── Mobile layout ────────────────────────────────────────────────────────────
@@ -1888,8 +1885,8 @@ export default function AccountingPage() {
               )}
               <button style={primaryBtn} onClick={() => {
                 const exp = viewingExpense;
-                const receipt = exp.receipt;
-                const html = `<!DOCTYPE html><html><head><title>Expense : ${exp.title}</title><style>
+                const receipt = safeImageSrc(exp.receipt);
+                const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(`${t('reports.expenseRecord')} : ${exp.title || ''}`)}</title><style>
                   body{font-family:Arial,sans-serif;margin:40px;color:#111;max-width:600px}
                   h1{font-size:20px;margin-bottom:4px}
                   .sub{font-size:12px;color:#666;margin-bottom:24px}
@@ -1900,26 +1897,22 @@ export default function AccountingPage() {
                   img{max-width:100%;border-radius:6px;border:1px solid #ddd;margin-top:8px}
                   .footer{margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:12px}
                 </style></head><body>
-                  <h1>${t('reports.expenseRecord')}</h1>
-                  <div class="sub">${t('reports.generatedLabel')} ${fmtDate(new Date(), { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+                  <h1>${escapeHtml(t('reports.expenseRecord'))}</h1>
+                  <div class="sub">${escapeHtml(t('reports.generatedLabel'))} ${escapeHtml(fmtDate(new Date(), { day: '2-digit', month: 'long', year: 'numeric' }))}</div>
                   <div class="grid">
-                    <div class="field"><label>${t('common.title')}</label><span>${exp.title || '-'}</span></div>
-                    <div class="field"><label>${t('reports.category')}</label><span>${exp.category || '-'}</span></div>
-                    <div class="field"><label>${t('common.amount')}</label><span style="color:#dc2626">${formatMoney(Number(exp.amount))}</span></div>
-                    <div class="field"><label>${t('common.date')}</label><span>${fmtDate(exp.date)}</span></div>
-                    <div class="field"><label>${t('reports.paidTo')}</label><span>${exp.paidTo || '-'}</span></div>
-                    <div class="field"><label>${t('sales.paymentMethod')}</label><span>${exp.method || '-'}</span></div>
-                    <div class="field"><label>${t('reports.recordedBy')}</label><span>${exp.recordedBy || '-'}</span></div>
+                    <div class="field"><label>${escapeHtml(t('common.title'))}</label><span>${escapeHtml(exp.title || '-')}</span></div>
+                    <div class="field"><label>${escapeHtml(t('reports.category'))}</label><span>${escapeHtml(exp.category || '-')}</span></div>
+                    <div class="field"><label>${escapeHtml(t('common.amount'))}</label><span style="color:#dc2626">${escapeHtml(formatMoney(Number(exp.amount)))}</span></div>
+                    <div class="field"><label>${escapeHtml(t('common.date'))}</label><span>${escapeHtml(fmtDate(exp.date))}</span></div>
+                    <div class="field"><label>${escapeHtml(t('reports.paidTo'))}</label><span>${escapeHtml(exp.paidTo || '-')}</span></div>
+                    <div class="field"><label>${escapeHtml(t('sales.paymentMethod'))}</label><span>${escapeHtml(exp.method || '-')}</span></div>
+                    <div class="field"><label>${escapeHtml(t('reports.recordedBy'))}</label><span>${escapeHtml(exp.recordedBy || '-')}</span></div>
                   </div>
-                  ${(exp.note || exp.notes) ? `<div class="notes-box"><strong>${t('common.notes')}:</strong> ${exp.note || exp.notes}</div>` : ''}
-                  ${receipt ? `<div><strong style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888">${t('reports.receipt')}</strong><br/><img src="${receipt}" /></div>` : ''}
-                  <div class="footer">GEM Gym Management · Expense ID: ${exp.id}</div>
+                  ${(exp.note || exp.notes) ? `<div class="notes-box"><strong>${escapeHtml(t('common.notes'))}:</strong> ${escapeHtml(exp.note || exp.notes)}</div>` : ''}
+                  ${receipt ? `<div><strong style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888">${escapeHtml(t('reports.receipt'))}</strong><br/><img src="${escapeHtml(receipt)}" /></div>` : ''}
+                  <div class="footer">GEM Gym Management · Expense ID: ${escapeHtml(exp.id)}</div>
                 </body></html>`;
-                const w = window.open('', '_blank', 'width=700,height=900');
-                w.document.write(html);
-                w.document.close();
-                w.focus();
-                setTimeout(() => w.print(), 400);
+                openPrintWindow(html, { features: 'width=700,height=900' });
               }}><Download size={13} /> {t('reports.downloadPdf')}</button>
             </div>
           </div>

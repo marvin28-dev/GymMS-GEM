@@ -578,7 +578,7 @@ function PaymentDetailModal({ open, onClose, payment, member }) {
             background: 'linear-gradient(135deg, #c9a96e, #b08d4a)',
             padding: '14px 18px', textAlign: 'center',
           }}>
-            <div style={{ fontFamily: 'Manrope', fontSize: 16, fontWeight: 800, color: '#0a0a0f', letterSpacing: '0.05em' }}>{t('memberProfile.gemGym')}</div>
+            <div style={{ fontFamily: 'Manrope', fontSize: 16, fontWeight: 800, color: '#0a0a0f', letterSpacing: '0.05em' }}>{getGymInfo().name.toUpperCase()}</div>
             <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.6)', marginTop: 2 }}>{t('memberProfile.paymentReceiptHeader')}</div>
           </div>
           {/* Body */}
