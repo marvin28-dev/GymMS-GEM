@@ -12,7 +12,7 @@ import Avatar from '../components/ui/Avatar';
 import { getAll as getPayments, create as createPayment } from '../services/payments.service';
 import { getAll as getMembers } from '../services/members.service';
 import { getAll as getStaff } from '../services/staff.service';
-import { fmtDate, getDateLocale } from '../utils/date';
+import { fmtDate, getDateLocale, todayStr, dayStr } from '../utils/date';
 import { getGymInfo, gymContactFooterHtml, printReceiptDocument, escapeHtml } from '../utils/receipt';
 import { softAll } from '../utils/loadAll';
 import { useGymSettings } from '../hooks/useGymSettings';
@@ -184,10 +184,11 @@ export default function PaymentsPage() {
   const applyPreset = (preset) => {
     setDatePreset(preset);
     const today = new Date();
-    const fmt = (d) => d.toISOString().slice(0, 10);
+    const fmt = dayStr;
     if (preset === 'Today') { setDateFrom(fmt(today)); setDateTo(fmt(today)); }
     else if (preset === 'This Week') {
-      const mon = new Date(today); mon.setDate(today.getDate() - today.getDay() + 1);
+      // Back to this week's Monday (on a Sunday that is six days back, not tomorrow)
+      const mon = new Date(today); mon.setDate(today.getDate() - ((today.getDay() + 6) % 7));
       setDateFrom(fmt(mon)); setDateTo(fmt(today));
     } else if (preset === 'This Month') {
       setDateFrom(fmt(new Date(today.getFullYear(), today.getMonth(), 1))); setDateTo(fmt(today));
@@ -223,14 +224,15 @@ export default function PaymentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveTick]);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const thisMonth = new Date().toISOString().slice(0, 7);
-  const totalThisMonth = payments.filter(p => (p.createdAt || '').slice(0, 7) === thisMonth).reduce((s, p) => s + (p.amount || 0), 0);
-  const totalToday = payments.filter(p => (p.createdAt || '').slice(0, 10) === today).reduce((s, p) => s + (p.amount || 0), 0);
+  // Today and this month are the gym's local ones, read against each payment's local day
+  const today = todayStr();
+  const thisMonth = today.slice(0, 7);
+  const totalThisMonth = payments.filter(p => dayStr(p.createdAt).slice(0, 7) === thisMonth).reduce((s, p) => s + (p.amount || 0), 0);
+  const totalToday = payments.filter(p => dayStr(p.createdAt) === today).reduce((s, p) => s + (p.amount || 0), 0);
 
   const filtered = payments.filter(p => {
     const name = p.member ? `${p.member.firstName} ${p.member.lastName}` : '';
-    const pDate = (p.createdAt || '').slice(0, 10);
+    const pDate = dayStr(p.createdAt);
     const matchSearch = !search || name.toLowerCase().includes(search.toLowerCase()) || (p.reference || '').toLowerCase().includes(search.toLowerCase());
     const matchMethod = methodFilter === 'All' || methodOf(p.method)?.key === methodFilter;
     const matchFrom = !dateFrom || pDate >= dateFrom;

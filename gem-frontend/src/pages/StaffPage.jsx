@@ -19,7 +19,7 @@ import { getAll as getStaffApi, create as createStaff, update as updateStaff, re
 import { uploadPhoto } from '../services/upload.service';
 import { getRole, getAuth, getPhonePlaceholder } from '../utils/auth';
 import { canView, canManage, isOwner, rankOf } from '../utils/hierarchy';
-import { fmtDate } from '../utils/date';
+import { fmtDate, todayStr } from '../utils/date';
 import { useSetupStatus } from '../hooks/useSetupStatus';
 import { SkeletonCards, SkeletonTableRows } from '../components/Skeleton';
 import { gymCache } from '../utils/gymCache';
@@ -616,7 +616,7 @@ export default function StaffPage() {
       // A note typed here becomes the first entry on their profile
       ...(form.notes || '').trim() ? { staffNotes: [...(Array.isArray(editingStaff?.staffNotes) ? editingStaff.staffNotes : []), {
         id: Date.now(),
-        date: new Date().toISOString().slice(0, 10),
+        date: todayStr(),
         content: form.notes.trim(),
         createdBy: [getAuth()?.user?.firstName, getAuth()?.user?.lastName].filter(Boolean).join(' ') || 'Manager',
         category: 'General',

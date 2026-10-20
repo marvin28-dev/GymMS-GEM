@@ -637,7 +637,7 @@ export default function AccountingPage() {
             title: `Salary : ${editingPaystub.staffName}`,
             category: 'Salaries',
             amount: newGross,
-            date: new Date().toISOString().slice(0, 10),
+            date: todayStr(),
             paidTo: editingPaystub.staffName,
             method: 'cash',
             note: `Paystub for ${editingPaystub.month}`,
@@ -688,7 +688,7 @@ export default function AccountingPage() {
         title: `Salary : ${stub.staffName}`,
         category: 'Salaries',
         amount: stub.grossPay,
-        date: new Date().toISOString().slice(0, 10),
+        date: todayStr(),
         paidTo: stub.staffName,
         method: 'cash',
         note: stub.deductions > 0

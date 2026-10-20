@@ -860,7 +860,7 @@ function ConvertToMemberModal({ open, onClose, member, gymData, onApplied }) {
       const res = await updateMember(member.id, {
         isVisitor: false,
         status: 'registered',
-        regFeeDate: new Date().toISOString().slice(0, 10),
+        regFeeDate: todayStr(),
         passesTotal: null,
         passesRemaining: null,
       });
@@ -1074,8 +1074,9 @@ function RenewRegFeeModal({ open, onClose, member, gymData, onSave }) {
 
   useEffect(() => { if (!open) { setApiError(''); setSaving(false); } }, [open]);
 
-  const today    = new Date().toISOString().slice(0, 10);
-  const newExpiry = (() => { const d = new Date(today + 'T00:00:00'); d.setFullYear(d.getFullYear() + 1); return d.toISOString().slice(0, 10); })();
+  const today    = todayStr();
+  // A year on, as a local day: a local midnight turned into UTC read a day early
+  const newExpiry = (() => { const d = new Date(today + 'T00:00:00'); d.setFullYear(d.getFullYear() + 1); return dayStr(d); })();
 
   if (!open || !member) return null;
 
@@ -1217,7 +1218,7 @@ const PKG_MONTHS = {
 };
 
 function toDateStr(raw) {
-  if (!raw) return new Date().toISOString().slice(0, 10);
+  if (!raw) return todayStr();
   return String(raw).slice(0, 10);
 }
 
@@ -1455,7 +1456,7 @@ function ChangePackageModal({ open, onClose, member, packagesList = [], onSave }
   useEffect(() => { if (!open) { setSelectedPkg(''); setExtraBalance(0); setShowPayment(false); setSaving(false); refund.reset(); } }, [open]);
 
   const pkg = packagesList.find(p => p.name === selectedPkg) || null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayStr();
   const effectiveBalance = extraBalance;
   const minPayment = pkg ? (pkg.minPayment ?? pkg.price) : 0;
   const canAfford = pkg && effectiveBalance >= minPayment;
@@ -1552,7 +1553,7 @@ function ChangePackageModal({ open, onClose, member, packagesList = [], onSave }
 function RenewMembershipModal({ open, onClose, member, packagesList = [], onSave, onSettleBalance }) {
   const { t } = useLanguage();
   const outstanding = Math.max(0, Number(member?.balance) || 0);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = todayStr();
   const [selectedPkg, setSelectedPkg]   = useState('');
   const [startDate, setStartDate]       = useState('');
   const [extraBalance, setExtraBalance] = useState(0);
@@ -1564,7 +1565,7 @@ function RenewMembershipModal({ open, onClose, member, packagesList = [], onSave
     setSelectedPkg(member.package?.name || member.package || '');
     const isExpiredOrLapsed = !member.endDate || new Date(member.endDate) < new Date();
     const isDeactivated = member.status === 'deactivated' || member.status === 'cancelled';
-    setStartDate((isExpiredOrLapsed || isDeactivated) ? new Date().toISOString().slice(0, 10) : member.endDate.slice(0, 10));
+    setStartDate((isExpiredOrLapsed || isDeactivated) ? todayStr() : member.endDate.slice(0, 10));
     setExtraBalance(0);
     setShowPayment(false);
     setSaving(false);
@@ -1974,7 +1975,7 @@ function ExtendModal({ open, onClose, member, onApplied }) {
   useEffect(() => { if (!open) { setPreset(0); setCustomDays(''); } }, [open]);
 
   const days = PRESETS[preset].days ?? parseInt(customDays || '0', 10);
-  const currentEnd = member.endDate || new Date().toISOString().slice(0, 10);
+  const currentEnd = member.endDate || todayStr();
   const newEnd = days > 0 ? addDays(currentEnd, days) : currentEnd;
 
   return (
@@ -2917,7 +2918,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
           const daysLeft = Math.round((expiry - today2) / 86400000);
           const isExpired = daysLeft < 0;
           const isWarn = !isExpired && daysLeft <= 30;
-          const expiryStr = expiry.toISOString().slice(0, 10);
+          const expiryStr = dayStr(expiry);
           const badgeBg = isExpired ? 'rgba(239,68,68,0.12)' : isWarn ? 'rgba(251,191,36,0.12)' : 'rgba(52,211,153,0.1)';
           const badgeColor = isExpired ? '#ef4444' : isWarn ? '#f59e0b' : '#34d399';
           const badgeLabel = isExpired ? t('memberProfile.overdue') : isWarn ? `${daysLeft}d left` : t('status.active');
@@ -3146,7 +3147,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
               const regDate = member.regFeeDate
                 ? member.regFeeDate.slice(0, 10)
                 : member.createdAt
-                  ? new Date(member.createdAt).toISOString().slice(0, 10)
+                  ? dayStr(member.createdAt)
                   : null;
               if (!regDate) return null;
               const expiry = new Date(regDate + 'T00:00:00'); expiry.setFullYear(expiry.getFullYear() + 1);

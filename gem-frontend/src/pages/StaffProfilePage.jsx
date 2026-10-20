@@ -1169,7 +1169,7 @@ export default function StaffProfilePage() {
     if (!noteText.trim() || noteSaving) return;
     const auth = getAuth()?.user || {};
     const author = [auth.firstName, auth.lastName].filter(Boolean).join(' ') || 'Manager';
-    const newNote = { id: Date.now(), date: new Date().toISOString().slice(0, 10), content: noteText, createdBy: author, category: noteCategory };
+    const newNote = { id: Date.now(), date: getToday(), content: noteText, createdBy: author, category: noteCategory };
     const updated = [...notes, newNote];
     setNoteSaving(true);
     setNoteError('');

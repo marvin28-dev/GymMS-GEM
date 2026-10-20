@@ -30,7 +30,8 @@ test('the code dialog says why a check-in was refused', async ({ page }) => {
   await expect(async () => {
     await search.fill('');
     await search.fill('Refused');
-    await expect(page.getByText('Rex Refused').first()).toBeVisible({ timeout: 1000 });
+    // In the search's own result, not the recent check-ins column, where he already is
+    await expect(page.locator('[data-fdtour="checkin-search"]').getByText('Rex Refused').first()).toBeVisible({ timeout: 1000 });
   }).toPass();
   await page.getByRole('button', { name: '✓', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Verify Access Code' });
@@ -53,8 +54,10 @@ test('staff on duty reads the schedule in French too', async ({ page }) => {
 
 test('"Last 24h" shows check-ins from before today', async ({ page }) => {
   const owner = await registerGym();
-  const yesterday = day(-1);
-  await page.route(`**/api/attendance?date=${yesterday}`, route => route.fulfill({
+  // Yesterday as a local day; the desk asks for it with the browser's offset (&tz=)
+  const y = new Date(Date.now() - 864e5);
+  const yesterday = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+  await page.route(new RegExp(`/api/attendance\\?date=${yesterday}(&|$)`), route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify([{ id: 'old-visit', checkIn: new Date(Date.now() - 20 * 3600e3).toISOString(), memberId: 'old-member', member: { id: 'old-member', firstName: 'Yesterday', lastName: 'Evening', status: 'active' } }]),
   }));

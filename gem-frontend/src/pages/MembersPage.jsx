@@ -778,9 +778,7 @@ export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gy
   const computeEndDate = (startStr, pkgId) => {
     const pkg = memberPackages.find(p => p.id === pkgId);
     if (!startStr || !pkg?.durationDays) return '';
-    const d = new Date(startStr);
-    d.setDate(d.getDate() + Number(pkg.durationDays));
-    return d.toISOString().slice(0, 10);
+    return addDaysStr(startStr, Number(pkg.durationDays));
   };
 
   const handlePackageChange = (pkgId) => {
@@ -832,7 +830,7 @@ export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gy
     setSaving(true);
     setApiError('');
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayStr();
 
       // Member owes only the membership fee; registration fee is always collected at signup
       const selectedPkg = memberPackages.find(p => p.id === form.packageId);
@@ -1009,7 +1007,7 @@ export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gy
             </select>
           </ModalField>
           <ModalField label={t('members.startDate')} required error={errors.startDate}>
-            <input autoComplete="off" style={inp(errors.startDate)} type="date" min={new Date().toISOString().slice(0, 10)} value={form.startDate}
+            <input autoComplete="off" style={inp(errors.startDate)} type="date" min={todayStr()} value={form.startDate}
               onChange={e => { handleStartDateChange(e.target.value); setErrors(er => ({ ...er, startDate: undefined })); }} />
           </ModalField>
           <ModalField label={t('members.endDateAuto')}>

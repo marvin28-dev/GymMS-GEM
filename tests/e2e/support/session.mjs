@@ -83,7 +83,10 @@ export async function signIn(page, session) {
     // and only once per tab, so signing out during a test sticks.
     if (!/^https?:$/.test(location.protocol) || sessionStorage.getItem('e2e_signed_in')) return;
     sessionStorage.setItem('e2e_signed_in', '1');
-    localStorage.setItem('gem_auth', JSON.stringify({ token, user, loginDate: new Date().toISOString().slice(0, 10) }));
+    // The app stamps the local day it was signed in on
+    const d = new Date();
+    const loginDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    localStorage.setItem('gem_auth', JSON.stringify({ token, user, loginDate }));
     localStorage.setItem('gem_last_activity', String(Date.now()));
   }, { token: session.token, user: session.user });
 }

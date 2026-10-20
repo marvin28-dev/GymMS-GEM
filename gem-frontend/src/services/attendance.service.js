@@ -1,7 +1,8 @@
 import api from './api';
 
+// A day's check-ins are the gym's local day (tz is the browser's offset from UTC)
 export const getAll = (params) =>
-  api.get('/attendance', { params });
+  api.get('/attendance', { params: params?.date ? { ...params, tz: new Date().getTimezoneOffset() } : params });
 
 // Members' check-ins over the last 7, 30 or 90 days, counted by the server
 export const getStats = (params) =>

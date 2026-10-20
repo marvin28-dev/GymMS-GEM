@@ -1,5 +1,6 @@
 import { countryByName } from './countries';
 import { pagesFor } from './rolePages';
+import { todayStr } from './date';
 
 const KEY          = 'gem_auth';
 const ACTIVITY_KEY = 'gem_last_activity';
@@ -7,7 +8,9 @@ const ACTIVITY_KEY = 'gem_last_activity';
 // Inactivity timeout - 15 minutes of no user interaction triggers the warning
 const INACTIVITY_MS = 15 * 60 * 1000;
 
-const today = () => new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD'
+// The local day: the UTC one began at 01:00 in Douala, so someone who signed in
+// at 00:30 was signed out half an hour later
+const today = todayStr; // 'YYYY-MM-DD'
 
 export function getAuth() {
   try {

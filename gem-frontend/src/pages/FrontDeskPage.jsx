@@ -530,7 +530,7 @@ export default function FrontDeskPage() {
   const [olderCheckins, setOlderCheckins] = useState([]);
   useEffect(() => {
     if (!longRange) return;
-    const dayBack = (n) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+    const dayBack = (n) => addDaysStr(getTodayStr(), -n);
     softAll([getAttendance({ date: dayBack(1) }), getAttendance({ date: dayBack(2) })]).then(([a, b]) => {
       const now = new Date();
       setOlderCheckins([...(a.data || []), ...(b.data || [])].map(ci => ({
@@ -756,7 +756,7 @@ export default function FrontDeskPage() {
       try { localStorage.setItem('gem_fd_gym', JSON.stringify(data)); } catch {}
     }).catch(console.error);
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getTodayStr();
     softAll([
       getMembers(), getPackages(),
       // The whole gym calendar, not just today's - the program panel lets you
@@ -767,7 +767,7 @@ export default function FrontDeskPage() {
       setMembersList(mRes.data || []); fdCache.write('members', mRes.data || []);
       setPackagesList(pkRes.data || []); fdCache.write('packages', pkRes.data || []);
       const pkgs = pkRes.data || [];
-      const todayMembers = (mRes.data || []).filter(m => m.createdAt && m.createdAt.slice(0, 10) === today);
+      const todayMembers = (mRes.data || []).filter(m => m.createdAt && dayStr(m.createdAt) === today);
       setDayRegs(todayMembers.map(m => {
         const pkg = pkgs.find(p => p.id === m.packageId);
         return {
@@ -1323,7 +1323,7 @@ export default function FrontDeskPage() {
     setExpenseFieldErrors(fe);
     if (Object.keys(fe).length || expenseSaving) return;
     setExpenseError('');
-    const today = new Date().toISOString().slice(0,10);
+    const today = getTodayStr();
     const entry = { id: Date.now(), description: expenseForm.description, amount: amt, category: expenseForm.category, paymentMethod: expenseForm.paymentMethod, paidTo: expenseForm.paidTo, submittedBy: session?.staffName || 'Staff', time: new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}), date: today, status: 'pending', exceedsLimit: false };
     // Every desk expense now waits for a manager's approval before it reaches
     // the books. `source:'frontdesk'` makes the server hold it pending.

@@ -18,7 +18,7 @@ import { getAll as getMembers } from '../services/members.service';
 import { getAll as getStaff, findByCode as findStaffByCode } from '../services/staff.service';
 import { getAll as getTimecards, punchIn as punchInApi, punchOut as punchOutApi, adjust as adjustTimecard } from '../services/timecards.service';
 import { getAuth, getRole } from '../utils/auth';
-import { fmtDate, fmtTime, getDateLocale, capFirst } from '../utils/date';
+import { fmtDate, fmtTime, getDateLocale, capFirst, todayStr, dayStr } from '../utils/date';
 import CheckinStats from '../components/CheckinStats';
 import { SkeletonCards, SkeletonTableRows } from '../components/Skeleton';
 import { softAll } from '../utils/loadAll';
@@ -409,7 +409,7 @@ export default function AttendancePage() {
   const [codeError, setCodeError]   = useState('');
 
   const _now = new Date();
-  const todayISO   = _now.toISOString().slice(0, 10);
+  const todayISO   = todayStr();
   const _locale    = lang === 'fr' ? 'fr-FR' : 'en-US';
   const todayShort = _now.toLocaleDateString(_locale, { day: '2-digit', month: 'short', year: 'numeric' });
   const today      = _now.toLocaleDateString(_locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -482,13 +482,13 @@ export default function AttendancePage() {
   const goPrevDay = () => {
     const d = new Date(viewDate + 'T12:00:00');
     d.setDate(d.getDate() - 1);
-    setViewDate(d.toISOString().slice(0, 10));
+    setViewDate(dayStr(d));
   };
   const goNextDay = () => {
     if (viewDate >= todayISO) return;
     const d = new Date(viewDate + 'T12:00:00');
     d.setDate(d.getDate() + 1);
-    setViewDate(d.toISOString().slice(0, 10));
+    setViewDate(dayStr(d));
   };
   const isViewingToday = viewDate === todayISO;
   const viewDateLabel = isViewingToday

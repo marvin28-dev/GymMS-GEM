@@ -1025,7 +1025,7 @@ function GymDashboard() {
   // zero. It waits for the batch and appears in one piece instead.
   const [ready, setReady] = useState(() => cache('members', null) !== null);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayStr();
 
   const loadDashboard = () => {
     const todayParam = today;
