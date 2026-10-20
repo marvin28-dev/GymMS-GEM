@@ -22,6 +22,10 @@ Object.assign(process.env, {
   TWILIO_FROM: '',
   TWILIO_MESSAGING_SERVICE_SID: '',
   RAILWAY_ENVIRONMENT: '',
+  // The helpers set up each test's gym from this one machine; behind a trusted
+  // proxy hop each setup call can name its own address, so the real per-address
+  // limits on sign-ups and sign-ins stay as they are (the API tests cover them)
+  TRUST_PROXY: '1',
   CLOUDINARY_CLOUD_NAME: 'test',
   CLOUDINARY_API_KEY: 'test',
   CLOUDINARY_API_SECRET: 'test',

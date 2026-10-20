@@ -5,13 +5,16 @@ import { createRequire } from 'node:module';
 const { API_URL } = createRequire(import.meta.url)('./ports.cjs');
 
 let n = 0;
+let calls = 0;
 export function uniqueCode(prefix = 'e') {
   n += 1;
   return `${prefix}${process.pid.toString(36)}${Date.now().toString(36)}${n}`.toLowerCase();
 }
 
 export async function call(method, path, { token, body } = {}) {
-  const headers = {};
+  // A fresh address for each setup call (see TRUST_PROXY in backend.cjs)
+  calls += 1;
+  const headers = { 'x-forwarded-for': `10.${process.pid % 250}.${Math.floor(calls / 250) % 250}.${calls % 250}` };
   if (token) headers.authorization = `Bearer ${token}`;
   if (body !== undefined) headers['content-type'] = 'application/json';
   const res = await fetch(API_URL + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
