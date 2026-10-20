@@ -69,6 +69,8 @@ export default function CommunicationPage() {
   const [mobileTab, setMobileTab] = useState('compose');
   const [search, setSearch] = useState('');
   const [showPeople, setShowPeople] = useState(false);
+  // A refused unschedule, delete or retry is shown above the history (F-120)
+  const [historyError, setHistoryError] = useState('');
   const bodyRef = useRef(null);
   const set = (patch) => { setD(prev => ({ ...prev, ...patch })); setErrors(e => { const n = { ...e }; Object.keys(patch).forEach(k => { delete n[k]; }); delete n._form; return n; }); };
 
@@ -231,13 +233,18 @@ export default function CommunicationPage() {
   const countOf = (f) => (f === 'all' ? history.length : history.filter(c => (f === 'sent' ? ['sent', 'partial', 'sending'].includes(c.status) : f === 'failed' ? (c.status === 'failed' || c.emailFailed + c.smsFailed > 0) : c.status === f)).length);
 
   const doRetry = async (id) => {
-    try { await retryCommunication(id); setNotice(t('communication.retrying')); load(); } catch (err) { setNotice(err?.response?.data?.error || t('communication.sendFailed')); }
+    setHistoryError('');
+    try { await retryCommunication(id); setNotice(t('communication.retrying')); load(); } catch (err) { setHistoryError(err?.response?.data?.error || t('communication.sendFailed')); }
   };
-  const doUnschedule = async (id) => { try { await cancelSchedule(id); load(); } catch { /* shown by the list */ } };
+  const doUnschedule = async (id) => {
+    setHistoryError('');
+    try { await cancelSchedule(id); load(); } catch (err) { setHistoryError(err?.response?.data?.error || t('communication.unscheduleFailed')); }
+  };
   const doDelete = async (id) => {
     const before = history;
+    setHistoryError('');
     setHistory(h => h.filter(c => c.id !== id));
-    try { await removeCommunication(id); } catch { setHistory(before); }
+    try { await removeCommunication(id); } catch (err) { setHistory(before); setHistoryError(err?.response?.data?.error || t('communication.deleteFailed')); }
   };
   const menuFor = (c) => [
     { label: t('common.view'), icon: <Eye size={15} />, onClick: () => setViewId(c.id), hidden: c.status === 'draft' },
@@ -457,6 +464,9 @@ export default function CommunicationPage() {
     </div>
   );
 
+  const historyProblem = historyError && (
+    <div role="alert" data-history-error style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 10, padding: '10px 14px', fontFamily: 'DM Sans', lineHeight: 1.5, ...(isMobile ? {} : { margin: '12px 22px 0' }) }}>{historyError}</div>
+  );
   const historyList = isMobile ? (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {loading ? <SkeletonCards count={3} /> : shown.length === 0 ? (
@@ -534,7 +544,7 @@ export default function CommunicationPage() {
               <button key={k} role="tab" aria-selected={mobileTab === k} onClick={() => setMobileTab(k)} style={{ padding: '10px 16px', fontSize: 13, cursor: 'pointer', background: 'none', border: 'none', borderBottom: `2px solid ${mobileTab === k ? 'var(--accent-gold)' : 'transparent'}`, color: mobileTab === k ? 'var(--accent-gold)' : 'var(--text-muted)', fontWeight: mobileTab === k ? 700 : 500, fontFamily: 'DM Sans' }}>{l}</button>
             ))}
           </div>
-          {mobileTab === 'compose' ? compose : <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{filters}{historyList}</div>}
+          {mobileTab === 'compose' ? compose : <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{filters}{historyProblem}{historyList}</div>}
         </>
       ) : (
         <>
@@ -549,6 +559,7 @@ export default function CommunicationPage() {
                 <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{t('communication.history')}</span>
                 <span style={{ marginLeft: 'auto' }}>{filters}</span>
               </div>
+              {historyProblem}
               {historyList}
             </section>
           </div>
