@@ -14,6 +14,7 @@ import { useSetupStatus, setSetupStatus } from '../hooks/useSetupStatus';
 import { confirmSetupSection } from '../services/gym.service';
 import TimeInput from '../components/ui/TimeInput';
 import LoadFailed from '../components/ui/LoadFailed';
+import { PAYMENT_METHODS } from '../utils/paymentMethods';
 
 const cardStyle = { background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, boxShadow: 'var(--shadow-card)' };
 const primaryBtn = { background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', color: '#0a0a0f', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '8px 16px', cursor: 'pointer', fontFamily: 'DM Sans', display: 'inline-flex', alignItems: 'center', gap: 6 };
@@ -27,7 +28,8 @@ const inputStyle = { width: '100%', background: 'var(--bg-elevated)', border: '1
 // What a gym starts out accepting, until the owner says otherwise
 const DEFAULT_PAYMENT_SETTINGS = {
   currency: getCurrencyCode(), taxRate: '0', lateFee: '5', paymentDueDays: '30',
-  methods: ['Cash', 'Credit/Debit Card', 'Bank Transfer'],
+  // Every method until the gym chooses, Mobile Money included
+  methods: PAYMENT_METHODS.map(m => m.key),
 };
 const DEFAULT_NOTIF_PREFS = {
   expiryReminders: true, lowStockAlerts: true, taskOverdue: true, eodSummary: false, welcomeEmail: true,

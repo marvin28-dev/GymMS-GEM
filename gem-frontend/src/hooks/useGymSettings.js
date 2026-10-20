@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { getMyGym } from '../services/gym.service';
 import { DATA_CHANGED } from '../utils/events';
+import { PAYMENT_METHODS } from '../utils/paymentMethods';
 
 // The gym's own settings - which payment methods it takes, what it notifies
 // about, the front desk expense limit. They live on the gym record, so one
 // fetch serves every screen and a change in Settings is felt everywhere.
 
 const DEFAULTS = {
-  payment: { methods: ['Cash', 'Credit/Debit Card', 'Bank Transfer'], taxRate: '0', lateFee: '5', paymentDueDays: '30' },
+  // A gym that has not chosen yet takes every method, Mobile Money included
+  payment: { methods: PAYMENT_METHODS.map(m => m.key), taxRate: '0', lateFee: '5', paymentDueDays: '30' },
   notifications: { expiryReminders: true, lowStockAlerts: true, taskOverdue: true, eodSummary: false, welcomeEmail: true },
   expenseLimit: 50000,
 };
