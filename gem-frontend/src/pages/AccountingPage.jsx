@@ -20,7 +20,8 @@ import { getAll as getPayments } from '../services/payments.service';
 import { getAll as getMembers } from '../services/members.service';
 import { getAll as getPayRecords, setStatus as setPayStatus, create as createPayRecord } from '../services/payroll.service';
 import { previewMonth as previewPay } from '../services/payAdjustments.service';
-import { fmtDate, capFirst, getDateLocale, dayStr, todayStr } from '../utils/date';
+import { fmtDate, capFirst, getDateLocale, dayStr, todayStr, payMonthText } from '../utils/date';
+import { expenseCategoryName } from '../utils/expenseCategories';
 import { revenueOf } from '../utils/revenue';
 import { getAll as getSales } from '../services/sales.service';
 import { useGymSettings } from '../hooks/useGymSettings';
@@ -112,6 +113,7 @@ const PERIOD_MONTHS_BACK = {
 };
 
 const PERIOD_OPTIONS = ['This Week', 'This Month', 'Last 3 Months', 'Last 6 Months', 'This Year'];
+const PERIOD_KEYS = { 'This Week': 'common.thisWeek', 'This Month': 'common.thisMonth', 'Last 3 Months': 'reports.last3Months', 'Last 6 Months': 'reports.last6Months', 'This Year': 'reports.thisYear' };
 
 const formatYAxis = (v) => v >= 1000000 ? (v / 1000000).toFixed(1) + 'M' : v.toLocaleString();
 
@@ -200,8 +202,8 @@ function saveFrontDeskExpenses(list) {
 
 // Bonuses and deductions are read as two separate ledgers, never one mixed list.
 const PAY_KINDS = [
-  { key: 'bonuses', title: 'Bonuses', sign: '+', color: 'var(--accent-green)' },
-  { key: 'deductions', title: 'Deductions', sign: '-', color: 'var(--accent-red)' },
+  { key: 'bonuses', titleKey: 'reports.bonuses', sign: '+', color: 'var(--accent-green)' },
+  { key: 'deductions', titleKey: 'reports.deductions', sign: '-', color: 'var(--accent-red)' },
 ];
 
 const StatusPill = ({ status, label }) => {
@@ -479,7 +481,7 @@ export default function AccountingPage() {
       // 0 is a real pay (no hours, or deductions that exactly cancel it)
       if (String(form.amount ?? '').trim() === '' || !(Number(form.amount) >= 0)) e.amount = t('common.required');
       const short = salaryPreview?.month === form.payMonth ? (salaryPreview.shortfall || 0) : 0;
-      if (short > 0) e._api = `Deductions for ${form.payMonth} are ${formatMoney(short)} more than the pay. Reduce or remove a deduction, then issue the pay.`;
+      if (short > 0) e._api = t('reports.payShortfall', { month: payMonthText(form.payMonth), amount: formatMoney(short) });
       return e;
     }
     if (!form.title) e.title = t('common.required');
@@ -595,7 +597,7 @@ export default function AccountingPage() {
       {otherMonthsDue.map(o => (
         <button key={o.ym} type="button" onClick={() => setPaystubMonth(o.ym)}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--accent-yellow-dim)', border: '1px solid rgba(234,179,8,0.35)', color: 'var(--text-primary)', borderRadius: 999, padding: '4px 11px', fontSize: 12, fontWeight: 600, fontFamily: 'DM Sans', cursor: 'pointer' }}>
-          {o.month}
+          {payMonthText(o.month)}
           <span style={{ fontFamily: 'JetBrains Mono, monospace', color: 'var(--accent-yellow)' }}>{o.count}</span>
         </button>
       ))}
@@ -634,13 +636,13 @@ export default function AccountingPage() {
       if (expenseId) {
         try {
           const res = await updateExpense(expenseId, {
-            title: `Salary : ${editingPaystub.staffName}`,
+            title: t('reports.salaryExpenseTitle', { name: editingPaystub.staffName }),
             category: 'Salaries',
             amount: newGross,
             date: todayStr(),
             paidTo: editingPaystub.staffName,
             method: 'cash',
-            note: `Paystub for ${editingPaystub.month}`,
+            note: t('reports.paystubNote', { month: payMonthText(editingPaystub.month) }),
             recordedBy: '',
           });
           setExpenses(prev => prev.map(e => e.id === expenseId ? res.data : e));
@@ -685,15 +687,15 @@ export default function AccountingPage() {
     }
     try {
       const expense = await createExpense({
-        title: `Salary : ${stub.staffName}`,
+        title: t('reports.salaryExpenseTitle', { name: stub.staffName }),
         category: 'Salaries',
         amount: stub.grossPay,
         date: todayStr(),
         paidTo: stub.staffName,
         method: 'cash',
         note: stub.deductions > 0
-          ? t('reports.salaryExpenseNote', { month: stub.month, handOver: formatMoney(stub.netPay), withheld: formatMoney(stub.deductions) })
-          : `Payroll for ${stub.month}`,
+          ? t('reports.salaryExpenseNote', { month: payMonthText(stub.month), handOver: formatMoney(stub.netPay), withheld: formatMoney(stub.deductions) })
+          : t('reports.payrollNote', { month: payMonthText(stub.month) }),
         recordedBy: '',
       });
       const map = loadPaystubExpenseMap();
@@ -735,7 +737,7 @@ export default function AccountingPage() {
 
   const expenseCategoryBreakdown = (() => {
     const cats = categoriesIn(periodFilteredExpenses);
-    const rows = cats.map(cat => ({ label: cat, amount: periodFilteredExpenses.filter(e => e.category === cat).reduce((s, e) => s + Number(e.amount || 0), 0) })).filter(r => r.amount > 0);
+    const rows = cats.map(cat => ({ label: expenseCategoryName(cat, t), amount: periodFilteredExpenses.filter(e => e.category === cat).reduce((s, e) => s + Number(e.amount || 0), 0) })).filter(r => r.amount > 0);
     const total = rows.reduce((s, r) => s + r.amount, 0);
     return rows.map(r => ({ ...r, pct: total > 0 ? Math.round((r.amount / total) * 100) : 0 }));
   })();
@@ -744,7 +746,7 @@ export default function AccountingPage() {
   // origin, and titles, names and notes are typed by people (F-085).
   const handleExportOverview = () => {
     const gymName = escapeHtml(getGymInfo().name);
-    openPrintWindow(`<html><head><meta charset="utf-8"><title>${escapeHtml(`${t('reports.financialOverview')} : ${period}`)}</title><style>
+    openPrintWindow(`<html><head><meta charset="utf-8"><title>${escapeHtml(`${t('reports.financialOverview')} : ${t(PERIOD_KEYS[period])}`)}</title><style>
       body{font-family:Arial,sans-serif;padding:40px;color:#111;font-size:13px}
       h1{font-size:22px;margin-bottom:4px}
       .sub{color:#666;font-size:12px;margin-bottom:28px}
@@ -761,7 +763,7 @@ export default function AccountingPage() {
       .footer{margin-top:40px;font-size:11px;color:#bbb;text-align:center;border-top:1px solid #eee;padding-top:12px}
     </style></head><body>
     <h1>${gymName}. ${escapeHtml(t('reports.financialOverview'))}</h1>
-    <div class="sub">${escapeHtml(t('reports.periodLabel'))}: <strong>${escapeHtml(period)}</strong> &nbsp;·&nbsp; ${escapeHtml(t('reports.generatedLabel'))} ${escapeHtml(fmtDate(new Date(), { day: '2-digit', month: 'short', year: 'numeric' }))}</div>
+    <div class="sub">${escapeHtml(t('reports.periodLabel'))}: <strong>${escapeHtml(t(PERIOD_KEYS[period]))}</strong> &nbsp;·&nbsp; ${escapeHtml(t('reports.generatedLabel'))} ${escapeHtml(fmtDate(new Date(), { day: '2-digit', month: 'short', year: 'numeric' }))}</div>
     <div class="cards">
       <div class="card"><div class="card-label">${escapeHtml(t('reports.totalRevenue'))}</div><div class="card-value" style="color:#2563eb">${escapeHtml(formatMoney(periodRevenue))}</div></div>
       <div class="card"><div class="card-label">${escapeHtml(t('reports.totalExpenditures'))}</div><div class="card-value" style="color:#ef4444">${escapeHtml(formatMoney(periodExpensesAmt))}</div></div>
@@ -782,13 +784,13 @@ export default function AccountingPage() {
         <div class="bar-bg"><div class="bar-fill" style="width:${Number(r.pct) || 0}%;background:#ef4444"></div></div>
         <div class="pct">${escapeHtml(`${r.pct}${t('reports.ofTotalExpenses')}`)}</div>
       </div>`).join('')}
-    <div class="footer">GEM Fitness Management System</div>
+    <div class="footer">${escapeHtml(t('reports.printFooter'))}</div>
     </body></html>`, { features: 'width=820,height=1000' });
   };
 
   const handleExportPaystubs = () => {
     const gymName = escapeHtml(getGymInfo().name);
-    openPrintWindow(`<html><head><meta charset="utf-8"><title>${escapeHtml(`${t('reports.payroll')} : ${fmtMonth(paystubMonth)}`)}</title><style>
+    openPrintWindow(`<html><head><meta charset="utf-8"><title>${escapeHtml(`${t('reports.payroll')} : ${payMonthText(fmtMonth(paystubMonth))}`)}</title><style>
       body{font-family:Arial,sans-serif;padding:40px;color:#111;font-size:13px}
       h1{font-size:22px;margin-bottom:4px}
       .sub{color:#666;font-size:12px;margin-bottom:24px}
@@ -799,7 +801,7 @@ export default function AccountingPage() {
       .footer{margin-top:32px;font-size:11px;color:#bbb;text-align:center;border-top:1px solid #eee;padding-top:12px}
     </style></head><body>
     <h1>${gymName}. ${escapeHtml(t('reports.paystubs'))}</h1>
-    <div class="sub">${escapeHtml(t('reports.monthLabel'))}: <strong>${escapeHtml(paystubMonth)}</strong> &nbsp;·&nbsp; ${escapeHtml(t('reports.generatedLabel'))} ${escapeHtml(fmtDate(new Date(), { day: '2-digit', month: 'short', year: 'numeric' }))}</div>
+    <div class="sub">${escapeHtml(t('reports.monthLabel'))}: <strong>${escapeHtml(payMonthText(fmtMonth(paystubMonth)))}</strong> &nbsp;·&nbsp; ${escapeHtml(t('reports.generatedLabel'))} ${escapeHtml(fmtDate(new Date(), { day: '2-digit', month: 'short', year: 'numeric' }))}</div>
     <table>
       <thead><tr>${[t('common.name'), t('staff.role'), t('reports.basicPay'), t('reports.allowances'), t('reports.deductions'), t('reports.netPay'), t('common.status')].map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
       <tbody>
@@ -817,7 +819,7 @@ export default function AccountingPage() {
         </tr>
       </tbody>
     </table>
-    <div class="footer">GEM Fitness Management System</div>
+    <div class="footer">${escapeHtml(t('reports.printFooter'))}</div>
     </body></html>`, { features: 'width=900,height=700' });
   };
 
@@ -829,7 +831,7 @@ export default function AccountingPage() {
     <>
       {/* Add / Edit Expense Modal */}
       <Modal open={showModal} onClose={() => setShowModal(false)}
-        title={editingExpense ? t('reports.editExpense') : (isSalaryEntry ? 'Issue Staff Pay' : t('reports.addExpense'))}>
+        title={editingExpense ? t('reports.editExpense') : (isSalaryEntry ? t('reports.issueStaffPay') : t('reports.addExpense'))}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: isSalaryEntry ? '1fr' : '1fr 1fr', gap: 12 }}>
             <div>
@@ -847,7 +849,7 @@ export default function AccountingPage() {
                       : { staffId: '', payMonth: '' }),
                   }));
                 }}>
-                {(EXPENSE_CATEGORIES.includes(form.category) || !form.category ? EXPENSE_CATEGORIES : [...EXPENSE_CATEGORIES, form.category]).map(c => <option key={c}>{c}</option>)}
+                {(EXPENSE_CATEGORIES.includes(form.category) || !form.category ? EXPENSE_CATEGORIES : [...EXPENSE_CATEGORIES, form.category]).map(c => <option key={c} value={c}>{expenseCategoryName(c, t)}</option>)}
               </select>
             </div>
             {!isSalaryEntry && (
@@ -863,7 +865,7 @@ export default function AccountingPage() {
             <>
               <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Staff member *</label>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.staffMemberField')}</label>
                   <select style={{ ...inputStyle, borderColor: errors.staffId ? 'var(--accent-red)' : 'var(--border-subtle)' }}
                     value={form.staffId}
                     onChange={e => { const staffId = e.target.value; setForm(f => ({ ...f, staffId })); loadSalaryPreview(staffId, form.payMonth); }}>
@@ -875,11 +877,11 @@ export default function AccountingPage() {
                   {errors.staffId && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.staffId}</div>}
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Pay period *</label>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.payPeriodField')}</label>
                   <select style={{ ...inputStyle, borderColor: errors.payMonth ? 'var(--accent-red)' : 'var(--border-subtle)' }}
                     value={form.payMonth}
                     onChange={e => { const payMonth = e.target.value; setForm(f => ({ ...f, payMonth })); loadSalaryPreview(form.staffId, payMonth); }}>
-                    {payMonthOptions().map(m => <option key={m} value={m}>{m}</option>)}
+                    {payMonthOptions().map(m => <option key={m} value={m}>{payMonthText(m)}</option>)}
                   </select>
                   {errors.payMonth && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.payMonth}</div>}
                 </div>
@@ -888,20 +890,20 @@ export default function AccountingPage() {
               {salaryPreview && (
                 <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '12px 14px', fontSize: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: 4 }}>
-                    <span>Base salary</span><span>{formatMoney(salaryPreview.basePay)}</span>
+                    <span>{t('reports.baseSalary')}</span><span>{formatMoney(salaryPreview.basePay)}</span>
                   </div>
                   {salaryPreview.bonuses.map((b, i) => (
                     <div key={`b${i}`} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-green)', marginBottom: 3 }}>
-                      <span>{b.label}{b.recurring ? '' : ' (one time)'}</span><span>+{formatMoney(b.amount)}</span>
+                      <span>{b.label}{b.recurring ? '' : ` (${t('reports.oneTime')})`}</span><span>+{formatMoney(b.amount)}</span>
                     </div>
                   ))}
                   {salaryPreview.deductions.map((d, i) => (
                     <div key={`d${i}`} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-red)', marginBottom: 3 }}>
-                      <span>{d.label}{d.recurring ? '' : ' (one time)'}</span><span>-{formatMoney(d.amount)}</span>
+                      <span>{d.label}{d.recurring ? '' : ` (${t('reports.oneTime')})`}</span><span>-{formatMoney(d.amount)}</span>
                     </div>
                   ))}
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-subtle)', marginTop: 6, paddingTop: 6, fontWeight: 700, color: 'var(--text-primary)' }}>
-                    <span>Net</span><span>{formatMoney(salaryPreview.net)}</span>
+                    <span>{t('reports.net')}</span><span>{formatMoney(salaryPreview.net)}</span>
                   </div>
                 </div>
               )}
@@ -914,7 +916,7 @@ export default function AccountingPage() {
               </div>
 
               <div style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--accent-gold-dim)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: 8, padding: '9px 12px', lineHeight: 1.5 }}>
-                This records the pay as issued. It appears under Paystubs, where marking it paid books the salary expense.
+                {t('reports.issueInfo')}
               </div>
             </>
           ) : (
@@ -970,7 +972,7 @@ export default function AccountingPage() {
             }} style={{ ...inputStyle, padding: '7px 14px', cursor: 'pointer' }} />
             {expenseImagePreview && (
               <div style={{ marginTop: 8, position: 'relative', display: 'inline-block' }}>
-                <img src={expenseImagePreview} alt="Receipt preview" style={{ maxWidth: '100%', maxHeight: 130, borderRadius: 8, border: '1px solid var(--border-subtle)', display: 'block' }} />
+                <img src={expenseImagePreview} alt={t('reports.receiptPreview')} style={{ maxWidth: '100%', maxHeight: 130, borderRadius: 8, border: '1px solid var(--border-subtle)', display: 'block' }} />
                 <button onClick={() => setExpenseImagePreview(null)} style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: '50%', width: 20, height: 20, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
               </div>
             )}
@@ -979,7 +981,7 @@ export default function AccountingPage() {
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
             <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
             {!editingExpense && <button style={secondaryBtn} onClick={() => handleSave(true)}>{t('tasks.saveAndAddAnother')}</button>}
-            <button style={primaryBtn} onClick={() => handleSave(false)}>{isSalaryEntry ? 'Issue Pay' : t('reports.saveExpense')}</button>
+            <button style={primaryBtn} onClick={() => handleSave(false)}>{isSalaryEntry ? t('reports.issuePay') : t('reports.saveExpense')}</button>
           </div>
         </div>
       </Modal>
@@ -991,7 +993,7 @@ export default function AccountingPage() {
             <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               {[
                 [t('common.title'), viewingExpense.title],
-                [t('reports.category'), viewingExpense.category],
+                [t('reports.category'), expenseCategoryName(viewingExpense.category, t)],
                 [t('common.amount'), formatMoney(Number(viewingExpense.amount))],
                 [t('common.date'), viewingExpense.date ? fmtDate(viewingExpense.date) : '-'],
                 [t('reports.paidTo'), viewingExpense.paidTo || '-'],
@@ -1022,7 +1024,7 @@ export default function AccountingPage() {
             {viewingExpense.receipt && (
               <div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 8 }}>{t('reports.receiptPhoto')}</div>
-                <img src={viewingExpense.receipt} alt="Receipt" style={{ width: '100%', borderRadius: 8, border: '1px solid var(--border-subtle)', maxHeight: 300, objectFit: 'contain', background: 'var(--bg-elevated)' }} />
+                <img src={viewingExpense.receipt} alt={t('reports.receipt')} style={{ width: '100%', borderRadius: 8, border: '1px solid var(--border-subtle)', maxHeight: 300, objectFit: 'contain', background: 'var(--bg-elevated)' }} />
               </div>
             )}
             {viewError && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 10, padding: '10px 14px', fontFamily: 'DM Sans' }}>{viewError}</div>}
@@ -1084,7 +1086,7 @@ export default function AccountingPage() {
         const lists = { bonuses: bd?.bonuses || [], deductions: bd?.deductions || [] };
         const totals = { bonuses: bd?.totalBonuses ?? p.allowances, deductions: bd?.totalDeductions ?? p.deductions };
         const meta = [
-          [t('reports.payPeriod'), p.month],
+          [t('reports.payPeriod'), payMonthText(p.month)],
           [t('reports.issuedLabel'), p.issuedAt ? fmtDate(p.issuedAt) : '-'],
           [t('reports.paidLabel'), p.paidAt ? fmtDate(p.paidAt) : '-'],
         ];
@@ -1117,7 +1119,7 @@ export default function AccountingPage() {
                   return (
                     <div key={g.key} style={{ marginTop: 12 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, color: g.color }}>
-                        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase' }}>{g.title}</span>
+                        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase' }}>{t(g.titleKey)}</span>
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{g.sign}{formatMoney(total)}</span>
                       </div>
                       {items.length === 0 ? (
@@ -1176,7 +1178,7 @@ export default function AccountingPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                   <div>
                     <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{editingPaystub.staffName}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{roleName(editingPaystub.role, t)} · {editingPaystub.month}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{roleName(editingPaystub.role, t)} · {payMonthText(editingPaystub.month)}</div>
                   </div>
                   <StatusPill status={editingPaystub.status} />
                 </div>
@@ -1269,7 +1271,7 @@ export default function AccountingPage() {
 
       {/* Settling pay: the figure to hand over is the one that stands out, so
           nobody hands over the full pay when deductions have been withheld */}
-      <Modal open={!!confirmPaid} onClose={() => setConfirmPaid(null)} title={confirmPaid ? t('reports.settleTitle', { name: confirmPaid.staffName, month: confirmPaid.month }) : ''} maxWidth={420}>
+      <Modal open={!!confirmPaid} onClose={() => setConfirmPaid(null)} title={confirmPaid ? t('reports.settleTitle', { name: confirmPaid.staffName, month: payMonthText(confirmPaid.month) }) : ''} maxWidth={420}>
         {confirmPaid && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ background: 'var(--accent-gold-glow)', border: '1px solid var(--accent-gold-dim)', borderRadius: 12, padding: '16px 18px', textAlign: 'center' }}>
@@ -1354,12 +1356,12 @@ export default function AccountingPage() {
   if (isMobile) {
     const EXPENSE_CATS = EXPENSE_COLORS;
     const SOURCES = [
-      { key: 'Social Media', label: 'Social Media', color: '#818cf8' },
-      { key: 'Friend',       label: 'Referral',     color: '#34d399' },
-      { key: 'Google',       label: 'Google',       color: '#60a5fa' },
-      { key: 'Flyer',        label: 'Flyer',        color: '#f59e0b' },
-      { key: 'Walk-in',      label: 'Walk-in',      color: '#fb7185' },
-      { key: 'Other',        label: 'Other',        color: '#a78bfa' },
+      { key: 'Social Media', label: t('reports.srcSocial'),   color: '#818cf8' },
+      { key: 'Friend',       label: t('reports.srcReferral'), color: '#34d399' },
+      { key: 'Google',       label: 'Google',                color: '#60a5fa' },
+      { key: 'Flyer',        label: t('reports.srcFlyer'),    color: '#f59e0b' },
+      { key: 'Walk-in',      label: t('reports.srcWalkIn'),   color: '#fb7185' },
+      { key: 'Other',        label: t('common.other'),        color: '#a78bfa' },
     ];
     const withSource = membersList.filter(m => m.howHeard);
     const srcCounts = Object.fromEntries(SOURCES.map(s => [s.key, 0]));
@@ -1380,7 +1382,7 @@ export default function AccountingPage() {
           <div>
             <h1 style={{ fontFamily: 'Manrope', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{t('nav.accounting')}</h1>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '3px 0 0', fontFamily: 'DM Sans' }}>
-              {mainTab === 'overview' ? period : mainTab === 'paystubs' ? fmtMonth(paystubMonth) : t('reports.marketingInsights')}
+              {mainTab === 'overview' ? t(PERIOD_KEYS[period]) : mainTab === 'paystubs' ? payMonthText(fmtMonth(paystubMonth)) : t('reports.marketingInsights')}
             </p>
           </div>
         </div>
@@ -1400,7 +1402,7 @@ export default function AccountingPage() {
             {pendingPanel && <div style={{ padding: '0 16px 12px' }}>{pendingPanel}</div>}
             {/* Period chips */}
             <div style={{ padding: '0 16px 12px', display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
-              {PERIOD_OPTIONS.map(p => chip(p, period === p, () => setPeriod(p)))}
+              {PERIOD_OPTIONS.map(p => chip(t(PERIOD_KEYS[p]), period === p, () => setPeriod(p)))}
             </div>
 
             {/* KPI 2x2 */}
@@ -1484,7 +1486,7 @@ export default function AccountingPage() {
             {activeTab !== 'Front Desk Expenses' && (
               <div style={{ padding: '0 16px 10px', display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
                 {['All Categories', ...categoriesIn(expenses)].map(c =>
-                  chip(c, categoryFilter === c, () => setCategoryFilter(c))
+                  chip(c === 'All Categories' ? t('reports.allCategories') : expenseCategoryName(c, t), categoryFilter === c, () => setCategoryFilter(c))
                 )}
               </div>
             )}
@@ -1511,7 +1513,7 @@ export default function AccountingPage() {
                         <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-red)', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0 }}>-{formatMoney(exp.amount)}</span>
                       </div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: exp._source === 'operations' ? 8 : 0 }}>
-                        <span style={{ fontSize: 10, background: 'var(--bg-elevated)', color: 'var(--text-muted)', borderRadius: 4, padding: '2px 6px', fontFamily: 'DM Sans' }}>{exp.category}</span>
+                        <span style={{ fontSize: 10, background: 'var(--bg-elevated)', color: 'var(--text-muted)', borderRadius: 4, padding: '2px 6px', fontFamily: 'DM Sans' }}>{expenseCategoryName(exp.category, t)}</span>
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>{String(exp.date || '').slice(0, 10)}</span>
                         {exp.status && <StatusPill status={exp.status} label={exp.status === 'approved' ? t('reports.reviewed') : t('reports.awaitingReview')} />}
                       </div>
@@ -1650,13 +1652,13 @@ export default function AccountingPage() {
         <div>
           <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>{t('reports.title')}</h1>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-            {mainTab === 'overview' ? `${t('reports.financialOverview')} : ${period}` : mainTab === 'paystubs' ? t('reports.payroll') : t('reports.marketingInsights')}
+            {mainTab === 'overview' ? `${t('reports.financialOverview')} : ${t(PERIOD_KEYS[period])}` : mainTab === 'paystubs' ? t('reports.payroll') : t('reports.marketingInsights')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {mainTab === 'overview' && (
             <select value={period} onChange={e => setPeriod(e.target.value)} style={toolbarControl}>
-              {PERIOD_OPTIONS.map(o => <option key={o} style={{ color: 'var(--text-primary)', background: 'var(--bg-card)' }}>{o}</option>)}
+              {PERIOD_OPTIONS.map(o => <option key={o} value={o} style={{ color: 'var(--text-primary)', background: 'var(--bg-card)' }}>{t(PERIOD_KEYS[o])}</option>)}
             </select>
           )}
           {mainTab === 'paystubs' && (
@@ -1701,7 +1703,7 @@ export default function AccountingPage() {
             <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('reports.financialHealthOverview')}</span>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 10 }}>{period}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 10 }}>{t(PERIOD_KEYS[period])}</span>
               </div>
             </div>
             <div style={{ padding: '20px 20px 12px 20px', height: 220 }}>
@@ -1723,7 +1725,7 @@ export default function AccountingPage() {
           <div style={{ ...cardStyle, marginBottom: 24 }}>
             <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('reports.revenueBreakdown')}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{period}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t(PERIOD_KEYS[period])}</span>
             </div>
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
               {loading ? <SkeletonCards count={3} height={44} /> : paymentCategoryBreakdown.length === 0 ? (
@@ -1750,7 +1752,7 @@ export default function AccountingPage() {
           <div style={{ ...cardStyle, marginBottom: 24 }}>
             <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('reports.expensesBreakdown')}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{period}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t(PERIOD_KEYS[period])}</span>
             </div>
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
               {loading ? <SkeletonCards count={3} height={44} /> : expenseCategoryBreakdown.length === 0 ? (
@@ -1793,7 +1795,7 @@ export default function AccountingPage() {
               ) : (
                 <select style={{ ...inputStyle, width: 160, margin: '8px 0' }} value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
                   <option value="All Categories">{t('reports.allCategories')}</option>
-                  {categoriesIn(expenses).map(c => <option key={c} value={c}>{c}</option>)}
+                  {categoriesIn(expenses).map(c => <option key={c} value={c}>{expenseCategoryName(c, t)}</option>)}
                 </select>
               )}
             </div>
@@ -1815,7 +1817,7 @@ export default function AccountingPage() {
                       <td style={{ padding: '12px 20px', fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-secondary)' }}>{exp.date ? String(exp.date).slice(0, 10) : '-'}</td>
                       <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{exp.title}</td>
                       <td style={{ padding: '12px 20px' }}>
-                        <span style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', fontSize: 11, padding: '3px 8px', borderRadius: 4 }}>{exp.category}</span>
+                        <span style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', fontSize: 11, padding: '3px 8px', borderRadius: 4 }}>{expenseCategoryName(exp.category, t)}</span>
                       </td>
                       <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 600, color: 'var(--accent-red)' }}>{formatMoney(Number(exp.amount))}</td>
                       <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>{exp.paidTo || exp.submittedBy || '-'}</td>
@@ -1915,7 +1917,7 @@ export default function AccountingPage() {
           {/* Paystubs table */}
           <div style={cardStyle}>
             <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('reports.paystubsMonth')} : {fmtMonth(paystubMonth)}</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('reports.paystubsMonth')} : {payMonthText(fmtMonth(paystubMonth))}</span>
             </div>
             <div className="gem-table-scroll" style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -1964,7 +1966,7 @@ export default function AccountingPage() {
                   <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
                     <div>
                       <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--text-muted)', fontWeight: 600 }}>
-                        {t('reports.totalPayrollLabel')} · {fmtMonth(paystubMonth)}
+                        {t('reports.totalPayrollLabel')} · {payMonthText(fmtMonth(paystubMonth))}
                       </div>
                       <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px', fontVariantNumeric: 'tabular-nums', marginTop: 4 }}>
                         {formatMoney(totalPayroll)}
@@ -2001,8 +2003,8 @@ export default function AccountingPage() {
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 7 }}>
                       {settled
-                        ? `All ${monthPaystubs.length} ${monthPaystubs.length === 1 ? 'payment' : 'payments'} settled`
-                        : `${pct}% settled · ${monthPaystubs.filter(p => p.status !== 'paid').length} still to pay`}
+                        ? (monthPaystubs.length === 1 ? t('reports.settledAllOne') : t('reports.settledAll', { n: monthPaystubs.length }))
+                        : t('reports.settledPart', { pct, n: monthPaystubs.filter(p => p.status !== 'paid').length })}
                     </div>
                   </div>
                 </div>
@@ -2015,12 +2017,12 @@ export default function AccountingPage() {
       {/* ── Marketing Tab ── */}
       {mainTab === 'marketing' && (() => {
         const SOURCES = [
-          { key: 'Social Media', label: 'Social Media (Facebook / Instagram)', color: '#818cf8' },
-          { key: 'Friend',       label: 'Friend or Family Referral',            color: '#34d399' },
-          { key: 'Google',       label: 'Google Search',                        color: '#60a5fa' },
-          { key: 'Flyer',        label: 'Flyer / Poster',                       color: '#f59e0b' },
-          { key: 'Walk-in',      label: 'Walk-in',                              color: '#fb7185' },
-          { key: 'Other',        label: 'Other',                                color: '#a78bfa' },
+          { key: 'Social Media', label: t('members.howHeardSocialMedia'), color: '#818cf8' },
+          { key: 'Friend',       label: t('members.howHeardFriend'),      color: '#34d399' },
+          { key: 'Google',       label: t('members.howHeardGoogle'),      color: '#60a5fa' },
+          { key: 'Flyer',        label: t('members.howHeardFlyer'),       color: '#f59e0b' },
+          { key: 'Walk-in',      label: t('members.howHeardWalkIn'),      color: '#fb7185' },
+          { key: 'Other',        label: t('common.other'),                color: '#a78bfa' },
         ];
         const RANGE_DAYS = { '7d': 7, '30d': 30, '90d': 90, '365d': 365, all: null };
         const RANGE_OPTS = [

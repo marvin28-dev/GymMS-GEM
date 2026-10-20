@@ -31,6 +31,7 @@ import { AddMemberModal, AddVisitorModal } from './MembersPage';
 import { TransactionModal } from './PaymentsPage';
 
 import { getAuth, getRole } from '../utils/auth';
+import { roleName } from '../utils/roleNames';
 import { getAll as getAttendance, checkIn as checkInApi } from '../services/attendance.service';
 import { getAll as getPayments, create as createPayment } from '../services/payments.service';
 import { getAll as getCalendar } from '../services/calendar.service';
@@ -199,7 +200,7 @@ function CardHeader({ title, action }) {
   );
 }
 
-function ViewAllLink({ label = 'View All →', onClick }) {
+function ViewAllLink({ label, onClick }) {
   const [hovered, setHovered] = useState(false);
   return (
     <button
@@ -700,7 +701,7 @@ function CheckInModal({ open, onClose, membersList = [], onCheckedIn }) {
     </Modal>
     {photoLightbox && (
       <div onClick={() => setPhotoLightbox(null)} style={{ position:'fixed', inset:0, zIndex:2000, background:'rgba(0,0,0,0.88)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'zoom-out' }}>
-        <img src={photoLightbox} alt="Profile" style={{ maxWidth:'80vw', maxHeight:'80vh', borderRadius:16, objectFit:'contain', boxShadow:'0 32px 80px rgba(0,0,0,0.6)', border:'2px solid rgba(255,255,255,0.1)' }}/>
+        <img src={photoLightbox} alt={t('members.profilePhoto')} style={{ maxWidth:'80vw', maxHeight:'80vh', borderRadius:16, objectFit:'contain', boxShadow:'0 32px 80px rgba(0,0,0,0.6)', border:'2px solid rgba(255,255,255,0.1)' }}/>
         <div style={{ position:'absolute', top:24, right:24, color:'rgba(255,255,255,0.5)', fontSize:12, fontFamily:'DM Sans' }}>{t('common.clickToClose')}</div>
       </div>
     )}
@@ -978,7 +979,6 @@ function GymDashboard() {
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
   const auth = getAuth();
-  const userName = auth?.user ? `${auth.user.firstName} ${auth.user.lastName}` : 'Manager';
   const role = getRole();
   const canManage  = ['general_manager', 'manager', 'front_desk'].includes(role);
   const canPayment = ['general_manager', 'manager'].includes(role);
@@ -1217,13 +1217,13 @@ function GymDashboard() {
 
       {/* ── Gym identity hero ─────────────────────────────────────────────── */}
       {(() => {
-        const gymName = gymData?.name || auth?.user?.gymName || 'My Gym';
+        const gymName = gymData?.name || auth?.user?.gymName || t('dashboard.myGym');
         const gymLocation = gymAddress(gymData);
         const logoSrc = gymData?.logo || (() => { try { return localStorage.getItem('gem_gym_logo') || null; } catch { return null; } })();
         const initials = gymName.split(/\s+/).filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'G';
         const hour = new Date().getHours();
         const greeting = hour < 12 ? t('dashboard.goodMorning') : hour < 17 ? t('dashboard.goodAfternoon') : t('dashboard.goodEvening');
-        const firstName = auth?.user?.firstName || 'Manager';
+        const firstName = auth?.user?.firstName || roleName(role, t);
         const size = isMobile ? 42 : 52;
 
         const logo = (
@@ -1592,7 +1592,7 @@ function GymDashboard() {
                       </div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 3 }}>{ev.title}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        {ev.instructor ? `${ev.instructor.firstName} ${ev.instructor.lastName}` : '-'} · {ev.location} · {ev.spots} spots
+                        {[ev.instructor ? `${ev.instructor.firstName} ${ev.instructor.lastName}` : '-', ev.location, ev.spots ? t('dashboard.nSpots', { n: ev.spots }) : null].filter(Boolean).join(' · ')}
                       </div>
                     </div>
                   </div>

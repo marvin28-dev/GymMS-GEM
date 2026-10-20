@@ -1,9 +1,10 @@
-// F-133: a package's length, its session limit and a task's assignee are
-// stored in English; the screen shows them in the reader's language.
+// F-133: a package's length, its session limit, a task's assignee and an
+// expense category are stored in English; the screen shows them in the reader's language.
 import { describe, it, expect } from 'vitest';
 import translations from '../../gem-frontend/src/i18n/translations.js';
 import { durationText, sessionsText } from '../../gem-frontend/src/utils/packageText.js';
 import { assigneeName } from '../../gem-frontend/src/utils/departments.js';
+import { expenseCategoryName } from '../../gem-frontend/src/utils/expenseCategories.js';
 
 const translator = (lang) => (key, vars) => {
   const text = key.split('.').reduce((o, k) => o?.[k], translations[lang]);
@@ -50,5 +51,14 @@ describe('assigneeName', () => {
     expect(assigneeName({ assignedTo: 'Ama Owusu' }, fr)).toBe('Ama Owusu');
     expect(assigneeName({ assignedTo: '' }, fr)).toBe('');
     expect(assigneeName({}, fr)).toBe('');
+  });
+});
+
+describe('expenseCategoryName', () => {
+  it('names the office\'s and the desk\'s categories in French, and keeps a typed one', () => {
+    expect(expenseCategoryName('Utilities', fr)).toBe('Charges courantes');
+    expect(expenseCategoryName('Salaries', fr)).toBe('Salaires');
+    expect(expenseCategoryName('Food & Drinks', fr)).toBe('Alimentation & Boissons');
+    expect(expenseCategoryName('Marketing', fr)).toBe('Marketing');
   });
 });

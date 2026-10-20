@@ -51,6 +51,7 @@ import { softAll } from '../utils/loadAll';
 import NotificationBell from '../components/NotificationBell';
 import TaskAssigneeField from '../components/TaskAssigneeField';
 import { assignFields, assigneeName } from '../utils/departments';
+import { expenseCategoryName } from '../utils/expenseCategories';
 import { TASK_CATEGORIES } from '../utils/taskCategories';
 import { gymCache } from '../utils/gymCache';
 import { fieldErrorStyle, serverFieldError } from '../utils/formErrors';
@@ -96,10 +97,6 @@ const ROLE_KEYS = {
 const PROD_CAT_KEYS = {
   'All': 'catAll', 'Beverages': 'catBeverages', 'Nutrition': 'catNutrition',
   'Supplements': 'catSupplements', 'Gear': 'catGear', 'Accessories': 'catAccessories',
-};
-const EXP_CAT_KEYS = {
-  'Supplies': 'expCatSupplies', 'Cleaning': 'expCatCleaning', 'Maintenance': 'expCatMaintenance',
-  'Food & Drinks': 'expCatFoodDrinks', 'Equipment': 'expCatEquipment', 'Transport': 'expCatTransport', 'Other': 'expCatOther',
 };
 const PM_KEYS = { 'Cash': 'pmCash', 'Card': 'pmCard', 'Mobile Money': 'pmMobileMoney' };
 
@@ -448,7 +445,7 @@ export default function FrontDeskPage() {
   const { t, lang } = useLanguage();
   const translateRole = (role) => { const k = ROLE_KEYS[role]; return k ? t(`staff.${k}`) : (role || ''); };
   const tProdCat = (cat) => { const k = PROD_CAT_KEYS[cat]; return k ? t(`frontDesk.${k}`) : cat; };
-  const tExpCat = (cat) => { const k = EXP_CAT_KEYS[cat]; return k ? t(`frontDesk.${k}`) : cat; };
+  const tExpCat = (cat) => expenseCategoryName(cat, t);
   const tPm = (pm) => { const k = PM_KEYS[pm]; return k ? t(`frontDesk.${k}`) : pm; };
   const isMobile = useIsMobile();
   const locale = lang === 'fr' ? 'fr-FR' : 'en-US';

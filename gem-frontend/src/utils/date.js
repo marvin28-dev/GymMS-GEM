@@ -60,3 +60,13 @@ export const addDaysStr = (dateStr, n) => {
   d.setDate(d.getDate() + (Number(n) || 0));
   return dayStr(d);
 };
+
+// A pay period is stored as "Sep 2026" so records always match; in French it
+// reads "septembre 2026". Anything else is shown as stored.
+const PAY_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const payMonthText = (label) => {
+  if (getDateLocale() !== 'fr-FR') return label;
+  const m = /^([A-Za-z]{3})\s+(\d{4})$/.exec(String(label || '').trim());
+  const idx = m ? PAY_MONTHS.indexOf(m[1]) : -1;
+  return idx < 0 ? label : new Date(Number(m[2]), idx, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+};

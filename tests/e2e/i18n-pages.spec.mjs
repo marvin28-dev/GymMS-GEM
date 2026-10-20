@@ -73,3 +73,65 @@ test('in French on a phone, Operations counts the pending tasks in French', asyn
   await expect(page.getByText(/Tâches en attente \(\d+\)/)).toBeVisible();
   await expect(page.getByText(/Pending Tasks/)).toHaveCount(0);
 });
+
+const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+
+test('in French, Settings names the themes and the opening days in French', async ({ page }) => {
+  const owner = await registerGym();
+  await inFrench(page);
+  await signIn(page, owner);
+  await page.goto('/settings?section=appearance');
+  await expect(page.getByText('Obsidienne').first()).toBeVisible();
+  await expect(page.getByText('Ivoire').first()).toBeVisible();
+  await page.goto('/settings?section=gym-profile');
+  await expect(page.getByText('Lun.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Mon', { exact: true })).toHaveCount(0);
+});
+
+// F-155: a logo the server did not keep is not shown as the gym's logo
+test('a logo that could not be saved is not left on screen, and says so in French', async ({ page }) => {
+  const owner = await registerGym();
+  await inFrench(page);
+  await signIn(page, owner);
+  await page.goto('/settings?section=gym-profile');
+  await page.route('**/api/gyms/me', route => (route.request().method() === 'PATCH' && (route.request().postData() || '').includes('"logo"')
+    ? route.fulfill({ status: 500, contentType: 'application/json', body: '{}' })
+    : route.fallback()));
+  await page.locator('input[type="file"][accept^="image/png"]').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: PNG });
+  await expect(page.getByText('Impossible d\'enregistrer ce logo. L\'ancien est conservé.')).toBeVisible();
+  await expect(page.getByAltText('Logo de la salle')).toHaveCount(0);
+  expect((await call('GET', '/gyms/me', { token: owner.token })).logo).toBeFalsy();
+});
+
+test('in French, the Dashboard counts a class\'s places in French', async ({ page }) => {
+  const owner = await registerGym();
+  await call('POST', '/calendar', { token: owner.token, body: { title: 'Yoga du soir', date: localDay(), time: '23:00', duration: '23:45', location: 'Salle 2', spots: 12 } });
+  await inFrench(page);
+  await signIn(page, owner);
+  await page.goto('/dashboard');
+  await expect(page.getByText(/Salle 2 · 12 places/)).toBeVisible();
+});
+
+test('in French, Accounting names periods, categories, pay months and the pay form in French', async ({ page }) => {
+  const owner = await registerGym();
+  await call('POST', '/expenses', { token: owner.token, body: { title: 'Facture eau', category: 'Utilities', amount: 12000, date: localDay(), paidTo: 'CDE', method: 'cash' } });
+  await inFrench(page);
+  await signIn(page, owner);
+  await page.goto('/accounting');
+  await expect(page.getByRole('row').filter({ hasText: 'Facture eau' })).toContainText('Charges courantes');
+  await expect(page.locator('select').filter({ has: page.locator('option', { hasText: '3 derniers mois' }) })).toHaveValue('This Month');
+  await expect(page.getByText('Aperçu financier : Ce mois')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Ajouter une dépense' }).first().click();
+  const form = page.getByRole('dialog');
+  await form.locator('select').first().selectOption('Salaries');
+  await expect(page.getByRole('dialog', { name: 'Émettre une paie' })).toBeVisible();
+  await expect(form.getByText('Employé *')).toBeVisible();
+  const month = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  await expect(form.locator('option', { hasText: month }).first()).toBeAttached();
+  await form.getByRole('button', { name: 'Annuler' }).click();
+
+  await page.getByRole('button', { name: 'Bulletins de paie' }).first().click();
+  await expect(page.getByText(`Bulletins de paie : ${month}`)).toBeVisible();
+});

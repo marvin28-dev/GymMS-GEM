@@ -16,6 +16,7 @@ import { confirmSetupSection } from '../services/gym.service';
 import TimeInput from '../components/ui/TimeInput';
 import LoadFailed from '../components/ui/LoadFailed';
 import { PAYMENT_METHODS } from '../utils/paymentMethods';
+import { capFirst, getDateLocale } from '../utils/date';
 
 const cardStyle = { background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, boxShadow: 'var(--shadow-card)' };
 const primaryBtn = { background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', color: '#0a0a0f', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '8px 16px', cursor: 'pointer', fontFamily: 'DM Sans', display: 'inline-flex', alignItems: 'center', gap: 6 };
@@ -60,21 +61,22 @@ const REQUIRED_CONFIRMS = ['gym-profile', 'payment', 'membership', 'packages', '
 const THEMES = [
   {
     id: 'dark',
-    name: 'Obsidian',
-    desc: 'Sleek dark, easy on the eyes',
+    nameKey: 'settings.themeDark',
+    descKey: 'settings.themeDarkDesc',
     bg: '#0a0a0f', card: '#16161f', text: '#f0ede6', accent: '#c9a96e',
     dots: ['#4ade80', '#60a5fa', '#f87171'],
   },
   {
     id: 'light',
-    name: 'Ivory',
-    desc: 'Warm daylight for bright rooms',
+    nameKey: 'settings.themeLight',
+    descKey: 'settings.themeLightDesc',
     bg: '#eae6dd', card: '#fbfaf7', text: '#1f1b14', accent: '#8a6a24',
     dots: ['#15803d', '#1d4ed8', '#b91c1c'],
   },
 ];
 
 function ThemeCard({ theme, selected, onSelect }) {
+  const { t } = useLanguage();
   const [hovered, setHovered] = useState(false);
   return (
     <div
@@ -121,8 +123,8 @@ function ThemeCard({ theme, selected, onSelect }) {
       {/* Label */}
       <div style={{ background: 'var(--bg-elevated)', padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{theme.name}</div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>{theme.desc}</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{t(theme.nameKey)}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>{t(theme.descKey)}</div>
         </div>
         {selected && (
           <div style={{ width: 20, height: 20, borderRadius: '50%', background: theme.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -220,10 +222,10 @@ export default function SettingsPage() {
   // data URI silently fails to write. Downscale to a thumbnail first.
   const shrinkLogo = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.onerror = () => reject(new Error(t('settings.logoReadFailed')));
     reader.onload = (ev) => {
       const img = new Image();
-      img.onerror = () => reject(new Error('That file is not a valid image.'));
+      img.onerror = () => reject(new Error(t('settings.logoNotImage')));
       img.onload = () => {
         const MAX = 256;
         const scale = Math.min(MAX / img.width, MAX / img.height, 1);
@@ -254,27 +256,33 @@ export default function SettingsPage() {
 
   const handleLogoFile = async (file) => {
     setLogoError('');
+    let dataUrl;
+    try { dataUrl = await shrinkLogo(file); } catch (err) { setLogoError(err.message); return; }
+    const before = logoPreview;
+    setLogoPreview(dataUrl);
     try {
-      const dataUrl = await shrinkLogo(file);
-      setLogoPreview(dataUrl);
       // Persist to the gym record so it shows on the login screen and other devices
       await updateMyGym({ logo: dataUrl });
       try { localStorage.setItem(LOGO_KEY, dataUrl); } catch {}
     } catch (err) {
-      if (err?.response?.status === 413) setLogoError('That image is too large. Try a smaller one.');
-      else setLogoError(err?.message || 'Could not save that logo.');
+      // Not saved, so the logo the gym really has stays on screen
+      setLogoPreview(before);
+      setLogoError(err?.response?.status === 413 ? t('settings.logoTooLarge') : (err?.response?.data?.error || t('settings.logoSaveFailed')));
     }
   };
 
   const removeLogo = async () => {
     setLogoError('');
+    const before = logoPreview;
     setLogoPreview(null);
-    try { localStorage.removeItem(LOGO_KEY); } catch {}
     if (logoInputRef.current) logoInputRef.current.value = '';
     try {
       await updateMyGym({ logo: null });
+      try { localStorage.removeItem(LOGO_KEY); } catch {}
     } catch {
-      setLogoError('Could not remove the logo. Please try again.');
+      // Still on the gym record, so it stays on screen
+      setLogoPreview(before);
+      setLogoError(t('settings.logoRemoveFailed'));
     }
   };
 
@@ -663,8 +671,8 @@ export default function SettingsPage() {
                           <button key={th.id} onClick={() => applyTheme(th.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, border: `2px solid ${currentTheme === th.id ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, background: currentTheme === th.id ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                             <div style={{ width: 32, height: 32, borderRadius: 8, background: th.bg, border: '2px solid rgba(255,255,255,0.1)', flexShrink: 0 }} />
                             <div>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: currentTheme === th.id ? 'var(--accent-gold)' : 'var(--text-primary)', fontFamily: 'DM Sans' }}>{th.name}</div>
-                              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{th.desc}</div>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: currentTheme === th.id ? 'var(--accent-gold)' : 'var(--text-primary)', fontFamily: 'DM Sans' }}>{t(th.nameKey)}</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t(th.descKey)}</div>
                             </div>
                             {currentTheme === th.id && <Check size={14} color="var(--accent-gold)" strokeWidth={2.5} style={{ marginLeft: 'auto' }} />}
                           </button>
@@ -928,7 +936,7 @@ export default function SettingsPage() {
                               onChange={e => setGymSchedule(s => ({ ...s, [day]: { ...s[day], open: e.target.checked } }))}
                               style={{ width: 14, height: 14, accentColor: 'var(--accent-gold)', cursor: 'pointer' }}
                             />
-                            <span style={{ fontSize: 12, fontWeight: 600, color: dayData.open ? 'var(--text-primary)' : 'var(--text-muted)', fontFamily: 'DM Sans' }}>{day}</span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: dayData.open ? 'var(--text-primary)' : 'var(--text-muted)', fontFamily: 'DM Sans' }}>{capFirst(new Date(2024, 0, 1 + DAYS.indexOf(day)).toLocaleDateString(getDateLocale(), { weekday: 'short' }))}</span>
                           </label>
                           {dayData.open ? (
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -971,7 +979,7 @@ export default function SettingsPage() {
                     onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
                     {logoPreview ? (
                       <>
-                        <button type="button" title="Remove logo" aria-label="Remove logo"
+                        <button type="button" title={t('settings.removeLogo')} aria-label={t('settings.removeLogo')}
                           onClick={e => { e.stopPropagation(); removeLogo(); }}
                           style={{ position: 'absolute', top: 8, right: 8, width: 24, height: 24, padding: 0, borderRadius: '50%', border: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 0 }}
                           onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent-red)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)'; }}
@@ -979,7 +987,7 @@ export default function SettingsPage() {
                           <X size={13} />
                         </button>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                          <img src={logoPreview} alt="Gym logo" style={{ maxHeight: 80, maxWidth: 200, objectFit: 'contain', borderRadius: 8 }} />
+                          <img src={logoPreview} alt={t('settings.gymLogo')} style={{ maxHeight: 80, maxWidth: 200, objectFit: 'contain', borderRadius: 8 }} />
                           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('settings.clickToChangeLogo')}</div>
                         </div>
                       </>
@@ -1206,7 +1214,7 @@ export default function SettingsPage() {
                     style={inputStyle}
                     value={expenseLimitInput}
                     onChange={e => setExpenseLimitInput(e.target.value)}
-                    placeholder="e.g. 50000"
+                    placeholder={t('common.eg', { x: 50000 })}
                   />
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>
                     {t('settings.expenseLimitHint')}
