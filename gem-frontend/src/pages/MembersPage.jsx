@@ -532,7 +532,7 @@ function MemberPaymentModal({ open, onClose, member }) {
             {/* Description */}
             <div>
               <label style={lbl}>{t('payments.description')} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({t('common.optional')})</span></label>
-              <input style={inp} value={form.description} onChange={set('description')} placeholder="e.g. Premium 12M Renewal" />
+              <input style={inp} value={form.description} onChange={set('description')} placeholder={t('members.paymentDescPh')} />
             </div>
 
             {/* Date locked */}
@@ -915,7 +915,7 @@ export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gy
             display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
           }}>
             {form.photoPreview
-              ? <img src={form.photoPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ? <img src={form.photoPreview} alt={t('common.preview')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               : <span style={{ fontSize: 28, color: 'var(--text-muted)' }}>👤</span>
             }
           </div>
@@ -1296,7 +1296,7 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
             display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
           }}>
             {form.photoPreview
-              ? <img src={form.photoPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ? <img src={form.photoPreview} alt={t('common.preview')} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               : <span style={{ fontSize: 28, color: 'var(--text-muted)' }}>👤</span>
             }
           </div>
@@ -1453,7 +1453,7 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{t('members.paymentProgress')}</span>
               <span style={{ fontSize: 12, fontWeight: 700, color: meetsMinimum ? '#10b981' : '#ef4444', fontFamily: 'DM Sans' }}>
-                {pctPaid}% paid · {remainder > 0 ? `${formatMoney(remainder)} remaining` : 'Fully paid ✓'}
+                {t('members.pctPaid', { pct: pctPaid })} · {remainder > 0 ? t('members.amountRemaining', { amount: formatMoney(remainder) }) : t('members.fullyPaid')}
               </span>
             </div>
             <div style={{ height: 6, borderRadius: 3, background: 'var(--border-subtle)', overflow: 'hidden' }}>
@@ -1476,7 +1476,7 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
             )}
             {meetsMinimum && remainder > 0 && (
               <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 4, fontFamily: 'DM Sans' }}>
-                ⏳ {t('members.visitorActiveRemainder', { deadline: form.remainderDeadline || `${deadDays} days` })}
+                ⏳ {t('members.visitorActiveRemainder', { deadline: form.remainderDeadline || t('members.nDays', { n: deadDays }) })}
               </div>
             )}
           </div>
@@ -1719,10 +1719,10 @@ export default function MembersPage() {
   const handleExport = () => {
     const headers = [t('members.memberCode'), t('members.firstName'), t('members.lastName'), t('members.gender'), t('common.email'), t('common.phone'), t('members.package'), t('common.status'), t('members.startDate'), t('members.endDate'), ...(showsMoney ? [t('members.balance')] : [])];
     const rows = filtered.map(m => [
-      m.memberCode, m.firstName, m.lastName, m.gender ?? '', m.email, m.phone,
-      m.package?.name ?? '', m.status, m.startDate ? m.startDate.slice(0,10) : '', m.endDate ? m.endDate.slice(0,10) : '', ...(showsMoney ? [m.balance ?? 0] : []),
+      m.memberCode, m.firstName, m.lastName, ({ Male: t('common.male'), Female: t('common.female'), Other: t('common.other') })[m.gender] ?? m.gender ?? '', m.email, m.phone,
+      m.package?.name ?? '', m.status ? t(`status.${m.status}`) : '', m.startDate ? m.startDate.slice(0,10) : '', m.endDate ? m.endDate.slice(0,10) : '', ...(showsMoney ? [m.balance ?? 0] : []),
     ]);
-    printPDF(headers, rows, 'GEM Members Report');
+    printPDF(headers, rows, t('members.reportTitle'));
   };
 
   if (inlineProfileId) {

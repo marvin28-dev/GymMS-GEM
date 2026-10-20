@@ -2,7 +2,7 @@
 // package's length and session limit, the code prompt's action, and who a task
 // is for read as French.
 import { test, expect } from '@playwright/test';
-import { registerGym, signIn, call } from './support/session.mjs';
+import { registerGym, signIn, call, addStaff, stubPrinting } from './support/session.mjs';
 
 const day = (offset = 0) => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10);
 const inFrench = (page) => page.addInitScript(() => { if (/^https?:$/.test(location.protocol)) localStorage.setItem('gem-lang', 'fr'); });
@@ -134,4 +134,59 @@ test('in French, Accounting names periods, categories, pay months and the pay fo
 
   await page.getByRole('button', { name: 'Bulletins de paie' }).first().click();
   await expect(page.getByText(`Bulletins de paie : ${month}`)).toBeVisible();
+});
+
+test('in French, the members export names its title, status and gender in French', async ({ page }) => {
+  const owner = await registerGym();
+  await call('POST', '/members', { token: owner.token, body: { firstName: 'Awa', lastName: 'Export', gender: 'Female', city: 'Douala', region: 'Littoral', regFeeMethod: 'cash', startDate: localDay(), endDate: localDay(new Date(Date.now() + 30 * 864e5)) } });
+  await inFrench(page);
+  await signIn(page, owner);
+  await stubPrinting(page);
+  await page.goto('/members');
+  await expect(page.getByText('Awa Export').first()).toBeVisible();
+  const [popup] = await Promise.all([
+    page.waitForEvent('popup'),
+    page.getByRole('button', { name: 'Exporter' }).first().click(),
+  ]);
+  await popup.waitForLoadState();
+  const text = await popup.locator('body').innerText();
+  expect(text).toContain('Rapport des membres GEM');
+  expect(text).toContain('Femme');
+  expect(text).not.toMatch(/\bactive\b|\bFemale\b/);
+});
+
+test('in French, the desk lists a reported issue in French', async ({ page }) => {
+  const owner = await registerGym();
+  const desk = await addStaff(owner, { role: 'front_desk' });
+  await call('POST', '/equipment', { token: owner.token, body: { equipment: 'Tapis 3', description: 'Courroie usée', severity: 'medium' } });
+  await inFrench(page);
+  await signIn(page, desk);
+  await page.goto('/front-desk');
+  await page.getByRole('button', { name: 'Opérations', exact: true }).click();
+  await expect(page.getByText('Problème signalé : Tapis 3')).toBeVisible();
+});
+
+test('in French, the desk sign-in card carries its badge in French', async ({ page }) => {
+  const owner = await registerGym();
+  // A desk session whose employee was deactivated falls back to the sign-in card
+  const desk = await addStaff(owner, { role: 'front_desk', firstName: 'Dana', lastName: 'Desk' });
+  await call('PATCH', `/staff/${desk.id}`, { token: owner.token, body: { isActive: false } });
+  await page.addInitScript((staffId) => {
+    if (/^https?:$/.test(location.protocol) && !sessionStorage.getItem('fd_session')) sessionStorage.setItem('fd_session', JSON.stringify({ staffId, staffName: 'Dana Desk' }));
+  }, desk.id);
+  await inFrench(page);
+  await signIn(page, owner);
+  await page.goto('/front-desk');
+  const card = page.getByText('Connexion Accueil').locator('xpath=ancestor::div[2]');
+  await expect(card.getByText('Accueil', { exact: true })).toBeVisible();
+  await expect(page.getByText('FRONT DESK', { exact: true })).toHaveCount(0);
+});
+
+test('the desk program panel names its views in full', async ({ page }) => {
+  const owner = await registerGym();
+  await inFrench(page);
+  await signIn(page, owner);
+  await page.goto('/front-desk');
+  for (const name of ['Jour', 'Sem.', 'Mois']) await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Moi', exact: true })).toHaveCount(0);
 });

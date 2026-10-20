@@ -165,9 +165,9 @@ function SchedulePanel({ events = [] }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('frontDesk.program')}</span>
         <div style={{ display: 'flex', gap: 2 }}>
-          {[['day','calendar.viewDay'],['week','calendar.viewWeek'],['month','calendar.viewMonth']].map(([v, key]) => (
+          {[['day','frontDesk.viewDayShort'],['week','frontDesk.viewWeekShort'],['month','frontDesk.viewMonthShort']].map(([v, key]) => (
             <button key={v} onClick={() => setView(v)} style={{ background: view === v ? 'var(--accent-gold)' : 'var(--bg-elevated)', color: view === v ? '#0a0a0f' : 'var(--text-muted)', border: 'none', borderRadius: 4, padding: '2px 7px', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'DM Sans', transition: 'all 0.1s' }}>
-              {t(key).slice(0,3)}
+              {t(key)}
             </button>
           ))}
         </div>
@@ -708,7 +708,7 @@ export default function FrontDeskPage() {
         const r = await startShiftApi(shiftPrompt.staffId);
         const note = t('frontDesk.shiftStarted', { time: shiftTime(r.data?.punchIn) });
         setShiftDone(note);
-        setOpsActivity(prev => [{ type: 'staff', text: `${shiftPrompt.name}: ${note}`, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) }, ...prev]);
+        setOpsActivity(prev => [{ type: 'staff', text: `${shiftPrompt.name}: ${note}`, time: new Date().toLocaleTimeString(getDateLocale(), { hour: '2-digit', minute: '2-digit' }) }, ...prev]);
         setTimeout(() => { setShiftPrompt(null); setShiftDone(''); }, 1600);
       } else {
         const res = await endOfDayApi(session?.staffId && session.staffId !== 'demo' ? session.staffId : undefined);
@@ -716,7 +716,7 @@ export default function FrontDeskPage() {
         if (names.length) {
           const note = t('frontDesk.autoClockedOut', { names: names.join(', ') });
           setEodClockNote(note);
-          setOpsActivity(prev => [{ type: 'staff', text: note, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) }, ...prev]);
+          setOpsActivity(prev => [{ type: 'staff', text: note, time: new Date().toLocaleTimeString(getDateLocale(), { hour: '2-digit', minute: '2-digit' }) }, ...prev]);
         }
         setShiftPrompt(null);
       }
@@ -808,7 +808,7 @@ export default function FrontDeskPage() {
       setTodayCheckins(checkins); fdCache.write('checkins', checkins);
       const issueEntries = (eqRes.data || []).map(issue => ({
         type: 'issue',
-        text: `Issue reported: ${issue.equipment}`,
+        text: t('frontDesk.issueReportedLine', { name: issue.equipment }),
         time: new Date(issue.reportedAt).toLocaleTimeString(getDateLocale(), { hour: '2-digit', minute: '2-digit' }),
       }));
       setOpsActivity([
@@ -1216,7 +1216,7 @@ export default function FrontDeskPage() {
     if (Object.keys(errs).length) { setSignUpErrors(errs); return; }
     const name = `${signUpForm.firstName.trim()} ${signUpForm.lastName.trim()}`;
     setSignUpSuccess(name);
-    setTodaySignups(prev => [{ name, package: packagesList.find(p=>p.id===signUpForm.packageId)?.name, time: new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) }, ...prev]);
+    setTodaySignups(prev => [{ name, package: packagesList.find(p=>p.id===signUpForm.packageId)?.name, time: new Date().toLocaleTimeString(getDateLocale(),{hour:'2-digit',minute:'2-digit'}) }, ...prev]);
     setSignUpForm(emptySignUp); setSignUpErrors({});
   };
 
@@ -1256,7 +1256,7 @@ export default function FrontDeskPage() {
       // The server says what is left, so the shelf count is never guessed
       const left = Object.fromEntries((res.data.stock || []).map(s => [s.id, s.stock]));
       setProductsData(prev => prev.map(p => (p.id in left ? { ...p, stock: left[p.id] } : p)));
-      setDaySales(prev => [...prev, { total: res.data.total, items: cart.reduce((s,i)=>s+i.qty,0), time: new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) }]);
+      setDaySales(prev => [...prev, { total: res.data.total, items: cart.reduce((s,i)=>s+i.qty,0), time: new Date().toLocaleTimeString(getDateLocale(),{hour:'2-digit',minute:'2-digit'}) }]);
       if (salesDayRef.current === getTodayStr()) setShownSales(prev => [res.data, ...prev]);
       else setSalesDay(getTodayStr());
       setSaleSuccess(true); setCart([]);
@@ -1300,7 +1300,7 @@ export default function FrontDeskPage() {
     } finally {
       setIssueSaving(false);
     }
-    setOpsActivity(prev => [{ type: 'issue', text: `Issue reported: ${issueForm.equipment}`, time: timeLabel }, ...prev]);
+    setOpsActivity(prev => [{ type: 'issue', text: t('frontDesk.issueReportedLine', { name: issueForm.equipment }), time: timeLabel }, ...prev]);
     setIssueSuccess(true); setIssueForm(emptyIssue);
     // Close the whole modal after the confirmation, rather than flipping back to
     // an empty form - which read as a second "report issue" prompt popping up.
@@ -1321,7 +1321,7 @@ export default function FrontDeskPage() {
     if (Object.keys(fe).length || expenseSaving) return;
     setExpenseError('');
     const today = getTodayStr();
-    const entry = { id: Date.now(), description: expenseForm.description, amount: amt, category: expenseForm.category, paymentMethod: expenseForm.paymentMethod, paidTo: expenseForm.paidTo, submittedBy: session?.staffName || 'Staff', time: new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}), date: today, status: 'pending', exceedsLimit: false };
+    const entry = { id: Date.now(), description: expenseForm.description, amount: amt, category: expenseForm.category, paymentMethod: expenseForm.paymentMethod, paidTo: expenseForm.paidTo, submittedBy: session?.staffName || 'Staff', time: new Date().toLocaleTimeString(getDateLocale(),{hour:'2-digit',minute:'2-digit'}), date: today, status: 'pending', exceedsLimit: false };
     // Every desk expense now waits for a manager's approval before it reaches
     // the books. `source:'frontdesk'` makes the server hold it pending.
     // Only a saved expense is reported as sent: money has left the drawer, so a
@@ -1348,7 +1348,7 @@ export default function FrontDeskPage() {
       setExpenseSaving(false);
     }
     setDayExpenses(prev => [...prev, entry]);
-    setOpsActivity(prev => [{ type:'expense', text:`Expense sent for review: ${expenseForm.description} : ${formatMoney(amt)}`, time: entry.time }, ...prev]);
+    setOpsActivity(prev => [{ type:'expense', text: t('frontDesk.expenseSentLine', { desc: expenseForm.description, amount: formatMoney(amt) }), time: entry.time }, ...prev]);
     setExpenseWasPending(true);
     setExpenseSuccess(true); setExpenseForm(emptyExpense);
     // Close the whole modal after the confirmation, rather than flipping back to
@@ -1468,7 +1468,7 @@ export default function FrontDeskPage() {
                 {loginStep === 'select' ? t('frontDesk.selectYourName') : `${t('frontDesk.loggingInAs')} ${selStaff ? staffFullName(selStaff) : ''}`}
               </div>
             </div>
-            <span style={{ marginLeft:'auto', background:'var(--accent-gold-dim)', color:'var(--accent-gold)', fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, letterSpacing:'1.5px', flexShrink:0 }}>FRONT DESK</span>
+            <span style={{ marginLeft:'auto', background:'var(--accent-gold-dim)', color:'var(--accent-gold)', fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:20, letterSpacing:'1.5px', flexShrink:0, textTransform:'uppercase' }}>{t('staff.roleFrontDesk')}</span>
           </div>
 
           <div style={{ padding: 28 }}>
@@ -2429,8 +2429,8 @@ export default function FrontDeskPage() {
       {/* ── Photo lightbox ── */}
       {photoLightbox && (
         <div onClick={() => setPhotoLightbox(null)} style={{ position:'fixed', inset:0, zIndex:2000, background:'rgba(0,0,0,0.88)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'zoom-out' }}>
-          <img src={photoLightbox} alt="Profile" style={{ maxWidth:'80vw', maxHeight:'80vh', borderRadius:16, objectFit:'contain', boxShadow:'0 32px 80px rgba(0,0,0,0.6)', border:'2px solid rgba(255,255,255,0.1)' }}/>
-          <div style={{ position:'absolute', top:24, right:24, color:'rgba(255,255,255,0.5)', fontSize:12, fontFamily:'DM Sans' }}>Click anywhere to close</div>
+          <img src={photoLightbox} alt={t('members.profilePhoto')} style={{ maxWidth:'80vw', maxHeight:'80vh', borderRadius:16, objectFit:'contain', boxShadow:'0 32px 80px rgba(0,0,0,0.6)', border:'2px solid rgba(255,255,255,0.1)' }}/>
+          <div style={{ position:'absolute', top:24, right:24, color:'rgba(255,255,255,0.5)', fontSize:12, fontFamily:'DM Sans' }}>{t('common.clickToClose')}</div>
         </div>
       )}
 

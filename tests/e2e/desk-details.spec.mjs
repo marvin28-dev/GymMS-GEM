@@ -75,7 +75,7 @@ test.describe('on a phone', () => {
     await expect(page.getByText('RECENT CHECK-INS')).toBeVisible();
     const programme = page.locator('[data-fdtour="left-panel"]');
     await expect(programme.getByText('PROGRAM')).toBeVisible();
-    await programme.getByRole('button', { name: 'Mon', exact: true }).click();
+    await programme.getByRole('button', { name: 'Month', exact: true }).click();
     const letters = await programme.evaluate(el => [...el.querySelectorAll('div')].filter(d => d.style.fontSize === '8px').map(d => d.textContent));
     expect(letters.slice(0, 7)).toEqual(['M', 'T', 'W', 'T', 'F', 'S', 'S']);
   });
