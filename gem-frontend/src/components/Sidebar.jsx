@@ -212,7 +212,7 @@ export default function Sidebar({ open, onClose, isMobile }) {
 
   const auth = getAuth();
   const authUser = auth?.user || {};
-  const userRole = authUser.role || 'general_manager';
+  const userRole = authUser.role || '';
   const roleProfile = pagesFor(userRole);
   const ROLE_KEYS = { general_manager: 'generalManager', manager: 'manager', trainer: 'trainer', instructor: 'instructor', front_desk: 'frontDesk', coach: 'coach', other: 'roleOther', accountant: 'accountant' };
   const roleLabel = ROLE_KEYS[userRole] ? t(`staff.${ROLE_KEYS[userRole]}`) : (roleProfile?.name || 'Manager');

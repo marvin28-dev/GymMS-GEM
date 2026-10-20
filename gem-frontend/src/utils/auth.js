@@ -1,4 +1,5 @@
 import { countryByName } from './countries';
+import { pagesFor } from './rolePages';
 
 const KEY          = 'gem_auth';
 const ACTIVITY_KEY = 'gem_last_activity';
@@ -149,8 +150,10 @@ export function getRole() {
 export function getHomeRoute() {
   const role = getRole();
   if (role === 'front_desk') return '/front-desk';
-  // "Other" has no pages beyond their own record, so that is where they land
-  if (role === 'other') return '/my-profile';
+  // A role with no dashboard ("Other", or one the app does not know) lands on
+  // its own record; sending it to the dashboard would bounce off the guard
+  const pages = pagesFor(role).pages;
+  if (pages && !pages.includes('dashboard')) return '/my-profile';
   return '/dashboard';
 }
 

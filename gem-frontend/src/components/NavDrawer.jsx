@@ -56,7 +56,7 @@ export default function NavDrawer({ open, onClose }) {
   const { pathname } = useLocation();
   const auth = getAuth();
   const authUser = auth?.user || {};
-  const userRole = authUser.role || 'general_manager';
+  const userRole = authUser.role || '';
   const roleProfile = pagesFor(userRole);
   const allowedPages = roleProfile ? roleProfile.pages : null;
   const firstName = authUser.firstName || '';
