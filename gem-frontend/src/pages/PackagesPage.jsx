@@ -16,6 +16,7 @@ import { getAll as getMembers } from '../services/members.service';
 import { getRole, getAuth } from '../utils/auth';
 import { useSetupStatus } from '../hooks/useSetupStatus';
 import { softAll } from '../utils/loadAll';
+import { serverFieldError } from '../utils/formErrors';
 import { SkeletonCards, SkeletonTableRows } from '../components/Skeleton';
 
 
@@ -56,6 +57,8 @@ export default function PackagesPage() {
   const [deletePkg, setDeletePkg] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
+  // A refused delete, shown at the top of the page (the dialogs close at once)
+  const [deleteError, setDeleteError] = useState('');
   const [profilePkg, setProfilePkg] = useState(null);
   const [showDeleteAuth, setShowDeleteAuth] = useState(false);
 
@@ -137,9 +140,9 @@ export default function PackagesPage() {
       }
       setShowVModal(false);
     } catch (err) {
-      const msg = err.response?.data?.error;
-      if (msg?.toLowerCase().includes('name')) setVErrors(e => ({ ...e, label: msg }));
-      else console.error('Failed to save visitor bundle:', err);
+      const se = serverFieldError(err, t('sales.saveFailed'));
+      if (se.field === 'name' || se.message.toLowerCase().includes('name')) setVErrors(e => ({ ...e, label: se.message }));
+      else setVErrors(e => ({ ...e, _form: se.message }));
     }
   };
 
@@ -177,9 +180,9 @@ export default function PackagesPage() {
       }
       if (another) { setForm(emptyForm); setErrors({}); } else { setShowModal(false); }
     } catch (err) {
-      const msg = err.response?.data?.error;
-      if (msg?.toLowerCase().includes('name')) setErrors(e => ({ ...e, name: msg }));
-      else console.error(err);
+      const se = serverFieldError(err, t('sales.saveFailed'));
+      if (se.field === 'name' || se.message.toLowerCase().includes('name')) setErrors(e => ({ ...e, name: se.message }));
+      else setErrors(e => ({ ...e, _form: se.message }));
     }
   };
 
@@ -307,6 +310,7 @@ export default function PackagesPage() {
                     {error && <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{error}</span>}
                   </div>
                 ))}
+                {errors._form && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{errors._form}</div>}
                 <button onClick={() => handleSave(false)} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 10, padding: '13px', fontSize: 14, fontWeight: 700, color: '#0a0a0f', cursor: 'pointer', fontFamily: 'DM Sans', marginTop: 4 }}>
                   {editingPkg ? t('common.saveChanges') : t('packages.addPackage')}
                 </button>
@@ -320,6 +324,7 @@ export default function PackagesPage() {
 
   return (
     <div className="page-fade">
+      {deleteError && <div role="alert" style={{ marginBottom: 16, fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{deleteError}</div>}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>{t('packages.title')}</h1>
@@ -534,6 +539,7 @@ export default function PackagesPage() {
               <option value="inactive">{t('packages.inactive')}</option>
             </select>
           </div>
+          {errors._form && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{errors._form}</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
             <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
             {!editingPkg && <button style={secondaryBtn} onClick={() => handleSave(true)}>{t('tasks.saveAndAddAnother')}</button>}
@@ -604,22 +610,24 @@ export default function PackagesPage() {
         danger
         action={`delete package "${profilePkg?.name}"`}
         onConfirm={async () => {
+          setDeleteError('');
           try {
             await removePackage(profilePkg.id);
             setPackages(prev => prev.filter(p => p.id !== profilePkg.id));
             setProfilePkg(null);
             setShowDeleteAuth(false);
-          } catch (err) { console.error(err); }
+          } catch (err) { setShowDeleteAuth(false); setDeleteError(err?.response?.data?.error || t('memberProfile.actionFailed')); }
         }}
       />
 
       <ConfirmModal open={!!deletePkg} onClose={() => setDeletePkg(null)}
         onConfirm={async () => {
+          setDeleteError('');
           try {
             await removePackage(deletePkg.id);
             setPackages(prev => prev.filter(p => p.id !== deletePkg.id));
             setDeletePkg(null);
-          } catch (err) { console.error(err); }
+          } catch (err) { setDeleteError(err?.response?.data?.error || t('memberProfile.actionFailed')); }
         }}
         title={t('packages.deletePackage')} message={deletePkg ? t('packages.deletePackageConfirm', { name: deletePkg.name }) : ''} confirmLabel={t('common.delete')} />
 
@@ -671,6 +679,7 @@ export default function PackagesPage() {
               <option value="inactive">{t('packages.inactive')}</option>
             </select>
           </div>
+          {vErrors._form && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{vErrors._form}</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
             <button style={secondaryBtn} onClick={() => setShowVModal(false)}>{t('common.cancel')}</button>
             <button style={primaryBtn} onClick={handleSaveV}>{t('common.save')}</button>
@@ -684,11 +693,12 @@ export default function PackagesPage() {
         danger
         action={`delete session bundle "${deleteVPkg?.label}"`}
         onConfirm={async () => {
+          setDeleteError('');
           try {
             await removePackage(deleteVPkg.id);
             setPackages(prev => prev.filter(p => p.id !== deleteVPkg.id));
             setDeleteVPkg(null);
-          } catch (err) { console.error(err); }
+          } catch (err) { setDeleteVPkg(null); setDeleteError(err?.response?.data?.error || t('memberProfile.actionFailed')); }
         }}
       />
     </div>
