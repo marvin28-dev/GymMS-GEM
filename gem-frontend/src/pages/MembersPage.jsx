@@ -25,7 +25,7 @@ import SendMessageModal from '../components/SendMessageModal';
 import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import MemberProfilePage from './MemberProfilePage';
 
-import { getAll as getMembers, create as createMember, update as updateMember, remove as removeMember } from '../services/members.service';
+import { getAll as getMembers, create as createMember, remove as removeMember } from '../services/members.service';
 import { getAll as getPackages } from '../services/packages.service';
 import { getMyGym } from '../services/gym.service';
 import { create as createPayment } from '../services/payments.service';
@@ -833,7 +833,15 @@ export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gy
       const regFeeAmount = gymData.registrationFee || 0;
       const initialBalance = pkgDebt;
 
+      // The photo goes up first and is created with the person: a failed upload
+      // keeps the form with a message, instead of a member saved without it (F-120)
+      let photoUrl;
+      if (form.photo) {
+        try { photoUrl = await uploadPhoto(form.photo, 'gem/members'); }
+        catch (err) { setApiError(err?.response?.data?.error || t('members.photoFailed')); return; }
+      }
       const res = await createMember({
+        photo: photoUrl,
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         phone: form.phone.trim(),
@@ -863,16 +871,6 @@ export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gy
         regFeeMethod: regPaid?.method,
       });
       const newMember = res.data;
-
-      // Upload photo to Cloudinary and persist URL on the member record
-      if (form.photo) {
-        try {
-          const photoUrl = await uploadPhoto(form.photo, 'gem/members');
-          await updateMember(newMember.id, { photo: photoUrl });
-        } catch (err) {
-          console.error('Photo upload failed:', err);
-        }
-      }
       reset();
       if (onCreated) {
         onCreated(newMember.id, newMember);
@@ -1186,7 +1184,15 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
       const isDayPass = !!selectedBundle?.isDayPass;
       // A bundle runs for its own validity; a day pass is spent on one visit.
       const endDate = isDayPass ? today : (selectedBundle?.durationDays ? addDaysStr(today, selectedBundle.durationDays) : undefined);
+      // The photo goes up first and is created with the person: a failed upload
+      // keeps the form with a message, instead of a member saved without it (F-120)
+      let photoUrl;
+      if (form.photo) {
+        try { photoUrl = await uploadPhoto(form.photo, 'gem/members'); }
+        catch (err) { setApiError(err?.response?.data?.error || t('members.photoFailed')); return; }
+      }
       const res = await createMember({
+        photo: photoUrl,
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         phone: form.phone.trim(),
@@ -1219,15 +1225,6 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
         },
       });
       const newVisitor = res.data;
-      if (form.photo) {
-        try {
-          const photoUrl = await uploadPhoto(form.photo, 'gem/members');
-          await updateMember(newVisitor.id, { photo: photoUrl });
-          newVisitor.photo = photoUrl;
-        } catch (err) {
-          console.error('Photo upload failed:', err);
-        }
-      }
       setCreated(newVisitor);
     } catch (err) {
       const fe = serverFieldError(err, t('members.visitorCreateFailed'));
@@ -1243,9 +1240,17 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
     if (onCreated) onCreated(member.id, member);
     else { onClose(); navigate(`/members/${member.id}`); }
   };
+  const [checkInError, setCheckInError] = useState('');
   const checkInNow = async () => {
     setCheckingIn(true);
-    try { await checkInApi({ memberId: created.id }); } catch { /* profile will show it */ }
+    setCheckInError('');
+    try {
+      await checkInApi({ memberId: created.id });
+    } catch (err) {
+      setCheckInError(checkInErrorText(err, t, t('attendance.checkInFailed')));
+      setCheckingIn(false);
+      return;
+    }
     setCheckingIn(false);
     finish(created);
   };
@@ -1260,6 +1265,7 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
           <div style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 10, padding: '14px 16px', fontSize: 13, color: '#34d399', fontWeight: 600 }}>
             ✓ {t('members.visitorCreatedCheckInPrompt')}
           </div>
+          {checkInError && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', fontFamily: 'DM Sans', lineHeight: 1.5 }}>{checkInError}</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button style={secondaryBtn} disabled={checkingIn} onClick={() => finish(created)}>{t('memberProfile.checkInLater')}</button>
             <button style={primaryBtn} disabled={checkingIn} onClick={checkInNow}>{checkingIn ? t('common.saving') : t('memberProfile.checkInNow')}</button>

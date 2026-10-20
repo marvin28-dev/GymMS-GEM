@@ -555,6 +555,7 @@ const translations = {
       incorrectCodeRetry: 'Incorrect code. Please try again.',
       "createFailed": "The member could not be added. Try again.",
       "visitorCreateFailed": "The visitor could not be registered. Try again.",
+      "photoFailed": "The photo could not be uploaded, so nothing was saved yet. Try again, or remove the photo.",
     },
     packages: {
       title: 'Packages', memberPackages: 'Member Packages', visitorBundles: 'Visitor Bundles',
@@ -2671,6 +2672,7 @@ const translations = {
       incorrectCodeRetry: 'Code incorrect. Veuillez réessayer.',
       "createFailed": "Le membre n’a pas pu être ajouté. Réessayez.",
       "visitorCreateFailed": "Le visiteur n’a pas pu être enregistré. Réessayez.",
+      "photoFailed": "La photo n’a pas pu être envoyée, rien n’a encore été enregistré. Réessayez, ou retirez la photo.",
     },
     packages: {
       title: 'Forfaits', memberPackages: 'Forfaits membres', visitorBundles: 'Packs visiteurs',
