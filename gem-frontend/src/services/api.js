@@ -34,7 +34,7 @@ function signOut() {
   const gymCode = getAuth()?.user?.gymCode;
   clearAuth();
   try { sessionStorage.removeItem('fd_session'); } catch { /* signing out still goes ahead */ }
-  const target = gymCode ? `/${gymCode}/login` : '/login';
+  const target = gymCode ? `/${encodeURIComponent(gymCode)}/login` : '/login';
   if (window.location.pathname !== target) window.location.href = target;
 }
 
@@ -81,10 +81,8 @@ api.interceptors.response.use(
       // throw the user to the login screen for a simple typo.
       const url = error.config?.url || '';
       const isCredentialCheck = /\/auth\/(change-password|verify-manager)/.test(url);
-      if (!onLoginPage && !isCredentialCheck && !signingOut) {
-        clearAuth();
-        window.location.href = '/login';
-      }
+      // An expired session goes back to the gym's own sign-in page, like any other sign-out
+      if (!onLoginPage && !isCredentialCheck && !signingOut) signOut();
     }
     return Promise.reject(error);
   }

@@ -1,7 +1,7 @@
 import api from './api';
 
 export const getGymByCode = (code) =>
-  api.get(`/gyms/code/${code}`);
+  api.get(`/gyms/code/${encodeURIComponent(code)}`);
 
 export const getMyGym = () =>
   api.get('/gyms/me');
