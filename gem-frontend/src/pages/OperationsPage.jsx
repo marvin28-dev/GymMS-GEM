@@ -49,6 +49,7 @@ import { fmtDate, fmtTime, getDateLocale, todayStr, dayStr } from '../utils/date
 import { membershipEndsThisWeek } from '../utils/attention';
 import { TASK_CATEGORIES } from '../utils/taskCategories';
 import { assignFields } from '../utils/departments';
+import { serverFieldError } from '../utils/formErrors';
 import TaskAssigneeField from '../components/TaskAssigneeField';
 import { SkeletonCards } from '../components/Skeleton';
 import { softAll } from '../utils/loadAll';
@@ -196,17 +197,29 @@ function AddTaskModal({ open, onClose, onSave, staffList = [] }) {
   const { t } = useLanguage();
   const [form, setForm] = useState(emptyTaskForm);
   const [errors, setErrors] = useState({});
-  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: '' })); };
+  const [saving, setSaving] = useState(false);
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: '', _form: '' })); };
 
-  // The same fields the Tasks page asks for, which the server also insists on
-  const handleSave = () => {
+  // The same fields the Tasks page asks for, which the server also insists on.
+  // The dialog closes only once the task is saved; a refusal stays in it (F-107).
+  const handleSave = async () => {
     const e = {};
     if (!form.title.trim()) e.title = t('tasks.titleRequired');
     if (!form.assignedTo) e.assignedTo = t('tasks.assigneeRequired');
     if (!form.dueDate) e.dueDate = t('tasks.dueDateRequired');
     if (!form.category) e.category = t('tasks.categoryRequired');
     if (Object.keys(e).length) { setErrors(e); return; }
-    onSave(form);
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onSave(form);
+    } catch (err) {
+      const se = serverFieldError(err, t('tasks.saveFailed'));
+      setErrors(se.field && ['title', 'dueDate', 'category'].includes(se.field) ? { [se.field]: se.message } : { _form: se.message });
+      return;
+    } finally {
+      setSaving(false);
+    }
     onClose();
     setForm(emptyTaskForm);
   };
@@ -244,9 +257,12 @@ function AddTaskModal({ open, onClose, onSave, staffList = [] }) {
           options={[['Low', t('tasks.priorityLow')], ['Medium', t('tasks.priorityMedium')], ['High', t('tasks.priorityHigh')]].map(([v, l]) => ({ value: v, label: l }))}
         />
       </div>
+      {errors._form && (
+        <div role="alert" style={{ marginTop: 16, fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{errors._form}</div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 24 }}>
         <button style={secondaryBtn} onClick={handleClose}>{t('common.cancel')}</button>
-        <button style={primaryBtn} onClick={handleSave}>{t('tasks.saveTask')}</button>
+        <button style={{ ...primaryBtn, opacity: saving ? 0.6 : 1 }} disabled={saving} onClick={handleSave}>{t('tasks.saveTask')}</button>
       </div>
     </Modal>
   );
@@ -308,6 +324,8 @@ export default function OperationsPage() {
   const [showAddMember, setShowAddMember] = useState(false);
   const [showReportIssue, setShowReportIssue] = useState(false);
   const [issues, setIssues] = useState(() => cache.read('issues', []));
+  // A refused status change, shown under that issue (F-120)
+  const [issueActionError, setIssueActionError] = useState({});
   const [issueFilter, setIssueFilter] = useState('All');
   // Today's figures come from the same server report as the end-of-day report,
   // so the two can never disagree; gym holds the opening hours.
@@ -387,10 +405,9 @@ export default function OperationsPage() {
       priority: form.priority.toLowerCase(),
       category: form.category,
     };
-    try {
-      const res = await createTask(payload);
-      setTasks(ts => [res.data, ...ts]);
-    } catch (err) { console.error(err); }
+    // A refusal goes back to the dialog, which shows it
+    const res = await createTask(payload);
+    setTasks(ts => [res.data, ...ts]);
   };
 
   // ── Mobile layout ────────────────────────────────────────────────────────────
@@ -619,10 +636,13 @@ export default function OperationsPage() {
                               <button
                                 onClick={async () => {
                                   const nextStatus = issue.status === 'open' ? 'in_progress' : 'resolved';
+                                  setIssueActionError(prev => ({ ...prev, [issue.id]: '' }));
                                   try {
                                     const res = await updateEquipment(issue.id, { status: nextStatus });
                                     setIssues(prev => prev.map(it => it.id === issue.id ? res.data : it));
-                                  } catch (err) { console.error(err); }
+                                  } catch (err) {
+                                    setIssueActionError(prev => ({ ...prev, [issue.id]: err?.response?.data?.error || t('operations.saveIssueFailed') }));
+                                  }
                                 }}
                                 style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 5, fontSize: 11, color: 'var(--text-secondary)', padding: '3px 8px', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 500 }}
                               >
@@ -630,6 +650,9 @@ export default function OperationsPage() {
                               </button>
                             )}
                           </div>
+                          {issueActionError[issue.id] && (
+                            <div role="alert" style={{ marginTop: 6, paddingLeft: 36, fontSize: 11.5, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{issueActionError[issue.id]}</div>
+                          )}
                         </div>
                       );
                     })}
