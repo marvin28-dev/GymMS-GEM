@@ -3528,7 +3528,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
                   {t('memberProfile.lastPaid')} {formatDate(member.regFeeDate)}
                   &ensp;·&ensp; {t('memberProfile.feeLabel')} {formatMoney(gymData?.registrationFee || 0)}
                   {(gymData?.registrationGracePeriodDays || 0) > 0 && regFeeStatusVal === 'grace' &&
-                    ` · ${gymData.registrationGracePeriodDays}${t('memberProfile.gracePeriodActive')}`}
+                    ` · ${t('memberProfile.gracePeriodActive', { n: gymData.registrationGracePeriodDays })}`}
                 </div>
               )}
             </div>
