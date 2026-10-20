@@ -174,3 +174,30 @@ test("a staff member's task can be opened and marked done from their profile on 
 
   await expect.poll(async () => (await call('GET', '/tasks', { token: owner.token })).find(tk => tk.id === task.id)?.status).toBe('Done');
 });
+
+// F-110
+test('a payment can be added on a phone, for the member it was taken from', async ({ page }) => {
+  const owner = await registerGym();
+  const day = new Date().toISOString().slice(0, 10);
+  // The Payments page takes money against what a member owes
+  const pkg = await call('POST', '/packages', { token: owner.token, body: { name: 'Owed Plan', price: 15000, dayPassPrice: 1500, duration: '1 Months', durationDays: 30, status: 'active' } });
+  const member = await call('POST', '/members', {
+    token: owner.token,
+    body: { firstName: 'Payne', lastName: 'Phonepay', city: 'Douala', region: 'Littoral', regFeeMethod: 'cash', startDate: day, endDate: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10), packageId: pkg.id, balance: 15000 },
+  });
+  await signIn(page, owner);
+  await page.goto('/payments');
+  await page.getByTitle('Add Payment').click();
+  const form = page.getByRole('dialog', { name: 'Add Payment' });
+  await expect(async () => {
+    await form.getByPlaceholder('Name or member code...').fill('');
+    await form.getByPlaceholder('Name or member code...').fill('Phonepay');
+    await expect(form.getByText('Payne Phonepay')).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await form.getByText('Payne Phonepay').click();
+  await form.locator('input[type="date"]').first().fill(day);
+  await form.locator('input[inputmode="numeric"]').first().fill('5000');
+  await form.getByRole('button', { name: 'Save Payment' }).click();
+
+  await expect.poll(async () => (await call('GET', '/payments', { token: owner.token })).some(p => p.memberId === member.id && Number(p.amount) === 5000)).toBe(true);
+});

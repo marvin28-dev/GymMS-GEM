@@ -305,6 +305,164 @@ export default function PaymentsPage() {
   };
 
   // ── Mobile layout ────────────────────────────────────────────────────────────
+  // Drawn by both layouts. The phone had its own add sheet with no member
+  // picker, so the server refused every payment made from it (F-110).
+  const paymentDialogs = (
+    <>
+      <TransactionModal payment={selectedPayment} onClose={() => setSelectedPayment(null)} />
+
+      {/* Add Payment Modal */}
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={t('payments.addPayment')}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* ── Step 1: Search for member ── */}
+          {!selectedMember && (
+            <>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.searchMember')} *</label>
+                <div style={{ position: 'relative' }}>
+                  <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                  <input
+                    autoFocus
+                    style={{ ...inputStyle, paddingLeft: 32 }}
+                    placeholder={t('payments.namOrCode')}
+                    value={memberSearch}
+                    onChange={e => setMemberSearch(e.target.value)}
+                  />
+                  {matchingMembers.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, marginTop: 4, boxShadow: 'var(--shadow-elevated)', overflow: 'hidden' }}>
+                      {matchingMembers.map(m => (
+                        <div key={m.id}
+                          onClick={() => { setSelectedMember(m); setForm(f => ({ ...f, memberId: m.id, description: f.description || autoPaymentDescription(m, 'membership') })); setMemberSearch(''); }}
+                          style={{ padding: '10px 14px', fontSize: 13, cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-hover)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <div>
+                            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{m.firstName} {m.lastName}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.memberCode} · {m.package?.name || '-'}</div>
+                          </div>
+                          {Number(m.balance) > 0 && (
+                            <span style={{ fontSize: 11, color: '#f87171', fontWeight: 600, background: 'rgba(248,113,113,0.1)', borderRadius: 4, padding: '2px 8px', whiteSpace: 'nowrap' }}>
+                              {t('payments.owes')} {(Number(m.balance) || 0).toLocaleString(getMoneyLocale())} {getCurrencySymbol()}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
+              </div>
+            </>
+          )}
+
+          {/* ── Step 2a: No outstanding balance ── */}
+          {selectedMember && !(Number(selectedMember.balance) > 0) && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '9px 14px' }}>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedMember.firstName} {selectedMember.lastName}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>{selectedMember.memberCode}</span>
+                </div>
+                <button onClick={() => setSelectedMember(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+              </div>
+              <div style={{ background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 14, padding: '32px 20px', textAlign: 'center' }}>
+                <div style={{ fontSize: 38, marginBottom: 10 }}>✓</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#34d399', marginBottom: 6 }}>{t('payments.noOutstandingBalance')}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  {t('payments.memberHasNoBalance', { firstName: selectedMember.firstName, lastName: selectedMember.lastName })}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button style={secondaryBtn} onClick={() => setSelectedMember(null)}>← {t('common.back')}</button>
+                <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.close')}</button>
+              </div>
+            </>
+          )}
+
+          {/* ── Step 2b: Payment form (member has outstanding balance) ── */}
+          {selectedMember && Number(selectedMember.balance) > 0 && (
+            <>
+              {/* Member chip */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-elevated)', border: '1px solid var(--accent-gold)', borderRadius: 10, padding: '9px 14px' }}>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedMember.firstName} {selectedMember.lastName}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>{selectedMember.memberCode}</span>
+                </div>
+                <button onClick={() => setSelectedMember(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+              </div>
+
+              {/* Outstanding balance banner */}
+              <div style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: '#f87171', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 2 }}>{t('payments.outstandingBalance')}</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#f87171', fontFamily: 'Manrope, sans-serif' }}>{(Number(selectedMember.balance) || 0).toLocaleString(getMoneyLocale())} {getCurrencySymbol()}</div>
+                </div>
+                <button type="button"
+                  onClick={() => setForm(f => ({ ...f, amount: String(selectedMember.balance) }))}
+                  style={{ background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.35)', color: '#f87171', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans', whiteSpace: 'nowrap' }}
+                >{t('payments.payInFull')}</button>
+              </div>
+
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.paymentDate')} *</label>
+                  <input type="date" style={{ ...inputStyle, borderColor: errors.date ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+                  {errors.date && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.date}</div>}
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.amount')} *</label>
+                  <input type="text" inputMode="numeric" style={{ ...inputStyle, borderColor: errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: digitsOnly(e.target.value) }))} placeholder="0" />
+                  {errors.amount && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.amount}</div>}
+                </div>
+              </div>
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.paymentMethod')} *</label>
+                  <select style={inputStyle} value={form.method} onChange={e => setForm(f => ({ ...f, method: e.target.value }))}>
+                    {methods.map(m => <option key={m.key} value={m.key}>{t(m.labelKey)}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.referenceId')}</label>
+                  <input style={inputStyle} value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder="TXN-XXX" />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.description')}</label>
+                <input style={inputStyle} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Premium 12M Renewal" />
+              </div>
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.receivedBy')}</label>
+                  <select style={inputStyle} value={form.receivedBy} onChange={e => setForm(f => ({ ...f, receivedBy: e.target.value }))}>
+                    <option value="">{t('payments.selectStaff')}</option>
+                    {staffList.filter(s => s.isActive !== false || staffName(s) === form.receivedBy).map(s => <option key={s.id} value={staffName(s)}>{staffName(s)}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.packageFor')}</label>
+                  <input style={inputStyle} value={form.packageFor} onChange={e => setForm(f => ({ ...f, packageFor: e.target.value }))} placeholder="e.g. Premium 12M" />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.notes')}</label>
+                <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
+                <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
+                <button style={primaryBtn} onClick={handleSave}>{t('payments.savePayment')}</button>
+              </div>
+            </>
+          )}
+
+        </div>
+      </Modal>
+    </>
+  );
+
   if (isMobile) {
     const METHOD_CHIPS = [{ key: 'All', label: t('payments.allMethods') }, ...methods.map(m => ({ key: m.key, label: t(m.labelKey) }))];
     return (
@@ -386,44 +544,7 @@ export default function PaymentsPage() {
 
         <FAB onClick={() => { setForm(emptyForm); setErrors({}); setMemberSearch(''); setSelectedMember(null); setShowModal(true); }} label={t('payments.addPayment')} />
 
-        {showModal && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end' }}>
-            <div style={{ background: 'var(--bg-secondary)', borderRadius: '20px 20px 0 0', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '20px 20px 40px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'Manrope', color: 'var(--text-primary)' }}>{t('payments.addPayment')}</span>
-                <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><Plus size={18} style={{ transform: 'rotate(45deg)' }} /></button>
-              </div>
-              {/* Minimal form */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{t('common.amount')} *</label>
-                  <input type="text" inputMode="numeric" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: digitsOnly(e.target.value) }))} style={{ width: '100%', background: 'var(--bg-elevated)', border: `1px solid ${errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)'}`, borderRadius: 10, padding: '10px 14px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', boxSizing: 'border-box' }} placeholder="0" />
-                  {errors.amount && <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{errors.amount}</span>}
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{t('payments.paymentMethod')} *</label>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {methods.map(m => [m.key, t(m.labelKey)]).map(([val, label]) => (
-                      <button key={val} onClick={() => setForm(f => ({ ...f, method: val }))} style={{ ...chipStyle(form.method === val), fontSize: 12 }}>{label}</button>
-                    ))}
-                  </div>
-                  {errors.method && <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{errors.method}</span>}
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{t('payments.paymentDate')} *</label>
-                  <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} style={{ width: '100%', background: 'var(--bg-elevated)', border: `1px solid ${errors.date ? 'var(--accent-red)' : 'var(--border-subtle)'}`, borderRadius: 10, padding: '10px 14px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{t('common.notes')}</label>
-                  <input value={form.notes || ''} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 14px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', boxSizing: 'border-box' }} placeholder={t('common.optional')} />
-                </div>
-                <button onClick={handleSave} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 10, padding: '13px', fontSize: 14, fontWeight: 700, color: '#0a0a0f', cursor: 'pointer', fontFamily: 'DM Sans', marginTop: 4 }}>
-                  {t('payments.savePayment')}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {paymentDialogs}
       </div>
     );
   }
@@ -607,157 +728,7 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      <TransactionModal payment={selectedPayment} onClose={() => setSelectedPayment(null)} />
-
-      {/* Add Payment Modal */}
-      <Modal open={showModal} onClose={() => setShowModal(false)} title={t('payments.addPayment')}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-          {/* ── Step 1: Search for member ── */}
-          {!selectedMember && (
-            <>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.searchMember')} *</label>
-                <div style={{ position: 'relative' }}>
-                  <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                  <input
-                    autoFocus
-                    style={{ ...inputStyle, paddingLeft: 32 }}
-                    placeholder={t('payments.namOrCode')}
-                    value={memberSearch}
-                    onChange={e => setMemberSearch(e.target.value)}
-                  />
-                  {matchingMembers.length > 0 && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, marginTop: 4, boxShadow: 'var(--shadow-elevated)', overflow: 'hidden' }}>
-                      {matchingMembers.map(m => (
-                        <div key={m.id}
-                          onClick={() => { setSelectedMember(m); setForm(f => ({ ...f, memberId: m.id, description: f.description || autoPaymentDescription(m, 'membership') })); setMemberSearch(''); }}
-                          style={{ padding: '10px 14px', fontSize: 13, cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-hover)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                          <div>
-                            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{m.firstName} {m.lastName}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.memberCode} · {m.package?.name || '-'}</div>
-                          </div>
-                          {Number(m.balance) > 0 && (
-                            <span style={{ fontSize: 11, color: '#f87171', fontWeight: 600, background: 'rgba(248,113,113,0.1)', borderRadius: 4, padding: '2px 8px', whiteSpace: 'nowrap' }}>
-                              {t('payments.owes')} {(Number(m.balance) || 0).toLocaleString(getMoneyLocale())} {getCurrencySymbol()}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
-              </div>
-            </>
-          )}
-
-          {/* ── Step 2a: No outstanding balance ── */}
-          {selectedMember && !(Number(selectedMember.balance) > 0) && (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '9px 14px' }}>
-                <div>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedMember.firstName} {selectedMember.lastName}</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>{selectedMember.memberCode}</span>
-                </div>
-                <button onClick={() => setSelectedMember(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
-              </div>
-              <div style={{ background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 14, padding: '32px 20px', textAlign: 'center' }}>
-                <div style={{ fontSize: 38, marginBottom: 10 }}>✓</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#34d399', marginBottom: 6 }}>{t('payments.noOutstandingBalance')}</div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                  {t('payments.memberHasNoBalance', { firstName: selectedMember.firstName, lastName: selectedMember.lastName })}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button style={secondaryBtn} onClick={() => setSelectedMember(null)}>← {t('common.back')}</button>
-                <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.close')}</button>
-              </div>
-            </>
-          )}
-
-          {/* ── Step 2b: Payment form (member has outstanding balance) ── */}
-          {selectedMember && Number(selectedMember.balance) > 0 && (
-            <>
-              {/* Member chip */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-elevated)', border: '1px solid var(--accent-gold)', borderRadius: 10, padding: '9px 14px' }}>
-                <div>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedMember.firstName} {selectedMember.lastName}</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>{selectedMember.memberCode}</span>
-                </div>
-                <button onClick={() => setSelectedMember(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
-              </div>
-
-              {/* Outstanding balance banner */}
-              <div style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 11, color: '#f87171', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 2 }}>{t('payments.outstandingBalance')}</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#f87171', fontFamily: 'Manrope, sans-serif' }}>{(Number(selectedMember.balance) || 0).toLocaleString(getMoneyLocale())} {getCurrencySymbol()}</div>
-                </div>
-                <button type="button"
-                  onClick={() => setForm(f => ({ ...f, amount: String(selectedMember.balance) }))}
-                  style={{ background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.35)', color: '#f87171', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans', whiteSpace: 'nowrap' }}
-                >{t('payments.payInFull')}</button>
-              </div>
-
-              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.paymentDate')} *</label>
-                  <input type="date" style={{ ...inputStyle, borderColor: errors.date ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
-                  {errors.date && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.date}</div>}
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.amount')} *</label>
-                  <input type="text" inputMode="numeric" style={{ ...inputStyle, borderColor: errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: digitsOnly(e.target.value) }))} placeholder="0" />
-                  {errors.amount && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.amount}</div>}
-                </div>
-              </div>
-              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.paymentMethod')} *</label>
-                  <select style={inputStyle} value={form.method} onChange={e => setForm(f => ({ ...f, method: e.target.value }))}>
-                    {methods.map(m => <option key={m.key} value={m.key}>{t(m.labelKey)}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.referenceId')}</label>
-                  <input style={inputStyle} value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder="TXN-XXX" />
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.description')}</label>
-                <input style={inputStyle} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Premium 12M Renewal" />
-              </div>
-              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.receivedBy')}</label>
-                  <select style={inputStyle} value={form.receivedBy} onChange={e => setForm(f => ({ ...f, receivedBy: e.target.value }))}>
-                    <option value="">{t('payments.selectStaff')}</option>
-                    {staffList.filter(s => s.isActive !== false || staffName(s) === form.receivedBy).map(s => <option key={s.id} value={staffName(s)}>{staffName(s)}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.packageFor')}</label>
-                  <input style={inputStyle} value={form.packageFor} onChange={e => setForm(f => ({ ...f, packageFor: e.target.value }))} placeholder="e.g. Premium 12M" />
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.notes')}</label>
-                <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
-              </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
-                <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
-                <button style={primaryBtn} onClick={handleSave}>{t('payments.savePayment')}</button>
-              </div>
-            </>
-          )}
-
-        </div>
-      </Modal>
+      {paymentDialogs}
     </div>
   );
 }
