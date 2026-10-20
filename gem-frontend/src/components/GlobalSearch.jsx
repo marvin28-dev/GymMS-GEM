@@ -6,7 +6,7 @@ import {
   Settings as SettingsIcon, Calendar, User, X, UserCircle, Ticket,
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { getRole } from '../utils/auth';
+import { getAuth, getRole } from '../utils/auth';
 import { pagesFor } from '../utils/rolePages';
 import { softAll } from '../utils/loadAll';
 import { getAll as getMembers } from '../services/members.service';
@@ -48,11 +48,15 @@ const SETTINGS_DESTS = [
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 // People and packages are fetched once when search first opens and kept for a
-// minute, so typing never waits on the network.
+// minute, so typing never waits on the network. The copy belongs to the session
+// that fetched it: after signing out and in as someone else in the same tab, it
+// is fetched again rather than showing the last account's people (F-098).
 let recordCache = null;
-let recordCacheAt = 0;
+const sessionOf = () => getAuth()?.token || '';
+const cachedRecords = () => (recordCache && recordCache.session === sessionOf() ? recordCache.data : null);
 function loadRecords(allowed) {
-  if (recordCache && Date.now() - recordCacheAt < 60000) return Promise.resolve(recordCache);
+  const session = sessionOf();
+  if (recordCache && recordCache.session === session && Date.now() - recordCache.at < 60000) return Promise.resolve(recordCache.data);
   const can = (p) => allowed === null || allowed.has(p);
   return softAll([
     can('members') ? getMembers() : null,
@@ -60,9 +64,9 @@ function loadRecords(allowed) {
     can('packages') ? getPackages() : null,
   ]).then(([m, s, p]) => {
     const list = (r) => (Array.isArray(r?.data) ? r.data : r?.data?.data || []);
-    recordCache = { members: list(m), staff: list(s), packages: list(p) };
-    recordCacheAt = Date.now();
-    return recordCache;
+    const data = { members: list(m), staff: list(s), packages: list(p) };
+    recordCache = { session, at: Date.now(), data };
+    return data;
   });
 }
 
@@ -72,7 +76,7 @@ export default function GlobalSearch({ compact = false }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
-  const [records, setRecords] = useState(recordCache);
+  const [records, setRecords] = useState(cachedRecords);
   const inputRef = useRef(null);
   const wrapRef = useRef(null);
 
