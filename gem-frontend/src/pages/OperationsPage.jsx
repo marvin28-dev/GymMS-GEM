@@ -49,6 +49,8 @@ import { fmtDate, fmtTime, getDateLocale, todayStr, dayStr } from '../utils/date
 import { membershipEndsThisWeek } from '../utils/attention';
 import { TASK_CATEGORIES } from '../utils/taskCategories';
 import { assignFields } from '../utils/departments';
+import { getRole } from '../utils/auth';
+import { pagesFor } from '../utils/rolePages';
 import { serverFieldError } from '../utils/formErrors';
 import TaskAssigneeField from '../components/TaskAssigneeField';
 import { SkeletonCards } from '../components/Skeleton';
@@ -297,6 +299,7 @@ function SummaryCard({ label, value, sub, icon: Icon, accent, dim, onClick }) {
 }
 
 const severityConfig = {
+  critical: { bg: 'rgba(220,38,38,0.18)', color: '#dc2626', icon: AlertTriangle },
   high:   { bg: 'var(--accent-red-dim)',    color: 'var(--accent-red)',    icon: AlertTriangle },
   medium: { bg: 'var(--accent-yellow-dim)', color: 'var(--accent-yellow)', icon: AlertTriangle },
   low:    { bg: 'var(--accent-blue-dim)',   color: 'var(--accent-blue)',   icon: AlertTriangle },
@@ -308,8 +311,19 @@ const issueStatusConfig = {
   resolved:    { bg: 'var(--accent-green-dim)',  color: 'var(--accent-green)'  },
 };
 
+// A task that is done, or a calendar invite already answered, is not pending
+const SETTLED_TASK = ['Done', 'done', 'Accepted', 'accepted', 'Declined', 'declined'];
+
 export default function OperationsPage() {
   const { t } = useLanguage();
+  // Names, never the stored codes (high, in_progress)
+  const severityLabel = (sev) => ({ low: t('operations.severityLow'), medium: t('operations.severityMedium'), high: t('operations.severityHigh'), critical: t('operations.severityCritical') }[String(sev || '').toLowerCase()] || sev);
+  const issueStatusLabel = (st) => ({ open: t('operations.issueOpen'), in_progress: t('tasks.statusInProgress'), resolved: t('operations.issueResolved') }[st] || st);
+  // A card or a quick action only leads to a page this role can open; the
+  // others sent the front desk to a page that sent them straight back
+  const allowedPages = pagesFor(getRole()).pages;
+  const canOpen = (path) => !allowedPages || allowedPages.includes(path.split('/').filter(Boolean)[0]);
+  const linkTo = (path) => (canOpen(path) ? () => navigate(path) : undefined);
   const translateRole = (role) => { const k = ROLE_KEYS[role]; return k ? t(`staff.${k}`) : (role || ''); };
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -394,7 +408,7 @@ export default function OperationsPage() {
     { icon: Wrench, label: t('operations.openIssues'), value: openIssues, color: openIssues ? 'var(--accent-red)' : undefined },
   ];
 
-  const pendingTasks = tasks.filter(t => t.status !== 'Done' && t.status !== 'done');
+  const pendingTasks = tasks.filter(task => !SETTLED_TASK.includes(task.status));
 
   const handleSaveTask = async (form) => {
     const payload = {
@@ -472,12 +486,12 @@ export default function OperationsPage() {
         {issues.filter(i => i.status !== 'resolved').length > 0 && (
           <div style={{ padding: '0 16px 14px' }}>
             <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 10, fontFamily: 'DM Sans' }}>
-              Equipment Issues
+              {t('operations.equipmentIssues')}
             </div>
             {issues.filter(i => i.status !== 'resolved').slice(0, 3).map(issue => (
               <div key={issue.id} style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12, padding: '11px 14px', marginBottom: 8 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{issue.equipment || issue.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2 }}>{issue.issue || issue.status}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2 }}>{issue.description || issueStatusLabel(issue.status)}</div>
               </div>
             ))}
           </div>
@@ -497,17 +511,17 @@ export default function OperationsPage() {
 
       {/* Row 1 : 4 cards */}
       <div className="gem-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 14 }}>
-        <SummaryCard label={t('operations.checkInsToday')} value={String(todayCheckIns)} icon={UserCheck} accent="var(--accent-green)" dim="var(--accent-green-dim)" onClick={() => navigate('/attendance')} />
-        <SummaryCard label={t('operations.newMembers')} value={String(todayMembers)} icon={UserPlus} accent="var(--accent-gold)" dim="var(--accent-gold-dim)" onClick={() => navigate('/members')} />
-        <SummaryCard label={t('operations.paymentsReceived')} value={String(todayPayments.length)} icon={CreditCard} accent="var(--accent-blue)" dim="var(--accent-blue-dim)" onClick={() => navigate('/payments')} />
-        <SummaryCard label={t('operations.revenueToday')} value={fmtMoney(todayRevenue)} sub={revenueSplit} icon={TrendingUp} accent="var(--accent-purple)" dim="var(--accent-purple-dim)" onClick={() => navigate('/accounting')} />
+        <SummaryCard label={t('operations.checkInsToday')} value={String(todayCheckIns)} icon={UserCheck} accent="var(--accent-green)" dim="var(--accent-green-dim)" onClick={linkTo('/attendance')} />
+        <SummaryCard label={t('operations.newMembers')} value={String(todayMembers)} icon={UserPlus} accent="var(--accent-gold)" dim="var(--accent-gold-dim)" onClick={linkTo('/members')} />
+        <SummaryCard label={t('operations.paymentsReceived')} value={String(todayPayments.length)} icon={CreditCard} accent="var(--accent-blue)" dim="var(--accent-blue-dim)" onClick={linkTo('/payments')} />
+        <SummaryCard label={t('operations.revenueToday')} value={fmtMoney(todayRevenue)} sub={revenueSplit} icon={TrendingUp} accent="var(--accent-purple)" dim="var(--accent-purple-dim)" onClick={linkTo('/accounting')} />
       </div>
 
       {/* Row 2 : 3 cards */}
       <div className="gem-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
-        <SummaryCard label={t('operations.visitorsToday')} value={String(todayVisitors)} icon={Users} accent="var(--accent-blue)" dim="var(--accent-blue-dim)" onClick={() => navigate('/attendance')} />
-        <SummaryCard label={t('operations.staffCount')} value={String(staffList.filter(s => s.isActive !== false && isWorkingToday(s)).length)} icon={ShoppingBag} accent="var(--accent-yellow)" dim="var(--accent-yellow-dim)" onClick={() => navigate('/staff')} />
-        <SummaryCard label={t('operations.expendituresToday')} value={fmtMoney(todayExpenses)} icon={TrendingDown} accent="var(--accent-red)" dim="var(--accent-red-dim)" onClick={() => navigate('/accounting')} />
+        <SummaryCard label={t('operations.visitorsToday')} value={String(todayVisitors)} icon={Users} accent="var(--accent-blue)" dim="var(--accent-blue-dim)" onClick={linkTo('/attendance')} />
+        <SummaryCard label={t('operations.staffCount')} value={String(staffList.filter(s => s.isActive !== false && isWorkingToday(s)).length)} icon={ShoppingBag} accent="var(--accent-yellow)" dim="var(--accent-yellow-dim)" onClick={linkTo('/staff')} />
+        <SummaryCard label={t('operations.expendituresToday')} value={fmtMoney(todayExpenses)} icon={TrendingDown} accent="var(--accent-red)" dim="var(--accent-red-dim)" onClick={linkTo('/accounting')} />
       </div>
 
       {/* Two-column grid */}
@@ -560,7 +574,7 @@ export default function OperationsPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                         <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{task.title}</span>
-                        <span style={{ ...pc, borderRadius: 20, padding: '2px 8px', fontSize: 10, fontWeight: 600, fontFamily: 'DM Sans', whiteSpace: 'nowrap', flexShrink: 0 }}>{task.priority}</span>
+                        <span style={{ ...pc, borderRadius: 20, padding: '2px 8px', fontSize: 10, fontWeight: 600, fontFamily: 'DM Sans', whiteSpace: 'nowrap', flexShrink: 0 }}>{t(`tasks.priority${task.priority}`)}</span>
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 3 }}>
                         {assigneeName} · {t('operations.due')} {dueDisplay}
@@ -610,7 +624,7 @@ export default function OperationsPage() {
                 ) : (
                   <div style={{ padding: '8px 0' }}>
                     {filtered.map((issue, i) => {
-                      const sev = severityConfig[issue.severity] || severityConfig.medium;
+                      const sev = severityConfig[String(issue.severity || '').toLowerCase()] || severityConfig.medium;
                       const ist = issueStatusConfig[issue.status] || issueStatusConfig.open;
                       return (
                         <div key={issue.id} style={{ padding: '14px 20px', borderBottom: i < filtered.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
@@ -625,8 +639,8 @@ export default function OperationsPage() {
                               </div>
                             </div>
                             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                              <span style={{ background: sev.bg, color: sev.color, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4, fontFamily: 'DM Sans' }}>{issue.severity}</span>
-                              <span style={{ background: ist.bg, color: ist.color, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4, fontFamily: 'DM Sans' }}>{issue.status}</span>
+                              <span style={{ background: sev.bg, color: sev.color, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4, fontFamily: 'DM Sans' }}>{severityLabel(issue.severity)}</span>
+                              <span style={{ background: ist.bg, color: ist.color, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4, fontFamily: 'DM Sans' }}>{issueStatusLabel(issue.status)}</span>
                             </div>
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans', lineHeight: 1.5, marginBottom: 6, paddingLeft: 36 }}>{issue.description}</div>
@@ -674,14 +688,14 @@ export default function OperationsPage() {
             </div>
             <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
-                { label: t('operations.recordCheckIn'), icon: UserCheck, accent: 'var(--accent-green)', dim: 'var(--accent-green-dim)', action: () => navigate('/attendance') },
+                { label: t('operations.recordCheckIn'), icon: UserCheck, accent: 'var(--accent-green)', dim: 'var(--accent-green-dim)', action: () => navigate('/attendance'), to: '/attendance' },
                 { label: t('dashboard.addMember'), icon: UserPlus, accent: 'var(--accent-gold)', dim: 'var(--accent-gold-dim)', action: () => setShowAddMember(true) },
-                { label: t('operations.recordPayment'), icon: CreditCard, accent: 'var(--accent-blue)', dim: 'var(--accent-blue-dim)', action: () => navigate('/payments') },
-                { label: t('dashboard.recordExpense'), icon: Wallet, accent: 'var(--accent-red)', dim: 'var(--accent-red-dim)', action: () => navigate('/accounting') },
-                { label: t('operations.sendAnnouncement'), icon: Megaphone, accent: 'var(--accent-purple)', dim: 'var(--accent-purple-dim)', action: () => navigate('/communication') },
+                { label: t('operations.recordPayment'), icon: CreditCard, accent: 'var(--accent-blue)', dim: 'var(--accent-blue-dim)', action: () => navigate('/payments'), to: '/payments' },
+                { label: t('dashboard.recordExpense'), icon: Wallet, accent: 'var(--accent-red)', dim: 'var(--accent-red-dim)', action: () => navigate('/accounting'), to: '/accounting' },
+                { label: t('operations.sendAnnouncement'), icon: Megaphone, accent: 'var(--accent-purple)', dim: 'var(--accent-purple-dim)', action: () => navigate('/communication'), to: '/communication' },
                 { label: t('tasks.addTask'), icon: ClipboardList, accent: 'var(--accent-purple)', dim: 'var(--accent-purple-dim)', action: () => setShowAddTask(true) },
                 { label: t('operations.reportIssue'), icon: Wrench, accent: 'var(--accent-yellow)', dim: 'var(--accent-yellow-dim)', action: () => setShowReportIssue(true) },
-              ].map(({ label, icon: Icon, accent, dim, action }) => (
+              ].filter(a => !a.to || canOpen(a.to)).map(({ label, icon: Icon, accent, dim, action }) => (
                 <button
                   key={label}
                   onClick={action}

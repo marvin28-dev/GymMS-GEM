@@ -15,7 +15,7 @@ import { getRole, getAuth } from '../utils/auth';
 import { notifyDataChanged } from '../utils/events';
 import { TASK_CATEGORIES, categoryColor, categoryLabel, normalizeCategory } from '../utils/taskCategories';
 import { assignFields, assignValue } from '../utils/departments';
-import { taskNeedsAttention } from '../utils/attention';
+import { taskNeedsAttention, taskOverdue } from '../utils/attention';
 import { softAll } from '../utils/loadAll';
 import { serverFieldError } from '../utils/formErrors';
 import { gymCache } from '../utils/gymCache';
@@ -63,7 +63,6 @@ export default function TasksPage() {
   const [actionError, setActionError] = useState('');
 
   const [loading, setLoading] = useState(() => !cache.has('list'));
-  const today = new Date();
 
   const liveTick = useLiveTick();
   useEffect(() => {
@@ -93,7 +92,7 @@ export default function TasksPage() {
   const filtered = tasks.filter(t => {
     const assignedName = typeof t.assignedTo === 'string' ? t.assignedTo : '';
     const matchSearch = !search || t.title.toLowerCase().includes(search.toLowerCase()) || assignedName.toLowerCase().includes(search.toLowerCase());
-    const isOverdue = t.status !== 'Done' && t.dueDate && new Date(t.dueDate) < today;
+    const isOverdue = taskOverdue(t);
     const matchStatus = statusFilter === 'All'
       || (statusFilter === 'Overdue' ? isOverdue
         : statusFilter === 'Attention' ? taskNeedsAttention(t)
@@ -362,7 +361,7 @@ export default function TasksPage() {
         <div style={{ padding: '16px 16px 10px' }}>
           <h1 style={{ fontFamily: 'Manrope', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{t('nav.tasks')}</h1>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '3px 0 0', fontFamily: 'DM Sans' }}>
-            {pendingCount > 0 ? t('tasks.pendingTasksPlural', { count: pendingCount }) : t('tasks.totalTasks', { count: tasks.length })}
+            {pendingCount > 0 ? `${pendingCount} ${pendingCount !== 1 ? t('tasks.pendingTasksPlural') : t('tasks.pendingTasks')}` : t('tasks.totalTasks', { count: tasks.length })}
           </p>
         </div>
 
@@ -414,7 +413,7 @@ export default function TasksPage() {
           ) : filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>{t('tasks.noTasksFound')}</div>
           ) : filtered.map(task => {
-            const isOverdue = task.status !== 'Done' && task.dueDate && new Date(task.dueDate) < today;
+            const isOverdue = taskOverdue(task);
             const isDone = task.status === 'Done';
             const pc = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS.Medium;
             return (
@@ -441,13 +440,13 @@ export default function TasksPage() {
                     {task.title}
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 20, background: pc.bg, color: pc.color, fontFamily: 'DM Sans' }}>{task.priority}</span>
+                    <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 20, background: pc.bg, color: pc.color, fontFamily: 'DM Sans' }}>{t(`tasks.priority${task.priority}`)}</span>
                     {task.category && (
                       <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 20, background: `${categoryColor(task.category)}1f`, color: categoryColor(task.category), fontFamily: 'DM Sans' }}>{categoryLabel(task.category, t)}</span>
                     )}
                     {task.dueDate && (
                       <span style={{ fontSize: 11, color: isOverdue ? 'var(--accent-red)' : 'var(--text-muted)', fontFamily: 'DM Sans' }}>
-                        {isOverdue ? 'Overdue · ' : ''}{String(task.dueDate).slice(0, 10)}
+                        {isOverdue ? `${t('tasks.overdue')} · ` : ''}{String(task.dueDate).slice(0, 10)}
                       </span>
                     )}
                     {task.assignedTo && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{task.assignedTo}</span>}
@@ -605,7 +604,7 @@ export default function TasksPage() {
             </thead>
             <tbody>
               {filtered.map(task => {
-                const isOverdue = task.status !== 'Done' && new Date(task.dueDate) < today;
+                const isOverdue = taskOverdue(task);
                 const pc = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS.Medium;
                 return (
                   <tr key={task.id} style={{ borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer' }}
@@ -616,7 +615,7 @@ export default function TasksPage() {
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{task.title}</span>
                         {task.category && (
                           <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap', background: `${categoryColor(task.category)}1f`, color: categoryColor(task.category) }}>
-                            {task.category}
+                            {categoryLabel(task.category, t)}
                           </span>
                         )}
                       </div>

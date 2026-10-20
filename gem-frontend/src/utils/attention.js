@@ -58,16 +58,25 @@ export function memberNeedsAttention(m) {
   return false;
 }
 
+// Done, accepted and declined are finished
+const settledTask = (t) => ['Done', 'Accepted', 'Declined'].includes(t?.status);
+
+// Overdue once its due day has passed, not during it. A due date is stored as
+// that day at midnight UTC, so the day is read from the date as stored; the
+// moment, or the local reading of it, put a task due today overdue all day.
+export function taskOverdue(t) {
+  if (!t?.dueDate || settledTask(t)) return false;
+  return String(t.dueDate).slice(0, 10) < todayStr();
+}
+
 // A task needs attention when it is not settled and is either waiting to be
 // started (Pending) or past its due date. One already in progress and still in
-// time does not; done, accepted and declined are finished.
+// time does not.
 export function taskNeedsAttention(t) {
-  if (!t) return false;
+  if (!t || settledTask(t)) return false;
   const s = t.status || 'Pending';
-  if (s === 'Done' || s === 'Accepted' || s === 'Declined') return false;
   if (s === 'Pending' || s === 'Overdue') return true;
-  if (t.dueDate) { try { return dayStr(t.dueDate) < todayStr(); } catch { return false; } }
-  return false;
+  return taskOverdue(t);
 }
 
 export function countMembersNeedingAttention(list) {
