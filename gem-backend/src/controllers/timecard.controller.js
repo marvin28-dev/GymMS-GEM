@@ -418,12 +418,16 @@ function endOfShift(punchIn, punchOut) {
   return rolled - start <= DAY_MS ? rolled : end;
 }
 
-// 'HH:MM' against a card's own date. undefined means "leave it alone".
+// 'HH:MM' against a card's own date. undefined means "leave it alone". A
+// 12-hour time ("02:30 PM") is read as the clock means it: reading only the
+// digits stored every afternoon time written that way twelve hours early.
 function timeOnDay(date, hhmm) {
-  const m = /^(\d{1,2}):(\d{2})/.exec(String(hhmm || ''));
+  const m = /^(\d{1,2}):(\d{2})(?:\s*([AaPp])\.?[Mm]\.?)?/.exec(String(hhmm || '').trim());
   if (!m) return undefined;
+  let hours = Number(m[1]);
+  if (m[3]) hours = (hours % 12) + (/p/i.test(m[3]) ? 12 : 0);
   const d = new Date(date);
-  d.setHours(Number(m[1]), Number(m[2]), 0, 0);
+  d.setHours(hours, Number(m[2]), 0, 0);
   return d;
 }
 
