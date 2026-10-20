@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { DATA_CHANGED } from '../utils/events';
 import { getRole } from '../utils/auth';
 import { TASKS_PATH } from '../utils/rolePages';
+import LoadFailed from './ui/LoadFailed';
 
 // Every notification points somewhere: the server's own link when it set one,
 // otherwise a best guess from its title/type. Nothing is a dead end. Where the
@@ -41,10 +42,11 @@ export default function NotificationBell({ onOpenLink }) {
   const { t } = useLanguage();
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const boxRef = useRef(null);
 
   const refresh = useCallback(() => {
-    getNotifs().then(res => setItems(res.data || [])).catch(() => {});
+    getNotifs().then(res => { setItems(res.data || []); setLoadFailed(false); }).catch(() => setLoadFailed(true));
   }, []);
 
   useEffect(() => {
@@ -122,11 +124,13 @@ export default function NotificationBell({ onOpenLink }) {
               </button>
             )}
           </div>
-          {items.length === 0 ? (
+          {items.length === 0 ? (loadFailed ? (
+            <div style={{ padding: 12 }}><LoadFailed message={t('notifications.loadFailed')} onRetry={refresh} /></div>
+          ) : (
             <div style={{ padding: '26px 14px', textAlign: 'center', fontSize: 12.5, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>
               {t('header.noNotifications')}
             </div>
-          ) : items.slice(0, 20).map(n => (
+          )) : items.slice(0, 20).map(n => (
             <div key={n.id} style={{ display: 'flex', gap: 8, padding: '11px 14px', borderBottom: '1px solid var(--border-subtle)' }}>
               <div
                 style={{ flex: 1, minWidth: 0, cursor: onOpenLink ? 'pointer' : 'default' }}

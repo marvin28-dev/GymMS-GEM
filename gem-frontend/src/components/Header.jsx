@@ -8,6 +8,7 @@ import { TASKS_PATH } from '../utils/rolePages';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useSessionPhoto } from '../utils/sessionPhoto';
 import GlobalSearch from './GlobalSearch';
+import LoadFailed from './ui/LoadFailed';
 
 const ROLE_KEYS = {
   general_manager: 'generalManager',
@@ -48,18 +49,22 @@ export default function Header({ onMenuClick, isMobile: isMobileProp }) {
   const roleKey = ROLE_KEYS[authUser.role];
   const roleLabel = roleKey ? t(`staff.${roleKey}`) : (authUser.role || 'Manager');
   const [expandNotifs, setExpandNotifs] = useState(false);
+  const [notifsFailed, setNotifsFailed] = useState(false);
 
   // The header never unmounts, so fetching once on mount meant a new
   // notification only appeared after a full page reload.
   const refreshNotifs = useCallback(() => {
     getNotifs()
-      .then(res => setNotifs((res.data || []).map(n => ({
-        ...n,
-        unread: !n.isRead,
-        text: n.body,
-        time: formatNotifTime(n.createdAt, t),
-      }))))
-      .catch(() => {});
+      .then(res => {
+        setNotifs((res.data || []).map(n => ({
+          ...n,
+          unread: !n.isRead,
+          text: n.body,
+          time: formatNotifTime(n.createdAt, t),
+        })));
+        setNotifsFailed(false);
+      })
+      .catch(() => setNotifsFailed(true));
   }, [t]);
 
   useEffect(() => { refreshNotifs(); }, [refreshNotifs]);
@@ -275,7 +280,10 @@ export default function Header({ onMenuClick, isMobile: isMobileProp }) {
 
               {/* Items */}
               <div style={{ maxHeight: expandNotifs ? 520 : 280, overflowY: 'auto', transition: 'max-height 0.25s ease' }}>
-                {notifs.length === 0 && (
+                {notifs.length === 0 && notifsFailed && (
+                  <div style={{ padding: 12 }}><LoadFailed message={t('notifications.loadFailed')} onRetry={refreshNotifs} /></div>
+                )}
+                {notifs.length === 0 && !notifsFailed && (
                   <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>
                     {t('header.noNotifications')}
                   </div>

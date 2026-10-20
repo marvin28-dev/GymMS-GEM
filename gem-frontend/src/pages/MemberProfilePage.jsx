@@ -9,6 +9,7 @@ import { autoPaymentDescription } from '../utils/paymentDescription';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import CodeInput from '../components/ui/CodeInput';
+import LoadFailed from '../components/ui/LoadFailed';
 import {
   ArrowLeft, Edit2, CreditCard, LogIn, Snowflake, XCircle, BookOpen,
   Package, RefreshCw, MessageSquare, StickyNote, Plus, User,
@@ -2636,17 +2637,24 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
   const [packagesList, setPackagesList] = useState(seedPackages && seedPackages.length ? seedPackages : []);
   const [loading, setLoading]       = useState(!seedMember);
 
+  // The member, the gym and the packages load apart, so one failing does not
+  // hide the rest, and a member who could not be fetched is not called
+  // missing: only a 404 is "not found" (F-102).
+  const [loadFailed, setLoadFailed] = useState(null);
+  const [partsFailed, setPartsFailed] = useState(false);
+  const [loadTick, setLoadTick] = useState(0);
   useEffect(() => {
     if (!id) return;
-    Promise.all([getMemberById(id), getMyGym(), getPackages()])
-      .then(([mRes, gRes, pRes]) => {
-        setMember(mRes.data);
-        setGymData(gRes.data);
-        setPackagesList(pRes.data || []);
-      })
-      .catch(console.error)
+    setLoadFailed(null);
+    setPartsFailed(false);
+    getMemberById(id)
+      .then(r => setMember(r.data))
+      .catch(err => setLoadFailed(err?.response?.status === 404 ? { notFound: true } : { message: err?.response?.data?.error }))
       .finally(() => setLoading(false));
-  }, [id]);
+    getMyGym().then(r => setGymData(r.data)).catch(() => setPartsFailed(true));
+    getPackages().then(r => setPackagesList(r.data || [])).catch(() => setPartsFailed(true));
+  }, [id, loadTick]);
+  const retryLoad = () => setLoadTick(n => n + 1);
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
@@ -2762,7 +2770,13 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
   // email and text this member was really sent.
   const [memberNotes, setMemberNotes] = useState([]);
   const [memberMessages, setMemberMessages] = useState([]);
-  const loadMessages = () => { if (id && !isFitness(getRole())) getMemberMessages(id).then(r => setMemberMessages(r.data || [])).catch(() => {}); };
+  const [messagesFailed, setMessagesFailed] = useState(false);
+  const loadMessages = () => {
+    if (!id || isFitness(getRole())) return;
+    getMemberMessages(id)
+      .then(r => { setMemberMessages(r.data || []); setMessagesFailed(false); })
+      .catch(() => setMessagesFailed(true));
+  };
   useEffect(() => {
     if (!id) return;
     try { setMemberNotes(JSON.parse(localStorage.getItem(`gem_member_notes_${id}`) || '[]')); } catch {}
@@ -2819,6 +2833,18 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
   }
 
   if (!member) {
+    if (loadFailed && !loadFailed.notFound) {
+      return (
+        <div style={{ padding: 32, maxWidth: 520, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
+          <LoadFailed message={loadFailed.message || t('memberProfile.loadFailed')} onRetry={retryLoad} style={{ width: '100%' }} />
+          {!hideBack && (
+            <button style={secondaryBtn} onClick={() => onBack ? onBack() : navigate(fromFrontDesk ? '/front-desk' : '/members')}>
+              <X size={14} /> {t('common.close')}
+            </button>
+          )}
+        </div>
+      );
+    }
     return (
       <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>
         <User size={48} style={{ marginBottom: 16, opacity: 0.4 }} />
@@ -3369,7 +3395,9 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
             </tr>
           </thead>
           <tbody>
-            {memberMessages.length === 0 ? (
+            {memberMessages.length === 0 && messagesFailed ? (
+              <tr><td colSpan={5} style={{ padding: 16 }}><LoadFailed message={t('memberProfile.messagesLoadFailed')} onRetry={loadMessages} /></td></tr>
+            ) : memberMessages.length === 0 ? (
               <tr><td colSpan={5} style={{ padding: 0 }}><EmptyState icon={MessageSquare} title={t('memberProfile.noMessagesTitle')} hint={t('memberProfile.noMessagesHint')} /></td></tr>
             ) : memberMessages.map(m => {
               const c = m.communication || {};
@@ -3458,6 +3486,10 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
 
   return (
     <div className={onBack ? undefined : 'page-fade'} style={{ padding: 28, maxWidth: 1200, margin: '0 auto' }}>
+
+      {(partsFailed || (loadFailed && !loadFailed.notFound)) && (
+        <LoadFailed message={t('memberProfile.partLoadFailed')} onRetry={retryLoad} style={{ marginBottom: 20 }} />
+      )}
 
       {/* ── Suspension / reg fee overdue banner ── */}
       {(isSuspended || regFeeStatusVal === 'overdue' || regFeeStatusVal === 'grace') && (

@@ -9,6 +9,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import RowMenu from '../components/ui/RowMenu';
 import Avatar from '../components/ui/Avatar';
 import Modal from '../components/ui/Modal';
+import LoadFailed from '../components/ui/LoadFailed';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import { canManage as outranks, canSeePrivateFields } from '../utils/hierarchy';
@@ -126,6 +127,13 @@ const inputStyle = { width: '100%', background: 'var(--bg-elevated)', border: '1
 // Pay and a rota mean nothing for a cleaner or a technician, so their profile
 // is not asked to complete them.
 const SETUP_SKIPPED_FOR_OTHER = new Set(['salary', 'schedule']);
+
+// Marks a part of the profile as not loaded. With keepRefusals a 403 is left
+// alone: a manager is refused pay records and bonuses on purpose (D-31).
+const markFailed = (set, key, keepRefusals = false) => (err) => {
+  if (keepRefusals && err?.response?.status === 403) return;
+  set(prev => ({ ...prev, [key]: true }));
+};
 
 const TABS = ['Details', 'Tasks Assigned', 'Schedule', 'Calendar', 'Clients', 'Pay & Earnings', 'Notes'];
 const TAB_KEYS = ['staff.tabDetails', 'staff.tabTasks', 'staff.tabSchedule', 'staff.tabCalendar', 'staff.tabClients', 'staff.tabPayEarnings', 'staff.tabNotes'];
@@ -464,10 +472,14 @@ export default function StaffProfilePage() {
   const [salarySaving, setSalarySaving] = useState(false);
   const [adjRemoveError, setAdjRemoveError] = useState(null);
 
+  // Parts of the profile that could not be loaded say so, with a retry (F-102)
+  const [sectionFailed, setSectionFailed] = useState({});
+  const [retryTick, setRetryTick] = useState(0);
+
   useEffect(() => {
     if (!id) return;
-    getAdjustments(id).then(res => setAdjustments(res.data || [])).catch(() => {});
-  }, [id]);
+    getAdjustments(id).then(res => setAdjustments(res.data || [])).catch(markFailed(setSectionFailed, 'pay', true));
+  }, [id, retryTick]);
 
   // Pay history and pay day both live on the server so they follow the gym
   // across devices rather than sitting in one browser's localStorage.
@@ -475,14 +487,14 @@ export default function StaffProfilePage() {
     if (!id) return;
     getPayRecords(id)
       .then(res => setPayRecords(res.data || []))
-      .catch(() => {});
-  }, [id]);
+      .catch(markFailed(setSectionFailed, 'pay', true));
+  }, [id, retryTick]);
 
   useEffect(() => {
     getMyGym()
       .then(res => setGymPayDay(res.data?.payDay != null ? String(res.data.payDay) : ''))
-      .catch(() => {});
-  }, []);
+      .catch(markFailed(setSectionFailed, 'pay'));
+  }, [retryTick]);
 
   // Change password
   const [showChangePw, setShowChangePw] = useState(false);
@@ -538,7 +550,7 @@ export default function StaffProfilePage() {
         if (Array.isArray(s.staffNotes)) setNotes(s.staffNotes);
         setPayDay(s.payDay != null ? String(s.payDay) : '');
         // Load timecards for this staff member
-        getTimecards({ staffId: s.id }).then(r => setTimecards(r.data || [])).catch(() => {});
+        getTimecards({ staffId: s.id }).then(r => setTimecards(r.data || [])).catch(markFailed(setSectionFailed, 'pay', true));
       })
       .catch(err => {
         console.error('Failed to load staff:', err);
@@ -552,7 +564,7 @@ export default function StaffProfilePage() {
         }
       })
       .finally(() => setLoadingStaff(false));
-  }, [id, liveTick]);
+  }, [id, liveTick, retryTick]);
 
 
   useEffect(() => {
@@ -577,8 +589,8 @@ export default function StaffProfilePage() {
         }).filter(tk => tk._personal || tk._created);
         setLocalTasks(tagged);
       })
-      .catch(console.error);
-  }, [memberData?.id, id, liveTick]);
+      .catch(markFailed(setSectionFailed, 'tasks'));
+  }, [memberData?.id, id, liveTick, retryTick]);
 
   // This person's own calendar: the classes they run and the gym events they
   // have accepted. An event they were invited to but have not accepted does not
@@ -612,8 +624,8 @@ export default function StaffProfilePage() {
         })).sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
         setCalItems(mine);
       })
-      .catch(() => {});
-  }, [memberData?.id, id, liveTick]);
+      .catch(markFailed(setSectionFailed, 'calendar'));
+  }, [memberData?.id, id, liveTick, retryTick]);
 
   if (loadingStaff) {
     return (
@@ -757,6 +769,11 @@ export default function StaffProfilePage() {
   // The person's calendar as a dated agenda, grouped by day and split into
   // what is still to come and what has passed. Shared by both layouts.
   const EVT_COLORS = { gold: '#c9a96e', blue: '#60a5fa', green: '#34d399', red: '#f87171', purple: '#a78bfa' };
+  const retrySections = () => { setSectionFailed({}); setRetryTick(n => n + 1); };
+  const sectionProblem = (key, style) => (sectionFailed[key]
+    ? <LoadFailed message={t(`staff.${key}LoadFailed`)} onRetry={retrySections} style={style} />
+    : null);
+
   const calendarAgenda = (() => {
     const todayStr = getToday();
     // Only what is still to come - a profile's calendar is for planning, not a
@@ -1668,6 +1685,7 @@ export default function StaffProfilePage() {
         {/* ── Tasks tab ── */}
         {activeTab === 'Tasks Assigned' && (
           <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {sectionProblem('tasks')}
             {localTasks.length > 0 && (
               <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 2 }}>
                 {[
@@ -1800,12 +1818,13 @@ export default function StaffProfilePage() {
         )}
 
         {/* ── Calendar tab ── */}
-        {activeTab === 'Calendar' && calendarAgenda}
+        {activeTab === 'Calendar' && <>{sectionProblem('calendar', { margin: '14px 16px 0' })}{calendarAgenda}</>}
         {activeTab === 'Clients' && showsClients && <div style={{ padding: '14px 16px' }}><CoachClientsPanel staffId={memberData.id} /></div>}
 
         {/* ── Pay tab ── */}
         {activeTab === 'Pay & Earnings' && seesPrivate && (
           <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {sectionProblem('pay')}
             {paySummary}
             {/* Bonuses, deductions and the pay they add up to - one card */}
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden' }}>
@@ -2497,6 +2516,7 @@ export default function StaffProfilePage() {
       )}
 
       {/* ── Tasks Assigned ───────────────────────────────────────────────── */}
+      {activeTab === 'Tasks Assigned' && sectionProblem('tasks', { marginBottom: 12 })}
       {activeTab === 'Tasks Assigned' && (
         <div style={cardStyle}>
           <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2689,6 +2709,7 @@ export default function StaffProfilePage() {
       )}
 
       {/* ── Calendar ─────────────────────────────────────────────────────── */}
+      {activeTab === 'Calendar' && sectionProblem('calendar', { marginBottom: 12 })}
       {activeTab === 'Calendar' && (
         <div style={cardStyle}>
           <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
@@ -2703,6 +2724,7 @@ export default function StaffProfilePage() {
       {/* ── Pay & Earnings ───────────────────────────────────────────────── */}
       {activeTab === 'Pay & Earnings' && seesPrivate && (
         <div>
+          {sectionProblem('pay', { marginBottom: 12 })}
           <div style={{ marginBottom: 16 }}>{paySummary}</div>
 
           {/* One card: the two ledgers side by side, and the pay they add up to */}

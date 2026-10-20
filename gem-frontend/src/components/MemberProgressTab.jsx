@@ -14,6 +14,7 @@ import { getAuth, getRole } from '../utils/auth';
 import { isFitness } from '../utils/rolePages';
 import { membershipEnded, hasGoals, trackOf, reasonLines } from '../utils/coaching';
 import { fmtDate, dayStr, todayStr, addDaysStr, capFirst, getDateLocale } from '../utils/date';
+import LoadFailed from './ui/LoadFailed';
 
 const COACHING = ['general_manager', 'manager', 'trainer', 'instructor', 'coach'];
 const MANAGEMENT = ['general_manager', 'manager'];
@@ -79,8 +80,13 @@ export default function MemberProgressTab({ member, visits = [], onGoalsChanged 
   const [historyFilter, setHistoryFilter] = useState('all');
   const [noteTopic, setNoteTopic] = useState('all');
   const [error, setError] = useState('');
+  // A failed load says so, instead of "No progress yet"
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  const load = () => getProgress(member.id).then(r => setLogs(r.data || [])).catch(() => {}).finally(() => setLoading(false));
+  const load = () => getProgress(member.id)
+    .then(r => { setLogs(r.data || []); setLoadFailed(false); })
+    .catch(() => setLoadFailed(true))
+    .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [member.id]);
   useLiveRefresh(load, ['coach']);
@@ -265,6 +271,7 @@ export default function MemberProgressTab({ member, visits = [], onGoalsChanged 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {loadFailed && <LoadFailed message={t('coach.progressLoadFailed')} onRetry={load} />}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Activity size={16} color="var(--accent-gold)" /> {t('coach.progressTitle')}
@@ -393,7 +400,7 @@ export default function MemberProgressTab({ member, visits = [], onGoalsChanged 
         </div>
         {loading ? (
           <div style={{ padding: 20, fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('common.loading')}</div>
-        ) : logs.length === 0 ? (
+        ) : logs.length === 0 && loadFailed ? null : logs.length === 0 ? (
           <div style={{ padding: '28px 20px', textAlign: 'center', fontFamily: 'DM Sans' }}>
             <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--bg-elevated)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}><Activity size={20} color="var(--text-muted)" /></div>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('coach.noProgressTitle')}</div>

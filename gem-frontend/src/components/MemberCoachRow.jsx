@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Dumbbell, Target } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { assignCoach } from '../services/coach.service';
@@ -7,6 +7,7 @@ import { getAuth, getRole } from '../utils/auth';
 import { membershipEnded, hasGoals } from '../utils/coaching';
 import GoalsModal from './GoalsModal';
 import Modal from './ui/Modal';
+import LoadFailed from './ui/LoadFailed';
 
 const FITNESS = ['trainer', 'instructor', 'coach'];
 const MANAGEMENT = ['general_manager', 'manager'];
@@ -34,10 +35,16 @@ export default function MemberCoachRow({ member, onChanged }) {
   const mine = !!coach && coach.id === me;
   const ended = membershipEnded(member);
 
+  // A list that failed to load says so, rather than offering no coaches
+  const [coachesFailed, setCoachesFailed] = useState(false);
+  const loadCoaches = useCallback(() => {
+    getStaff()
+      .then(r => { setCoaches((r.data || []).filter(s => FITNESS.includes(s.role) && s.isActive !== false)); setCoachesFailed(false); })
+      .catch(() => setCoachesFailed(true));
+  }, []);
   useEffect(() => {
-    if (!isMgmt) return;
-    getStaff().then(r => setCoaches((r.data || []).filter(s => FITNESS.includes(s.role) && s.isActive !== false))).catch(() => {});
-  }, [isMgmt]);
+    if (isMgmt) loadCoaches();
+  }, [isMgmt, loadCoaches]);
 
   const change = async (coachId) => {
     setBusy(true); setError(''); setConfirmStop(false);
@@ -83,6 +90,7 @@ export default function MemberCoachRow({ member, onChanged }) {
         )}
       </span>
       {error && <div role="alert" style={{ width: '100%', fontSize: 12.5, color: 'var(--accent-red)' }}>{error}</div>}
+      {isMgmt && coachesFailed && <LoadFailed message={t('coach.coachesLoadFailed')} onRetry={loadCoaches} style={{ width: '100%' }} />}
       {isMgmt && (() => {
         const next = pending ? (coaches.find(c => c.id === pending) || (coach?.id === pending ? coach : null)) : null;
         const who = nameOf(member);
