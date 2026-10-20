@@ -1510,6 +1510,7 @@ export default function StaffProfilePage() {
           <div style={{ background: 'var(--accent-gold-dim)', color: 'var(--accent-gold)', fontSize: 12, fontWeight: 600, padding: '3px 12px', borderRadius: 20, fontFamily: 'DM Sans' }}>{roleLabel}</div>
         </div>
 
+        {location.state?.newStaff?.photoProblem && <div role="alert" style={{ margin: '12px 16px 0', fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 10, padding: '10px 14px', fontFamily: 'DM Sans' }}>{location.state.newStaff.photoProblem}</div>}
         {/* A new employee chooses their own password the first time they sign in */}
         {location.state?.newStaff && !inviteFeedback && (
           <div style={{ margin: '12px 16px 0', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -2267,6 +2268,7 @@ export default function StaffProfilePage() {
         </div>
       )}
 
+      {location.state?.newStaff?.photoProblem && <div role="alert" style={{ marginBottom: 12, fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 10, padding: '10px 14px', fontFamily: 'DM Sans' }}>{location.state.newStaff.photoProblem}</div>}
       {/* A new employee chooses their own password the first time they sign in */}
       {location.state?.newStaff && (
         <div style={{ marginBottom: 16, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>

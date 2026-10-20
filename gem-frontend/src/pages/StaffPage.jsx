@@ -577,16 +577,19 @@ export default function StaffPage() {
 
   function openAdd() { setModalMode('add'); setEditingStaff(null); setSaveError(''); setModalOpen(true); }
   function openEdit(s) { setModalMode('edit'); setEditingStaff(s); setSaveError(''); setModalOpen(true); }
+  // A refused (de)activation is shown at the top of the list (F-120)
+  const [statusError, setStatusError] = useState('');
   function requestDeactivate(s) { setAuthTarget({ staff: s, action: 'deactivate' }); setShowStaffAuth(true); }
   function requestReactivate(s) { setAuthTarget({ staff: s, action: 'reactivate' }); setShowStaffAuth(true); }
   async function confirmStaffAuth() {
     if (!authTarget) return;
     const { staff, action } = authTarget;
     const isActive = action === 'reactivate';
+    setStatusError('');
     try {
       await updateStaff(staff.id, { isActive });
       setStaffList(prev => prev.map(s => s.id === staff.id ? { ...s, isActive, status: isActive ? 'active' : 'inactive' } : s));
-    } catch (err) { console.error(err); }
+    } catch (err) { setStatusError(err?.response?.data?.error || t('staff.failedSave')); }
     setShowStaffAuth(false); setAuthTarget(null);
   }
 
@@ -633,16 +636,19 @@ export default function StaffPage() {
       } else {
         const res = await createStaff(payload);
         const s = res.data;
-        // Upload photos to Cloudinary and persist URLs on the staff record
+        // Upload photos to Cloudinary and persist URLs on the staff record. The
+        // person exists by now, so a photo that fails is reported on their
+        // profile rather than lost without a word (F-120).
         const photoUpdates = {};
+        let photoProblem = '';
         if (form.photoFile) {
-          try { photoUpdates.photo = await uploadPhoto(form.photoFile, 'gem/staff'); } catch (err) { console.error('Profile photo upload failed:', err); }
+          try { photoUpdates.photo = await uploadPhoto(form.photoFile, 'gem/staff'); } catch { photoProblem = t('staff.photoFailedAfterCreate'); }
         }
         if (form.photoIdFile) {
-          try { photoUpdates.photoId = await uploadPhoto(form.photoIdFile, 'gem/staff/ids'); } catch (err) { console.error('ID photo upload failed:', err); }
+          try { photoUpdates.photoId = await uploadPhoto(form.photoIdFile, 'gem/staff/ids'); } catch { photoProblem = t('staff.photoFailedAfterCreate'); }
         }
         if (Object.keys(photoUpdates).length > 0) {
-          try { await updateStaff(s.id, photoUpdates); Object.assign(s, photoUpdates); } catch {}
+          try { await updateStaff(s.id, photoUpdates); Object.assign(s, photoUpdates); } catch { photoProblem = t('staff.photoFailedAfterCreate'); }
         }
         setStaffList(prev => [s, ...prev]);
         setModalOpen(false);
@@ -656,6 +662,7 @@ export default function StaffPage() {
               emergencyPhone: form.emergencyPhone || null,
               emailSent: s.emailSent === true,
               inviteEmail: s.email || null,
+              photoProblem,
             },
           },
         });
@@ -701,6 +708,7 @@ export default function StaffPage() {
     }
     return (
       <div style={{ minHeight: '100%' }}>
+        {statusError && <div role="alert" style={{ margin: '12px 16px 0', fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 10, padding: '10px 14px', fontFamily: 'DM Sans' }}>{statusError}</div>}
         <div style={{ padding: '16px 16px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1 style={{ fontFamily: 'Manrope', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{t('staff.title')}</h1>
@@ -784,6 +792,7 @@ export default function StaffPage() {
 
   return (
     <div style={{ fontFamily: 'DM Sans, sans-serif' }}>
+      {statusError && <div role="alert" style={{ marginBottom: 12, fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 10, padding: '10px 14px', fontFamily: 'DM Sans' }}>{statusError}</div>}
       {/* A blank subtitle drops the <p> from the DOM entirely (PageHeader only
           renders it when truthy), which shifts the button row down the instant
           the real count arrives. A non-breaking space keeps the line's height

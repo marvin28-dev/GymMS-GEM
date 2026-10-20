@@ -892,6 +892,7 @@ const translations = {
       "prevWeek": "Previous week",
       "nextWeek": "Next week",
       "photoFailed": "The photo could not be uploaded. Try again, or save without it.",
+      "photoFailedAfterCreate": "The employee was added, but their photo could not be saved. Add it from this profile.",
     },
     attendance: {
       title: 'Attendance', checkIn: 'Check In', checkOut: 'Check Out',
@@ -3008,6 +3009,7 @@ const translations = {
       "prevWeek": "Semaine précédente",
       "nextWeek": "Semaine suivante",
       "photoFailed": "La photo n’a pas pu être envoyée. Réessayez, ou enregistrez sans elle.",
+      "photoFailedAfterCreate": "L’employé a été ajouté, mais sa photo n’a pas pu être enregistrée. Ajoutez-la depuis ce profil.",
     },
     attendance: {
       title: 'Présences', checkIn: 'Entrée', checkOut: 'Sortie',
