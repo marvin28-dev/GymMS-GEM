@@ -5,12 +5,13 @@ import { getCurrencySymbol, formatMoney } from '../utils/currency';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Search, UserCheck, X, MoreHorizontal, LogOut, Clock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, CheckCircle, AlertCircle, AlertTriangle, QrCode, Calendar } from 'lucide-react';
+import { Search, UserCheck, X, MoreHorizontal, LogOut, Clock, ChevronLeft, ChevronRight, CheckCircle, AlertCircle, AlertTriangle, QrCode, Calendar } from 'lucide-react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import Avatar from '../components/ui/Avatar';
 import MemberStatusTags from '../components/ui/MemberStatusTags';
 import RowMenu from '../components/ui/RowMenu';
 import CodeInput from '../components/ui/CodeInput';
+import TimeInput from '../components/ui/TimeInput';
 import VisitKindBadge from '../components/ui/VisitKindBadge';
 import { getAll as getAttendance, checkIn as checkInApi, checkOut as checkOutApi } from '../services/attendance.service';
 import { getAll as getMembers } from '../services/members.service';
@@ -101,14 +102,15 @@ const toInputTime = (t) => {
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 };
 
-// Converts "HH:MM" (24h) → "09:42 AM" for display/storage
-const toDisplayTime = (t) => {
-  if (!t) return '';
-  if (t.includes('AM') || t.includes('PM')) return t;
-  let [h, m] = t.split(':').map(Number);
-  const p = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')} ${p}`;
+// An "HH:MM" time today, shown the way times loaded from the server are, so a
+// row added on screen reads like the rest. (A 12-hour "09:42 PM" sent back to
+// the server was once read as 09:42 in the morning.)
+const clockLabel = (hhmm) => {
+  const [h, m] = toInputTime(hhmm || '').split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return hhmm || '';
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return fmtTime(d);
 };
 
 // Hours worked can never be negative, so a shift cannot end before it started.
@@ -143,71 +145,6 @@ function resolvePerson(entry, staffList) {
 
 
 const TYPE_FILTERS = ['Members', 'Visitors', 'Staff'];
-
-// ─── Custom time picker ────────────────────────────────────────────────────────
-// value: "HH:MM" 24h string; onChange: (newVal) => void
-function TimeInput({ value, onChange }) {
-  const parse = (v) => {
-    if (!v) return { h: 12, m: 0, pm: false };
-    const [hh, mm] = v.split(':').map(Number);
-    return { h: hh % 12 || 12, m: mm, pm: hh >= 12 };
-  };
-  const emit = (h, m, pm) => {
-    let h24 = pm ? (h === 12 ? 12 : h + 12) : (h === 12 ? 0 : h);
-    onChange(`${String(h24).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
-  };
-
-  const { h, m, pm } = parse(value);
-
-  const spinH = (dir) => { const next = ((h - 1 + dir + 12) % 12) + 1; emit(next, m, pm); };
-  const spinM = (dir) => { emit(h, (m + dir + 60) % 60, pm); };
-  const togglePm = () => emit(h, m, !pm);
-
-  const spinBtn = (onClick) => ({
-    background: 'none', border: 'none', cursor: 'pointer',
-    color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
-    justifyContent: 'center', padding: 2, borderRadius: 4,
-    transition: 'color 0.15s',
-  });
-
-  const SpinCol = ({ val, onUp, onDown, digits = 2 }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-      <button style={spinBtn(onUp)} onClick={onUp}
-        onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-gold)'}
-        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
-        <ChevronUp size={16} strokeWidth={2.5} />
-      </button>
-      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', minWidth: 44, textAlign: 'center', lineHeight: 1 }}>
-        {String(val).padStart(digits, '0')}
-      </span>
-      <button style={spinBtn(onDown)} onClick={onDown}
-        onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-gold)'}
-        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
-        <ChevronDown size={16} strokeWidth={2.5} />
-      </button>
-    </div>
-  );
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px 20px' }}>
-      <SpinCol val={h} onUp={() => spinH(1)} onDown={() => spinH(-1)} />
-      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 26, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2, userSelect: 'none' }}>:</span>
-      <SpinCol val={m} onUp={() => spinM(1)} onDown={() => spinM(-1)} />
-      <button
-        onClick={togglePm}
-        style={{
-          marginLeft: 10, padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontFamily: 'DM Sans',
-          fontSize: 13, fontWeight: 700, border: '1px solid var(--border-subtle)',
-          background: pm ? 'var(--accent-gold-dim)' : 'var(--bg-card)',
-          color: pm ? 'var(--accent-gold)' : 'var(--text-secondary)',
-          transition: 'all 0.15s',
-        }}
-      >
-        {pm ? 'PM' : 'AM'}
-      </button>
-    </div>
-  );
-}
 
 // ─── Row 3-dot menu (portal-based so it escapes table overflow clipping) ──────
 
@@ -244,7 +181,7 @@ function CheckOutModal({ open, onClose, entry, person, onConfirm, error, busy, f
         </div>
         <div>
           <label style={labelStyle}>{t('attendance.checkoutTimeLabel')}</label>
-          <TimeInput value={time} onChange={v => { setTime(v); setTimeEdited(true); }} />
+          <TimeInput value={time} onChange={e => { setTime(e.target.value); setTimeEdited(true); }} />
         </div>
         {timeEdited && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -276,7 +213,7 @@ function CheckOutModal({ open, onClose, entry, person, onConfirm, error, busy, f
               <button
                 style={{ ...primaryBtn, opacity: canConfirm && !busy ? 1 : 0.45, cursor: canConfirm && !busy ? 'pointer' : 'not-allowed' }}
                 disabled={!canConfirm || busy}
-                onClick={() => onConfirm({ time: toDisplayTime(time), notes: notes.trim(), timeChanged: timeEdited })}
+                onClick={() => onConfirm({ time, notes: notes.trim(), timeChanged: timeEdited })}
               >
                 <LogOut size={13} /> {t('attendance.confirmCheckOut')}
               </button>
@@ -317,7 +254,7 @@ function CheckInModal({ open, onClose, person, onConfirm }) {
         </div>
         <div>
           <label style={labelStyle}>{t('attendance.checkinTimeLabel')}</label>
-          <TimeInput value={time} onChange={v => { setTime(v); setTimeEdited(true); }} />
+          <TimeInput value={time} onChange={e => { setTime(e.target.value); setTimeEdited(true); }} />
         </div>
         {timeEdited && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -347,7 +284,7 @@ function CheckInModal({ open, onClose, person, onConfirm }) {
 
 
 // ─── Edit time modal (always requires notes → manager task) ───────────────────
-function EditTimeModal({ open, onClose, entry, field, onConfirm }) {
+function EditTimeModal({ open, onClose, entry, field, onConfirm, error }) {
   const { t } = useLanguage();
   const [time, setTime]   = useState('');
   const [notes, setNotes] = useState('');
@@ -382,7 +319,7 @@ function EditTimeModal({ open, onClose, entry, field, onConfirm }) {
         </div>
         <div>
           <label style={labelStyle}>{label}</label>
-          <TimeInput value={time} onChange={setTime} />
+          <TimeInput value={time} onChange={e => setTime(e.target.value)} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <label style={labelStyle}>
@@ -398,12 +335,13 @@ function EditTimeModal({ open, onClose, entry, field, onConfirm }) {
             {t('attendance.checkoutBeforeCheckin', { time: field === 'time' ? entry.checkOut : entry.time })}
           </div>
         )}
+        {error && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px' }}>{error}</div>}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button style={secondaryBtn} onClick={onClose}>{t('common.cancel')}</button>
           <button
             style={{ ...primaryBtn, opacity: canSave ? 1 : 0.45, cursor: canSave ? 'pointer' : 'not-allowed' }}
             disabled={!canSave}
-            onClick={() => onConfirm({ time: toDisplayTime(time), notes: notes.trim(), field })}
+            onClick={() => onConfirm({ time, notes: notes.trim(), field })}
           >
             {t('common.save')}
           </button>
@@ -460,6 +398,7 @@ export default function AttendancePage() {
   const openCheckout = (value) => { setCheckoutResult({ error: '', busy: false, finished: false }); setCheckoutModal(value); };
   const [checkinModal, setCheckinModal]   = useState(null);
   const [editModal, setEditModal]         = useState(null);
+  const [editError, setEditError]         = useState('');
   // Time cards in view that a manager has still to sign off
   const [checkInError, setCheckInError]   = useState('');
   const [flash, setFlash]                 = useState(null);
@@ -678,7 +617,7 @@ export default function AttendancePage() {
           id:         res.data.id,
           personId:   who.id,
           personType: 'Staff',
-          time:       toDisplayTime(nowTime()),
+          time:       fmtTime(new Date()),
           checkOut:   null,
           recordedBy: (() => { const u = getAuth()?.user; return u ? `${u.firstName} ${u.lastName}` : '-'; })(),
           date:       todayShort,
@@ -706,7 +645,7 @@ export default function AttendancePage() {
           personId:   foundResult.data.id,
           personType: (foundResult.data.isVisitor || foundResult.data.status === 'visitor') ? 'Visitor' : 'Member',
           kind:       res.data?.kind || null,
-          time:       toDisplayTime(nowTime()),
+          time:       fmtTime(new Date()),
           checkOut:   null,
           recordedBy: staffName,
           date:       todayShort,
@@ -745,7 +684,7 @@ export default function AttendancePage() {
         const nowMins = now.getHours() * 60 + now.getMinutes();
         if (nowMins < earliestMins) {
           const eh = Math.floor(earliestMins / 60), em = earliestMins % 60;
-          setCheckInError(t('attendance.tooEarlyShift', { time: toDisplayTime(s.shiftStart), earliest: toDisplayTime(`${String(eh).padStart(2,'0')}:${String(em).padStart(2,'0')}`) }));
+          setCheckInError(t('attendance.tooEarlyShift', { time: clockLabel(s.shiftStart), earliest: clockLabel(`${String(eh).padStart(2,'0')}:${String(em).padStart(2,'0')}`) }));
           return;
         }
       }
@@ -799,7 +738,7 @@ export default function AttendancePage() {
         adjustError = err?.response?.data?.error || t('attendance.checkOutFailed');
       }
     }
-    const outAt = adjustError ? toDisplayTime(nowTime()) : time;
+    const outAt = adjustError ? fmtTime(new Date()) : clockLabel(time);
     setCheckins(prev => prev.map(c => c.id === entry.id ? { ...c, checkOut: outAt, notes: notes || null, pending: timeChanged && isStaff && !adjustError } : c));
     showFlash(checkoutModal.person.name, 'out');
     if (adjustError) {
@@ -812,12 +751,16 @@ export default function AttendancePage() {
   const confirmEdit = async ({ time, notes, field }) => {
     const entry = editModal.entry;
     const isStaff = entry.personType === 'Staff';
+    setEditError('');
     if (isStaff) {
       try {
         await adjustTimecard(entry.id, { [field === 'time' ? 'punchIn' : 'punchOut']: time, note: notes || undefined });
-      } catch (err) { console.error('Time adjustment failed:', err); }
+      } catch (err) {
+        setEditError(err?.response?.data?.error || t('attendance.timeChangeFailed'));
+        return;
+      }
     }
-    setCheckins(prev => prev.map(c => c.id === entry.id ? { ...c, [field]: time, notes, pending: isStaff } : c));
+    setCheckins(prev => prev.map(c => c.id === entry.id ? { ...c, [field]: clockLabel(time), notes, pending: isStaff } : c));
     setEditModal(null);
   };
 
@@ -978,8 +921,8 @@ export default function AttendancePage() {
 
             {/* Flash message */}
             {flash && (
-              <div style={{ marginTop: 8, background: flash.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${flash.type === 'success' ? '#22c55e' : 'var(--accent-red)'}`, borderRadius: 10, padding: '10px 14px', fontSize: 13, color: flash.type === 'success' ? '#22c55e' : 'var(--accent-red)', fontFamily: 'DM Sans' }}>
-                {flash.msg}
+              <div role="status" style={{ marginTop: 8, background: flash.action === 'in' ? 'var(--accent-green-dim)' : 'var(--accent-blue-dim)', border: `1px solid ${flash.action === 'in' ? 'var(--accent-green)' : 'var(--accent-blue)'}`, borderRadius: 10, padding: '10px 14px', fontSize: 13, color: flash.action === 'in' ? 'var(--accent-green)' : 'var(--accent-blue)', fontFamily: 'DM Sans' }}>
+                {flash.name} : {flash.action === 'in' ? t('attendance.checkedInMsg') : t('attendance.checkedOutMsg')}
               </div>
             )}
           </div>
@@ -1023,7 +966,7 @@ export default function AttendancePage() {
             await doCheckIn(timeChanged ? { time, notes } : {});
           }} />
         <CheckOutModal open={!!checkoutModal} entry={checkoutModal?.entry} person={checkoutModal?.person} onClose={() => setCheckoutModal(null)} onConfirm={confirmCheckOut} {...checkoutResult} />
-        <EditTimeModal open={!!editModal} entry={editModal?.entry} field={editModal?.field} onClose={() => setEditModal(null)} onConfirm={confirmEdit} />
+        <EditTimeModal open={!!editModal} entry={editModal?.entry} field={editModal?.field} onClose={() => { setEditModal(null); setEditError(''); }} onConfirm={confirmEdit} error={editError} />
       </div>
     );
   }
@@ -1185,7 +1128,7 @@ export default function AttendancePage() {
                     <span style={{ fontFamily: 'Manrope', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{foundResult.data.name}</span>
                     <span style={{ background: 'var(--accent-blue-dim)', color: 'var(--accent-blue)', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 600 }}>{t('attendance.staff')}</span>
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{translateRole(foundResult.data.role)}{foundResult.data.shiftStart ? ` · ${t('attendance.shiftLabel')} ${toDisplayTime(foundResult.data.shiftStart)}` : ''}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{translateRole(foundResult.data.role)}{foundResult.data.shiftStart ? ` · ${t('attendance.shiftLabel')} ${clockLabel(foundResult.data.shiftStart)}` : ''}</div>
                   {foundResult.type === 'staffWorkout' && <div style={{ fontSize: 11, color: 'var(--accent-green)', marginTop: 2 }}>{t('attendance.cameToTrain')}</div>}
                   {foundResult.alreadyIn && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 2 }}>{t('attendance.checkedInAlreadyAt', { time: foundResult.alreadyIn.time })}</div>}
                   {checkInError && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 2 }}>⚠ {checkInError}</div>}
@@ -1224,7 +1167,7 @@ export default function AttendancePage() {
           {/* Left: title */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <span style={{ fontFamily: 'Manrope', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-              {isViewingToday ? t('attendance.checkInsLabel') : `${t('attendance.checkIn')}s : ${capFirst(new Date(viewDate + 'T12:00:00').toLocaleDateString(_locale, { weekday: 'long', month: 'long', day: 'numeric' }))}`}
+              {isViewingToday ? t('attendance.checkInsLabel') : `${t('attendance.checkInsOnDay')} : ${capFirst(new Date(viewDate + 'T12:00:00').toLocaleDateString(_locale, { weekday: 'long', month: 'long', day: 'numeric' }))}`}
             </span>
             {historyLoading && (
               <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: 4, padding: '2px 8px', whiteSpace: 'nowrap' }}>{t('common.loading')}</span>
@@ -1360,7 +1303,7 @@ export default function AttendancePage() {
           await doCheckIn(timeChanged ? { time, notes } : {});
         }} />
       <CheckOutModal open={!!checkoutModal} entry={checkoutModal?.entry} person={checkoutModal?.person} onClose={() => setCheckoutModal(null)} onConfirm={confirmCheckOut} {...checkoutResult} />
-      <EditTimeModal open={!!editModal} entry={editModal?.entry} field={editModal?.field} onClose={() => setEditModal(null)} onConfirm={confirmEdit} />
+      <EditTimeModal open={!!editModal} entry={editModal?.entry} field={editModal?.field} onClose={() => { setEditModal(null); setEditError(''); }} onConfirm={confirmEdit} error={editError} />
 
       {/* ── QR Scanner Overlay ───────────────────────────────────────────── */}
       {showQrScanner && (
