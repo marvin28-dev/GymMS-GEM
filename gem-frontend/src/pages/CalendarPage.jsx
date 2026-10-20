@@ -116,6 +116,7 @@ export default function CalendarPage() {
   const [myCalendarEvents, setMyCalendarEvents] = useState(() => cache.read('mine', []));
   const [myTasks, setMyTasks] = useState([]);
   const [respondingId, setRespondingId] = useState(null);
+  const [actionError, setActionError] = useState('');
   const [staffList, setStaffList] = useState(() => cache.read('staff', []));
   const [clients, setClients] = useState([]);
   const [clientSearch, setClientSearch] = useState('');
@@ -273,17 +274,32 @@ export default function CalendarPage() {
   };
 
   const requestDelete = (evt) => { if (evt.seriesId) setDeleteTarget(evt); else handleDeleteEvent(evt, false); };
+  // A refused delete or invite answer keeps the event open with the reason
+  // (F-120); it used to close as if done and leave the reload to contradict it.
   const handleDeleteEvent = async (evt, series = false) => {
-    try { await removeEvent(evt.id, { series }); } catch { /* reload shows the truth */ }
+    setActionError('');
+    try {
+      await removeEvent(evt.id, { series });
+    } catch (err) {
+      setDeleteTarget(null);
+      setActionError(err?.response?.data?.error || t('memberProfile.actionFailed'));
+      return;
+    }
     setDeleteTarget(null); setSelectedEvent(null); setShowForm(false);
     reload();
   };
 
   const respondToInvite = async (taskId, decision) => {
     setRespondingId(taskId);
-    try { await updateTask(taskId, { status: decision }); refreshMine(); }
-    catch (err) { console.error('Responding to the invite failed:', err); }
-    finally { setRespondingId(null); }
+    setActionError('');
+    try {
+      await updateTask(taskId, { status: decision });
+      refreshMine();
+      return true;
+    } catch (err) {
+      setActionError(err?.response?.data?.error || t('memberProfile.actionFailed'));
+      return false;
+    } finally { setRespondingId(null); }
   };
 
   const openItem = (it) => { if (it.kind === 'task') navigate(TASKS_PATH(role)); else setSelectedEvent(it); };
@@ -706,6 +722,7 @@ export default function CalendarPage() {
         {viewSwitch}
       </div>
 
+      {actionError && !ev && <div role="alert" style={{ marginBottom: 12, fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{actionError}</div>}
       {pendingPanel}
       {viewMode === 'month' && monthView}
       {viewMode === 'week' && weekView}
@@ -720,7 +737,7 @@ export default function CalendarPage() {
 
       {/* Details */}
       {ev && (
-        <Modal open={!!ev} onClose={() => setSelectedEvent(null)} title={t('calendar.eventDetails')} maxWidth={480}>
+        <Modal open={!!ev} onClose={() => { setSelectedEvent(null); setActionError(''); }} title={t('calendar.eventDetails')} maxWidth={480}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ width: 4, height: 48, background: evColors.bar, borderRadius: 2 }} />
@@ -760,10 +777,11 @@ export default function CalendarPage() {
             {ev.myResponse === 'pending' && inviteFor(ev) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '10px 12px', borderRadius: 10, border: '1px dashed var(--accent-gold)', background: 'var(--accent-gold-glow)' }}>
                 <span style={{ flex: '1 1 160px', fontSize: 12.5, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{t('calendar.answerInvite')}</span>
-                <button disabled={respondingId === inviteFor(ev).id} onClick={async () => { await respondToInvite(inviteFor(ev).id, 'Declined'); setSelectedEvent(null); }} style={{ ...secondaryBtn, color: 'var(--accent-red)', borderColor: 'var(--accent-red-dim)' }}>{t('calendar.decline')}</button>
-                <button disabled={respondingId === inviteFor(ev).id} onClick={async () => { await respondToInvite(inviteFor(ev).id, 'Accepted'); setSelectedEvent(null); }} style={primaryBtn}>{t('calendar.accept')}</button>
+                <button disabled={respondingId === inviteFor(ev).id} onClick={async () => { if (await respondToInvite(inviteFor(ev).id, 'Declined')) setSelectedEvent(null); }} style={{ ...secondaryBtn, color: 'var(--accent-red)', borderColor: 'var(--accent-red-dim)' }}>{t('calendar.decline')}</button>
+                <button disabled={respondingId === inviteFor(ev).id} onClick={async () => { if (await respondToInvite(inviteFor(ev).id, 'Accepted')) setSelectedEvent(null); }} style={primaryBtn}>{t('calendar.accept')}</button>
               </div>
             )}
+            {actionError && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{actionError}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
               {canEdit(ev) && <button style={{ ...secondaryBtn, color: 'var(--accent-red)', borderColor: 'var(--accent-red-dim)' }} onClick={() => requestDelete(ev)}>{t('common.delete')}</button>}
               {canEdit(ev) && <button style={secondaryBtn} onClick={() => openEdit(ev)}>{t('common.edit')}</button>}
