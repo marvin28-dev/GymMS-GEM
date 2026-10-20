@@ -156,7 +156,7 @@ function SchedulePanel({ events = [] }) {
   };
 
   // Month calendar data
-  const firstDay    = new Date(moCursor.year, moCursor.month, 1).getDay();
+  const firstDay    = (new Date(moCursor.year, moCursor.month, 1).getDay() + 6) % 7;
   const daysInMonth = new Date(moCursor.year, moCursor.month + 1, 0).getDate();
   const moCells = Array.from({ length: firstDay + daysInMonth }, (_, i) => i < firstDay ? null : i - firstDay + 1);
   const moName  = new Date(moCursor.year, moCursor.month).toLocaleString(locale, { month: 'short', year: 'numeric' });
@@ -244,7 +244,8 @@ function SchedulePanel({ events = [] }) {
             <button onClick={() => setMoCursor(c => { const d = new Date(c.year, c.month+1); return {year:d.getFullYear(),month:d.getMonth()}; })} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ChevronRight size={13}/></button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, textAlign: 'center' }}>
-            {['S','M','T','W','T','F','S'].map((l,i) => <div key={i} style={{ fontSize: 8, fontWeight: 700, color: 'var(--text-muted)', padding: '2px 0' }}>{l}</div>)}
+            {/* 2 January 2023 was a Monday */}
+            {Array.from({ length: 7 }, (_, i) => new Date(2023, 0, i + 2).toLocaleDateString(locale, { weekday: 'narrow' })).map((l,i) => <div key={i} style={{ fontSize: 8, fontWeight: 700, color: 'var(--text-muted)', padding: '2px 0' }}>{l}</div>)}
             {moCells.map((d,i) => {
               const dStr    = d ? toDateStr(d) : null;
               const isToday = dStr === todayStr;
@@ -523,6 +524,23 @@ export default function FrontDeskPage() {
   const [sendingCode,   setSendingCode]   = useState(false);
   const [sendCodeMsg,   setSendCodeMsg]   = useState('');
   const [timeFilter,    setTimeFilter]    = useState('timeToday');
+  // "Last 24 / 48 hours" reach back before today, so those check-ins are loaded
+  // when one of them is chosen (they used to show only today's)
+  const longRange = timeFilter === 'timeLast24h' || timeFilter === 'timeLast48h';
+  const [olderCheckins, setOlderCheckins] = useState([]);
+  useEffect(() => {
+    if (!longRange) return;
+    const dayBack = (n) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+    softAll([getAttendance({ date: dayBack(1) }), getAttendance({ date: dayBack(2) })]).then(([a, b]) => {
+      const now = new Date();
+      setOlderCheckins([...(a.data || []), ...(b.data || [])].map(ci => ({
+        ...ci,
+        type: 'member',
+        timeLabel: new Date(ci.checkIn).toLocaleString(getDateLocale(), { weekday: 'short', hour: '2-digit', minute: '2-digit' }),
+        minutesAgo: Math.floor((now - new Date(ci.checkIn)) / 60000),
+      })));
+    });
+  }, [longRange]);
   const [photoLightbox, setPhotoLightbox] = useState(null); // photo URL or null
 
   // ── SIGN UP ────────────────────────────────────────────────────────────────
@@ -1174,11 +1192,11 @@ export default function FrontDeskPage() {
         setCodeError(checkInErrorText(err, t, t('frontDesk.checkInFailed')));
       }
     } else {
-      setCodeError('Incorrect code. Please try again.');
+      setCodeError(t('frontDesk.incorrectCode'));
     }
   };
 
-  const todayDayName = capFirst(new Date().toLocaleDateString(getDateLocale(), { weekday: 'long' }));
+  const todayDayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date().getDay()];
   const isWorkingToday = (s) => {
     if (!s.schedule || typeof s.schedule !== 'object') return true;
     const day = s.schedule[todayDayName];
@@ -1186,7 +1204,7 @@ export default function FrontDeskPage() {
   };
 
   const maxMinutes = TIME_FILTER_KEYS.find(f => f.key === timeFilter)?.maxMinutes ?? 1440;
-  const filteredCheckins = useMemo(() => todayCheckins.filter(c => c.minutesAgo <= maxMinutes), [todayCheckins, maxMinutes]);
+  const filteredCheckins = useMemo(() => (longRange ? [...todayCheckins, ...olderCheckins] : todayCheckins).filter(c => c.minutesAgo <= maxMinutes), [todayCheckins, olderCheckins, longRange, maxMinutes]);
   const memberCheckins = filteredCheckins.filter(c => c.type === 'member');
   const staffCheckins  = filteredCheckins.filter(c => c.type === 'staff');
   const blockReason    = foundMember ? getCheckInBlock(foundMember) : null;
@@ -1523,7 +1541,7 @@ export default function FrontDeskPage() {
 
   // Left sidebar (always visible)
   const leftPanel = (
-    <div data-fdtour="left-panel" style={{ borderRight:'1px solid var(--border-subtle)', padding:20, display:'flex', flexDirection:'column', gap:20, overflowY:'auto' }}>
+    <div data-fdtour="left-panel" style={{ ...(isMobile ? { borderTop:'1px solid var(--border-subtle)' } : { borderRight:'1px solid var(--border-subtle)' }), padding:20, display:'flex', flexDirection:'column', gap:20, overflowY:'auto' }}>
       <SchedulePanel events={scheduleEvents}/>
       <div style={{ borderTop:'1px solid var(--border-subtle)', paddingTop:16 }}>
         <div style={{ fontSize:10, fontWeight:700, letterSpacing:'1.5px', color:'var(--text-muted)', marginBottom:12, fontFamily:'DM Sans' }}>{t('frontDesk.staffOnDuty')}</div>
@@ -1872,8 +1890,9 @@ export default function FrontDeskPage() {
         )}
 
         {/* ── RIGHT COLUMN ─────────────────────────────────────────────────── */}
-        {!isMobile && activeTab === 'CHECK-IN' && (
-          <div data-fdtour="checkin-recent" style={{ borderLeft:'1px solid var(--border-subtle)', display:'flex', flexDirection:'column', overflowY:'auto' }}>
+        {/* On a phone the columns stack: recent check-ins under the keypad, then the programme */}
+        {activeTab === 'CHECK-IN' && (
+          <div data-fdtour="checkin-recent" style={{ ...(isMobile ? { borderTop:'1px solid var(--border-subtle)', maxHeight:'60vh' } : { borderLeft:'1px solid var(--border-subtle)' }), display:'flex', flexDirection:'column', overflowY:'auto' }}>
             <div style={{ padding:'16px 18px', borderBottom:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
               <span style={{ fontSize:10, fontWeight:700, letterSpacing:'1.5px', color:'var(--text-muted)', fontFamily:'DM Sans' }}>{t('frontDesk.recentCheckIns')}</span>
               <select value={timeFilter} onChange={e=>setTimeFilter(e.target.value)} style={{ background:'var(--bg-elevated)', border:'1px solid var(--border-subtle)', borderRadius:6, padding:'3px 8px', fontSize:11, color:'var(--text-secondary)', fontFamily:'DM Sans', cursor:'pointer', outline:'none' }}>
@@ -1925,6 +1944,7 @@ export default function FrontDeskPage() {
             </div>
           </div>
         )}
+        {isMobile && activeTab === 'CHECK-IN' && leftPanel}
 
         {activeTab === 'SIGN UP' && (
           <div style={{ borderLeft:'1px solid var(--border-subtle)', display:'flex', flexDirection:'column', overflowY:'auto' }}>
@@ -2388,7 +2408,7 @@ export default function FrontDeskPage() {
               {t('frontDesk.askForCode')} <strong style={{ color:'var(--text-primary)' }}>{foundMember.firstName} {foundMember.lastName}</strong> {t('frontDesk.forTheirCode')}
             </div>
             <CodeInput autoFocus maxLength={6} value={codeEntered} onChange={v=>{ setCodeEntered(v); setCodeError(''); }} onEnter={handleCodeVerifyCheckIn} placeholder="••••" style={{ background:'var(--bg-elevated)', border:`1px solid ${codeError?'rgba(239,68,68,0.5)':'var(--border-subtle)'}`, borderRadius:10, padding:'11px 14px', fontSize:20, color:'var(--accent-gold)', fontFamily:'JetBrains Mono, monospace', letterSpacing:'0.25em', textAlign:'center', outline:'none', width:'100%', boxSizing:'border-box' }}/>
-            {codeError && <div style={{ fontSize:11, color:'#ef4444', fontFamily:'DM Sans' }}>{t('frontDesk.incorrectCode')}</div>}
+            {codeError && <div role="alert" style={{ fontSize:11, color:'#ef4444', fontFamily:'DM Sans' }}>{codeError}</div>}
             <div style={{ paddingTop:4, borderTop:'1px solid var(--border-subtle)' }}>
               <div style={{ fontSize:10, fontWeight:700, letterSpacing:'1px', color:'var(--text-muted)', fontFamily:'DM Sans', margin:'8px 0' }}>{t('frontDesk.forgotCode')}</div>
               <div style={{ display:'flex', gap:8 }}>
