@@ -937,15 +937,24 @@ function CheckInCodeModal({ open, onClose, member, onSuccess }) {
   const [entered, setEntered] = useState('');
   const [error, setError]     = useState('');
   const [done, setDone]       = useState(false);
-  useEffect(() => { if (!open) { setEntered(''); setError(''); setDone(false); } }, [open]);
+  const [busy, setBusy]       = useState(false);
+  useEffect(() => { if (!open) { setEntered(''); setError(''); setDone(false); setBusy(false); } }, [open]);
 
-  const handleConfirm = () => {
-    if (entered.trim() === member?.accessCode) {
-      setDone(true);
-      setTimeout(() => { onSuccess?.(); onClose(); }, 900);
-    } else {
+  // "Check-in confirmed" only once the server has checked them in; its refusal
+  // (already in at 10:15, a lapsed membership) stays in the dialog (F-107).
+  // onSuccess answers with the reason it could not check them in, or nothing.
+  const handleConfirm = async () => {
+    if (busy) return;
+    if (entered.trim() !== member?.accessCode) {
       setError(t('memberProfile.incorrectCodeMsg'));
+      return;
     }
+    setBusy(true);
+    const problem = await onSuccess?.();
+    setBusy(false);
+    if (problem) { setError(problem); return; }
+    setDone(true);
+    setTimeout(() => onClose(), 900);
   };
 
   return (
@@ -984,11 +993,11 @@ function CheckInCodeModal({ open, onClose, member, onSuccess }) {
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
               <button style={secondaryBtn} onClick={onClose}>{t('memberProfile.cancel')}</button>
               <button
-                style={{ ...primaryBtn, opacity: entered.trim() ? 1 : 0.4, cursor: entered.trim() ? 'pointer' : 'not-allowed' }}
-                disabled={!entered.trim()}
+                style={{ ...primaryBtn, opacity: entered.trim() && !busy ? 1 : 0.4, cursor: entered.trim() && !busy ? 'pointer' : 'not-allowed' }}
+                disabled={!entered.trim() || busy}
                 onClick={handleConfirm}
               >
-                <LogIn size={13} /> {t('memberProfile.checkIn')}
+                <LogIn size={13} /> {busy ? t('memberProfile.processing') : t('memberProfile.checkIn')}
               </button>
             </div>
           </>
@@ -2726,12 +2735,17 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
   useEffect(() => { loadApprovals(); }, [id]);
   // Live: a payment, pass or check-in made on another screen shows here at once
   useLiveRefresh(() => { reloadMember(); loadApprovals(); getPackages().then(r => setPackagesList(r.data || [])).catch(() => {}); });
+  // A refused approval stays in the list with the server's reason (F-120)
+  const [approvalError, setApprovalError] = useState({});
   const resolveApproval = async (reqId, doApprove) => {
+    setApprovalError(prev => ({ ...prev, [reqId]: '' }));
     try {
       const res = doApprove ? await approveRequest(reqId) : await rejectRequest(reqId);
       if (doApprove) applyMemberUpdate(res.data?.member);
       setPendingApprovals(prev => prev.filter(r => r.id !== reqId));
-    } catch { /* leave it in the list to retry */ }
+    } catch (err) {
+      setApprovalError(prev => ({ ...prev, [reqId]: err?.response?.data?.error || t('memberProfile.actionFailed') }));
+    }
   };
 
   // When opened straight onto an action (front desk "Add payment"/"Renew" on the
@@ -3237,7 +3251,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
     // Same gate as everywhere else: a frozen/lapsed member with no pass can't be
     // checked in. Surface the reason instead of firing a request that 403s.
     const block = checkInBlockReason(member, t, fmtDate);
-    if (block) { setCheckInError(block); return; }
+    if (block) { setCheckInError(block); return block; }
     setCheckInError('');
     let checkInRes = null;
     try {
@@ -3246,8 +3260,9 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
       // A second check-in within 30 minutes is the same visit: the server
       // refuses it and records nothing, and the profile says so (it used to
       // flash "Check-in confirmed", which read as a second check-in).
-      setCheckInError(checkInErrorText(err, t, t('attendance.checkInFailed')));
-      return;
+      const reason = checkInErrorText(err, t, t('attendance.checkInFailed'));
+      setCheckInError(reason);
+      return reason;
     }
     const now = new Date();
     const authUser = getAuth()?.user;
@@ -3274,6 +3289,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
     setMember(prev => ({ ...prev, lastVisit: now.toISOString() }));
     setCheckedInFlash(true);
     setTimeout(() => setCheckedInFlash(false), 2500);
+    return null;
   };
 
   const AttendanceTab = () => (
@@ -3588,7 +3604,11 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
                   <button style={{ ...primaryBtn, padding: '6px 16px', fontSize: 12 }} onClick={() => resolveApproval(r.id, true)}><UserCheck size={13} /> {t('memberProfile.approve')}</button>
                   <button style={{ ...secondaryBtn, padding: '6px 16px', fontSize: 12 }} onClick={() => resolveApproval(r.id, false)}><XCircle size={13} /> {t('memberProfile.decline')}</button>
                 </div>
-              ) : (
+              ) : null}
+              {approvalError[r.id] ? (
+                <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{approvalError[r.id]}</div>
+              ) : null}
+              {isMgmt ? null : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 11, color: 'var(--accent-yellow)', fontWeight: 600 }}>{t('memberProfile.awaitingApproval')}</span>
                   {r.requestedById === myAccountId && (
