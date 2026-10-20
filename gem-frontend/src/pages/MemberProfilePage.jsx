@@ -6,6 +6,7 @@ import useOnOpen from '../hooks/useOnOpen';
 import { useState, useEffect, useRef } from 'react';
 import { getCurrencySymbol, formatMoney } from '../utils/currency';
 import { durationText } from '../utils/packageText';
+import { roleName } from '../utils/roleNames';
 import { digitsOnly } from '../utils/number';
 import { autoPaymentDescription } from '../utils/paymentDescription';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -423,7 +424,7 @@ function AddPaymentModal({ open, onClose, onSave, member }) {
       });
       onClose();
     } catch (err) {
-      setError(err?.response?.data?.error || 'Failed to save payment.');
+      setError(err?.response?.data?.error || t('memberProfile.paymentSaveFailed'));
     } finally { setSaving(false); }
   };
 
@@ -501,7 +502,7 @@ function AddPaymentModal({ open, onClose, onSave, member }) {
         {/* Description */}
         <div>
           <label style={lbl}>{t('memberProfile.descriptionLabel')} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{t('memberProfile.optional')}</span></label>
-          <input style={inp} value={form.description} onChange={set('description')} placeholder="e.g. Premium 12M Renewal" />
+          <input style={inp} value={form.description} onChange={set('description')} placeholder={t('members.paymentDescPh')} />
         </div>
 
         {/* Date locked */}
@@ -1130,12 +1131,12 @@ function RenewRegFeeModal({ open, onClose, member, gymData, onSave }) {
             onClick={async () => {
               setSaving(true); setApiError('');
               try {
-                await createPayment({ amount: feeAmount, method, reference: ref, memberId: member.id, type: 'registration', description: 'Annual registration fee renewal' });
+                await createPayment({ amount: feeAmount, method, reference: ref, memberId: member.id, type: 'registration', description: t('memberProfile.regFeeRenewalDesc') });
                 await updateMember(member.id, { regFeeDate: today, status: member.status === 'suspended' ? 'active' : member.status });
                 onSave?.({ regFeeDate: today, status: member.status === 'suspended' ? 'active' : member.status });
                 onClose();
               } catch (err) {
-                setApiError(err?.response?.data?.error || 'Payment failed. Try again.');
+                setApiError(err?.response?.data?.error || t('memberProfile.paymentFailedRetry'));
                 setSaving(false);
               }
             }}
@@ -1359,7 +1360,7 @@ function InlinePaymentSection({ shortfall, maxAmount, minAmount = 0, defaultAmou
             setSubmitted(true);
             onPaymentAdded(n, res?.data?.id);
           } catch (err) {
-            setApiError(err?.response?.data?.error || 'Payment failed. Try again.');
+            setApiError(err?.response?.data?.error || t('memberProfile.paymentFailedRetry'));
             setSaving(false);
           }
         }}
@@ -1663,8 +1664,8 @@ function RenewMembershipModal({ open, onClose, member, packagesList = [], onSave
           return (
             <div style={{ fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 14px' }}>
               {allowance == null
-                ? <>This package has <strong style={{ color: 'var(--accent-gold)' }}>unlimited sessions</strong>, so no session limit will apply.</>
-                : <>Renewing sets their sessions to <strong style={{ color: 'var(--accent-gold)' }}>{allowance}</strong>{current != null ? <>, replacing the {current} they have left.</> : '.'}</>}
+                ? <>{t('memberProfile.renewUnlimitedA')} <strong style={{ color: 'var(--accent-gold)' }}>{t('memberProfile.renewUnlimitedB')}</strong>{t('memberProfile.renewUnlimitedC')}</>
+                : <>{t('memberProfile.renewSetsA')} <strong style={{ color: 'var(--accent-gold)' }}>{allowance}</strong>{current != null ? t('memberProfile.renewReplacing', { n: current }) : '.'}</>}
             </div>
           );
         })()}
@@ -1684,7 +1685,7 @@ function RenewMembershipModal({ open, onClose, member, packagesList = [], onSave
             memberId={member.id}
             type="membership"
             confirmLabel="renew"
-            savingLabel="Processing & Renewing…"
+            savingLabel={t('memberProfile.processingRenewing')}
             onPaymentAdded={async (n) => {
               const newBalance = extraBalance + n;
               setExtraBalance(newBalance);
@@ -2163,7 +2164,7 @@ function UnfreezeModal({ open, onClose, member, onApplied }) {
         </div>
 
         <DismissibleInfo dismissKey="unfreeze_membership" color="green">
-          Only the {daysActuallyFrozen} days actually frozen will be added back to the original end date. The remaining {daysReturned} extension days are cancelled.
+          {t('memberProfile.unfreezeAddBack', { frozen: daysActuallyFrozen, returned: daysReturned })}
         </DismissibleInfo>
         <ActionConfirm
           member={member}
@@ -2922,7 +2923,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
           const expiryStr = dayStr(expiry);
           const badgeBg = isExpired ? 'rgba(239,68,68,0.12)' : isWarn ? 'rgba(251,191,36,0.12)' : 'rgba(52,211,153,0.1)';
           const badgeColor = isExpired ? '#ef4444' : isWarn ? '#f59e0b' : '#34d399';
-          const badgeLabel = isExpired ? t('memberProfile.overdue') : isWarn ? `${daysLeft}d left` : t('status.active');
+          const badgeLabel = isExpired ? t('memberProfile.overdue') : isWarn ? t('memberProfile.daysLeftShort', { n: daysLeft }) : t('status.active');
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('memberProfile.registrationExpiry')}</span>
@@ -2957,7 +2958,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
             {canViewCode && (
               <button
                 onClick={() => setShowCode(v => !v)}
-                title={showCode ? 'Hide code' : 'Show code'}
+                title={showCode ? t('staff.hideCode') : t('memberProfile.showCode')}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -3158,7 +3159,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
               const isWarn = !isOverdue && daysLeft <= 30;
               const badgeColor = isOverdue ? '#ef4444' : isWarn ? '#f59e0b' : '#34d399';
               const badgeBg    = isOverdue ? 'rgba(239,68,68,0.12)' : isWarn ? 'rgba(251,191,36,0.12)' : 'rgba(52,211,153,0.1)';
-              const badgeLabel = isOverdue ? t('memberProfile.overdue') : isWarn ? `${daysLeft}d left` : t('status.active');
+              const badgeLabel = isOverdue ? t('memberProfile.overdue') : isWarn ? t('memberProfile.daysLeftShort', { n: daysLeft }) : t('status.active');
               return row('regRenewal', t('memberProfile.regRenewalDue'), <>
                 {(isOverdue || isWarn) && (
                   <button onClick={() => setShowRegFeeModal(true)} style={{ background: 'none', border: `1px solid ${badgeColor}`, color: badgeColor, borderRadius: 6, padding: '2px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans' }}>
@@ -3464,7 +3465,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{n.date}</span>
-                    <span style={{ background: cc.bg, color: cc.color, borderRadius: 20, padding: '2px 9px', fontSize: 11, fontWeight: 500 }}>{n.category}</span>
+                    <span style={{ background: cc.bg, color: cc.color, borderRadius: 20, padding: '2px 9px', fontSize: 11, fontWeight: 500 }}>{({ General: t('memberProfile.categoryGeneral'), Health: t('memberProfile.categoryHealth'), Financial: t('memberProfile.categoryFinancial'), Other: t('memberProfile.categoryOther') })[n.category] || n.category}</span>
                   </div>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('memberProfile.by')} {n.author}</span>
                 </div>
@@ -3560,7 +3561,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
               style={{ width: 64, height: 64, borderRadius: '50%', flexShrink: 0, border: '2px dashed var(--border)', background: 'var(--bg-elevated)', cursor: photoUploading ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}
               onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-gold)'} onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
               <Camera size={18} color="var(--text-muted)" />
-              <span style={{ fontSize: 8, color: 'var(--text-muted)', fontFamily: 'DM Sans', lineHeight: 1 }}>{photoUploading ? '...' : 'Photo'}</span>
+              <span style={{ fontSize: 8, color: 'var(--text-muted)', fontFamily: 'DM Sans', lineHeight: 1 }}>{photoUploading ? '...' : t('members.photo')}</span>
             </button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -3767,7 +3768,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
       <ConvertToMemberModal  open={showConvertToMemberModal}  onClose={() => setShowConvertToMemberModal(false)}  member={member} gymData={gymData} onApplied={applyMemberUpdate} />
       <AddNoteModal open={showNoteModal} onClose={() => setShowNoteModal(false)}
         onSave={(form) => {
-          const note = { date: fmtDate(new Date()), content: form.note, category: form.category, author: 'Staff' };
+          const note = { date: fmtDate(new Date()), content: form.note, category: form.category, author: [getAuth()?.user?.firstName, getAuth()?.user?.lastName].filter(Boolean).join(' ') || roleName(getRole(), t) };
           const updated = [note, ...memberNotes];
           setMemberNotes(updated);
           try { localStorage.setItem(`gem_member_notes_${id}`, JSON.stringify(updated)); } catch {}

@@ -220,3 +220,34 @@ async function staffPayInFrench(page, phone) {
   await expect(pay.getByRole('button', { name: 'Confirmer et enregistrer' })).toBeVisible();
   await expect(page.getByText(/Issue Pay|Every month|How often/)).toHaveCount(0);
 }
+
+test('in French, the member profile\'s days left, renewal text and notes are French', async ({ page }) => {
+  const owner = await registerGym();
+  const pkg = await call('POST', '/packages', { token: owner.token, body: { name: 'Plan Libre', price: 20000, dayPassPrice: 1000, duration: '1 Months', durationDays: 30, sessions: 'Unlimited', status: 'active' } });
+  const member = await call('POST', '/members', { token: owner.token, body: { firstName: 'Lea', lastName: 'Libre', city: 'Douala', region: 'Littoral', regFeeMethod: 'cash', packageId: pkg.id, startDate: localDay(new Date(Date.now() - 27 * 864e5)), endDate: localDay(new Date(Date.now() + 3 * 864e5)) } });
+  await call('POST', '/payments', { token: owner.token, body: { memberId: member.id, amount: 20000, method: 'cash', type: 'membership' } });
+  // A yearly registration fee paid about eleven months ago is due within 30 days
+  await call('PATCH', '/gyms/me', { token: owner.token, body: { registrationFeeRequired: true, registrationFeeFrequency: 'yearly' } });
+  await call('PATCH', `/members/${member.id}`, { token: owner.token, body: { regFeeDate: localDay(new Date(Date.now() - 350 * 864e5)) } });
+  await inFrench(page);
+  await signIn(page, owner);
+  await page.goto(`/members/${member.id}`);
+  await expect(page.getByText(/^\d+ j restants$/).first()).toBeVisible();
+  await expect(page.getByText(/\d+d left/)).toHaveCount(0);
+
+  await expect(page.getByRole('button', { name: 'Afficher le code' })).toBeVisible();
+  await page.getByRole('button', { name: 'Adhésion' }).click();
+  await page.getByRole('button', { name: 'Renouveler', exact: true }).last().click();
+  const renew = page.getByRole('dialog', { name: 'Renouveler l’adhésion' }).or(page.getByRole('dialog', { name: "Renouveler l'adhésion" }));
+  await expect(renew).toContainText('Ce forfait offre des séances illimitées');
+  await renew.getByRole('button', { name: 'Annuler' }).first().click();
+
+  await page.getByRole('button', { name: 'Ajouter une note' }).first().click();
+  const note = page.getByRole('dialog', { name: 'Ajouter une note' });
+  await note.locator('textarea').fill('Préfère le matin');
+  await note.getByRole('button', { name: 'Enregistrer la note' }).click();
+  await page.getByRole('button', { name: 'Notes', exact: true }).click();
+  const saved = page.getByText('Préfère le matin').locator('xpath=ancestor::div[2]');
+  await expect(saved).toContainText('Général');
+  await expect(saved).toContainText('par Olive Owner');
+});
