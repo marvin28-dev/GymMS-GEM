@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Target, Ruler } from 'lucide-react';
 import Modal from './ui/Modal';
 import GemInput from './ui/GemInput';
@@ -8,6 +8,7 @@ import { getAuth } from '../utils/auth';
 import { GOAL_TYPES } from '../utils/coaching';
 import { todayStr, addDaysStr, fmtDate } from '../utils/date';
 import { serverFieldError, fieldErrorStyle, revealFirstError } from '../utils/formErrors';
+import useOnOpen from '../hooks/useOnOpen';
 
 const decimal = (v) => String(v).replace(',', '.').replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1').slice(0, 7);
 const MEASURES = [['weight', 'coach.weightKg', '84.5'], ['waist', 'coach.waistCm', '92'], ['bodyFat', 'coach.bodyFatPct', '24'], ['hips', 'coach.hipsCm', '100'], ['chest', 'coach.chestCm', '98']];
@@ -25,15 +26,16 @@ export default function GoalsModal({ open, onClose, member, mode = 'set', onSave
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
+  // Filled when it opens: the page behind reloads on every change in the gym,
+  // and the goals and measurements being typed must survive it
+  useOnOpen(open, () => {
     setNow({});
     setGoal(mode === 'edit' && member ? {
       goalType: member.goalType || '', goalWeight: member.goalWeight ?? '', goalWaist: member.goalWaist ?? '', goalBodyFat: member.goalBodyFat ?? '',
       goalSessionsPerWeek: member.goalSessionsPerWeek || '', goalTargetDate: member.goalTargetDate ? String(member.goalTargetDate).slice(0, 10) : '', goalNote: member.goalNote || '',
     } : { goalType: '', goalWeight: '', goalWaist: '', goalBodyFat: '', goalSessionsPerWeek: '', goalTargetDate: '', goalNote: '' });
     setErrors({}); setSaving(false);
-  }, [open, mode, member]);
+  });
 
   const name = member ? `${member.firstName || ''} ${member.lastName || ''}`.trim() : '';
   const clear = (k) => setErrors(e => ({ ...e, [k]: undefined, _form: undefined }));

@@ -2,6 +2,7 @@
 import MemberCoachRow from '../components/MemberCoachRow';
 import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import useLiveRefresh from '../hooks/useLiveRefresh';
+import useOnOpen from '../hooks/useOnOpen';
 import { useState, useEffect, useRef } from 'react';
 import { getCurrencySymbol, formatMoney, getMoneyLocale } from '../utils/currency';
 import { digitsOnly } from '../utils/number';
@@ -151,8 +152,9 @@ function EditPersonalModal({ open, onClose, member, onSave }) {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
 
-  useEffect(() => {
-    if (member && open) setForm({
+  // Filled when it opens: the profile reloads on every change in the gym
+  useOnOpen(open, () => {
+    if (member) setForm({
       firstName:        member.firstName        || '',
       lastName:         member.lastName         || '',
       gender:           member.gender           || '',
@@ -168,7 +170,7 @@ function EditPersonalModal({ open, onClose, member, onSave }) {
       emergencyContact: member.emergencyContact || '',
       emergencyPhone:   member.emergencyPhone   || '',
     });
-  }, [member, open]);
+  });
   useEffect(() => { if (open) setFieldErrors({}); }, [open]);
 
   if (!member) return null;
@@ -1557,17 +1559,16 @@ function RenewMembershipModal({ open, onClose, member, packagesList = [], onSave
   const [showPayment, setShowPayment]   = useState(false);
   const [saving, setSaving]             = useState(false);
 
-  useEffect(() => {
-    if (open) {
-      setSelectedPkg(member.package?.name || member.package || '');
-      const isExpiredOrLapsed = !member.endDate || new Date(member.endDate) < new Date();
-      const isDeactivated = member.status === 'deactivated' || member.status === 'cancelled';
-      setStartDate((isExpiredOrLapsed || isDeactivated) ? new Date().toISOString().slice(0, 10) : member.endDate.slice(0, 10));
-      setExtraBalance(0);
-      setShowPayment(false);
-      setSaving(false);
-    }
-  }, [open, member]);
+  // Set when it opens, so a reload of the member does not undo the choices
+  useOnOpen(open, () => {
+    setSelectedPkg(member.package?.name || member.package || '');
+    const isExpiredOrLapsed = !member.endDate || new Date(member.endDate) < new Date();
+    const isDeactivated = member.status === 'deactivated' || member.status === 'cancelled';
+    setStartDate((isExpiredOrLapsed || isDeactivated) ? new Date().toISOString().slice(0, 10) : member.endDate.slice(0, 10));
+    setExtraBalance(0);
+    setShowPayment(false);
+    setSaving(false);
+  });
 
   const pkg = packagesList.find(p => p.name === selectedPkg) || null;
   const endDate = (pkg && startDate) ? calcEndDateFromPkg(startDate, pkg) : null;

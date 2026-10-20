@@ -105,7 +105,7 @@ export default function CoachDashboard() {
     { label: t('coach.tileFollowUp'), value: checkinsDue, sub: t('coach.tileFollowUpSub'), icon: BellRing, color: checkinsDue ? 'var(--accent-yellow)' : 'var(--text-muted)', onClick: () => setFilter('follow') },
   ];
 
-  const WeightChange = ({ c }) => {
+  const renderWeightChange = (c) => {
     if (c.latestWeight == null) return null;
     const diff = c.firstWeight != null ? Math.round((c.latestWeight - c.firstWeight) * 10) / 10 : 0;
     const Icon = diff < 0 ? TrendingDown : diff > 0 ? TrendingUp : Minus;
@@ -118,8 +118,11 @@ export default function CoachDashboard() {
   };
 
   const openLog = (c, kind = 'session') => { setLogKind(kind); setLogFor(c); };
-  // The one thing to do for a client: set their goals, take the check-in, or log
-  const PrimaryAction = ({ c, f }) => {
+  // The one thing to do for a client: set their goals, take the check-in, or log.
+  // These are called as functions, not used as components: defined inside the
+  // page, each reload would make them new components and remount them, closing
+  // the Log menu under the coach's finger (F-112).
+  const renderPrimaryAction = (c, f) => {
     if (membershipEnded(c)) return null;
     const goals = !hasGoals(c);
     const checkin = !goals && f?.type === 'checkin';
@@ -145,14 +148,14 @@ export default function CoachDashboard() {
     );
   };
 
-  const ContactButtons = ({ c, f }) => hasPhone(c.phone) ? (
+  const renderContact = (c, f) => hasPhone(c.phone) ? (
     <>
       <a href={whatsappLink(c.phone, message(c, f))} target="_blank" rel="noopener noreferrer" aria-label={t('coach.whatsapp')} title={t('coach.whatsapp')} style={iconBtn('rgba(37,211,102,0.14)', '#25d366')}><MessageCircle size={16} /></a>
       <a href={callLink(c.phone)} aria-label={t('coach.call')} title={t('coach.call')} style={iconBtn('var(--accent-blue-dim)', 'var(--accent-blue)')}><Phone size={15} /></a>
     </>
   ) : null;
 
-  const Photo = ({ m, size = 40 }) => (m.photo
+  const renderPhoto = (m, size = 40) => (m.photo
     ? <img src={m.photo} alt="" style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
     : <Avatar firstName={m.firstName} lastName={m.lastName} avatarColor={m.avatarColor} size={size} />);
 
@@ -199,7 +202,7 @@ export default function CoachDashboard() {
         return (
           <div key={c.id} data-follow-row style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', borderTop: i ? '1px solid var(--border-subtle)' : 'none', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
             <button onClick={() => navigate(`/members/${c.id}`)} style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
-              <Photo m={c} size={36} />
+              {renderPhoto(c, 36)}
               <span style={{ minWidth: 0, fontFamily: 'DM Sans' }}>
                 <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.firstName} {c.lastName}</span>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: f.type === 'birthday' ? 'var(--accent-gold)' : f.type === 'goals' ? 'var(--accent-blue)' : 'var(--accent-yellow)', fontWeight: 600 }}><ReasonIcon size={12} /> {reasonText(f)}</span>
@@ -207,8 +210,8 @@ export default function CoachDashboard() {
               </span>
             </button>
             <span style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: isMobile ? 46 : 0 }}>
-              <PrimaryAction c={c} f={f} />
-              <ContactButtons c={c} f={f} />
+              {renderPrimaryAction(c, f)}
+              {renderContact(c, f)}
             </span>
           </div>
         );
@@ -253,7 +256,7 @@ export default function CoachDashboard() {
         <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderTop: i ? '1px solid var(--border-subtle)' : 'none', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
           <button onClick={() => navigate(`/members/${c.id}`)} style={{ display: 'flex', alignItems: 'center', gap: 11, flex: 1, minWidth: isMobile ? 'calc(100% - 4px)' : 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
             <span style={{ position: 'relative', flexShrink: 0 }}>
-              <Photo m={c} size={42} />
+              {renderPhoto(c, 42)}
               {inToday.has(c.id) && <span title={t('coach.inNow')} style={{ position: 'absolute', right: -1, bottom: -1, width: 12, height: 12, borderRadius: '50%', background: 'var(--accent-green)', border: '2px solid var(--bg-card)' }} />}
             </span>
             <span style={{ minWidth: 0, flex: 1, fontFamily: 'DM Sans', display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -268,12 +271,12 @@ export default function CoachDashboard() {
               {reasonLines(c.track, t).length > 0 && c.track.key !== 'on' && (
                 <span style={{ fontSize: 12, color: c.track.key === 'off' ? 'var(--accent-red)' : 'var(--accent-yellow)', fontWeight: 500 }}>{reasonLines(c.track, t).join(' · ')}</span>
               )}
-              <WeightChange c={c} />
+              {renderWeightChange(c)}
             </span>
           </button>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: isMobile ? 53 : 0 }}>
-            <PrimaryAction c={c} f={null} />
-            <ContactButtons c={c} f={c.follow[0]} />
+            {renderPrimaryAction(c, null)}
+            {renderContact(c, c.follow[0])}
           </div>
         </div>
       ))}
@@ -290,7 +293,7 @@ export default function CoachDashboard() {
         <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('coach.noCheckins')}</div>
       ) : (showAllIn ? checkins : checkins.slice(0, 6)).map((v, i) => (
         <button key={v.id} onClick={() => navigate(`/members/${v.member.id}`)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 16px', borderTop: i ? '1px solid var(--border-subtle)' : 'none', borderLeft: 'none', borderRight: 'none', borderBottom: 'none', background: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'DM Sans' }}>
-          <Photo m={v.member} size={32} />
+          {renderPhoto(v.member, 32)}
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.member.firstName} {v.member.lastName}</span>
             <span style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
