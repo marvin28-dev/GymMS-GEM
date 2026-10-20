@@ -43,6 +43,19 @@ async function getMyGym(req, res) {
 }
 
 const FREQUENCIES = ['yearly', 'one-time'];
+
+// A short list of names kept on the gym (package access types, product
+// categories): trimmed, no blanks or repeats, 40 characters and 50 names at
+// most. null when what was sent is not a list.
+function cleanList(value) {
+  if (!Array.isArray(value)) return null;
+  const out = [];
+  for (const v of value) {
+    const name = String(v ?? '').trim().slice(0, 40);
+    if (name && !out.includes(name)) out.push(name);
+  }
+  return out.slice(0, 50);
+}
 // A number within bounds, or null
 const numberIn = (v, { min = 0, max = Infinity, whole = false } = {}) => {
   const n = Number(v);
@@ -116,7 +129,12 @@ async function updateMyGym(req, res) {
   }
   // Settings are merged, so saving one section cannot wipe another
   if (settings !== undefined && settings !== null && typeof settings === 'object') {
-    data.settings = { ...(previous?.settings || {}), ...settings };
+    const next = { ...settings };
+    if ('accessTypes' in next) {
+      next.accessTypes = cleanList(next.accessTypes);
+      if (!next.accessTypes) return res.status(400).json({ error: 'Send the access types as a list.', field: 'accessTypes' });
+    }
+    data.settings = { ...(previous?.settings || {}), ...next };
   }
 
   const gym = await prisma.gym.update({ where: { id: req.user.gymId }, data });
@@ -160,4 +178,17 @@ async function confirmSetupSection(req, res) {
   res.json(await setupStatus(req.user.gymId));
 }
 
-module.exports = { getGymByCode, getMyGym, updateMyGym, getSetup, confirmSetupSection };
+// ── PUT /api/gyms/me/product-categories { categories } ───────────────────────
+// The shop's categories belong to the gym, not to one browser. The desk adds
+// products, so it may change the list too (the rest of the settings are the
+// owner's).
+async function setProductCategories(req, res) {
+  const list = cleanList(req.body?.categories);
+  if (!list) return res.status(400).json({ error: 'Send the categories as a list.', field: 'categories' });
+  const gym = await prisma.gym.findUnique({ where: { id: req.user.gymId }, select: { settings: true } });
+  await prisma.gym.update({ where: { id: req.user.gymId }, data: { settings: { ...(gym?.settings || {}), productCategories: list } } });
+  logActivity(req, { category: 'settings', action: 'gym.product_categories', summary: `Set the shop's product categories: ${list.join(', ') || 'none'}` });
+  res.json({ productCategories: list });
+}
+
+module.exports = { getGymByCode, getMyGym, updateMyGym, getSetup, confirmSetupSection, setProductCategories };
