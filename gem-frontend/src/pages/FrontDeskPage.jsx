@@ -1342,6 +1342,60 @@ export default function FrontDeskPage() {
     }
   };
 
+  // The exit gate (the manager's account password), drawn by both the desk and
+  // its sign-in screen: every way out of the kiosk goes through it (F-106).
+  const exitGate = showExitAuth ? (
+    <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.7)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+      <div style={{ width:'100%', maxWidth:400, background:'var(--bg-card)', border:'1px solid var(--border-subtle)', borderRadius:18, boxShadow:'0 24px 80px rgba(0,0,0,0.5)', overflow:'hidden' }}>
+        {/* Header */}
+        <div style={{ padding:'20px 28px', borderBottom:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', gap:12 }}>
+          <div>
+            <div style={{ fontFamily:'Manrope', fontSize:15, fontWeight:700, color:'var(--text-primary)' }}>
+              {t('frontDesk.enterYourPassword')}
+            </div>
+            <div style={{ fontSize:12, color:'var(--text-muted)', fontFamily:'DM Sans', marginTop:2 }}>
+              {`${t('frontDesk.authenticatingAs')} ${meUser ? `${meUser.firstName || ''} ${meUser.lastName || ''}`.trim() : ''}`}
+            </div>
+          </div>
+          <button onClick={() => setShowExitAuth(false)} style={{ marginLeft:'auto', background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', display:'flex', padding:4 }}>
+            <X size={16}/>
+          </button>
+        </div>
+
+        <div style={{ padding:28, display:'flex', flexDirection:'column', gap:16 }}>
+          <div style={{ position:'relative' }}>
+            <input
+              type={showExitPw ? 'text' : 'password'}
+              value={exitPassword}
+              autoFocus
+              autoComplete="new-password"
+              name="gem-exit-secret"
+              autoCorrect="off"
+              spellCheck={false}
+              data-lpignore="true"
+              data-1p-ignore
+              data-form-type="other"
+              onChange={e => { setExitPassword(e.target.value); setExitPinError(''); }}
+              onKeyDown={e => { if (e.key === 'Enter') handleExitConfirm(); }}
+              placeholder={t('auth.loginPasswordPh')}
+              style={{ width:'100%', boxSizing:'border-box', background:'var(--bg-elevated)', border:`1px solid ${exitPinError ? 'var(--accent-red)' : 'var(--border-subtle)'}`, borderRadius:10, padding:'12px 44px 12px 14px', fontSize:15, color:'var(--text-primary)', fontFamily:'DM Sans', outline:'none' }}
+            />
+            <button type="button" onClick={() => setShowExitPw(v => !v)} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', display:'flex', padding:2 }}>
+              {showExitPw ? <EyeOff size={16}/> : <Eye size={16}/>}
+            </button>
+          </div>
+          {exitPinError && (
+            <div style={{ background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', borderRadius:8, padding:'8px 14px', fontSize:12, color:'var(--accent-red)', fontFamily:'DM Sans', textAlign:'center' }}>{exitPinError}</div>
+          )}
+          <button onClick={handleExitConfirm} disabled={!exitPassword || exitBusy}
+            style={{ ...primaryBtn, width:'100%', justifyContent:'center', padding:'13px', fontSize:14, opacity:(!exitPassword || exitBusy) ? 0.6 : 1, cursor:(!exitPassword || exitBusy) ? 'default' : 'pointer' }}>
+            <LogOut size={15}/> {exitBusy ? t('frontDesk.verifying') : t('frontDesk.exitToApp')}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   // ══════════════════════════════════════════════════════════════════════════
   // LOGIN SCREEN
   // ══════════════════════════════════════════════════════════════════════════
@@ -1431,8 +1485,9 @@ export default function FrontDeskPage() {
 
         <div style={{ marginTop:20, display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
           <span style={{ fontSize:11, color:'var(--text-muted)', fontFamily:'DM Sans' }}>{t('frontDesk.selectNameAndPin')}</span>
-          <span onClick={() => navigate('/dashboard')} style={{ fontSize:12, color:'var(--text-muted)', fontFamily:'DM Sans', cursor:'pointer', transition:'color 0.15s' }} onMouseEnter={e=>e.currentTarget.style.color='var(--text-secondary)'} onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}>{t('frontDesk.backToDashboard')}</span>
+          <span onClick={() => requestExit('/dashboard')} style={{ fontSize:12, color:'var(--text-muted)', fontFamily:'DM Sans', cursor:'pointer', transition:'color 0.15s' }} onMouseEnter={e=>e.currentTarget.style.color='var(--text-secondary)'} onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}>{t('frontDesk.backToDashboard')}</span>
         </div>
+        {exitGate}
       </div>
     );
   }
@@ -2334,58 +2389,7 @@ export default function FrontDeskPage() {
         </div>
       )}
 
-      {/* ── Exit re-auth overlay (manager's account password) ── */}
-      {showExitAuth && (
-        <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.7)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
-          <div style={{ width:'100%', maxWidth:400, background:'var(--bg-card)', border:'1px solid var(--border-subtle)', borderRadius:18, boxShadow:'0 24px 80px rgba(0,0,0,0.5)', overflow:'hidden' }}>
-            {/* Header */}
-            <div style={{ padding:'20px 28px', borderBottom:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', gap:12 }}>
-              <div>
-                <div style={{ fontFamily:'Manrope', fontSize:15, fontWeight:700, color:'var(--text-primary)' }}>
-                  {t('frontDesk.enterYourPassword')}
-                </div>
-                <div style={{ fontSize:12, color:'var(--text-muted)', fontFamily:'DM Sans', marginTop:2 }}>
-                  {`${t('frontDesk.authenticatingAs')} ${meUser ? `${meUser.firstName || ''} ${meUser.lastName || ''}`.trim() : ''}`}
-                </div>
-              </div>
-              <button onClick={() => setShowExitAuth(false)} style={{ marginLeft:'auto', background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', display:'flex', padding:4 }}>
-                <X size={16}/>
-              </button>
-            </div>
-
-            <div style={{ padding:28, display:'flex', flexDirection:'column', gap:16 }}>
-              <div style={{ position:'relative' }}>
-                <input
-                  type={showExitPw ? 'text' : 'password'}
-                  value={exitPassword}
-                  autoFocus
-                  autoComplete="new-password"
-                  name="gem-exit-secret"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  data-lpignore="true"
-                  data-1p-ignore
-                  data-form-type="other"
-                  onChange={e => { setExitPassword(e.target.value); setExitPinError(''); }}
-                  onKeyDown={e => { if (e.key === 'Enter') handleExitConfirm(); }}
-                  placeholder={t('auth.loginPasswordPh')}
-                  style={{ width:'100%', boxSizing:'border-box', background:'var(--bg-elevated)', border:`1px solid ${exitPinError ? 'var(--accent-red)' : 'var(--border-subtle)'}`, borderRadius:10, padding:'12px 44px 12px 14px', fontSize:15, color:'var(--text-primary)', fontFamily:'DM Sans', outline:'none' }}
-                />
-                <button type="button" onClick={() => setShowExitPw(v => !v)} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', display:'flex', padding:2 }}>
-                  {showExitPw ? <EyeOff size={16}/> : <Eye size={16}/>}
-                </button>
-              </div>
-              {exitPinError && (
-                <div style={{ background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', borderRadius:8, padding:'8px 14px', fontSize:12, color:'var(--accent-red)', fontFamily:'DM Sans', textAlign:'center' }}>{exitPinError}</div>
-              )}
-              <button onClick={handleExitConfirm} disabled={!exitPassword || exitBusy}
-                style={{ ...primaryBtn, width:'100%', justifyContent:'center', padding:'13px', fontSize:14, opacity:(!exitPassword || exitBusy) ? 0.6 : 1, cursor:(!exitPassword || exitBusy) ? 'default' : 'pointer' }}>
-                <LogOut size={15}/> {exitBusy ? t('frontDesk.verifying') : t('frontDesk.exitToApp')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {exitGate}
 
       {/* ── Member quick-view drawer (slide-over) ── */}
       {memberDrawer && (

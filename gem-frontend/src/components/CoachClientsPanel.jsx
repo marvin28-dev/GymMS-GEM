@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Users, UserCheck, Dumbbell, Activity, ChevronRight, TrendingDown, TrendingUp, Minus } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useIsMobile } from '../hooks/useIsMobile';
@@ -21,6 +21,9 @@ const ORDER = { off: 0, slipping: 1, nogoal: 2, on: 3, ended: 4 };
 export default function CoachClientsPanel({ staffId }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  // Opened from the front desk, a client opens on the desk's own member page:
+  // /members/:id is inside the app, behind the desk's exit password (F-106)
+  const memberPath = useLocation().pathname.startsWith('/front-desk') ? '/front-desk/member' : '/members';
   const isMobile = useIsMobile();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -89,7 +92,7 @@ export default function CoachClientsPanel({ staffId }) {
           const diff = c.latestWeight != null && c.firstWeight != null ? Math.round((c.latestWeight - c.firstWeight) * 10) / 10 : null;
           const DiffIcon = diff < 0 ? TrendingDown : diff > 0 ? TrendingUp : Minus;
           return (
-            <button key={c.id} data-client-row onClick={() => navigate(`/members/${c.id}`)}
+            <button key={c.id} data-client-row onClick={() => navigate(`${memberPath}/${c.id}`)}
               style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 16px', border: 'none', borderTop: i ? '1px solid var(--border-subtle)' : 'none', background: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'DM Sans' }}>
               {c.photo
                 ? <img src={c.photo} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
