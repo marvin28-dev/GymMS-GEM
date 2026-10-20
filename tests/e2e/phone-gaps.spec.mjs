@@ -69,3 +69,44 @@ test('a task can be marked done on a phone', async ({ page }) => {
 
   await expect.poll(async () => (await call('GET', '/tasks', { token: owner.token })).find(tk => tk.id === task.id)?.status).toBe('Done');
 });
+
+async function gymWithPackage(name) {
+  const owner = await registerGym();
+  const pkg = await call('POST', '/packages', { token: owner.token, body: { name, price: 15000, dayPassPrice: 1500, duration: '1 Months', durationDays: 30, status: 'active' } });
+  return { owner, pkg };
+}
+
+async function packageMenu(page, name, item) {
+  await page.locator('div').filter({ hasText: name }).filter({ has: page.getByRole('button', { name: 'Actions' }) }).last().getByRole('button', { name: 'Actions' }).click();
+  await page.getByRole('menuitem', { name: item }).click();
+}
+
+test('a package can be viewed, edited and deleted on a phone', async ({ page }) => {
+  const { owner, pkg } = await gymWithPackage('Phone Plan');
+  await signIn(page, owner);
+  await page.goto('/packages');
+
+  await packageMenu(page, 'Phone Plan', 'View');
+  await expect(page.getByRole('dialog', { name: 'Package Profile' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await packageMenu(page, 'Phone Plan', 'Edit');
+  await page.locator('input[type="text"]').first().fill('Phone Plan Plus');
+  await page.getByRole('button', { name: 'Save Changes' }).click();
+  await page.getByPlaceholder('••••').fill(owner.accessCode);
+  await page.getByRole('button', { name: 'Authorize' }).click();
+  await expect.poll(async () => (await call('GET', '/packages', { token: owner.token })).find(p => p.id === pkg.id)?.name).toBe('Phone Plan Plus');
+
+  await packageMenu(page, 'Phone Plan Plus', 'Delete');
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+  await expect.poll(async () => (await call('GET', '/packages', { token: owner.token })).some(p => p.id === pkg.id)).toBe(false);
+});
+
+test('a visitor bundle can be added on a phone', async ({ page }) => {
+  const owner = await registerGym();
+  await signIn(page, owner);
+  await page.goto('/packages');
+  await page.getByRole('button', { name: 'Visitor Bundles' }).click();
+  await page.getByTitle('Add Bundle').click();
+  await expect(page.getByRole('dialog', { name: 'Add Session Bundle' })).toBeVisible();
+});

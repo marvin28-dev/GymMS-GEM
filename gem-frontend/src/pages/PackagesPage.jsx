@@ -222,6 +222,166 @@ export default function PackagesPage() {
   const td = { padding: '14px 20px' };
 
   // ── Mobile layout ────────────────────────────────────────────────────────────
+  // Drawn by both layouts: on a phone their buttons used to do nothing,
+  // because only the desktop drew them (F-109)
+  const sharedDialogs = (
+    <>
+      {/* Package Profile Modal */}
+      {profilePkg && (() => {
+        const subscriberCount = membersList.filter(m => m.packageId === profilePkg.id).length;
+        return (
+          <Modal open={!!profilePkg} onClose={() => setProfilePkg(null)} title={t('packages.packageProfile')} maxWidth={500}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{profilePkg.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace', marginTop: 4 }}>{profilePkg.code}</div>
+                </div>
+                <StatusBadge status={profilePkg.status} />
+              </div>
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {[
+                  { label: t('packages.price'), value: formatMoney(profilePkg.price) },
+                  ...(!profilePkg.isVisitor ? [{ label: t('packages.dayPassPrice'), value: profilePkg.dayPassPrice != null ? formatMoney(profilePkg.dayPassPrice) : '-' }] : []),
+                  { label: t('packages.duration'), value: profilePkg.duration },
+                  { label: t('packages.sessions'), value: profilePkg.sessions },
+                  { label: t('packages.accessLevel'), value: profilePkg.access },
+                ].map(r => (
+                  <div key={r.label} style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 4 }}>{r.label}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Manrope' }}>{r.value}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Users size={16} color="var(--accent-blue)" />
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
+                  <strong style={{ color: 'var(--text-primary)' }}>{subscriberCount}</strong> active subscriber{subscriberCount !== 1 ? 's' : ''} on this package
+                </span>
+              </div>
+              {canPrice && (
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('packages.deletingRequiresManager')}</div>
+                  <button onClick={() => setShowDeleteAuth(true)} style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', border: '1px solid var(--accent-red)', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Trash2 size={13} /> {t('packages.deletePackage')}
+                  </button>
+                </div>
+              )}
+            </div>
+          </Modal>
+        );
+      })()}
+
+      <ManagerAuthModal
+        open={showEditAuth}
+        onClose={() => { setShowEditAuth(false); setPendingSave(null); }}
+        action={`edit the package "${editingPkg?.name || ''}"`}
+        onConfirm={async () => {
+          if (pendingSave) await doSave(pendingSave.payload, pendingSave.another);
+          setShowEditAuth(false); setPendingSave(null);
+        }}
+      />
+
+      <ManagerAuthModal
+        open={showDeleteAuth}
+        onClose={() => setShowDeleteAuth(false)}
+        danger
+        action={`delete package "${profilePkg?.name}"`}
+        onConfirm={async () => {
+          setDeleteError('');
+          try {
+            await removePackage(profilePkg.id);
+            setPackages(prev => prev.filter(p => p.id !== profilePkg.id));
+            setProfilePkg(null);
+            setShowDeleteAuth(false);
+          } catch (err) { setShowDeleteAuth(false); setDeleteError(err?.response?.data?.error || t('memberProfile.actionFailed')); }
+        }}
+      />
+
+      <ConfirmModal open={!!deletePkg} onClose={() => setDeletePkg(null)}
+        onConfirm={async () => {
+          setDeleteError('');
+          try {
+            await removePackage(deletePkg.id);
+            setPackages(prev => prev.filter(p => p.id !== deletePkg.id));
+            setDeletePkg(null);
+          } catch (err) { setDeleteError(err?.response?.data?.error || t('memberProfile.actionFailed')); }
+        }}
+        title={t('packages.deletePackage')} message={deletePkg ? t('packages.deletePackageConfirm', { name: deletePkg.name }) : ''} confirmLabel={t('common.delete')} />
+
+      {/* ── Add / Edit Visitor Session Bundle Modal ── */}
+      <Modal open={showVModal} onClose={() => setShowVModal(false)} title={editingVPkg ? t('packages.editBundle') : t('packages.addSessionBundle')} maxWidth={460}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.bundleLabel')} *</label>
+            <input style={{ ...inputStyle, borderColor: vErrors.label ? 'var(--accent-red)' : 'var(--border-subtle)' }}
+              value={vForm.label} onChange={e => setVForm(f => ({ ...f, label: e.target.value }))}
+              placeholder="e.g. 10 Sessions" autoComplete="off" />
+            {vErrors.label && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{vErrors.label}</div>}
+          </div>
+          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.numSessions')} *</label>
+              <input type="number" min="1" style={{ ...inputStyle, borderColor: vErrors.sessions ? 'var(--accent-red)' : 'var(--border-subtle)' }}
+                value={vForm.sessions} onChange={e => setVForm(f => ({ ...f, sessions: e.target.value }))}
+                placeholder="e.g. 10" autoComplete="off" />
+              {vErrors.sessions && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{vErrors.sessions}</div>}
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.pricePerSessionField')} ({getCurrencySymbol()}) *</label>
+              <input type="number" min="1" style={{ ...inputStyle, borderColor: vErrors.pricePerSession ? 'var(--accent-red)' : 'var(--border-subtle)' }}
+                value={vForm.pricePerSession} onChange={e => setVForm(f => ({ ...f, pricePerSession: e.target.value }))}
+                placeholder="e.g. 2500" autoComplete="off" />
+              {vErrors.pricePerSession && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{vErrors.pricePerSession}</div>}
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.durationDays')} <span style={{ color: 'var(--text-muted)' }}>({t('packages.durationDaysHint')})</span></label>
+            <input type="number" min="1" style={inputStyle}
+              value={vForm.durationDays} onChange={e => setVForm(f => ({ ...f, durationDays: e.target.value }))}
+              placeholder="e.g. 30" autoComplete="off" />
+          </div>
+          {/* Live total preview */}
+          {vForm.sessions && vForm.pricePerSession && (
+            <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t('packages.totalPrice')}</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent-gold)', fontFamily: 'Manrope' }}>
+                {(Number(vForm.sessions) * Number(vForm.pricePerSession)).toLocaleString(getMoneyLocale())} {getCurrencySymbol()}
+              </span>
+            </div>
+          )}
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.status')}</label>
+            <select style={inputStyle} value={vForm.status} onChange={e => setVForm(f => ({ ...f, status: e.target.value }))}>
+              <option value="active">{t('packages.active')}</option>
+              <option value="inactive">{t('packages.inactive')}</option>
+            </select>
+          </div>
+          {vErrors._form && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{vErrors._form}</div>}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
+            <button style={secondaryBtn} onClick={() => setShowVModal(false)}>{t('common.cancel')}</button>
+            <button style={primaryBtn} onClick={handleSaveV}>{t('common.save')}</button>
+          </div>
+        </div>
+      </Modal>
+
+      <ManagerAuthModal
+        open={!!deleteVPkg}
+        onClose={() => setDeleteVPkg(null)}
+        danger
+        action={`delete session bundle "${deleteVPkg?.label}"`}
+        onConfirm={async () => {
+          setDeleteError('');
+          try {
+            await removePackage(deleteVPkg.id);
+            setPackages(prev => prev.filter(p => p.id !== deleteVPkg.id));
+            setDeleteVPkg(null);
+          } catch (err) { setDeleteVPkg(null); setDeleteError(err?.response?.data?.error || t('memberProfile.actionFailed')); }
+        }}
+      />
+    </>
+  );
+
   if (isMobile) {
     const memberPkgs = packages.filter(p => !p.isVisitor && p.status !== 'archived');
     const visitorPkgs = packages.filter(p => p.isVisitor && p.status !== 'archived');
@@ -245,6 +405,7 @@ export default function PackagesPage() {
         </div>
 
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {deleteError && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{deleteError}</div>}
           {loading ? (
             <SkeletonCards count={3} />
           ) : shownPkgs.length === 0 ? (
@@ -318,6 +479,7 @@ export default function PackagesPage() {
             </div>
           </div>
         )}
+        {sharedDialogs}
       </div>
     );
   }
@@ -548,159 +710,7 @@ export default function PackagesPage() {
         </div>
       </Modal>
 
-      {/* Package Profile Modal */}
-      {profilePkg && (() => {
-        const subscriberCount = membersList.filter(m => m.packageId === profilePkg.id).length;
-        return (
-          <Modal open={!!profilePkg} onClose={() => setProfilePkg(null)} title={t('packages.packageProfile')} maxWidth={500}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{profilePkg.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace', marginTop: 4 }}>{profilePkg.code}</div>
-                </div>
-                <StatusBadge status={profilePkg.status} />
-              </div>
-              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                {[
-                  { label: t('packages.price'), value: formatMoney(profilePkg.price) },
-                  ...(!profilePkg.isVisitor ? [{ label: t('packages.dayPassPrice'), value: profilePkg.dayPassPrice != null ? formatMoney(profilePkg.dayPassPrice) : '-' }] : []),
-                  { label: t('packages.duration'), value: profilePkg.duration },
-                  { label: t('packages.sessions'), value: profilePkg.sessions },
-                  { label: t('packages.accessLevel'), value: profilePkg.access },
-                ].map(r => (
-                  <div key={r.label} style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '12px 14px' }}>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 4 }}>{r.label}</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Manrope' }}>{r.value}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Users size={16} color="var(--accent-blue)" />
-                <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
-                  <strong style={{ color: 'var(--text-primary)' }}>{subscriberCount}</strong> active subscriber{subscriberCount !== 1 ? 's' : ''} on this package
-                </span>
-              </div>
-              {canPrice && (
-                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('packages.deletingRequiresManager')}</div>
-                  <button onClick={() => setShowDeleteAuth(true)} style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', border: '1px solid var(--accent-red)', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Trash2 size={13} /> {t('packages.deletePackage')}
-                  </button>
-                </div>
-              )}
-            </div>
-          </Modal>
-        );
-      })()}
-
-      <ManagerAuthModal
-        open={showEditAuth}
-        onClose={() => { setShowEditAuth(false); setPendingSave(null); }}
-        action={`edit the package "${editingPkg?.name || ''}"`}
-        onConfirm={async () => {
-          if (pendingSave) await doSave(pendingSave.payload, pendingSave.another);
-          setShowEditAuth(false); setPendingSave(null);
-        }}
-      />
-
-      <ManagerAuthModal
-        open={showDeleteAuth}
-        onClose={() => setShowDeleteAuth(false)}
-        danger
-        action={`delete package "${profilePkg?.name}"`}
-        onConfirm={async () => {
-          setDeleteError('');
-          try {
-            await removePackage(profilePkg.id);
-            setPackages(prev => prev.filter(p => p.id !== profilePkg.id));
-            setProfilePkg(null);
-            setShowDeleteAuth(false);
-          } catch (err) { setShowDeleteAuth(false); setDeleteError(err?.response?.data?.error || t('memberProfile.actionFailed')); }
-        }}
-      />
-
-      <ConfirmModal open={!!deletePkg} onClose={() => setDeletePkg(null)}
-        onConfirm={async () => {
-          setDeleteError('');
-          try {
-            await removePackage(deletePkg.id);
-            setPackages(prev => prev.filter(p => p.id !== deletePkg.id));
-            setDeletePkg(null);
-          } catch (err) { setDeleteError(err?.response?.data?.error || t('memberProfile.actionFailed')); }
-        }}
-        title={t('packages.deletePackage')} message={deletePkg ? t('packages.deletePackageConfirm', { name: deletePkg.name }) : ''} confirmLabel={t('common.delete')} />
-
-      {/* ── Add / Edit Visitor Session Bundle Modal ── */}
-      <Modal open={showVModal} onClose={() => setShowVModal(false)} title={editingVPkg ? t('packages.editBundle') : t('packages.addSessionBundle')} maxWidth={460}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.bundleLabel')} *</label>
-            <input style={{ ...inputStyle, borderColor: vErrors.label ? 'var(--accent-red)' : 'var(--border-subtle)' }}
-              value={vForm.label} onChange={e => setVForm(f => ({ ...f, label: e.target.value }))}
-              placeholder="e.g. 10 Sessions" autoComplete="off" />
-            {vErrors.label && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{vErrors.label}</div>}
-          </div>
-          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.numSessions')} *</label>
-              <input type="number" min="1" style={{ ...inputStyle, borderColor: vErrors.sessions ? 'var(--accent-red)' : 'var(--border-subtle)' }}
-                value={vForm.sessions} onChange={e => setVForm(f => ({ ...f, sessions: e.target.value }))}
-                placeholder="e.g. 10" autoComplete="off" />
-              {vErrors.sessions && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{vErrors.sessions}</div>}
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.pricePerSessionField')} ({getCurrencySymbol()}) *</label>
-              <input type="number" min="1" style={{ ...inputStyle, borderColor: vErrors.pricePerSession ? 'var(--accent-red)' : 'var(--border-subtle)' }}
-                value={vForm.pricePerSession} onChange={e => setVForm(f => ({ ...f, pricePerSession: e.target.value }))}
-                placeholder="e.g. 2500" autoComplete="off" />
-              {vErrors.pricePerSession && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{vErrors.pricePerSession}</div>}
-            </div>
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.durationDays')} <span style={{ color: 'var(--text-muted)' }}>({t('packages.durationDaysHint')})</span></label>
-            <input type="number" min="1" style={inputStyle}
-              value={vForm.durationDays} onChange={e => setVForm(f => ({ ...f, durationDays: e.target.value }))}
-              placeholder="e.g. 30" autoComplete="off" />
-          </div>
-          {/* Live total preview */}
-          {vForm.sessions && vForm.pricePerSession && (
-            <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t('packages.totalPrice')}</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent-gold)', fontFamily: 'Manrope' }}>
-                {(Number(vForm.sessions) * Number(vForm.pricePerSession)).toLocaleString(getMoneyLocale())} {getCurrencySymbol()}
-              </span>
-            </div>
-          )}
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.status')}</label>
-            <select style={inputStyle} value={vForm.status} onChange={e => setVForm(f => ({ ...f, status: e.target.value }))}>
-              <option value="active">{t('packages.active')}</option>
-              <option value="inactive">{t('packages.inactive')}</option>
-            </select>
-          </div>
-          {vErrors._form && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{vErrors._form}</div>}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
-            <button style={secondaryBtn} onClick={() => setShowVModal(false)}>{t('common.cancel')}</button>
-            <button style={primaryBtn} onClick={handleSaveV}>{t('common.save')}</button>
-          </div>
-        </div>
-      </Modal>
-
-      <ManagerAuthModal
-        open={!!deleteVPkg}
-        onClose={() => setDeleteVPkg(null)}
-        danger
-        action={`delete session bundle "${deleteVPkg?.label}"`}
-        onConfirm={async () => {
-          setDeleteError('');
-          try {
-            await removePackage(deleteVPkg.id);
-            setPackages(prev => prev.filter(p => p.id !== deleteVPkg.id));
-            setDeleteVPkg(null);
-          } catch (err) { setDeleteVPkg(null); setDeleteError(err?.response?.data?.error || t('memberProfile.actionFailed')); }
-        }}
-      />
+      {sharedDialogs}
     </div>
   );
 }
