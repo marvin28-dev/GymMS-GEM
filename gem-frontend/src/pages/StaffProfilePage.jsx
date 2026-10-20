@@ -17,7 +17,7 @@ import GemSelect from '../components/ui/GemSelect';
 import { getOne as getStaffMember, getCode as getStaffCode, regenerateCode as regenerateStaffCode, update as updateStaff, remove as removeStaff, resendInvite as resendStaffInvite } from '../services/staff.service';
 import { uploadPhoto } from '../services/upload.service';
 import { getAuth, getRole } from '../utils/auth';
-import { jobOf, departmentOfRole } from '../utils/departments';
+import { jobOf, departmentOfRole, assigneeName } from '../utils/departments';
 import { getAll as getTasks, update as updateTask } from '../services/tasks.service';
 import { getAll as getCalendar } from '../services/calendar.service';
 import { getAll as getTimecards, approve as approveTimecard, reject as rejectTimecard } from '../services/timecards.service';
@@ -1583,7 +1583,7 @@ export default function StaffProfilePage() {
                 {[
                   [t('tasks.priority'), <span key="p" style={{ ...pc, fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 4 }}>{viewingTask.priority}</span>],
                   [t('common.status'), <StatusBadge key="s" status={(viewingTask.status || 'pending').toLowerCase()} />],
-                  [t('tasks.assignedTo'), viewingTask.assignedTo || ''],
+                  [t('tasks.assignedTo'), assigneeName(viewingTask, t)],
                   [t('staff.taskDueDateCol'), viewingTask.dueDate ? String(viewingTask.dueDate).slice(0, 10) : ''],
                   [t('tasks.createdBy'), viewingTask.createdBySystem ? t('tasks.createdBySystem') : (viewingTask.createdBy || '')],
                   [t('staff.taskAge'), age === null ? '' : (age === 0 ? t('staff.ageToday') : t('staff.ageDaysAgo', { count: age }))],

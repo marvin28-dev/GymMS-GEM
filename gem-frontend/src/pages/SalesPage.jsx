@@ -287,7 +287,7 @@ function RestockModal({ open, onClose, product, onRestock }) {
     <Modal open={open} onClose={handleClose} title={`${t('sales.restock')}: ${product?.name || ''}`} maxWidth={420}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <GemInput label={t('sales.addQuantity')} required type="text" inputMode="numeric" value={addQty} error={error || undefined}
-          onChange={e => { setAddQty(digitsOnly(e.target.value)); setError(''); }} placeholder="e.g. 50" autoFocus />
+          onChange={e => { setAddQty(digitsOnly(e.target.value)); setError(''); }} placeholder={t('common.eg', { x: 50 })} autoFocus />
         {product && (
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
             {t('sales.currentStock')}: <strong style={{ color: 'var(--text-primary)' }}>{product.stock}</strong>
@@ -580,7 +580,7 @@ export default function SalesPage() {
         open={!!authPending}
         onClose={() => setAuthPending(null)}
         danger
-        action={authPending?.type === 'product' ? `Delete product "${authPending.data?.name}"` : `Remove category "${authPending?.data}"`}
+        action={authPending?.type === 'product' ? t('sales.authDeleteProduct', { name: authPending.data?.name || '' }) : t('sales.authRemoveCategory', { name: authPending?.data || '' })}
         onConfirm={confirmAuth}
       />
     </>
@@ -845,7 +845,7 @@ export default function SalesPage() {
             <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 20, padding: '5px 12px', fontSize: 12, fontFamily: 'DM Sans', color: 'var(--text-primary)', fontWeight: 500 }}>
               {cat}
               <button
-                title={categories.length <= 1 ? 'Cannot remove last category' : `Remove ${cat}`}
+                title={categories.length <= 1 ? t('sales.lastCategory') : t('sales.removeCategory', { name: cat })}
                 onClick={() => handleRemoveCategory(cat)}
                 disabled={categories.length <= 1}
                 style={{ background: 'none', border: 'none', cursor: categories.length <= 1 ? 'not-allowed' : 'pointer', padding: 0, display: 'flex', alignItems: 'center', color: categories.length <= 1 ? 'var(--text-muted)' : 'var(--text-secondary)', fontSize: 14, lineHeight: 1, opacity: categories.length <= 1 ? 0.4 : 1 }}

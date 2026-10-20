@@ -18,6 +18,7 @@ import GemSelect from '../components/ui/GemSelect';
 import { getAll as getStaffApi, create as createStaff, update as updateStaff, remove as removeStaff } from '../services/staff.service';
 import { uploadPhoto } from '../services/upload.service';
 import { getRole, getAuth, getPhonePlaceholder } from '../utils/auth';
+import { roleName } from '../utils/roleNames';
 import { canView, canManage, isOwner, rankOf } from '../utils/hierarchy';
 import { fmtDate, todayStr } from '../utils/date';
 import { useSetupStatus } from '../hooks/useSetupStatus';
@@ -29,15 +30,6 @@ import { serverFieldError, fieldErrorStyle, revealFirstError } from '../utils/fo
 
 const formatDate = (d) => fmtDate(d);
 
-const ROLE_KEYS = {
-  general_manager: 'generalManager', 'General Manager': 'generalManager',
-  manager: 'manager', 'Manager': 'manager',
-  trainer: 'trainer', 'Trainer': 'trainer',
-  instructor: 'instructor', 'Instructor': 'instructor',
-  front_desk: 'frontDesk', 'Front Desk': 'frontDesk',
-  coach: 'coach', 'Coach': 'coach',
-  other: 'roleOther', 'Other': 'roleOther',
-};
 
 function compressImage(dataUrl, maxW = 1000, maxH = 1000, quality = 0.82) {
   return new Promise(resolve => {
@@ -331,7 +323,7 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
             onMouseLeave={e => e.currentTarget.style.borderColor = form.photoData ? 'var(--accent-gold)' : 'var(--border)'}
           >
             {form.photoData
-              ? <img src={form.photoData} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Preview" />
+              ? <img src={form.photoData} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={t('common.preview')} />
               : <Camera size={28} color="var(--text-muted)" />
             }
           </div>
@@ -339,7 +331,7 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
               {form.photoData ? t('staff.clickToChangePhoto') : t('staff.uploadProfilePhoto')}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, fontFamily: 'DM Sans' }}>JPG, PNG or WEBP. Max 5MB.</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, fontFamily: 'DM Sans' }}>{t('members.photoHint')}</div>
           </div>
         </div>
 
@@ -363,7 +355,7 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
             <div>
               <label style={labelStyle}>{t('staff.role')}</label>
               <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: 'var(--text-muted)' }}>
-                {isOwnerAccount ? 'General Manager / Owner' : form.role}
+                {isOwnerAccount ? t('staff.ownerRole') : (ROLE_LABELS[form.role] || form.role)}
               </div>
             </div>
           ) : (
@@ -618,7 +610,7 @@ export default function StaffPage() {
         id: Date.now(),
         date: todayStr(),
         content: form.notes.trim(),
-        createdBy: [getAuth()?.user?.firstName, getAuth()?.user?.lastName].filter(Boolean).join(' ') || 'Manager',
+        createdBy: [getAuth()?.user?.firstName, getAuth()?.user?.lastName].filter(Boolean).join(' ') || roleName(getRole(), t),
         category: 'General',
       }] } : {},
       // The owner's join date is fixed at account creation and never edited
@@ -690,13 +682,12 @@ export default function StaffPage() {
   // The main list is the active roster; the deactivated ones only appear once
   // the general manager switches to their tab (nobody else sees that tab).
   const showingDeactivated = isGM && staffTab === 'Deactivated';
-  const roleName = (r) => { const k = ROLE_KEYS[r]; return k ? t(`staff.${k}`) : ((r || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())); };
   const displayStaff = rosterStaff
     .filter(s => showingDeactivated ? !isActiveStaff(s) : isActiveStaff(s));
   const tabCount = { Active: rosterStaff.filter(isActiveStaff).length, Deactivated: deactivatedCount };
   const roleChip = (r) => {
     const rc = ROLE_COLORS[r] || { bg: 'var(--bg-elevated)', color: 'var(--text-muted)' };
-    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, background: rc.bg, color: rc.color, fontFamily: 'DM Sans', whiteSpace: 'nowrap' }}>{roleName(r)}</span>;
+    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, background: rc.bg, color: rc.color, fontFamily: 'DM Sans', whiteSpace: 'nowrap' }}>{roleName(r, t)}</span>;
   };
 
   // ── Mobile layout ────────────────────────────────────────────────────────────

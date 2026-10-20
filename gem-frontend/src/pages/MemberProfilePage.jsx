@@ -5,6 +5,7 @@ import useLiveRefresh from '../hooks/useLiveRefresh';
 import useOnOpen from '../hooks/useOnOpen';
 import { useState, useEffect, useRef } from 'react';
 import { getCurrencySymbol, formatMoney } from '../utils/currency';
+import { durationText } from '../utils/packageText';
 import { digitsOnly } from '../utils/number';
 import { autoPaymentDescription } from '../utils/paymentDescription';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -1491,7 +1492,7 @@ function ChangePackageModal({ open, onClose, member, packagesList = [], onSave }
         {pkg && (
           <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <InfoRow label={t('memberProfile.packagePrice')} value={fmtMoney(pkg.price)} />
-            <InfoRow label={t('memberProfile.durationLabel')} value={pkg.duration} />
+            <InfoRow label={t('memberProfile.durationLabel')} value={durationText(pkg.duration, t)} />
             <InfoRow label={t('memberProfile.accessLabel')} value={pkg.access} />
             <InfoRow label={t('memberProfile.newEndDateLabel')} value={formatDate(calcEndDateFromPkg(today, pkg))} />
           </div>

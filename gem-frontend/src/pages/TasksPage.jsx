@@ -14,7 +14,7 @@ import { getAll as getStaff } from '../services/staff.service';
 import { getRole, getAuth } from '../utils/auth';
 import { notifyDataChanged } from '../utils/events';
 import { TASK_CATEGORIES, categoryColor, categoryLabel, normalizeCategory } from '../utils/taskCategories';
-import { assignFields, assignValue } from '../utils/departments';
+import { assignFields, assignValue, assigneeName } from '../utils/departments';
 import { taskNeedsAttention, taskOverdue } from '../utils/attention';
 import { softAll } from '../utils/loadAll';
 import { serverFieldError } from '../utils/formErrors';
@@ -89,18 +89,18 @@ export default function TasksPage() {
   // from their profile's Tasks tab, not from this shared page.)
   const canCompleteTask = () => ['general_manager', 'manager'].includes(role);
 
-  const filtered = tasks.filter(t => {
-    const assignedName = typeof t.assignedTo === 'string' ? t.assignedTo : '';
-    const matchSearch = !search || t.title.toLowerCase().includes(search.toLowerCase()) || assignedName.toLowerCase().includes(search.toLowerCase());
-    const isOverdue = taskOverdue(t);
+  const filtered = tasks.filter(task => {
+    const assignedName = assigneeName(task, t);
+    const matchSearch = !search || task.title.toLowerCase().includes(search.toLowerCase()) || assignedName.toLowerCase().includes(search.toLowerCase());
+    const isOverdue = taskOverdue(task);
     const matchStatus = statusFilter === 'All'
       || (statusFilter === 'Overdue' ? isOverdue
-        : statusFilter === 'Attention' ? taskNeedsAttention(t)
-        : t.status === statusFilter);
-    const matchPriority = priorityFilter === 'All' || t.priority === priorityFilter;
+        : statusFilter === 'Attention' ? taskNeedsAttention(task)
+        : task.status === statusFilter);
+    const matchPriority = priorityFilter === 'All' || task.priority === priorityFilter;
     // 'None' catches tasks raised before categories existed, or left blank
     const matchCategory = categoryFilter === 'All'
-      || (categoryFilter === 'None' ? !t.category : normalizeCategory(t.category) === categoryFilter);
+      || (categoryFilter === 'None' ? !task.category : normalizeCategory(task.category) === categoryFilter);
     return matchSearch && matchStatus && matchPriority && matchCategory;
   });
 
@@ -250,7 +250,7 @@ export default function TasksPage() {
         {viewTask.description && <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{viewTask.description}</div>}
         <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {[
-            { label: t('tasks.assignedTo'), value: viewTask.assignedTo || '-' },
+            { label: t('tasks.assignedTo'), value: assigneeName(viewTask, t) || '-' },
             { label: t('tasks.dueDate'), value: viewTask.dueDate ? String(viewTask.dueDate).slice(0, 10) : '-' },
             { label: t('tasks.priority'), value: t(`tasks.priority${viewTask.priority}`) },
             { label: t('tasks.createdBy'), value: viewTask.createdBySystem ? t('tasks.createdBySystem') : (viewTask.createdBy || '-') },
@@ -449,7 +449,7 @@ export default function TasksPage() {
                         {isOverdue ? `${t('tasks.overdue')} · ` : ''}{String(task.dueDate).slice(0, 10)}
                       </span>
                     )}
-                    {task.assignedTo && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{task.assignedTo}</span>}
+                    {task.assignedTo && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{assigneeName(task, t)}</span>}
                   </div>
                 </div>
 
@@ -621,7 +621,7 @@ export default function TasksPage() {
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.description}</div>
                     </td>
-                    <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>{task.assignedTo}</td>
+                    <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>{assigneeName(task, t)}</td>
                     <td style={{ padding: '12px 20px', fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: isOverdue ? 'var(--accent-red)' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                       {task.dueDate ? String(task.dueDate).slice(0, 10) : '-'}
                     </td>

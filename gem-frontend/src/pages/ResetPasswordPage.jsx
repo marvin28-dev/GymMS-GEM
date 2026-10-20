@@ -78,8 +78,8 @@ export default function ResetPasswordPage() {
 
   function validate() {
     const e = {};
-    if (!password || password.length < 6) e.password = 'Password must be at least 6 characters';
-    if (password !== confirm) e.confirm = 'Passwords do not match';
+    if (!password || password.length < 6) e.password = t('auth.pwTooShort');
+    if (password !== confirm) e.confirm = t('auth.pwMismatch');
     return e;
   }
 

@@ -40,6 +40,15 @@ export const DEPARTMENTS = [
 
 export const departmentOfRole = (role) => DEPARTMENTS.find(d => d.roles.includes(jobOf(role))) || null;
 
+// Who a task reaches, in the reader's language: the server names a job or a
+// department in English
+const JOB_NAMES = ['manager', 'front_desk', 'trainer'];
+export function assigneeName(task, t) {
+  if (task?.assignedGroup === 'management') return t('tasks.deptManagement');
+  if (task?.assignedRole && JOB_NAMES.includes(jobOf(task.assignedRole))) return t(`tasks.allOf_${jobOf(task.assignedRole)}`);
+  return typeof task?.assignedTo === 'string' ? task.assignedTo : '';
+}
+
 // Which department a task's current value belongs to, so a form editing an
 // existing task opens with the right department already picked.
 export function departmentOfValue(value, staffList) {

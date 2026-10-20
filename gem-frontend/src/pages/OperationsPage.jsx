@@ -48,7 +48,7 @@ import { getAll as getExpenses } from '../services/expenses.service';
 import { fmtDate, fmtTime, getDateLocale, todayStr, dayStr } from '../utils/date';
 import { membershipEndsThisWeek } from '../utils/attention';
 import { TASK_CATEGORIES } from '../utils/taskCategories';
-import { assignFields } from '../utils/departments';
+import { assignFields, assigneeName } from '../utils/departments';
 import { getRole } from '../utils/auth';
 import { pagesFor } from '../utils/rolePages';
 import { serverFieldError } from '../utils/formErrors';
@@ -57,7 +57,7 @@ import { SkeletonCards } from '../components/Skeleton';
 import { softAll } from '../utils/loadAll';
 import { gymCache } from '../utils/gymCache';
 
-const sName = s => s ? `${s.firstName || ''} ${s.lastName || ''}`.trim() || s.id : 'Unassigned';
+const sName = s => `${s.firstName || ''} ${s.lastName || ''}`.trim() || s.id;
 
 const primaryBtn = {
   background: 'linear-gradient(135deg, #c9a96e, #b08d4a)',
@@ -466,7 +466,7 @@ export default function OperationsPage() {
         {pendingTasks.length > 0 && (
           <div style={{ padding: '0 16px 14px' }}>
             <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 10, fontFamily: 'DM Sans' }}>
-              Pending Tasks ({pendingTasks.length})
+              {t('operations.pendingTasksCount', { n: pendingTasks.length })}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {pendingTasks.slice(0, 5).map(task => (
@@ -566,7 +566,7 @@ export default function OperationsPage() {
                 <div style={{ padding: '24px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, fontFamily: 'DM Sans' }}>{t('operations.allTasksDone')}</div>
               ) : pendingTasks.map((task, i) => {
                 const pc = priorityColors[(task.priority || '').toLowerCase()] || priorityColors.low;
-                const assigneeName = typeof task.assignedTo === 'string' ? (task.assignedTo || 'Unassigned') : (task.assignedTo ? sName(task.assignedTo) : 'Unassigned');
+                const assignee = assigneeName(task, t) || t('common.unassigned');
                 const dueDisplay = task.dueDate ? String(task.dueDate).slice(0, 10) : '-';
                 return (
                   <div key={task.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 20px', borderBottom: i < pendingTasks.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
@@ -577,7 +577,7 @@ export default function OperationsPage() {
                         <span style={{ ...pc, borderRadius: 20, padding: '2px 8px', fontSize: 10, fontWeight: 600, fontFamily: 'DM Sans', whiteSpace: 'nowrap', flexShrink: 0 }}>{t(`tasks.priority${task.priority}`)}</span>
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 3 }}>
-                        {assigneeName} · {t('operations.due')} {dueDisplay}
+                        {assignee} · {t('operations.due')} {dueDisplay}
                       </div>
                     </div>
                     <StatusBadge status={task.status} />
@@ -605,7 +605,7 @@ export default function OperationsPage() {
                     <Wrench size={15} color="var(--accent-yellow)" />
                     <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{t('operations.equipmentIssues')}</span>
                     {openCount > 0 && (
-                      <span style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, fontFamily: 'DM Sans' }}>{openCount} open</span>
+                      <span style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, fontFamily: 'DM Sans' }}>{t('operations.nOpen', { n: openCount })}</span>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>

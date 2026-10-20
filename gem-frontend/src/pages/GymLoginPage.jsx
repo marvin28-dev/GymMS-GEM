@@ -12,7 +12,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useIsMobile } from '../utils/useIsMobile';
 import { gymAddress } from '../utils/gymAddress';
 
-const DEFAULT_GYM = { name: 'Loading...', location: '', color: '#c9a96e', bg: 'rgba(201,169,110,0.07)', initials: '...', tagline: 'Welcome back', logo: null };
+const DEFAULT_GYM = { name: '', location: '', color: '#c9a96e', bg: 'rgba(201,169,110,0.07)', initials: '...', logo: null };
 
 function buildBranding(gym) {
   const words = gym.name.split(' ');
@@ -467,13 +467,13 @@ export default function GymLoginPage() {
                 : <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: gym.initials.length > 3 ? 12 : 16, fontWeight: 900, color: gym.color }}>{gym.initials}</span>}
             </div>
             <div>
-              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 2 }}>{gym.name}</div>
+              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 2 }}>{gym.name || t('common.loading')}</div>
               {gym.location && <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-muted)', fontSize: 12 }}><MapPin size={11} /> {gym.location}</div>}
             </div>
           </div>
 
           <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>{t('auth.loginSignIn')}</h2>
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 24, lineHeight: 1.5 }}>{t('auth.loginSub')} <strong>{gym.name}</strong></p>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 24, lineHeight: 1.5 }}>{t('auth.loginSub')} <strong>{gym.name || t('common.loading')}</strong></p>
 
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
@@ -576,13 +576,13 @@ export default function GymLoginPage() {
               <Dumbbell size={11} color="var(--text-muted)" strokeWidth={2} />
             </div>
           </div>
-          <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.15, marginBottom: 8, letterSpacing: '-0.5px' }}>{gym.name}</h1>
+          <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.15, marginBottom: 8, letterSpacing: '-0.5px' }}>{gym.name || t('common.loading')}</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16 }}>
             <MapPin size={13} color="var(--text-muted)" />
             <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{gym.location}</span>
           </div>
           <div style={{ height: 2, width: 40, background: `linear-gradient(90deg, ${gym.color}, transparent)`, borderRadius: 1, marginBottom: 16 }} />
-          <p style={{ fontSize: 14, color: 'var(--text-secondary)', fontStyle: 'italic', lineHeight: 1.5 }}>"{gym.tagline}"</p>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', fontStyle: 'italic', lineHeight: 1.5 }}>"{t('auth.welcomeBack')}"</p>
         </div>
 
         <div onClick={() => nav('/')} style={{ display: 'flex', alignItems: 'center', gap: 8, borderTop: '1px solid var(--border-subtle)', paddingTop: 20, cursor: 'pointer' }}>
@@ -601,7 +601,7 @@ export default function GymLoginPage() {
         <div style={{ width: '100%', maxWidth: 400 }}>
           <div style={{ marginBottom: 32 }}>
             <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 6, letterSpacing: '-0.4px' }}>{t('auth.loginTitle')}</h2>
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{t('auth.loginSub')} <strong style={{ color: 'var(--text-primary)' }}>{gym.name}</strong></p>
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{t('auth.loginSub')} <strong style={{ color: 'var(--text-primary)' }}>{gym.name || t('common.loading')}</strong></p>
           </div>
 
           <form onSubmit={handleLogin}>

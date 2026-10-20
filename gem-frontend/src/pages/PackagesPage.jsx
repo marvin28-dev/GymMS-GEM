@@ -1,6 +1,7 @@
 ﻿import { useLiveTick } from '../hooks/useLiveRefresh';
 import { useState, useEffect } from 'react';
 import { getCurrencySymbol, formatMoney } from '../utils/currency';
+import { durationText, sessionsText } from '../utils/packageText';
 import { Plus, Pencil, Trash2, Eye, Users, X } from 'lucide-react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import FAB from '../components/FAB';
@@ -234,12 +235,12 @@ export default function PackagesPage() {
           <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.packageName')} *</label>
-              <input style={{ ...inputStyle, borderColor: errors.name ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Premium 12M" />
+              <input style={{ ...inputStyle, borderColor: errors.name ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={t('common.eg', { x: 'Premium 12M' })} />
               {errors.name && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.name}</div>}
             </div>
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.code')}</label>
-              <input style={inputStyle} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="e.g. PKG-P12" />
+              <input style={inputStyle} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder={t('common.eg', { x: 'PKG-P12' })} />
             </div>
           </div>
           <div>
@@ -267,7 +268,7 @@ export default function PackagesPage() {
             </div>
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.durationValue')}</label>
-              <input type="number" min="0" style={inputStyle} value={form.durationValue} onChange={e => setForm(f => ({ ...f, durationValue: e.target.value }))} placeholder="e.g. 12" />
+              <input type="number" min="0" style={inputStyle} value={form.durationValue} onChange={e => setForm(f => ({ ...f, durationValue: e.target.value }))} placeholder={t('common.eg', { x: 12 })} />
             </div>
           </div>
           <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -277,7 +278,7 @@ export default function PackagesPage() {
                 {form.sessionLimit === 'Unlimited' ? (
                   <div style={{ ...inputStyle, color: 'var(--text-muted)', fontStyle: 'italic', cursor: 'default', userSelect: 'none' }}>{t('packages.unlimited')}</div>
                 ) : (
-                  <input type="number" min="1" style={inputStyle} value={form.sessionLimit} onChange={e => setForm(f => ({ ...f, sessionLimit: e.target.value }))} placeholder="e.g. 20" />
+                  <input type="number" min="1" style={inputStyle} value={form.sessionLimit} onChange={e => setForm(f => ({ ...f, sessionLimit: e.target.value }))} placeholder={t('common.eg', { x: 20 })} />
                 )}
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', width: 'fit-content' }}>
                   <input
@@ -348,8 +349,8 @@ export default function PackagesPage() {
                 {[
                   { label: t('packages.price'), value: formatMoney(profilePkg.price) },
                   ...(!profilePkg.isVisitor ? [{ label: t('packages.dayPassPrice'), value: profilePkg.dayPassPrice != null ? formatMoney(profilePkg.dayPassPrice) : '-' }] : []),
-                  { label: t('packages.duration'), value: profilePkg.duration },
-                  { label: t('packages.sessions'), value: profilePkg.sessions },
+                  { label: t('packages.duration'), value: durationText(profilePkg.duration, t) },
+                  { label: t('packages.sessions'), value: sessionsText(profilePkg.sessions, t) },
                   { label: t('packages.accessLevel'), value: profilePkg.access },
                 ].map(r => (
                   <div key={r.label} style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '12px 14px' }}>
@@ -380,7 +381,7 @@ export default function PackagesPage() {
       <ManagerAuthModal
         open={showEditAuth}
         onClose={() => { setShowEditAuth(false); setPendingSave(null); }}
-        action={`edit the package "${editingPkg?.name || ''}"`}
+        action={t('packages.authEdit', { name: editingPkg?.name || '' })}
         onConfirm={async () => {
           if (pendingSave) await doSave(pendingSave.payload, pendingSave.another);
           setShowEditAuth(false); setPendingSave(null);
@@ -391,7 +392,7 @@ export default function PackagesPage() {
         open={showDeleteAuth}
         onClose={() => setShowDeleteAuth(false)}
         danger
-        action={`delete package "${profilePkg?.name}"`}
+        action={t('packages.authDelete', { name: profilePkg?.name || '' })}
         onConfirm={async () => {
           setDeleteError('');
           try {
@@ -421,7 +422,7 @@ export default function PackagesPage() {
             <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.bundleLabel')} *</label>
             <input style={{ ...inputStyle, borderColor: vErrors.label ? 'var(--accent-red)' : 'var(--border-subtle)' }}
               value={vForm.label} onChange={e => setVForm(f => ({ ...f, label: e.target.value }))}
-              placeholder="e.g. 10 Sessions" autoComplete="off" />
+              placeholder={t('packages.bundleLabelPh')} autoComplete="off" />
             {vErrors.label && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{vErrors.label}</div>}
           </div>
           <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -429,14 +430,14 @@ export default function PackagesPage() {
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.numSessions')} *</label>
               <input type="number" min="1" style={{ ...inputStyle, borderColor: vErrors.sessions ? 'var(--accent-red)' : 'var(--border-subtle)' }}
                 value={vForm.sessions} onChange={e => setVForm(f => ({ ...f, sessions: e.target.value }))}
-                placeholder="e.g. 10" autoComplete="off" />
+                placeholder={t('common.eg', { x: 10 })} autoComplete="off" />
               {vErrors.sessions && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{vErrors.sessions}</div>}
             </div>
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.pricePerSessionField')} ({getCurrencySymbol()}) *</label>
               <input type="number" min="1" style={{ ...inputStyle, borderColor: vErrors.pricePerSession ? 'var(--accent-red)' : 'var(--border-subtle)' }}
                 value={vForm.pricePerSession} onChange={e => setVForm(f => ({ ...f, pricePerSession: e.target.value }))}
-                placeholder="e.g. 2500" autoComplete="off" />
+                placeholder={t('common.eg', { x: 2500 })} autoComplete="off" />
               {vErrors.pricePerSession && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{vErrors.pricePerSession}</div>}
             </div>
           </div>
@@ -444,7 +445,7 @@ export default function PackagesPage() {
             <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.durationDays')} <span style={{ color: 'var(--text-muted)' }}>({t('packages.durationDaysHint')})</span></label>
             <input type="number" min="1" style={inputStyle}
               value={vForm.durationDays} onChange={e => setVForm(f => ({ ...f, durationDays: e.target.value }))}
-              placeholder="e.g. 30" autoComplete="off" />
+              placeholder={t('common.eg', { x: 30 })} autoComplete="off" />
           </div>
           {/* Live total preview */}
           {vForm.sessions && vForm.pricePerSession && (
@@ -474,7 +475,7 @@ export default function PackagesPage() {
         open={!!deleteVPkg}
         onClose={() => setDeleteVPkg(null)}
         danger
-        action={`delete session bundle "${deleteVPkg?.label}"`}
+        action={t('packages.authDeleteBundle', { name: deleteVPkg?.label || '' })}
         onConfirm={async () => {
           setDeleteError('');
           try {
@@ -542,7 +543,7 @@ export default function PackagesPage() {
                   <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent-gold)', fontFamily: 'JetBrains Mono, monospace' }}>
                     {formatMoney(pkg.price)}
                   </span>
-                  {pkg.duration && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{pkg.duration}</span>}
+                  {pkg.duration && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{durationText(pkg.duration, t)}</span>}
                   {pkg.sessions && pkg.sessions !== 'Unlimited' && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{pkg.sessions} {t('members.visitorSessions')}</span>}
                   <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Users size={11} strokeWidth={2} />{memberCount}
@@ -610,7 +611,7 @@ export default function PackagesPage() {
           <div className="gem-table-scroll"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.01)' }}>
-                {[t('packages.packageName'), 'Code', t('packages.duration'), t('packages.price'), t('packages.sessions'), t('packages.access'), t('common.status'), t('common.actions')].map(h => (
+                {[t('packages.packageName'), t('packages.code'), t('packages.duration'), t('packages.price'), t('packages.sessions'), t('packages.access'), t('common.status'), t('common.actions')].map(h => (
                   <th key={h} style={th}>{h}</th>
                 ))}
               </tr>
@@ -622,9 +623,9 @@ export default function PackagesPage() {
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={td}><div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{pkg.name}</div></td>
                   <td style={{ ...td, fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-muted)' }}>{pkg.code}</td>
-                  <td style={{ ...td, fontSize: 13, color: 'var(--text-secondary)' }}>{pkg.duration}</td>
+                  <td style={{ ...td, fontSize: 13, color: 'var(--text-secondary)' }}>{durationText(pkg.duration, t)}</td>
                   <td style={{ ...td, fontSize: 14, fontWeight: 700, fontFamily: 'Manrope, sans-serif', color: 'var(--accent-gold)' }}>{formatMoney(pkg.price)}</td>
-                  <td style={{ ...td, fontSize: 13, color: 'var(--text-secondary)' }}>{pkg.sessions}</td>
+                  <td style={{ ...td, fontSize: 13, color: 'var(--text-secondary)' }}>{sessionsText(pkg.sessions, t)}</td>
                   <td style={{ ...td, fontSize: 12, color: 'var(--text-secondary)' }}>{pkg.access}</td>
                   <td style={td}><StatusBadge status={pkg.status} /></td>
                   <td style={td}>
@@ -664,7 +665,7 @@ export default function PackagesPage() {
                   <td style={td}><div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{pkg.label}</div></td>
                   <td style={td}>
                     <span style={{ background: 'var(--accent-blue-dim)', color: 'var(--accent-blue)', borderRadius: 6, padding: '2px 10px', fontSize: 12, fontWeight: 600 }}>
-                      {pkg.sessions} {pkg.sessions === 1 ? 'session' : 'sessions'}
+                      {t(pkg.sessions === 1 ? 'packages.nSession' : 'packages.nSessions', { n: pkg.sessions })}
                     </span>
                   </td>
                   <td style={{ ...td, fontSize: 13, color: 'var(--text-secondary)' }}>{formatMoney(pkg.pricePerSession)} / session</td>

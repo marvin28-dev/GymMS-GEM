@@ -50,7 +50,7 @@ import { useGymSettings, refreshGymSettings } from '../hooks/useGymSettings';
 import { softAll } from '../utils/loadAll';
 import NotificationBell from '../components/NotificationBell';
 import TaskAssigneeField from '../components/TaskAssigneeField';
-import { assignFields } from '../utils/departments';
+import { assignFields, assigneeName } from '../utils/departments';
 import { TASK_CATEGORIES } from '../utils/taskCategories';
 import { gymCache } from '../utils/gymCache';
 import { fieldErrorStyle, serverFieldError } from '../utils/formErrors';
@@ -2089,7 +2089,7 @@ export default function FrontDeskPage() {
                 <div key={tk.id} style={{ padding:'10px 18px', borderBottom:'1px solid var(--border-subtle)', display:'flex', gap:10, alignItems:'flex-start', justifyContent:'space-between' }}>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', fontFamily:'DM Sans', lineHeight:1.3 }}>{tk.title}</div>
-                    <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'DM Sans', marginTop:2 }}>{tk.assignedTo || '-'}</div>
+                    <div style={{ fontSize:10, color:'var(--text-muted)', fontFamily:'DM Sans', marginTop:2 }}>{assigneeName(tk, t) || '-'}</div>
                   </div>
                   <StatusBadge status={tk.status.toLowerCase()} />
                   <RowMenu title={t('common.actions')} items={[

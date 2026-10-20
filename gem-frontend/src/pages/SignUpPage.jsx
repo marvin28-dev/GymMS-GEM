@@ -409,7 +409,7 @@ function WelcomeStep({ onStart, onDemo, onSignIn }) {
           <div style={{ position: 'relative', paddingBottom: '56.25%', background: '#050508' }}>
             <iframe
               src="https://www.youtube.com/embed/dQw4w9WgXcQ"
-              title="GEM: How it works"
+              title={t('signup.welcomeVideoTitle')}
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
@@ -548,7 +548,7 @@ function WelcomeStep({ onStart, onDemo, onSignIn }) {
           <div style={{ position: 'relative', paddingBottom: '56.25%', background: '#050508' }}>
             <iframe
               src="https://www.youtube.com/embed/dQw4w9WgXcQ"
-              title="GEM: How it works"
+              title={t('signup.welcomeVideoTitle')}
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
