@@ -891,6 +891,7 @@ const translations = {
       "addressRequired": "Fill in the street, city and region.",
       "prevWeek": "Previous week",
       "nextWeek": "Next week",
+      "photoFailed": "The photo could not be uploaded. Try again, or save without it.",
     },
     attendance: {
       title: 'Attendance', checkIn: 'Check In', checkOut: 'Check Out',
@@ -3005,6 +3006,7 @@ const translations = {
       "addressRequired": "Renseignez la rue, la ville et la région.",
       "prevWeek": "Semaine précédente",
       "nextWeek": "Semaine suivante",
+      "photoFailed": "La photo n’a pas pu être envoyée. Réessayez, ou enregistrez sans elle.",
     },
     attendance: {
       title: 'Présences', checkIn: 'Entrée', checkOut: 'Sortie',

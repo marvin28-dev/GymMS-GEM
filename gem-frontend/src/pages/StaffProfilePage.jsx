@@ -297,18 +297,26 @@ export default function StaffProfilePage() {
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const profilePhotoRef = useRef(null);
+  // What a refused change says, shown where it was made (F-107, F-120)
+  const [photoError, setPhotoError] = useState('');
+  const [statusError, setStatusError] = useState('');
+  const [scheduleError, setScheduleError] = useState('');
+  const [taskError, setTaskError] = useState('');
+  const [noteError, setNoteError] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
 
   async function handleProfilePhotoUpload(e) {
     const file = e.target.files?.[0];
     if (!file) return;
     setPhotoUploading(true);
+    setPhotoError('');
     try {
       const url = await uploadPhoto(file, 'gem/staff');
       await updateStaff(id, { photo: url });
       setMemberData(prev => ({ ...prev, photoData: url }));
       setShowPhotoModal(false);
     } catch (err) {
-      console.error('Profile photo upload failed:', err);
+      setPhotoError(err?.response?.data?.error || t('staff.photoFailed'));
     } finally {
       setPhotoUploading(false);
       // so choosing the same file again still fires a change
@@ -318,12 +326,13 @@ export default function StaffProfilePage() {
 
   async function removeProfilePhoto() {
     setPhotoUploading(true);
+    setPhotoError('');
     try {
       await updateStaff(id, { photo: null });
       setMemberData(prev => ({ ...prev, photoData: null }));
       setShowPhotoModal(false);
     } catch (err) {
-      console.error('Removing the profile photo failed:', err);
+      setPhotoError(err?.response?.data?.error || t('staff.failedSave'));
     } finally {
       setPhotoUploading(false);
     }
@@ -783,6 +792,7 @@ export default function StaffProfilePage() {
 
   const changeTaskStatus = async (taskId, status, notes) => {
     setTaskBusy(true);
+    setTaskError('');
     try {
       const payload = { status };
       if (notes?.trim()) payload.notes = notes.trim();
@@ -790,8 +800,10 @@ export default function StaffProfilePage() {
       setLocalTasks(prev => prev.map(tk => (tk.id === taskId ? { ...tk, ...(res.data || { status }) } : tk)));
       setViewingTask(prev => (prev && prev.id === taskId ? { ...prev, ...(res.data || { status }) } : prev));
       notifyDataChanged();
+      return true;
     } catch (err) {
-      console.error('Task status change failed:', err);
+      setTaskError(err?.response?.data?.error || t('staff.failedSave'));
+      return false;
     } finally {
       setTaskBusy(false);
     }
@@ -813,7 +825,7 @@ export default function StaffProfilePage() {
 
   const confirmTaskDone = async () => {
     if (!doneTask) return;
-    await changeTaskStatus(doneTask.id, 'Done', doneNote);
+    if (!await changeTaskStatus(doneTask.id, 'Done', doneNote)) return;
     setDoneTask(null);
     setDoneNote('');
   };
@@ -1034,10 +1046,10 @@ export default function StaffProfilePage() {
     };
     // Upload photos to Cloudinary if new files were selected
     if (editForm.photoFile) {
-      try { apiFields.photo = await uploadPhoto(editForm.photoFile, 'gem/staff'); } catch (err) { console.error('Profile photo upload failed:', err); }
+      try { apiFields.photo = await uploadPhoto(editForm.photoFile, 'gem/staff'); } catch (err) { setEditError(err?.response?.data?.error || t('staff.photoFailed')); setEditSaving(false); return; }
     }
     if (editForm.photoIdFile) {
-      try { apiFields.photoId = await uploadPhoto(editForm.photoIdFile, 'gem/staff/ids'); } catch (err) { console.error('ID photo upload failed:', err); }
+      try { apiFields.photoId = await uploadPhoto(editForm.photoIdFile, 'gem/staff/ids'); } catch (err) { setEditError(err?.response?.data?.error || t('staff.photoIdFailed')); setEditSaving(false); return; }
     }
     try {
       const res = await updateStaff(id, apiFields);
@@ -1071,17 +1083,43 @@ export default function StaffProfilePage() {
     }
   };
 
-  const deactivate = async () => {
-    // Staff are switched off, never deleted - removeStaff here used to wipe the
-    // record while the screen only showed them as inactive.
-    try { await updateStaff(id, { isActive: false }); } catch (err) { console.error('Deactivate failed:', err); }
-    setMemberData(prev => ({ ...prev, status: 'inactive', isActive: false }));
+  // Staff are switched off, never deleted - removeStaff here used to wipe the
+  // record while the screen only showed them as inactive. The screen changes
+  // only once the server has made the change (F-107).
+  const setActive = async (isActive) => {
+    setStatusError('');
+    try {
+      await updateStaff(id, { isActive });
+      setMemberData(prev => ({ ...prev, status: isActive ? 'active' : 'inactive', isActive }));
+    } catch (err) {
+      setStatusError(err?.response?.data?.error || t('staff.failedSave'));
+    }
   };
+  const deactivate = () => setActive(false);
+  const reactivate = () => setActive(true);
 
-  const reactivate = async () => {
-    try { await updateStaff(id, { isActive: true }); } catch (err) { console.error('Reactivate failed:', err); }
-    setMemberData(prev => ({ ...prev, status: 'active', isActive: true }));
+  // A note is kept once the server has it; a refusal stays in the dialog
+  const saveNote = async () => {
+    if (!noteText.trim() || noteSaving) return;
+    const auth = getAuth()?.user || {};
+    const author = [auth.firstName, auth.lastName].filter(Boolean).join(' ') || 'Manager';
+    const newNote = { id: Date.now(), date: new Date().toISOString().slice(0, 10), content: noteText, createdBy: author, category: noteCategory };
+    const updated = [...notes, newNote];
+    setNoteSaving(true);
+    setNoteError('');
+    try {
+      await updateStaff(id, { staffNotes: updated });
+      setNotes(updated);
+      setNoteText('');
+      setNoteCategory('General');
+      setShowNoteModal(false);
+    } catch (err) {
+      setNoteError(err?.response?.data?.error || t('staff.failedSave'));
+    } finally {
+      setNoteSaving(false);
+    }
   };
+  const openNoteModal = () => { setNoteError(''); setShowNoteModal(true); };
 
   const handleChangePassword = async () => {
     setPwError('');
@@ -1372,6 +1410,7 @@ export default function StaffProfilePage() {
   };
 
   const saveSchedule = async () => {
+    setScheduleError('');
     try {
       if (scheduleMode === 'repeating') {
         await updateStaff(id, { schedule });
@@ -1385,7 +1424,7 @@ export default function StaffProfilePage() {
       setScheduleConfigured(true);
       setTimeout(() => setScheduleSaved(false), 2000);
     } catch (err) {
-      console.error('Failed to save schedule:', err);
+      setScheduleError(err?.response?.data?.error || t('staff.failedSave'));
     }
   };
 
@@ -1393,6 +1432,7 @@ export default function StaffProfilePage() {
   const clearWeekOverride = async () => {
     const next = { ...scheduleOverrides };
     delete next[selectedWeek];
+    setScheduleError('');
     try {
       await updateStaff(id, { scheduleOverrides: next });
       setScheduleOverrides(next);
@@ -1400,9 +1440,11 @@ export default function StaffProfilePage() {
       setScheduleSaved(true);
       setTimeout(() => setScheduleSaved(false), 2000);
     } catch (err) {
-      console.error('Failed to clear week schedule:', err);
+      setScheduleError(err?.response?.data?.error || t('staff.failedSave'));
     }
   };
+
+  const actionError = photoError || statusError;
 
   // ── Mobile layout ──────────────────────────────────────────────────────────
   if (isMobile) {
@@ -1481,6 +1523,7 @@ export default function StaffProfilePage() {
           </div>
         )}
 
+        {actionError && <div role="alert" style={{ margin: '12px 16px 0', fontSize: 12, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{actionError}</div>}
         {/* Resend invite feedback */}
         {inviteFeedback && (
           <div style={{ margin: '12px 16px 0', background: inviteFeedback.ok ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${inviteFeedback.ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`, borderRadius: 12, padding: '11px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -1729,6 +1772,7 @@ export default function StaffProfilePage() {
             <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans', textAlign: 'right' }}>
               {t(scheduleMode === 'week' ? 'staff.workingDaysThisWeek' : 'staff.workingDays', { count: DAYS.filter(d => !schedule[d].off).length })}
             </div>
+            {scheduleError && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{scheduleError}</div>}
             {canEditSchedule ? (
               <button onClick={saveSchedule} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 10, padding: '12px', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#0a0a0f', fontFamily: 'DM Sans', marginTop: 4 }}>
                 {scheduleSaved ? `✓ ${t('staff.saved')}` : t('staff.saveSchedule')}
@@ -1878,8 +1922,8 @@ export default function StaffProfilePage() {
         {/* ── Notes tab ── */}
         {activeTab === 'Notes' && seesPrivate && (
           <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {canEditProfile && (
-              <button onClick={() => setShowNoteModal(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 10, padding: '12px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#0a0a0f', fontFamily: 'DM Sans', marginBottom: 4 }}>
+            {managesTarget && (
+              <button onClick={openNoteModal} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 10, padding: '12px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#0a0a0f', fontFamily: 'DM Sans', marginBottom: 4 }}>
                 <Plus size={15} /> {t('staff.addNote')}
               </button>
             )}
@@ -1985,7 +2029,8 @@ export default function StaffProfilePage() {
               <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6, fontFamily: 'DM Sans' }}>{t('staff.noteLabel')}</label>
               <textarea value={noteText} onChange={e => setNoteText(e.target.value)} style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 12px', fontSize: 14, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', minHeight: 100, resize: 'vertical', boxSizing: 'border-box' }} />
             </div>
-            <button onClick={() => { if (!noteText.trim()) return; const auth = getAuth()?.user || {}; const author = [auth.firstName, auth.lastName].filter(Boolean).join(' ') || 'Manager'; const newNote = { id: Date.now(), date: new Date().toISOString().slice(0,10), content: noteText, createdBy: author, category: noteCategory }; const updated = [...notes, newNote]; setNotes(updated); updateStaff(id, { staffNotes: updated }).catch(() => {}); setNoteText(''); setShowNoteModal(false); }} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 10, padding: '12px', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: '#0a0a0f', fontFamily: 'DM Sans' }}>{t('staff.saveNote')}</button>
+            {noteError && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{noteError}</div>}
+            <button onClick={saveNote} disabled={noteSaving} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 10, padding: '12px', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: '#0a0a0f', fontFamily: 'DM Sans' }}>{t('staff.saveNote')}</button>
           </div>
         </Modal>
         {/* ── Bonus / Deduction Modal (mobile) ────────────────────────────── */}
@@ -2207,6 +2252,7 @@ export default function StaffProfilePage() {
 
       </div>
 
+      {actionError && <div role="alert" style={{ marginBottom: 16, fontSize: 12, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{actionError}</div>}
       {inviteFeedback && (
         <div style={{ marginBottom: 20, background: inviteFeedback.ok ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${inviteFeedback.ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`, borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
           <span style={{ fontSize: 15, lineHeight: 1 }}>{inviteFeedback.ok ? '✉' : '✕'}</span>
@@ -2465,7 +2511,8 @@ export default function StaffProfilePage() {
               {filteredTasks.length === 0 ? (
                 <div style={{ padding: '32px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>{t('staff.noTasksMatchFilters')}</div>
               ) : (
-                <div className="gem-table-scroll"><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className="gem-table-scroll">
+                {taskError && !viewingTask && !doneTask && <div role="alert" style={{ margin: '12px 20px 0', fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{taskError}</div>}<table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr>
                       {[t('staff.taskTitleCol'), t('staff.taskDueDateCol'), t('staff.taskPriorityCol'), t('staff.taskStatusCol'), ''].map((h, i) => (
@@ -2593,6 +2640,7 @@ export default function StaffProfilePage() {
           )}
 
           <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {scheduleError && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{scheduleError}</div>}
             {DAYS.map((day, di) => (
               <div key={day} className="gem-table-scroll" style={{ borderRadius: 10 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr 1fr auto', gap: 16, alignItems: 'center', padding: '12px 16px', background: 'var(--bg-elevated)', borderRadius: 10, opacity: schedule[day].off ? 0.5 : 1, minWidth: 420 }}>
@@ -2842,7 +2890,7 @@ export default function StaffProfilePage() {
         <div style={cardStyle}>
           <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('staff.notesTitle')}</span>
-            {canEditProfile && <button style={primaryBtn} onClick={() => setShowNoteModal(true)}><Plus size={13} />{t('staff.addNote')}</button>}
+            {managesTarget && <button style={primaryBtn} onClick={openNoteModal}><Plus size={13} />{t('staff.addNote')}</button>}
           </div>
           <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {notes.length === 0 && (
@@ -3213,7 +3261,7 @@ export default function StaffProfilePage() {
       />
 
       {/* ── Complete Task Modal ───────────────────────────────────────────── */}
-      <Modal open={!!doneTask} onClose={() => { setDoneTask(null); setDoneNote(''); }} title={t('staff.completeTask')} maxWidth={460}>
+      <Modal open={!!doneTask} onClose={() => { setDoneTask(null); setDoneNote(''); setTaskError(''); }} title={t('staff.completeTask')} maxWidth={460}>
         {doneTask && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '12px 14px' }}>
@@ -3235,8 +3283,9 @@ export default function StaffProfilePage() {
               />
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>{t('staff.completionNoteHint')}</div>
             </div>
+            {taskError && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{taskError}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button style={secondaryBtn} onClick={() => { setDoneTask(null); setDoneNote(''); }}>{t('common.cancel')}</button>
+              <button style={secondaryBtn} onClick={() => { setDoneTask(null); setDoneNote(''); setTaskError(''); }}>{t('common.cancel')}</button>
               <button style={{ ...primaryBtn, opacity: taskBusy ? 0.6 : 1 }} disabled={taskBusy} onClick={confirmTaskDone}>
                 {taskBusy ? t('staff.saving') : t('staff.markDoneBtn')}
               </button>
@@ -3246,7 +3295,7 @@ export default function StaffProfilePage() {
       </Modal>
 
       {/* ── Task Detail Modal ─────────────────────────────────────────────── */}
-      <Modal open={!!viewingTask} onClose={() => { setViewingTask(null); setCompletingInline(false); setDoneNote(''); }} title={t('staff.taskDetails')} maxWidth={520}>
+      <Modal open={!!viewingTask} onClose={() => { setViewingTask(null); setCompletingInline(false); setDoneNote(''); setTaskError(''); }} title={t('staff.taskDetails')} maxWidth={520}>
         {viewingTask && (() => {
           const pc = PRIORITY_COLORS[viewingTask.priority] || PRIORITY_COLORS.Medium;
           const age = taskAgeDays(viewingTask);
@@ -3363,6 +3412,7 @@ export default function StaffProfilePage() {
                 </div>
               )}
 
+              {taskError && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{taskError}</div>}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 {completingInline ? (
                   <>
@@ -3373,7 +3423,7 @@ export default function StaffProfilePage() {
                       style={{ ...primaryBtn, opacity: taskBusy ? 0.6 : 1 }}
                       disabled={taskBusy}
                       onClick={async () => {
-                        await changeTaskStatus(viewingTask.id, 'Done', doneNote);
+                        if (!await changeTaskStatus(viewingTask.id, 'Done', doneNote)) return;
                         setCompletingInline(false);
                         setDoneNote('');
                         setViewingTask(null);
@@ -3564,20 +3614,10 @@ export default function StaffProfilePage() {
           </div>
           <GemSelect label={t('staff.categoryLabel')} value={noteCategory} onChange={e => setNoteCategory(e.target.value)}
             options={['General','Performance','Health','Financial','Other'].map(c => ({ value: c, label: c }))} />
+          {noteError && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px', fontFamily: 'DM Sans' }}>{noteError}</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button style={secondaryBtn} onClick={() => setShowNoteModal(false)}>{t('common.cancel')}</button>
-            <button style={primaryBtn} onClick={() => {
-              if (!noteText.trim()) return;
-              const auth = getAuth()?.user || {};
-              const author = [auth.firstName, auth.lastName].filter(Boolean).join(' ') || 'Manager';
-              const newNote = { id: Date.now(), date: new Date().toISOString().slice(0, 10), content: noteText, createdBy: author, category: noteCategory };
-              const updated = [...notes, newNote];
-              setNotes(updated);
-              updateStaff(id, { staffNotes: updated }).catch(() => {});
-              setNoteText('');
-              setNoteCategory('General');
-              setShowNoteModal(false);
-            }}>{t('staff.saveNote')}</button>
+            <button style={{ ...primaryBtn, opacity: noteSaving ? 0.6 : 1 }} disabled={noteSaving} onClick={saveNote}>{t('staff.saveNote')}</button>
           </div>
         </div>
       </Modal>
