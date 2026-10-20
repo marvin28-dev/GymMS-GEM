@@ -1,6 +1,6 @@
 ﻿import { useLiveTick } from '../hooks/useLiveRefresh';
 import { useState, useEffect } from 'react';
-import { getCurrencySymbol, formatMoney, getMoneyLocale } from '../utils/currency';
+import { formatMoney } from '../utils/currency';
 import { digitsOnly } from '../utils/number';
 import { autoPaymentDescription } from '../utils/paymentDescription';
 import { Plus, Search, Printer, CheckCircle, Clock, XCircle, CreditCard, Banknote, ArrowLeftRight, Calendar, ChevronRight } from 'lucide-react';
@@ -345,7 +345,7 @@ export default function PaymentsPage() {
                           </div>
                           {Number(m.balance) > 0 && (
                             <span style={{ fontSize: 11, color: '#f87171', fontWeight: 600, background: 'rgba(248,113,113,0.1)', borderRadius: 4, padding: '2px 8px', whiteSpace: 'nowrap' }}>
-                              {t('payments.owes')} {(Number(m.balance) || 0).toLocaleString(getMoneyLocale())} {getCurrencySymbol()}
+                              {t('payments.owes')} {formatMoney(Number(m.balance) || 0)}
                             </span>
                           )}
                         </div>
@@ -400,7 +400,7 @@ export default function PaymentsPage() {
               <div style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <div>
                   <div style={{ fontSize: 11, color: '#f87171', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 2 }}>{t('payments.outstandingBalance')}</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#f87171', fontFamily: 'Manrope, sans-serif' }}>{(Number(selectedMember.balance) || 0).toLocaleString(getMoneyLocale())} {getCurrencySymbol()}</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#f87171', fontFamily: 'Manrope, sans-serif' }}>{formatMoney(Number(selectedMember.balance) || 0)}</div>
                 </div>
                 <button type="button"
                   onClick={() => setForm(f => ({ ...f, amount: String(selectedMember.balance) }))}

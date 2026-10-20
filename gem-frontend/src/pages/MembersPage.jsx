@@ -1,6 +1,6 @@
 ﻿import useLiveRefresh from '../hooks/useLiveRefresh';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getCurrencySymbol, formatMoney, getMoneyLocale } from '../utils/currency';
+import { formatMoney } from '../utils/currency';
 import { packageAllowance } from '../utils/packages';
 import { autoPaymentDescription } from '../utils/paymentDescription';
 import CollectPaymentStep from '../components/CollectPaymentStep';
@@ -1003,7 +1003,7 @@ export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gy
           <ModalField label={t('members.membershipOption')} required error={errors.package}>
             <select style={inp(errors.package)} value={form.packageId} onChange={e => handlePackageChange(e.target.value)}>
               <option value="">{t('members.selectPackage')}</option>
-              {memberPackages.map(p => <option key={p.id} value={p.id}>{p.name} : {(p.price || 0).toLocaleString(getMoneyLocale())} {getCurrencySymbol()}</option>)}
+              {memberPackages.map(p => <option key={p.id} value={p.id}>{p.name} : {formatMoney(p.price || 0)}</option>)}
             </select>
           </ModalField>
           <ModalField label={t('members.startDate')} required error={errors.startDate}>
@@ -1410,13 +1410,13 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{pkg.label}</div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                            {pkg.pricePerSession.toLocaleString(getMoneyLocale())} {getCurrencySymbol()} {t('common.perSession')}
+                            {formatMoney(pkg.pricePerSession)} {t('common.perSession')}
                           </div>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: 14, fontWeight: 700, color: selected ? 'var(--accent-gold)' : 'var(--text-primary)', fontFamily: 'Manrope' }}>
-                          {pkg.totalPrice.toLocaleString(getMoneyLocale())} {getCurrencySymbol()}
+                          {formatMoney(pkg.totalPrice)}
                         </div>
                         <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{pkg.isDayPass ? t('members.dayPassOneSession') : `${pkg.sessions} ${t('members.visitorSessions')}`}</div>
                       </div>
@@ -1453,7 +1453,7 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{t('members.paymentProgress')}</span>
               <span style={{ fontSize: 12, fontWeight: 700, color: meetsMinimum ? '#10b981' : '#ef4444', fontFamily: 'DM Sans' }}>
-                {pctPaid}% paid · {remainder > 0 ? `${remainder.toLocaleString(getMoneyLocale())} ${getCurrencySymbol()} remaining` : 'Fully paid ✓'}
+                {pctPaid}% paid · {remainder > 0 ? `${formatMoney(remainder)} remaining` : 'Fully paid ✓'}
               </span>
             </div>
             <div style={{ height: 6, borderRadius: 3, background: 'var(--border-subtle)', overflow: 'hidden' }}>
@@ -1466,7 +1466,7 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
             </div>
             {!meetsMinimum && totalPrice > 0 && (
               <div style={{ fontSize: 11, color: '#ef4444', marginTop: 6, fontFamily: 'DM Sans' }}>
-                {t('members.minPctRequiredMsg', { pct: minPct, amount: minRequired.toLocaleString(getMoneyLocale()), currency: getCurrencySymbol() })}
+                {t('members.minPctRequiredMsg', { pct: minPct, amount: formatMoney(minRequired) })}
               </div>
             )}
             {meetsMinimum && remainder === 0 && (

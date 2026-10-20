@@ -1,6 +1,6 @@
 ﻿import { useLiveTick } from '../hooks/useLiveRefresh';
 import { useState, useRef, useEffect } from 'react';
-import { getCurrencySymbol, formatMoney, getMoneyLocale } from '../utils/currency';
+import { getCurrencySymbol, formatMoney } from '../utils/currency';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { ArrowLeft, ClipboardList, Eye, EyeOff, Plus, RefreshCw, Banknote, TrendingUp, TrendingDown, Calendar, Download, FileText, Lock, Edit2, Camera, IdCard, ChevronLeft, ChevronRight, UserX, UserCheck, Mail, Trash2, CloudUpload, X, Phone } from 'lucide-react';
@@ -2266,8 +2266,8 @@ export default function StaffProfilePage() {
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5, lineHeight: 1.5 }}>
                     {editWeeklyHours > 0 && salary > 0
                       ? (editType === 'Full Time'
-                        ? t('staff.payFromHourly', { rate: salary.toLocaleString(getMoneyLocale()), hours: editWeeklyHours, total: suggestedPay.toLocaleString(getMoneyLocale()) })
-                        : t('staff.payFromSalary', { salary: salary.toLocaleString(getMoneyLocale()), hours: editWeeklyHours, total: suggestedPay.toLocaleString(getMoneyLocale()) }))
+                        ? t('staff.payFromHourly', { rate: formatMoney(salary), hours: editWeeklyHours, total: formatMoney(suggestedPay) })
+                        : t('staff.payFromSalary', { salary: formatMoney(salary), hours: editWeeklyHours, total: formatMoney(suggestedPay) }))
                       : t('staff.noRotaForPay')}
                   </div>
                   {payMissing && (
@@ -3265,8 +3265,8 @@ export default function StaffProfilePage() {
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5, lineHeight: 1.5 }}>
                   {editWeeklyHours > 0 && salary > 0
                     ? (editType === 'Full Time'
-                      ? t('staff.payFromHourly', { rate: salary.toLocaleString(getMoneyLocale()), hours: editWeeklyHours, total: suggestedPay.toLocaleString(getMoneyLocale()) })
-                      : t('staff.payFromSalary', { salary: salary.toLocaleString(getMoneyLocale()), hours: editWeeklyHours, total: suggestedPay.toLocaleString(getMoneyLocale()) }))
+                      ? t('staff.payFromHourly', { rate: formatMoney(salary), hours: editWeeklyHours, total: formatMoney(suggestedPay) })
+                      : t('staff.payFromSalary', { salary: formatMoney(salary), hours: editWeeklyHours, total: formatMoney(suggestedPay) }))
                     : t('staff.noRotaForPay')}
                 </div>
                 {payMissing && (

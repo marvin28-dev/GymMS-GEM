@@ -4,7 +4,7 @@ import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import useLiveRefresh from '../hooks/useLiveRefresh';
 import useOnOpen from '../hooks/useOnOpen';
 import { useState, useEffect, useRef } from 'react';
-import { getCurrencySymbol, formatMoney, getMoneyLocale } from '../utils/currency';
+import { getCurrencySymbol, formatMoney } from '../utils/currency';
 import { digitsOnly } from '../utils/number';
 import { autoPaymentDescription } from '../utils/paymentDescription';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -3526,7 +3526,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
               {member.regFeeDate && (
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
                   {t('memberProfile.lastPaid')} {formatDate(member.regFeeDate)}
-                  &ensp;·&ensp; {t('memberProfile.feeLabel')} {(gymData?.registrationFee || 5000).toLocaleString(getMoneyLocale())} {getCurrencySymbol()}
+                  &ensp;·&ensp; {t('memberProfile.feeLabel')} {formatMoney(gymData?.registrationFee || 0)}
                   {(gymData?.registrationGracePeriodDays || 0) > 0 && regFeeStatusVal === 'grace' &&
                     ` · ${gymData.registrationGracePeriodDays}${t('memberProfile.gracePeriodActive')}`}
                 </div>

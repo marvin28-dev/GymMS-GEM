@@ -1,6 +1,6 @@
 ﻿import { useLiveTick } from '../hooks/useLiveRefresh';
 import { useState, useEffect } from 'react';
-import { getCurrencySymbol, formatMoney, getMoneyLocale } from '../utils/currency';
+import { getCurrencySymbol, formatMoney } from '../utils/currency';
 import { Plus, Pencil, Trash2, Eye, Users, X } from 'lucide-react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import FAB from '../components/FAB';
@@ -450,7 +450,7 @@ export default function PackagesPage() {
             <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t('packages.totalPrice')}</span>
               <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent-gold)', fontFamily: 'Manrope' }}>
-                {(Number(vForm.sessions) * Number(vForm.pricePerSession)).toLocaleString(getMoneyLocale())} {getCurrencySymbol()}
+                {formatMoney(Number(vForm.sessions) * Number(vForm.pricePerSession))}
               </span>
             </div>
           )}

@@ -5,7 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { getMyGym, updateMyGym } from '../services/gym.service';
 import { getAuth, updateSessionGym } from '../utils/auth';
 import { COUNTRIES, countryByName } from '../utils/countries';
-import { getCurrencySymbol, CURRENCY_SYMBOLS, getMoneyLocale, getCurrencyCode } from '../utils/currency';
+import { getCurrencySymbol, CURRENCY_SYMBOLS, getCurrencyCode, formatMoney } from '../utils/currency';
 import { notifyDataChanged } from '../utils/events';
 import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import RowMenu from '../components/ui/RowMenu';
@@ -1285,7 +1285,7 @@ export default function SettingsPage() {
                     </div>
                     <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--text-muted)' }}>
                       {Number(freezeFee.fee) > 0
-                        ? t('settings.freezeFeeSummary', { amount: `${Number(freezeFee.fee).toLocaleString(getMoneyLocale())} ${getCurrencySymbol()}`, days: freezeFee.intervalDays || 0 })
+                        ? t('settings.freezeFeeSummary', { amount: formatMoney(Number(freezeFee.fee)), days: freezeFee.intervalDays || 0 })
                         : t('settings.freezeFeeOff')}
                     </div>
                   </div>

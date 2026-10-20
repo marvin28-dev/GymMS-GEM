@@ -1,6 +1,6 @@
 import { useLiveTick } from '../hooks/useLiveRefresh';
 import { useState, useRef, useEffect } from 'react';
-import { getMoneyLocale } from '../utils/currency';
+import { formatMoney } from '../utils/currency';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { MoreVertical, UserCircle, Pencil, Trash2, Plus, Camera, IdCard, ChevronRight, UserX, UserCheck } from 'lucide-react';
@@ -409,8 +409,8 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5, lineHeight: 1.5 }}>
                 {hoursPerWeek > 0 && currentPay > 0
                   ? (form.employmentType === 'Full Time'
-                    ? t('staff.payFromHourly', { rate: currentPay.toLocaleString(getMoneyLocale()), hours: hoursPerWeek, total: suggestedPay.toLocaleString(getMoneyLocale()) })
-                    : t('staff.payFromSalary', { salary: currentPay.toLocaleString(getMoneyLocale()), hours: hoursPerWeek, total: suggestedPay.toLocaleString(getMoneyLocale()) }))
+                    ? t('staff.payFromHourly', { rate: formatMoney(currentPay), hours: hoursPerWeek, total: formatMoney(suggestedPay) })
+                    : t('staff.payFromSalary', { salary: formatMoney(currentPay), hours: hoursPerWeek, total: formatMoney(suggestedPay) }))
                   : t('staff.noRotaForPay')}
               </div>
               {payMissing && (
