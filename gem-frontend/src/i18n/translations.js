@@ -2076,6 +2076,7 @@ const translations = {
       categoryEmpty: 'You have no notifications in this category.',
       catAll: 'All', catMembership: 'Membership', catPayment: 'Payment',
       catTask: 'Task', catInventory: 'Inventory', catSystem: 'System',
+      loadFailed: 'Could not load your notifications. Try again in a moment.',
     },
     forgotPassword: {
       backToSignIn: 'Back to sign in',
@@ -4200,6 +4201,7 @@ const translations = {
       categoryEmpty: 'Aucune notification dans cette catégorie.',
       catAll: 'Toutes', catMembership: 'Adhésion', catPayment: 'Paiement',
       catTask: 'Tâche', catInventory: 'Inventaire', catSystem: 'Système',
+      loadFailed: 'Impossible de charger vos notifications. Réessayez dans un instant.',
     },
     forgotPassword: {
       backToSignIn: 'Retour à la connexion',

@@ -69,16 +69,24 @@ export default function NotificationsPage() {
     return t('common.daysAgoLong', { n: days });
   }
 
+  // A list that could not be loaded says so, rather than "No notifications";
+  // a refused change says so, rather than happening on screen only (F-102, F-107)
+  const [loadError, setLoadError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const failed = (err) => setActionError(err?.response?.data?.error || t('memberProfile.actionFailed'));
   const liveTick = useLiveTick();
   useEffect(() => {
     getNotifications()
-      .then(res => setNotifs((res.data || []).map(n => ({
-        ...n,
-        unread: !n.isRead,
-        text: n.body,
-        time: formatTime(n.createdAt),
-      }))))
-      .catch(console.error);
+      .then(res => {
+        setLoadError('');
+        setNotifs((res.data || []).map(n => ({
+          ...n,
+          unread: !n.isRead,
+          text: n.body,
+          time: formatTime(n.createdAt),
+        })));
+      })
+      .catch(() => setLoadError(t('notifications.loadFailed')));
   }, [liveTick]);
   const [activeCategory, setActiveCategory] = useState('All');
 
@@ -91,23 +99,37 @@ export default function NotificationsPage() {
   const unreadCount = notifs.filter(n => n.unread).length;
 
   const markRead = async (id) => {
-    try { await apiMarkOneRead(id); } catch (_) {}
-    setNotifs(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n));
+    setActionError('');
+    try {
+      await apiMarkOneRead(id);
+      setNotifs(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n));
+    } catch (err) { failed(err); }
   };
   const markAllRead = async () => {
-    try { await apiMarkAllRead(); } catch (_) {}
-    setNotifs(prev => prev.map(n => ({ ...n, unread: false })));
+    setActionError('');
+    try {
+      await apiMarkAllRead();
+      setNotifs(prev => prev.map(n => ({ ...n, unread: false })));
+    } catch (err) { failed(err); }
   };
   // Clears this person's own list; a gym-wide notice stays for everyone else
   const clearAll = async () => {
     const previous = notifs;
+    setActionError('');
     setNotifs([]);
-    try { await apiRemoveAll(); } catch (_) { setNotifs(previous); }
+    try { await apiRemoveAll(); } catch (err) { setNotifs(previous); failed(err); }
   };
   const deleteNotif = async (id) => {
-    try { await apiRemoveNotif(id); } catch (_) {}
-    setNotifs(prev => prev.filter(n => n.id !== id));
+    setActionError('');
+    try {
+      await apiRemoveNotif(id);
+      setNotifs(prev => prev.filter(n => n.id !== id));
+    } catch (err) { failed(err); }
   };
+  const problem = actionError || loadError;
+  const problemBox = problem ? (
+    <div role="alert" style={{ marginBottom: 14, fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 10, padding: '10px 14px', fontFamily: 'DM Sans' }}>{problem}</div>
+  ) : null;
 
   const handleNotifClick = (n) => {
     if (n.unread) markRead(n.id);
@@ -150,6 +172,7 @@ export default function NotificationsPage() {
           </div>
         </div>
 
+        {problemBox}
         {/* Category chips */}
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 12, scrollbarWidth: 'none' }}>
           {(isFitnessRole ? FITNESS_CATEGORIES : CATEGORIES).map(c => {
@@ -164,7 +187,7 @@ export default function NotificationsPage() {
 
         {/* Notification list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 16 }}>
-          {filtered.length === 0 ? (
+          {filtered.length === 0 ? (loadError ? null :
             <div style={{ textAlign: 'center', padding: '48px 16px' }}>
               <Bell size={36} color="var(--text-muted)" style={{ marginBottom: 10 }} />
               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'DM Sans', marginBottom: 6 }}>
@@ -233,6 +256,7 @@ export default function NotificationsPage() {
         </div>
       </div>
 
+      {problemBox}
       {/* Category tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: 'var(--bg-elevated)', padding: 4, borderRadius: 8, width: 'fit-content' }}>
         {(isFitnessRole ? FITNESS_CATEGORIES : CATEGORIES).map(c => (
@@ -243,7 +267,7 @@ export default function NotificationsPage() {
       </div>
 
       <div style={cardStyle}>
-        {filtered.length === 0 ? (
+        {filtered.length === 0 ? (loadError ? null :
           <div style={{ padding: 60, textAlign: 'center' }}>
             <Bell size={40} color="var(--text-muted)" style={{ marginBottom: 12 }} />
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>
