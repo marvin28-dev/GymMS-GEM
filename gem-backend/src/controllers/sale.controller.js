@@ -2,18 +2,14 @@ const prisma = require('../utils/prisma');
 const { logActivity, money } = require('../utils/activityLog');
 
 const { toPaymentMethod } = require('../utils/paymentMethod');
+const { DAY, readTz, startOfLocalDay } = require('../utils/localDay');
 
 // Days are the gym's local days: tz is the browser's getTimezoneOffset.
 // ?date=YYYY-MM-DD returns that whole day (the desk's sales panel pages back
 // through days); ?from=&to= every day between, both included (the books);
 // with neither, the latest 100.
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
-function startOfLocalDay(day, tz) {
-  const [y, m, d] = String(day).split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d) + tz * 60000);
-}
 function localDay(query) {
-  const tz = Math.max(-840, Math.min(840, Number(query.tz) || 0));
+  const tz = readTz(query);
   if (DAY.test(String(query.date || ''))) {
     const from = startOfLocalDay(query.date, tz);
     return { gte: from, lt: new Date(from.getTime() + 86400000) };

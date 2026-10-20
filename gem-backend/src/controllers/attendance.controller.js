@@ -1,6 +1,7 @@
 const prisma = require('../utils/prisma');
 const { logActivity } = require('../utils/activityLog');
 const { attemptCounter } = require('../utils/attempts');
+const { DAY, readTz, startOfLocalDay } = require('../utils/localDay');
 
 const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 const LAPSED = ['expired', 'frozen', 'suspended', 'cancelled', 'deactivated'];
@@ -47,7 +48,8 @@ async function getAll(req, res) {
   const { date } = req.query;
   const where = { gymId: req.user.gymId };
   if (date) {
-    const start = new Date(String(date));
+    // ?date=YYYY-MM-DD&tz= is that whole local day; without tz, the UTC day as before
+    const start = DAY.test(String(date)) ? startOfLocalDay(date, readTz(req.query)) : new Date(String(date));
     if (Number.isNaN(start.getTime())) return res.status(400).json({ error: 'That date could not be read.', field: 'date' });
     const end = new Date(start);
     end.setDate(end.getDate() + 1);

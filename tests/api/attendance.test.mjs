@@ -82,3 +82,30 @@ describe('guessing codes at the desk', () => {
     expect((await checkIn({ memberId: m.id }, guesser.token)).status).toBe(201);
   });
 });
+
+describe('the list for one day', () => {
+  // A zone whose date today differs from the UTC date, whatever the hour now
+  const elsewhere = () => {
+    const now = new Date();
+    const tz = now.getUTCHours() >= 12 ? -720 : 720;
+    const local = new Date(now.getTime() - tz * 60000);
+    return { tz, date: local.toISOString().slice(0, 10) };
+  };
+
+  it("is the gym's local day when tz is given", async () => {
+    const m = await addMember(api, gym.token, { firstName: 'Local', lastName: `Day ${Date.now()}` });
+    const made = await checkIn({ memberId: m.id });
+    expect(made.status).toBeLessThan(300);
+    const { tz, date } = elsewhere();
+    const res = await api.get(`/api/attendance?date=${date}&tz=${tz}`, { token: gym.token });
+    expect(res.status).toBe(200);
+    expect(res.body.some(v => v.memberId === m.id)).toBe(true);
+  });
+
+  it('is the UTC day without tz, as before', async () => {
+    const m = await addMember(api, gym.token, { firstName: 'Utc', lastName: `Day ${Date.now()}` });
+    await checkIn({ memberId: m.id });
+    const res = await api.get(`/api/attendance?date=${new Date().toISOString().slice(0, 10)}`, { token: gym.token });
+    expect(res.body.some(v => v.memberId === m.id)).toBe(true);
+  });
+});
