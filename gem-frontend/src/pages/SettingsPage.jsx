@@ -421,10 +421,13 @@ export default function SettingsPage() {
   const snapshotNotif  = () => setPristineNotif(snap(notifPrefs));
 
   useEffect(() => {
+    // Only the latest load fills the form: an earlier answer arriving late
+    // would wipe what was typed since (in development React runs this twice)
+    let alive = true;
     getMyGym()
       .then(res => {
         const g = res.data;
-        if (!g) return;
+        if (!g || !alive) return;
         setGymCode(g.code || '');
         // The gym record is the source of truth for the whole profile
         setLogoPreview(g.logo || null);
@@ -480,6 +483,7 @@ export default function SettingsPage() {
         setPristineRegFee(snap({ fee: loadedRegFee, autoRenew: localStorage.getItem('gem_auto_renew') === 'true', freeze: loadedFreeze }));
       })
       .catch(console.error);
+    return () => { alive = false; };
   }, []);
 
   const [accessTypes, setAccessTypes] = useState(() => {
