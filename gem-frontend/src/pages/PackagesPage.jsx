@@ -17,6 +17,7 @@ import { getRole, getAuth } from '../utils/auth';
 import { useSetupStatus } from '../hooks/useSetupStatus';
 import { softAll } from '../utils/loadAll';
 import { serverFieldError } from '../utils/formErrors';
+import { isActiveMember } from '../utils/attention';
 import { SkeletonCards, SkeletonTableRows } from '../components/Skeleton';
 
 
@@ -247,12 +248,12 @@ export default function PackagesPage() {
           <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.price')} *</label>
-              <input type="number" min="0" style={{ ...inputStyle, borderColor: errors.price ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00" />
+              <input type="number" min="0" style={{ ...inputStyle, borderColor: errors.price ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0" />
               {errors.price && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.price}</div>}
             </div>
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.dayPassPrice')} *</label>
-              <input type="number" min="0" style={{ ...inputStyle, borderColor: errors.dayPassPrice ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.dayPassPrice} onChange={e => setForm(f => ({ ...f, dayPassPrice: e.target.value }))} placeholder="0.00" />
+              <input type="number" min="0" style={{ ...inputStyle, borderColor: errors.dayPassPrice ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.dayPassPrice} onChange={e => setForm(f => ({ ...f, dayPassPrice: e.target.value }))} placeholder="0" />
               {errors.dayPassPrice && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.dayPassPrice}</div>}
             </div>
           </div>
@@ -330,7 +331,8 @@ export default function PackagesPage() {
       </Modal>
       {/* Package Profile Modal */}
       {profilePkg && (() => {
-        const subscriberCount = membersList.filter(m => m.packageId === profilePkg.id).length;
+        // Members whose membership on it is running, not everyone ever put on it
+        const subscriberCount = membersList.filter(m => m.packageId === profilePkg.id && isActiveMember(m)).length;
         return (
           <Modal open={!!profilePkg} onClose={() => setProfilePkg(null)} title={t('packages.packageProfile')} maxWidth={500}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -358,7 +360,7 @@ export default function PackagesPage() {
               <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Users size={16} color="var(--accent-blue)" />
                 <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
-                  <strong style={{ color: 'var(--text-primary)' }}>{subscriberCount}</strong> active subscriber{subscriberCount !== 1 ? 's' : ''} on this package
+                  <strong style={{ color: 'var(--text-primary)' }}>{subscriberCount}</strong> {t('packages.activeOnPackage')}
                 </span>
               </div>
               {canPrice && (
@@ -513,7 +515,7 @@ export default function PackagesPage() {
           ) : shownPkgs.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>{t('packages.noPackages')}</div>
           ) : shownPkgs.map(pkg => {
-            const memberCount = membersList.filter(m => m.package?.id === pkg.id || m.packageId === pkg.id).length;
+            const memberCount = membersList.filter(m => (m.package?.id === pkg.id || m.packageId === pkg.id) && isActiveMember(m)).length;
             return (
               <div key={pkg.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, padding: '14px 16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
