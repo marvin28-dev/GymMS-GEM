@@ -459,6 +459,10 @@ export default function StaffProfilePage() {
   const [adjForm, setAdjForm] = useState({ kind: 'bonus', label: '', amount: '', recurring: true, month: '', note: '' });
   const [adjError, setAdjError] = useState('');
   const [payPreview, setPayPreview] = useState(null);
+  // A refused pay change keeps its form open; a refused removal is shown under its item
+  const [salaryError, setSalaryError] = useState('');
+  const [salarySaving, setSalarySaving] = useState(false);
+  const [adjRemoveError, setAdjRemoveError] = useState(null);
 
   useEffect(() => {
     if (!id) return;
@@ -1209,10 +1213,13 @@ export default function StaffProfilePage() {
   };
 
   const deleteAdjustment = async (item) => {
+    setAdjRemoveError(null);
     try {
       await removeAdjustment(item.id);
       setAdjustments(prev => prev.filter(a => a.id !== item.id));
-    } catch { /* leave the list as it was */ }
+    } catch (err) {
+      setAdjRemoveError({ id: item.id, text: err?.response?.data?.error || t('staff.failedSave') });
+    }
   };
 
   const openAdjModal = (kind) => {
@@ -1306,19 +1313,26 @@ export default function StaffProfilePage() {
     }
   };
 
-  // Each staff member has their own pay day; empty falls back to the gym default
-  const savePayDay = (day) => {
-    setPayDay(day);
-    updateStaff(id, { payDay: day === '' ? null : Number(day) }).catch(() => {});
-  };
-
   const effectivePayDay = payDay || gymPayDay;
 
-  const saveSalaryEdit = () => {
+  // Pay and pay day are saved together, and the new figures only show once the
+  // server has them; a refusal keeps the form open with the reason.
+  // Each staff member has their own pay day; empty falls back to the gym default.
+  const saveSalaryEdit = async () => {
     const v = Number(salaryInput);
-    if (v > 0) { setSalary(v); setSalaryConfigured(true); updateStaff(id, { salary: v }).catch(() => {}); }
-    savePayDay(payDayInput);
-    setShowSalaryEdit(false);
+    const changes = { payDay: payDayInput === '' ? null : Number(payDayInput) };
+    if (v > 0) changes.salary = v;
+    setSalaryError('');
+    setSalarySaving(true);
+    try {
+      await updateStaff(id, changes);
+      if (v > 0) { setSalary(v); setSalaryConfigured(true); }
+      setPayDay(payDayInput);
+      setShowSalaryEdit(false);
+    } catch (err) {
+      setSalaryError(err?.response?.data?.error || t('staff.failedSave'));
+    }
+    setSalarySaving(false);
   };
 
   // Phone and desktop share one pay summary, so the two can never drift apart:
@@ -1353,9 +1367,10 @@ export default function StaffProfilePage() {
               </select>
             </label>
           </div>
+          {salaryError && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', fontFamily: 'DM Sans', lineHeight: 1.5 }}>{salaryError}</div>}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <button type="button" style={{ ...secondaryBtn, padding: '8px 16px', fontSize: 13, flex: isMobile ? 1 : 'none', justifyContent: 'center' }} onClick={() => setShowSalaryEdit(false)}>{t('common.cancel')}</button>
-            <button type="button" style={{ ...primaryBtn, padding: '8px 18px', fontSize: 13, flex: isMobile ? 1 : 'none', justifyContent: 'center' }} onClick={saveSalaryEdit}>{t('common.save')}</button>
+            <button type="button" style={{ ...secondaryBtn, padding: '8px 16px', fontSize: 13, flex: isMobile ? 1 : 'none', justifyContent: 'center' }} onClick={() => { setShowSalaryEdit(false); setSalaryError(''); }}>{t('common.cancel')}</button>
+            <button type="button" disabled={salarySaving} style={{ ...primaryBtn, padding: '8px 18px', fontSize: 13, flex: isMobile ? 1 : 'none', justifyContent: 'center', opacity: salarySaving ? 0.6 : 1 }} onClick={saveSalaryEdit}>{salarySaving ? t('common.saving') : t('common.save')}</button>
           </div>
         </div>
       ) : (
@@ -1819,6 +1834,7 @@ export default function StaffProfilePage() {
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'DM Sans', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.label}</div>
                             <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2 }}>{a.recurring ? 'Every month' : 'This paycheck only'}</div>
+                            {adjRemoveError?.id === a.id && <div role="alert" style={{ fontSize: 11.5, color: 'var(--accent-red)', marginTop: 4, lineHeight: 1.4 }}>{adjRemoveError.text}</div>}
                           </div>
                           <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums', flexShrink: 0, color: g.color }}>
                             {formatMoney(a.amount)}
@@ -2717,6 +2733,7 @@ export default function StaffProfilePage() {
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.label}</div>
                             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{a.recurring ? 'Every month' : 'This paycheck only'}</div>
+                            {adjRemoveError?.id === a.id && <div role="alert" style={{ fontSize: 11.5, color: 'var(--accent-red)', marginTop: 4, lineHeight: 1.4 }}>{adjRemoveError.text}</div>}
                           </div>
                           <span style={{ flexShrink: 0, fontSize: 13, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums', color: g.color }}>
                             {formatMoney(a.amount)}

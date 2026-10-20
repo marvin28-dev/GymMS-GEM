@@ -92,3 +92,55 @@ test('a refused task status change stays in the task dialog', async ({ page }) =
   await page.getByRole('dialog').getByRole('button', { name: 'In Progress', exact: true }).click();
   await expect(page.getByRole('dialog').getByText('Server is down for the test')).toBeVisible();
 });
+
+test('a refused pay change keeps the form and the old pay', async ({ page }) => {
+  const owner = await registerGym();
+  const staff = await addStaff(owner, { firstName: 'Paula', lastName: 'Payroll', salary: 150000 });
+  await signIn(page, owner);
+  await page.goto(`/staff/${staff.id}`);
+  await page.getByRole('button', { name: 'Pay & Earnings' }).first().click();
+  await refusePatch(page, `/staff/${staff.id}`);
+  await page.getByRole('button', { name: 'Change pay' }).click();
+  await confirmWithCode(page, owner.accessCode);
+  await page.getByLabel('Monthly Basic Pay').fill('999000');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+  await expect(page.getByText('Server is down for the test')).toBeVisible();
+  await expect(page.getByLabel('Monthly Basic Pay')).toHaveValue('999000');
+  expect((await call('GET', `/staff/${staff.id}`, { token: owner.token })).salary).toBe(150000);
+});
+
+test('a pay change the server made is shown', async ({ page }) => {
+  const owner = await registerGym();
+  const staff = await addStaff(owner, { firstName: 'Pius', lastName: 'Paid', salary: 150000 });
+  await signIn(page, owner);
+  await page.goto(`/staff/${staff.id}`);
+  await page.getByRole('button', { name: 'Pay & Earnings' }).first().click();
+  await page.getByRole('button', { name: 'Change pay' }).click();
+  await confirmWithCode(page, owner.accessCode);
+  await page.getByLabel('Monthly Basic Pay').fill('175000');
+  await page.getByLabel('Pay day').selectOption('21');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+  await expect(page.getByText('Paid on the 21st of every month')).toBeVisible();
+  const saved = await call('GET', `/staff/${staff.id}`, { token: owner.token });
+  expect(saved.salary).toBe(175000);
+  expect(saved.payDay).toBe(21);
+});
+
+test('a refused bonus removal keeps the bonus and says why', async ({ page }) => {
+  const owner = await registerGym();
+  const staff = await addStaff(owner, { firstName: 'Bonnie', lastName: 'Bonus', salary: 150000 });
+  const bonus = await call('POST', '/pay-adjustments', { token: owner.token, body: { staffId: staff.id, kind: 'bonus', label: 'Transport allowance', amount: 10000, recurring: true } });
+  await signIn(page, owner);
+  await page.goto(`/staff/${staff.id}`);
+  await page.getByRole('button', { name: 'Pay & Earnings' }).first().click();
+  await page.route(`**/api/pay-adjustments/${bonus.id}`, route => (route.request().method() === 'DELETE'
+    ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Server is down for the test' }) })
+    : route.fallback()));
+  const row = page.getByText('Transport allowance').locator('xpath=../..');
+  await row.getByRole('button').click();
+
+  await expect(page.getByText('Server is down for the test')).toBeVisible();
+  await expect(page.getByText('Transport allowance')).toBeVisible();
+});
