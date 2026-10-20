@@ -439,7 +439,9 @@ export default function StaffProfilePage() {
   // Schedule
   const [schedule, setSchedule] = useState(emptySchedule);
   const [scheduleSaved, setScheduleSaved] = useState(false);
-  const setDay = (day, field, value) => setSchedule(prev => ({ ...prev, [day]: { ...prev[day], [field]: value } }));
+  // A change not yet saved: the live reload below leaves the grid alone (F-112)
+  const [scheduleDirty, setScheduleDirty] = useState(false);
+  const setDay = (day, field, value) => { setScheduleDirty(true); setSchedule(prev => ({ ...prev, [day]: { ...prev[day], [field]: value } })); };
 
   // 'repeating' edits the standing weekly pattern; 'week' edits one week only,
   // stored as an override against that week's Monday.
@@ -450,6 +452,9 @@ export default function StaffProfilePage() {
   const weekIndex = weeks.findIndex(w => w.key === selectedWeek);
   const currentWeek = weeks[weekIndex] || weeks[0];
   const canStepWeek = (delta) => weekIndex + delta >= 0 && weekIndex + delta < weeks.length;
+  // What the reload needs to know about the grid on screen, read when it lands
+  const rotaView = useRef({ dirty: false, mode: 'repeating', week: selectedWeek });
+  useEffect(() => { rotaView.current = { dirty: scheduleDirty, mode: scheduleMode, week: selectedWeek }; });
   const stepWeek = (delta) => {
     if (!canStepWeek(delta)) return;
     switchScheduleMode('week', weeks[weekIndex + delta].key);
@@ -556,7 +561,13 @@ export default function StaffProfilePage() {
           if (sal > 0) setSalaryConfigured(true);
         }
         if (s.schedule && typeof s.schedule === 'object') {
-          setSchedule({ ...emptySchedule, ...s.schedule });
+          // Never over an unsaved change, and for the mode and week on screen:
+          // one-week mode shows that week's exception, not the repeating pattern
+          const view = rotaView.current;
+          if (!view.dirty) {
+            const weekOverride = view.mode === 'week' ? s.scheduleOverrides?.[view.week] : null;
+            setSchedule({ ...emptySchedule, ...(weekOverride || s.schedule) });
+          }
           const hasWorkingDay = Object.values(s.schedule).some(d => d && !d.off);
           if (hasWorkingDay) setScheduleConfigured(true);
         }
@@ -1446,6 +1457,7 @@ export default function StaffProfilePage() {
   // Switching mode loads whatever that mode is currently showing, so the grid
   // always reflects the thing about to be saved.
   const switchScheduleMode = (mode, weekKeyValue = selectedWeek) => {
+    setScheduleDirty(false);
     setScheduleMode(mode);
     setSelectedWeek(weekKeyValue);
     if (mode === 'repeating') {
@@ -1468,6 +1480,7 @@ export default function StaffProfilePage() {
         await updateStaff(id, { scheduleOverrides: next });
         setScheduleOverrides(next);
       }
+      setScheduleDirty(false);
       setScheduleSaved(true);
       setScheduleConfigured(true);
       setTimeout(() => setScheduleSaved(false), 2000);
@@ -1485,6 +1498,7 @@ export default function StaffProfilePage() {
       await updateStaff(id, { scheduleOverrides: next });
       setScheduleOverrides(next);
       setSchedule({ ...emptySchedule, ...(memberData?.schedule || {}) });
+      setScheduleDirty(false);
       setScheduleSaved(true);
       setTimeout(() => setScheduleSaved(false), 2000);
     } catch (err) {
