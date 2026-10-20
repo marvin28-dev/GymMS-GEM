@@ -54,3 +54,31 @@ test('a late answer to an earlier load does not wipe what was typed', async ({ p
   await page.waitForTimeout(500);
   await expect(fieldAfter(page, 'Website')).toHaveValue('https://typed.example.test');
 });
+
+const gymDown = (route) => (route.request().method() === 'GET'
+  ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Server is down for the test' }) })
+  : route.fallback());
+
+test('settings say when the gym could not be loaded, and load it on Try again', async ({ page }) => {
+  const owner = await registerGym();
+  await page.route('**/api/gyms/me', gymDown);
+  await signIn(page, owner);
+  await page.goto('/settings?section=gym-profile');
+
+  await expect(page.getByText('The gym\'s settings could not be loaded, so these forms are empty and cannot be saved yet.')).toBeVisible();
+  await page.unroute('**/api/gyms/me');
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await expect(fieldAfter(page, 'Gym Name *')).toHaveValue(/E2E Gym/);
+  await expect(page.getByText('The gym\'s settings could not be loaded, so these forms are empty and cannot be saved yet.')).toHaveCount(0);
+});
+
+test.describe('on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+  test('settings say when the gym could not be loaded', async ({ page }) => {
+    const owner = await registerGym();
+    await page.route('**/api/gyms/me', gymDown);
+    await signIn(page, owner);
+    await page.goto('/settings');
+    await expect(page.getByText('The gym\'s settings could not be loaded, so these forms are empty and cannot be saved yet.')).toBeVisible();
+  });
+});

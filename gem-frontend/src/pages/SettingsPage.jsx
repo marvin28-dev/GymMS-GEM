@@ -13,6 +13,7 @@ import ActivityLog from './LogsPage';
 import { useSetupStatus, setSetupStatus } from '../hooks/useSetupStatus';
 import { confirmSetupSection } from '../services/gym.service';
 import TimeInput from '../components/ui/TimeInput';
+import LoadFailed from '../components/ui/LoadFailed';
 
 const cardStyle = { background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, boxShadow: 'var(--shadow-card)' };
 const primaryBtn = { background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', color: '#0a0a0f', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '8px 16px', cursor: 'pointer', fontFamily: 'DM Sans', display: 'inline-flex', alignItems: 'center', gap: 6 };
@@ -420,6 +421,10 @@ export default function SettingsPage() {
   const revertNotif    = () => { if (pristineNotif) setNotifPrefs(JSON.parse(pristineNotif)); setNotifError(''); };
   const snapshotNotif  = () => setPristineNotif(snap(notifPrefs));
 
+  // A gym that could not be loaded says so: the forms stay empty and nothing
+  // can be saved until it has (each Save compares against what was loaded)
+  const [gymLoadFailed, setGymLoadFailed] = useState(false);
+  const [gymLoadTick, setGymLoadTick] = useState(0);
   useEffect(() => {
     // Only the latest load fills the form: an earlier answer arriving late
     // would wipe what was typed since (in development React runs this twice)
@@ -428,6 +433,7 @@ export default function SettingsPage() {
       .then(res => {
         const g = res.data;
         if (!g || !alive) return;
+        setGymLoadFailed(false);
         setGymCode(g.code || '');
         // The gym record is the source of truth for the whole profile
         setLogoPreview(g.logo || null);
@@ -482,9 +488,12 @@ export default function SettingsPage() {
         setPristineNotif(snap(loadedNotif));
         setPristineRegFee(snap({ fee: loadedRegFee, autoRenew: localStorage.getItem('gem_auto_renew') === 'true', freeze: loadedFreeze }));
       })
-      .catch(console.error);
+      .catch(() => { if (alive) setGymLoadFailed(true); });
     return () => { alive = false; };
-  }, []);
+  }, [gymLoadTick]);
+  const gymLoadProblem = gymLoadFailed
+    ? <LoadFailed message={t('settings.loadFailed')} onRetry={() => setGymLoadTick(n => n + 1)} style={{ marginBottom: 16 }} />
+    : null;
 
   const [accessTypes, setAccessTypes] = useState(() => {
     try { return JSON.parse(localStorage.getItem(ACCESS_TYPES_KEY) || 'null') || DEFAULT_ACCESS_TYPES; } catch { return DEFAULT_ACCESS_TYPES; }
@@ -604,6 +613,7 @@ export default function SettingsPage() {
           <h1 style={{ fontFamily: 'Manrope', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{t('settings.title')}</h1>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3, fontFamily: 'DM Sans' }}>{t('settings.settingsSubtitle')}</p>
         </div>
+        {gymLoadProblem}
 
         {/* Section list - tap to open */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -678,6 +688,7 @@ export default function SettingsPage() {
         <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>{t('settings.title')}</h1>
         <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{t('settings.manageSubtitle')}</p>
       </div>
+      {gymLoadProblem}
 
       {setupOpen && (() => {
         const confirmedCount = REQUIRED_CONFIRMS.filter(s => confirmedSections.has(s)).length;
