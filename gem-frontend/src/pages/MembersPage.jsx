@@ -9,6 +9,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Download, UserPlus, Search, ChevronLeft, ChevronRight, MoreHorizontal, ChevronDown, X, MessageSquare, CreditCard, Check, SquareCheck, Lock, Phone, Eye, UserCheck, Clock, ChevronRight as ArrowRight } from 'lucide-react';
 import RowMenu from '../components/ui/RowMenu';
 import { passesLeft, checkInErrorText, needsCheckInCode } from '../utils/checkin';
+import { pageNumbers } from '../utils/pager';
 import { useIsMobile } from '../hooks/useIsMobile';
 import FAB from '../components/FAB';
 import { getAuth, getRole, getPhonePlaceholder, getAddressPlaceholder } from '../utils/auth';
@@ -262,12 +263,16 @@ function filterByTab(list, tab) {
   return list;
 }
 
+// A visitor's passes left, bundle and day passes together (the number every
+// screen shows); members have no passes to count
+const visitorPassesLeft = (m) => ((m.isVisitor || m.status === 'visitor') ? passesLeft(m) : null);
+
 function applyFilters(list, { pkg, sessionsLeft, gender, joined, owing, expiring, needsAttention, mine, inactiveSub, sort }) {
   let out = [...list];
   if (pkg)                         out = out.filter(m => m.package?.name === pkg);
-  if (sessionsLeft === '1 left')   out = out.filter(m => m.sessionsRemaining != null && m.sessionsRemaining === 1);
-  if (sessionsLeft === '≤ 3 left') out = out.filter(m => m.sessionsRemaining != null && m.sessionsRemaining <= 3);
-  if (sessionsLeft === '≤ 5 left') out = out.filter(m => m.sessionsRemaining != null && m.sessionsRemaining <= 5);
+  if (sessionsLeft === '1 left')   out = out.filter(m => visitorPassesLeft(m) === 1);
+  if (sessionsLeft === '≤ 3 left') out = out.filter(m => visitorPassesLeft(m) != null && visitorPassesLeft(m) <= 3);
+  if (sessionsLeft === '≤ 5 left') out = out.filter(m => visitorPassesLeft(m) != null && visitorPassesLeft(m) <= 5);
   if (gender)   out = out.filter(m => (m.gender ?? '') === gender);
   if (owing)    out = out.filter(m => (m.balance || 0) > 0);
   if (expiring) out = out.filter(membershipEndsThisWeek);
@@ -1937,11 +1942,11 @@ export default function MembersPage() {
         {/* Modals */}
         {showAddMember && (
           <AddMemberModal open={showAddMember} packagesList={packagesList} gymData={gymData} onClose={() => setShowAddMember(false)}
-            onCreated={(m) => { setMembersList(p => [m, ...p]); setShowAddMember(false); }} />
+            onCreated={(id, m) => { setMembersList(p => [m, ...p]); setShowAddMember(false); }} />
         )}
         {showAddVisitor && (
           <AddVisitorModal open={showAddVisitor} packagesList={packagesList} gymData={gymData} onClose={() => setShowAddVisitor(false)}
-            onCreated={(m) => { setMembersList(p => [m, ...p]); setShowAddVisitor(false); }} />
+            onCreated={(id, m) => { setMembersList(p => [m, ...p]); setShowAddVisitor(false); }} />
         )}
       </div>
     );
@@ -2263,12 +2268,13 @@ export default function MembersPage() {
             <PageBtn onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
               <ChevronLeft size={14} strokeWidth={2} />
             </PageBtn>
-            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(n => (
-              <PageBtn key={n} active={currentPage === n} onClick={() => setCurrentPage(n)}>
-                {n}
-              </PageBtn>
-            ))}
-            {totalPages > 5 && <span style={{ fontSize: 13, color: 'var(--text-muted)', padding: '0 2px' }}>...</span>}
+            {pageNumbers(totalPages, currentPage).map((n, i) => (n === '…'
+              ? <span key={`gap-${i}`} style={{ fontSize: 13, color: 'var(--text-muted)', padding: '0 2px' }}>…</span>
+              : (
+                <PageBtn key={n} active={currentPage === n} onClick={() => setCurrentPage(n)}>
+                  {n}
+                </PageBtn>
+              )))}
             <PageBtn onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
               <ChevronRight size={14} strokeWidth={2} />
             </PageBtn>
