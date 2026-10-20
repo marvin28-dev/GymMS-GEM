@@ -25,7 +25,6 @@ import { revenueOf } from '../utils/revenue';
 import { getAll as getSales } from '../services/sales.service';
 import { useGymSettings } from '../hooks/useGymSettings';
 import { enabledMethods, canonicalMethod, PAYMENT_METHODS } from '../utils/paymentMethods';
-import { notifyDataChanged } from '../utils/events';
 import { softAll } from '../utils/loadAll';
 import { escapeHtml, getGymInfo, openPrintWindow, safeImageSrc } from '../utils/receipt';
 import { gymCache } from '../utils/gymCache';
@@ -354,21 +353,26 @@ export default function AccountingPage() {
   // it into the books (it then shows up in the normal expense list and totals).
   const canApproveExpenses = ['general_manager', 'manager'].includes(role);
   const [approvingId, setApprovingId] = useState(null);
-  const approvePendingExpense = async (id) => {
+  // Reviewing a desk expense moves it into the books. (There is no "reject" -
+  // the money is already spent; the manager is confirming the entry.) The
+  // books themselves reload with every write (useLiveTick); a refusal is
+  // shown under the expense it was for (F-120).
+  const [reviewError, setReviewError] = useState(null);
+  const reviewExpense = async (id) => {
     setApprovingId(id);
+    setReviewError(null);
     try {
       await approveExpenseApi(id);
-      const [eRes, pendRes, fdRes] = await Promise.all([getExpenses(), getPendingExpenses(), getExpenses({ source: 'frontdesk', status: 'all' })]);
-      setExpenses(eRes.data || []); cache.write('expenses', eRes.data || []);
-      setPendingApprovals(pendRes.data || []);
-      setFrontDeskExpenses((fdRes.data || []).map(normFdExpense));
-      notifyDataChanged();
+      setPendingApprovals(prev => prev.filter(e => e.id !== id));
+      setFrontDeskExpenses(prev => prev.map(e => (e.id === id ? { ...e, status: 'approved' } : e)));
     } catch (err) {
-      console.error('Failed to approve expense:', err);
+      setReviewError({ id, text: err?.response?.data?.error || t('reports.reviewFailed') });
     } finally {
       setApprovingId(null);
     }
   };
+  // A refused deletion reopens the expense with the reason
+  const [viewError, setViewError] = useState('');
 
   const pendingPanel = (canApproveExpenses && pendingApprovals.length > 0) ? (
     <div style={{ ...cardStyle, marginBottom: 24, border: '1px solid rgba(201,169,110,0.4)' }}>
@@ -388,8 +392,9 @@ export default function AccountingPage() {
             <RowMenu title={t('common.actions')} items={[
               { label: t('reports.view'), icon: <Eye size={15} />, onClick: () => openView(e) },
               { label: approvingId === e.id ? t('common.loading') : t('reports.markReviewed'), icon: <CheckCircle size={15} />,
-                onClick: () => { if (approvingId !== e.id) approvePendingExpense(e.id); } },
+                onClick: () => { if (approvingId !== e.id) reviewExpense(e.id); } },
             ]} />
+            {reviewError?.id === e.id && <div role="alert" style={{ flexBasis: '100%', fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans', lineHeight: 1.4 }}>{reviewError.text}</div>}
           </div>
         ))}
       </div>
@@ -454,7 +459,7 @@ export default function AccountingPage() {
     setExpenseImagePreview(loadReceipt(exp.id));
     setShowModal(true);
   };
-  const openView = (exp) => setViewingExpense({ ...exp, receipt: loadReceipt(exp.id) });
+  const openView = (exp) => { setViewError(''); setViewingExpense({ ...exp, receipt: loadReceipt(exp.id) }); };
 
   const validate = () => {
     const e = {};
@@ -526,24 +531,6 @@ export default function AccountingPage() {
       setShowExpenseAuthModal(true);
     } else {
       commitExpenseSave(another);
-    }
-  };
-
-  // Reviewing a desk expense moves it into the books. (There is no "reject" -
-  // the money is already spent; the manager is confirming the entry.)
-  const handleFrontDeskAction = async (id) => {
-    setApprovingId(id);
-    try {
-      await approveExpenseApi(id);
-      const [eRes, pendRes, fdRes] = await Promise.all([getExpenses(), getPendingExpenses(), getExpenses({ source: 'frontdesk', status: 'all' })]);
-      setExpenses(eRes.data || []); cache.write('expenses', eRes.data || []);
-      setPendingApprovals(pendRes.data || []);
-      setFrontDeskExpenses((fdRes.data || []).map(normFdExpense));
-      notifyDataChanged();
-    } catch (err) {
-      console.error('Failed to review expense:', err);
-    } finally {
-      setApprovingId(null);
     }
   };
 
@@ -993,10 +980,11 @@ export default function AccountingPage() {
                         <RowMenu title={t('common.actions')} items={[
                           { label: t('reports.view'), icon: <Eye size={15} />, onClick: () => openView(exp) },
                           { label: approvingId === exp.id ? t('common.loading') : t('reports.markReviewed'), icon: <CheckCircle size={15} />,
-                            onClick: () => { if (approvingId !== exp.id) handleFrontDeskAction(exp.id); },
+                            onClick: () => { if (approvingId !== exp.id) reviewExpense(exp.id); },
                             hidden: !(exp._source !== 'operations' && exp.status === 'pending' && canApproveExpenses) },
                         ]} />
                       </div>
+                      {reviewError?.id === exp.id && <div role="alert" style={{ marginTop: 6, fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans', lineHeight: 1.4 }}>{reviewError.text}</div>}
                     </div>
                   );
                 })
@@ -1362,7 +1350,10 @@ export default function AccountingPage() {
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-hover)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <td style={{ padding: '12px 20px', fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-secondary)' }}>{exp.date ? String(exp.date).slice(0, 10) : '-'}</td>
-                      <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{exp.description}</td>
+                      <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
+                        {exp.description}
+                        {reviewError?.id === exp.id && <div role="alert" style={{ marginTop: 4, fontWeight: 400, fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans', lineHeight: 1.4 }}>{reviewError.text}</div>}
+                      </td>
                       <td style={{ padding: '12px 20px' }}>
                         <span style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', fontSize: 11, padding: '3px 8px', borderRadius: 4 }}>{exp.category || '-'}</span>
                       </td>
@@ -1373,7 +1364,7 @@ export default function AccountingPage() {
                         <RowMenu title={t('common.actions')} items={[
                           { label: t('reports.view'), icon: <Eye size={15} />, onClick: () => openView(exp) },
                           { label: approvingId === exp.id ? t('common.loading') : t('reports.markReviewed'), icon: <CheckCircle size={15} />,
-                            onClick: () => { if (approvingId !== exp.id) handleFrontDeskAction(exp.id); },
+                            onClick: () => { if (approvingId !== exp.id) reviewExpense(exp.id); },
                             hidden: !(exp.status === 'pending' && canApproveExpenses) },
                         ]} />
                       </td>
@@ -1830,7 +1821,7 @@ export default function AccountingPage() {
 
       {/* Expense Detail Modal */}
       {viewingExpense && (
-        <Modal open={!!viewingExpense} onClose={() => setViewingExpense(null)} title={t('reports.expenseRecord')} maxWidth={500}>
+        <Modal open={!!viewingExpense} onClose={() => { setViewingExpense(null); setViewError(''); }} title={t('reports.expenseRecord')} maxWidth={500}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               {[
@@ -1869,6 +1860,7 @@ export default function AccountingPage() {
                 <img src={viewingExpense.receipt} alt="Receipt" style={{ width: '100%', borderRadius: 8, border: '1px solid var(--border-subtle)', maxHeight: 300, objectFit: 'contain', background: 'var(--bg-elevated)' }} />
               </div>
             )}
+            {viewError && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 10, padding: '10px 14px', fontFamily: 'DM Sans' }}>{viewError}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
               {/* Changing the books happens here, with the entry open in front
                   of you, and each action is confirmed with the owner's code */}
@@ -2178,10 +2170,14 @@ export default function AccountingPage() {
         onClose={() => { setShowDeleteAuthModal(false); setDeleteExpense(null); }}
         onConfirm={async () => {
           setShowDeleteAuthModal(false);
+          const exp = deleteExpense;
           try {
-            await removeExpense(deleteExpense.id);
-            setExpenses(prev => prev.filter(e => e.id !== deleteExpense.id));
-          } catch (err) { console.error(err); }
+            await removeExpense(exp.id);
+            setExpenses(prev => prev.filter(e => e.id !== exp.id));
+          } catch (err) {
+            openView(exp);
+            setViewError(err?.response?.data?.error || t('reports.deleteFailed'));
+          }
           setDeleteExpense(null);
         }}
         action={t('reports.actionDeleteExpense', { title: deleteExpense?.title })}
