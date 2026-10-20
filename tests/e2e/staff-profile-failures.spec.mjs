@@ -144,3 +144,26 @@ test('a refused bonus removal keeps the bonus and says why', async ({ page }) =>
   await expect(page.getByText('Server is down for the test')).toBeVisible();
   await expect(page.getByText('Transport allowance')).toBeVisible();
 });
+
+test('an access code that could not be shown says why', async ({ page }) => {
+  const owner = await registerGym();
+  const staff = await addStaff(owner, { firstName: 'Cody', lastName: 'Code' });
+  await signIn(page, owner);
+  await page.goto(`/staff/${staff.id}`);
+  await page.route(`**/api/staff/${staff.id}/code`, route => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Server is down for the test' }) }));
+  await page.getByRole('button', { name: 'View Code' }).click();
+  await confirmWithCode(page, owner.accessCode);
+
+  await expect(page.getByText('Server is down for the test')).toBeVisible();
+});
+
+test('an access code is shown once confirmed', async ({ page }) => {
+  const owner = await registerGym();
+  const staff = await addStaff(owner, { firstName: 'Cleo', lastName: 'Code' });
+  await signIn(page, owner);
+  await page.goto(`/staff/${staff.id}`);
+  await page.getByRole('button', { name: 'View Code' }).click();
+  await confirmWithCode(page, owner.accessCode);
+
+  await expect(page.getByText(staff.accessCode, { exact: true })).toBeVisible();
+});

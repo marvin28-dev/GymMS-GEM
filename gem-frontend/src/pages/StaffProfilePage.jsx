@@ -209,16 +209,33 @@ export default function StaffProfilePage() {
   const canIssueCodes = role === 'general_manager';
   const [showNewCodeAuth, setShowNewCodeAuth] = useState(false);
   const [newCodeNotice, setNewCodeNotice] = useState('');
+  // A code that could not be shown or replaced says why, in red (F-120)
+  const [codeError, setCodeError] = useState('');
   const issueNewCode = async () => {
     setShowNewCodeAuth(false);
     setCodeLoading(true);
+    setCodeError('');
     try {
       const res = await regenerateStaffCode(memberData.id);
       setRevealedCode(res.data.accessCode);
       setShowCode(true);
       setNewCodeNotice(t('staff.newCodeIssued'));
     } catch (err) {
-      setNewCodeNotice(err?.response?.data?.error || t('staff.newCodeFailed'));
+      setNewCodeNotice('');
+      setCodeError(err?.response?.data?.error || t('staff.newCodeFailed'));
+    } finally {
+      setCodeLoading(false);
+    }
+  };
+  const revealCode = async () => {
+    setCodeLoading(true);
+    setCodeError('');
+    try {
+      const res = await getStaffCode(memberData.id);
+      setRevealedCode(res.data.accessCode);
+      setShowCode(true);
+    } catch (err) {
+      setCodeError(err?.response?.data?.error || t('staff.codeLoadFailed'));
     } finally {
       setCodeLoading(false);
     }
@@ -1643,8 +1660,7 @@ export default function StaffProfilePage() {
                       <span style={{ fontSize: 16, fontFamily: 'JetBrains Mono, monospace', letterSpacing: 6, color: 'var(--text-muted)' }}>••••</span>
                       <button onClick={async () => {
                         if (needsPasswordForCode) { setShowCodeAuthModal(true); return; }
-                        setCodeLoading(true);
-                        try { const res = await getStaffCode(memberData.id); setRevealedCode(res.data.accessCode); setShowCode(true); } catch { } finally { setCodeLoading(false); }
+                        revealCode();
                       }} disabled={codeLoading} style={{ background: 'var(--accent-gold-dim)', border: 'none', borderRadius: 6, padding: '3px 9px', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--accent-gold)', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', gap: 3 }}>
                         <Lock size={9} />{codeLoading ? '…' : t('staff.viewCode')}
                       </button>
@@ -1653,6 +1669,7 @@ export default function StaffProfilePage() {
                 </div>
               </div>
               {newCodeNotice && <div style={{ padding: '0 16px 11px', fontSize: 11.5, color: 'var(--accent-green)', fontFamily: 'DM Sans', textAlign: 'right' }}>{newCodeNotice}</div>}
+              {codeError && <div role="alert" style={{ padding: '0 16px 11px', fontSize: 11.5, color: 'var(--accent-red)', fontFamily: 'DM Sans', textAlign: 'right' }}>{codeError}</div>}
             </div>
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '12px 14px' }}>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 10, fontFamily: 'DM Sans' }}>{t('staff.checkPhotoId')}</div>
@@ -2055,7 +2072,7 @@ export default function StaffProfilePage() {
         <ConfirmModal open={showDeactivateConfirm} title={t('staff.deactivateTitle')} message={t('staff.deactivateMsg', { name: memberData.name })} onCancel={() => setShowDeactivateConfirm(false)} onConfirm={() => { deactivate(); setShowDeactivateConfirm(false); }} danger />
         <ManagerAuthModal open={showReactivateAuth} onClose={() => setShowReactivateAuth(false)} onVerified={() => { reactivate(); setShowReactivateAuth(false); }} action={t('staff.reactivateAction')} />
         <ManagerAuthModal open={showNewCodeAuth} usePassword={isSelf} onClose={() => setShowNewCodeAuth(false)} onVerified={issueNewCode} action={t('staff.newCodeAction')} />
-        <ManagerAuthModal open={showCodeAuthModal} usePassword={isSelf} onClose={() => setShowCodeAuthModal(false)} onVerified={async () => { setShowCodeAuthModal(false); setCodeLoading(true); try { const res = await getStaffCode(memberData.id); setRevealedCode(res.data.accessCode); setShowCode(true); } catch { } finally { setCodeLoading(false); } }} action={t('staff.viewCodeAction')} />
+        <ManagerAuthModal open={showCodeAuthModal} usePassword={isSelf} onClose={() => setShowCodeAuthModal(false)} onVerified={() => { setShowCodeAuthModal(false); revealCode(); }} action={t('staff.viewCodeAction')} />
         <ManagerAuthModal open={showSalaryAuthModal} onClose={() => setShowSalaryAuthModal(false)} onVerified={() => { setShowSalaryAuthModal(false); setSalaryInput(String(salary)); setPayDayInput(payDay); setShowSalaryEdit(true); }} action={t('staff.changeSalaryAction')} />
         <ManagerAuthModal open={showEditAuth} onClose={() => setShowEditAuth(false)} onVerified={() => { setShowEditAuth(false); openEditForm(); }} action={t('staff.editProfileAction')} />
         <Modal open={showNoteModal} onClose={() => setShowNoteModal(false)} title={t('staff.addNote')} maxWidth={480}>
@@ -2457,9 +2474,7 @@ export default function StaffProfilePage() {
                     <button
                       onClick={async () => {
                         if (needsPasswordForCode) { setShowCodeAuthModal(true); return; }
-                        setCodeLoading(true);
-                        try { const res = await getStaffCode(memberData.id); setRevealedCode(res.data.accessCode); setShowCode(true); }
-                        catch { /* ignore */ } finally { setCodeLoading(false); }
+                        revealCode();
                       }}
                       disabled={codeLoading}
                       style={{
@@ -2478,6 +2493,9 @@ export default function StaffProfilePage() {
               </div>
               {newCodeNotice && (
                 <div style={{ marginTop: 8, fontSize: 12, color: 'var(--accent-green)', fontFamily: 'DM Sans' }}>{newCodeNotice}</div>
+              )}
+              {codeError && (
+                <div role="alert" style={{ marginTop: 8, fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{codeError}</div>
               )}
             </div>
           </div>
@@ -3253,16 +3271,7 @@ export default function StaffProfilePage() {
       <ManagerAuthModal
         open={showCodeAuthModal} usePassword={isSelf}
         onClose={() => setShowCodeAuthModal(false)}
-        onConfirm={async () => {
-          setShowCodeAuthModal(false);
-          setCodeLoading(true);
-          try {
-            const res = await getStaffCode(memberData.id);
-            setRevealedCode(res.data.accessCode);
-            setShowCode(true);
-          } catch { /* ignore */ }
-          finally { setCodeLoading(false); }
-        }}
+        onConfirm={() => { setShowCodeAuthModal(false); revealCode(); }}
         action={`View access code for ${memberData.name}`}
       />
 
