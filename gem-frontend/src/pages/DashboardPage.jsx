@@ -8,7 +8,7 @@ import { getCurrencySymbol, formatMoney } from '../utils/currency';
 import { digitsOnly } from '../utils/number';
 import { autoPaymentDescription } from '../utils/paymentDescription';
 import { fmtDate, fmtTime, capFirst, getDateLocale, todayStr } from '../utils/date';
-import { membershipEndsThisWeek } from '../utils/attention';
+import { membershipEndsThisWeek, isActiveMember } from '../utils/attention';
 import { revenueOf } from '../utils/revenue';
 import { getAll as getSales } from '../services/sales.service';
 import { useNavigate } from 'react-router-dom';
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 
 import Avatar from '../components/ui/Avatar';
+import CodeInput from '../components/ui/CodeInput';
 import StatusBadge from '../components/ui/StatusBadge';
 import MemberStatusTags from '../components/ui/MemberStatusTags';
 import VisitKindBadge from '../components/ui/VisitKindBadge';
@@ -62,8 +63,9 @@ const formatTime = (isoStr) => {
   return fmtTime(isoStr);
 };
 
+// Weeks start on Monday, as on the Calendar page
 function buildCalendar(year, month) {
-  const firstDay = new Date(year, month, 1).getDay();
+  const firstDay = (new Date(year, month, 1).getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const daysInPrev = new Date(year, month, 0).getDate();
   const cells = [];
@@ -86,8 +88,9 @@ const getMonthName = (year, month, lang) =>
 
 const getDayLabels = (lang) => {
   const locale = lang === 'fr' ? 'fr-FR' : 'en-US';
+  // 2 January 2023 was a Monday
   return Array.from({ length: 7 }, (_, i) =>
-    new Date(2023, 0, i + 1).toLocaleDateString(locale, { weekday: 'short' })
+    new Date(2023, 0, i + 2).toLocaleDateString(locale, { weekday: 'short' })
   );
 };
 
@@ -281,10 +284,7 @@ function MiniCalendar({ lang = 'en' }) {
             const today_ = isToday(cell);
             const dimmed = !cell.current;
             return (
-              <div key={idx} style={{ height: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', cursor: 'pointer', borderRadius: 6 }}
-                onMouseEnter={e => { if (!today_) e.currentTarget.style.background = 'var(--bg-card-hover)'; }}
-                onMouseLeave={e => { if (!today_) e.currentTarget.style.background = 'transparent'; }}
-              >
+              <div key={idx} style={{ height: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', borderRadius: 6 }}>
                 <div style={{ width: today_ ? 26 : 'auto', height: today_ ? 26 : 'auto', borderRadius: today_ ? '50%' : 0, background: today_ ? '#c9a96e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: today_ ? 700 : 400, color: today_ ? '#0a0a0f' : dimmed ? 'var(--text-muted)' : 'var(--text-primary)' }}>
                   {cell.day}
                 </div>
@@ -667,10 +667,10 @@ function CheckInModal({ open, onClose, membersList = [], onCheckedIn }) {
               {t('frontDesk.noPhotoEnterCode')}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <input
+              <CodeInput
                 value={codeInput}
-                onChange={e => { setCodeInput(e.target.value); setCodeError(''); }}
-                onKeyDown={e => e.key === 'Enter' && verifyAndCheckIn()}
+                onChange={v => { setCodeInput(v); setCodeError(''); }}
+                onEnter={verifyAndCheckIn}
                 placeholder={t('frontDesk.typeOrPaste')}
                 style={{ flex: 1, background: 'var(--bg-card)', border: `1px solid ${codeError ? 'var(--accent-red)' : 'var(--border-subtle)'}`, borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', letterSpacing: '0.5px' }}
                 onFocus={e => { if (!codeError) e.target.style.borderColor = 'var(--accent-gold)'; }}
@@ -1077,7 +1077,7 @@ function GymDashboard() {
   const todayRev = revenueOf(Array.isArray(payments) ? payments : [], shopToday, d => d === todayStr());
   const todayRevenue = todayRev.total;
 
-  const activeMembers = membersList.filter(m => m.status === 'active').length;
+  const activeMembers = membersList.filter(isActiveMember).length;
 
   const currentDateStr = capFirst(new Date().toLocaleDateString(getDateLocale(), {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',

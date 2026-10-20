@@ -35,7 +35,7 @@ import { uploadPhoto } from '../services/upload.service';
 import { fmtDate, fmtTime, todayStr, addDaysStr, dayStr } from '../utils/date';
 import { useGymSettings } from '../hooks/useGymSettings';
 import { enabledMethods } from '../utils/paymentMethods';
-import { memberNeedsAttention, membershipEndsThisWeek } from '../utils/attention';
+import { memberNeedsAttention, membershipEndsThisWeek, isActiveMember } from '../utils/attention';
 import { citiesOf, regionsOf } from '../utils/address';
 import { CountryField } from '../components/AddressInputs';
 import { serverFieldError, fieldErrorStyle, revealFirstError } from '../utils/formErrors';
@@ -258,7 +258,7 @@ const JOINED_OPTIONS   = ['This week', 'This month', 'Last 3 months', 'This year
 const INACTIVE_STATUSES = ['suspended', 'frozen', 'expired', 'deactivated', 'cancelled', 'pending'];
 function filterByTab(list, tab) {
   if (tab === 'All Members') return list;
-  if (tab === 'Active')      return list.filter(m => ['active', 'expiring', 'visitor'].includes(m.status));
+  if (tab === 'Active')      return list.filter(isActiveMember);
   if (tab === 'Inactive')    return list.filter(m => INACTIVE_STATUSES.includes(m.status));
   return list;
 }

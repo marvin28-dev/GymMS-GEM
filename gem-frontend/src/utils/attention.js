@@ -58,6 +58,10 @@ export function memberNeedsAttention(m) {
   return false;
 }
 
+// Active the way the Members page's Active tab counts it: members whose
+// membership is running (ending soon included) and visitors with passes left
+export const isActiveMember = (m) => ['active', 'expiring', 'visitor'].includes(m?.status);
+
 // Done, accepted and declined are finished
 const settledTask = (t) => ['Done', 'Accepted', 'Declined'].includes(t?.status);
 
