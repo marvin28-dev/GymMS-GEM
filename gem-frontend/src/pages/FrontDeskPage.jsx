@@ -53,7 +53,7 @@ import TaskAssigneeField from '../components/TaskAssigneeField';
 import { assignFields } from '../utils/departments';
 import { TASK_CATEGORIES } from '../utils/taskCategories';
 import { gymCache } from '../utils/gymCache';
-import { fieldErrorStyle } from '../utils/formErrors';
+import { fieldErrorStyle, serverFieldError } from '../utils/formErrors';
 import TimeInput from '../components/ui/TimeInput';
 
 const formatDate = (d) => fmtDate(d);
@@ -551,6 +551,9 @@ export default function FrontDeskPage() {
   const [expenseError,   setExpenseError]   = useState('');
   const [expenseFieldErrors, setExpenseFieldErrors] = useState({});
   const [issueErrors, setIssueErrors] = useState({});
+  const [issueError, setIssueError] = useState('');
+  const [issueSaving, setIssueSaving] = useState(false);
+  const [expenseSaving, setExpenseSaving] = useState(false);
   const [expenseSuccess, setExpenseSuccess] = useState(false);
   const [expenseWasPending, setExpenseWasPending] = useState(false);
   const [opsActivity,   setOpsActivity]   = useState([]);
@@ -1261,8 +1264,12 @@ export default function FrontDeskPage() {
   const handleIssue = async () => {
     const fe = { ...(!issueForm.equipment.trim() && { equipment: t('common.required') }), ...(!issueForm.description.trim() && { description: t('common.required') }) };
     setIssueErrors(fe);
-    if (Object.keys(fe).length) return;
+    if (Object.keys(fe).length || issueSaving) return;
     const timeLabel = new Date().toLocaleTimeString(getDateLocale(), { hour: '2-digit', minute: '2-digit' });
+    // Only a saved issue is reported as logged: on a refusal the form stays,
+    // with the server's reason (F-084)
+    setIssueError('');
+    setIssueSaving(true);
     try {
       await createEquipmentIssue({
         equipment: issueForm.equipment.trim(),
@@ -1270,7 +1277,14 @@ export default function FrontDeskPage() {
         description: issueForm.description.trim(),
         severity: issueForm.severity.toLowerCase(),
       });
-    } catch (err) { console.error('Failed to save issue:', err); }
+    } catch (err) {
+      const se = serverFieldError(err, t('operations.saveIssueFailed'));
+      if (se.field === 'equipment' || se.field === 'description') setIssueErrors(x => ({ ...x, [se.field]: se.message }));
+      else setIssueError(se.message);
+      return;
+    } finally {
+      setIssueSaving(false);
+    }
     setOpsActivity(prev => [{ type: 'issue', text: `Issue reported: ${issueForm.equipment}`, time: timeLabel }, ...prev]);
     setIssueSuccess(true); setIssueForm(emptyIssue);
     // Close the whole modal after the confirmation, rather than flipping back to
@@ -1289,12 +1303,15 @@ export default function FrontDeskPage() {
       ...((!amt || amt <= 0) ? { amount: t('payments.invalidAmount') } : amt > limit ? { amount: t('frontDesk.expenseOverLimitBlocked', { limit: formatMoney(limit) }) } : {}),
     };
     setExpenseFieldErrors(fe);
-    if (Object.keys(fe).length) return;
+    if (Object.keys(fe).length || expenseSaving) return;
     setExpenseError('');
     const today = new Date().toISOString().slice(0,10);
     const entry = { id: Date.now(), description: expenseForm.description, amount: amt, category: expenseForm.category, paymentMethod: expenseForm.paymentMethod, paidTo: expenseForm.paidTo, submittedBy: session?.staffName || 'Staff', time: new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}), date: today, status: 'pending', exceedsLimit: false };
     // Every desk expense now waits for a manager's approval before it reaches
     // the books. `source:'frontdesk'` makes the server hold it pending.
+    // Only a saved expense is reported as sent: money has left the drawer, so a
+    // refusal must say so and keep the form (F-107)
+    setExpenseSaving(true);
     try {
       await createExpense({
         title: expenseForm.description.trim(),
@@ -1306,7 +1323,15 @@ export default function FrontDeskPage() {
         recordedBy: session?.staffName || undefined,
         source: 'frontdesk',
       });
-    } catch (err) { console.error('Failed to save expense:', err); }
+    } catch (err) {
+      const se = serverFieldError(err, t('reports.failedToSave'));
+      const field = se.field === 'title' ? 'description' : se.field;
+      if (field === 'description' || field === 'paidTo' || field === 'amount') setExpenseFieldErrors(x => ({ ...x, [field]: se.message }));
+      else setExpenseError(se.message);
+      return;
+    } finally {
+      setExpenseSaving(false);
+    }
     setDayExpenses(prev => [...prev, entry]);
     setOpsActivity(prev => [{ type:'expense', text:`Expense sent for review: ${expenseForm.description} : ${formatMoney(amt)}`, time: entry.time }, ...prev]);
     setExpenseWasPending(true);
@@ -1828,7 +1853,7 @@ export default function FrontDeskPage() {
             <div style={{ fontSize:10, fontWeight:700, letterSpacing:'1.5px', color:'var(--text-muted)', fontFamily:'DM Sans' }}>{t('frontDesk.quickActions')}</div>
             <div className="gem-two-col" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
               {[
-                { icon: Wrench,   label: t('operations.reportIssue'),  accent:'var(--accent-yellow)', dim:'rgba(251,191,36,0.1)',  onClick:()=>{ setIssueSuccess(false); setIssueForm(emptyIssue); setShowIssueModal(true); } },
+                { icon: Wrench,   label: t('operations.reportIssue'),  accent:'var(--accent-yellow)', dim:'rgba(251,191,36,0.1)',  onClick:()=>{ setIssueSuccess(false); setIssueError(''); setIssueErrors({}); setIssueForm(emptyIssue); setShowIssueModal(true); } },
                 { icon: Receipt,  label: t('frontDesk.quickExpense'),   accent:'#f87171',              dim:'rgba(248,113,113,0.1)', onClick:()=>{ refreshGymSettings(); setExpenseError(''); setExpenseSuccess(false); setShowExpenseModal(true); } },
                 { icon: FileText, label: t('tasks.addTask'),            accent:'var(--accent-green)',  dim:'rgba(52,211,153,0.1)', onClick:()=>setShowTaskModal(true) },
                 { icon: Download, label: t('frontDesk.eodReport'),      accent:'var(--accent-gold)',   dim:'rgba(201,169,110,0.1)', onClick:()=>setShowEodModal(true) },
@@ -2081,7 +2106,7 @@ export default function FrontDeskPage() {
       </div>
 
       {/* ── Report Issue Modal ── */}
-      <Modal open={showIssueModal} onClose={()=>{ setShowIssueModal(false); setIssueSuccess(false); }} title={t('frontDesk.reportIssueTitle')} maxWidth={480}>
+      <Modal open={showIssueModal} onClose={()=>{ setShowIssueModal(false); setIssueSuccess(false); setIssueError(''); }} title={t('frontDesk.reportIssueTitle')} maxWidth={480}>
         {issueSuccess ? (
           <div style={{ padding:'24px 0', textAlign:'center' }}>
             <CheckCircle size={40} color="var(--accent-green)" style={{ marginBottom:12 }}/>
@@ -2101,9 +2126,12 @@ export default function FrontDeskPage() {
                 {[['Low', t('operations.severityLow')], ['Medium', t('operations.severityMedium')], ['High', t('operations.severityHigh')], ['Critical', t('operations.severityCritical')]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
+            {issueError && (
+              <div role="alert" style={{ background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.3)', borderRadius:10, padding:'10px 14px', fontSize:12, color:'var(--accent-red)', fontFamily:'DM Sans' }}>{issueError}</div>
+            )}
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
               <button style={secondaryBtn} onClick={()=>setShowIssueModal(false)}>{t('common.cancel')}</button>
-              <button style={primaryBtn} onClick={handleIssue}><Wrench size={13}/> {t('frontDesk.submitBtn')}</button>
+              <button style={{ ...primaryBtn, opacity: issueSaving ? 0.6 : 1 }} disabled={issueSaving} onClick={handleIssue}><Wrench size={13}/> {t('frontDesk.submitBtn')}</button>
             </div>
           </div>
         )}
@@ -2128,7 +2156,7 @@ export default function FrontDeskPage() {
                 {t('frontDesk.expenseLimit')}: <strong style={{ color:'var(--accent-gold)' }}>{formatMoney(limit)}</strong>. {t('frontDesk.expenseLimitMsg')}
               </div>
               {expenseError && (
-                <div style={{ background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.3)', borderRadius:10, padding:'10px 14px', fontSize:12, color:'var(--accent-red)', fontFamily:'DM Sans' }}>{expenseError}</div>
+                <div role="alert" style={{ background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.3)', borderRadius:10, padding:'10px 14px', fontSize:12, color:'var(--accent-red)', fontFamily:'DM Sans' }}>{expenseError}</div>
               )}
               <div><label style={labelStyle}>{t('payments.description')} *</label><input style={{ ...inputStyle, borderColor: expenseFieldErrors.description ? 'var(--accent-red)' : undefined }} value={expenseForm.description} onChange={e=>{ setExpenseForm(f=>({...f,description:e.target.value})); setExpenseFieldErrors(x=>({ ...x, description: undefined })); }} placeholder={t('frontDesk.descriptionPurchased')}/>{expenseFieldErrors.description && <span role="alert" style={fieldErrorStyle}>{expenseFieldErrors.description}</span>}</div>
               <div><label style={labelStyle}>{t('frontDesk.paidToLabel')}</label><input style={{ ...inputStyle, borderColor: expenseFieldErrors.paidTo ? 'var(--accent-red)' : undefined }} value={expenseForm.paidTo} onChange={e=>{ setExpenseForm(f=>({...f,paidTo:e.target.value})); setExpenseError(''); setExpenseFieldErrors(x=>({ ...x, paidTo: undefined })); }} placeholder={t('frontDesk.paidToPlaceholder')}/>{expenseFieldErrors.paidTo && <span role="alert" style={fieldErrorStyle}>{expenseFieldErrors.paidTo}</span>}</div>
@@ -2151,7 +2179,7 @@ export default function FrontDeskPage() {
               </div>
               <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
                 <button style={secondaryBtn} onClick={()=>setShowExpenseModal(false)}>{t('common.cancel')}</button>
-                <button style={{ ...primaryBtn, opacity: overLimit ? 0.5 : 1, cursor: overLimit ? 'not-allowed' : 'pointer' }} disabled={overLimit} onClick={handleExpense}><Receipt size={13}/> {t('frontDesk.submitForApproval')}</button>
+                <button style={{ ...primaryBtn, opacity: overLimit || expenseSaving ? 0.5 : 1, cursor: overLimit ? 'not-allowed' : 'pointer' }} disabled={overLimit || expenseSaving} onClick={handleExpense}><Receipt size={13}/> {t('frontDesk.submitForApproval')}</button>
               </div>
             </div>
           );
