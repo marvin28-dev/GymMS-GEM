@@ -299,6 +299,8 @@ function applyFilters(list, { pkg, sessionsLeft, gender, joined, owing, expiring
   return out;
 }
 
+// Never by the check-in code: typing four digits would show whose code it is,
+// and the front desk searches this list too (F-078).
 function filterBySearch(list, term) {
   if (!term.trim()) return list;
   const t = term.toLowerCase();
@@ -306,8 +308,7 @@ function filterBySearch(list, term) {
     `${m.firstName} ${m.lastName}`.toLowerCase().includes(t) ||
     (m.phone || '').toLowerCase().includes(t) ||
     (m.email || '').toLowerCase().includes(t) ||
-    (m.memberCode || '').toLowerCase().includes(t) ||
-    (m.accessCode || '').toLowerCase().includes(t)
+    (m.memberCode || '').toLowerCase().includes(t)
   );
 }
 
