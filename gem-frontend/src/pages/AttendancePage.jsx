@@ -213,7 +213,7 @@ function TimeInput({ value, onChange }) {
 // ─── Row 3-dot menu (portal-based so it escapes table overflow clipping) ──────
 
 // ─── Check-out modal ──────────────────────────────────────────────────────────
-function CheckOutModal({ open, onClose, entry, person, onConfirm }) {
+function CheckOutModal({ open, onClose, entry, person, onConfirm, error, busy, finished }) {
   const { t } = useLanguage();
   const [time, setTime]             = useState('');
   const [notes, setNotes]           = useState('');
@@ -263,15 +263,26 @@ function CheckOutModal({ open, onClose, entry, person, onConfirm }) {
             {t('attendance.checkoutBeforeCheckin', { time: entry.time })}
           </div>
         )}
+        {error && (
+          <div role="alert" style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 8, padding: '9px 12px' }}>
+            {error}
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button style={secondaryBtn} onClick={onClose}>{t('common.cancel')}</button>
-          <button
-            style={{ ...primaryBtn, opacity: canConfirm ? 1 : 0.45, cursor: canConfirm ? 'pointer' : 'not-allowed' }}
-            disabled={!canConfirm}
-            onClick={() => onConfirm({ time: toDisplayTime(time), notes: notes.trim(), timeChanged: timeEdited })}
-          >
-            <LogOut size={13} /> {t('attendance.confirmCheckOut')}
-          </button>
+          {finished ? (
+            <button style={secondaryBtn} onClick={onClose}>{t('common.close')}</button>
+          ) : (
+            <>
+              <button style={secondaryBtn} onClick={onClose}>{t('common.cancel')}</button>
+              <button
+                style={{ ...primaryBtn, opacity: canConfirm && !busy ? 1 : 0.45, cursor: canConfirm && !busy ? 'pointer' : 'not-allowed' }}
+                disabled={!canConfirm || busy}
+                onClick={() => onConfirm({ time: toDisplayTime(time), notes: notes.trim(), timeChanged: timeEdited })}
+              >
+                <LogOut size={13} /> {t('attendance.confirmCheckOut')}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -444,6 +455,10 @@ export default function AttendancePage() {
   const [loading, setLoading]             = useState(() => !cache.has('checkins'));
   const [photoLightbox, setPhotoLightbox] = useState(null);
   const [checkoutModal, setCheckoutModal] = useState(null);
+  // What the check-out dialog says when the server refused; finished once the
+  // check-out itself went through but a changed time did not (F-107)
+  const [checkoutResult, setCheckoutResult] = useState({ error: '', busy: false, finished: false });
+  const openCheckout = (value) => { setCheckoutResult({ error: '', busy: false, finished: false }); setCheckoutModal(value); };
   const [checkinModal, setCheckinModal]   = useState(null);
   const [editModal, setEditModal]         = useState(null);
   // Time cards in view that a manager has still to sign off
@@ -756,7 +771,7 @@ export default function AttendancePage() {
 
   const handleCheckOutFromSearch = () => {
     if (!foundResult?.alreadyIn) return;
-    setCheckoutModal({ entry: foundResult.alreadyIn, person: { name: foundResult.data.name } });
+    openCheckout({ entry: foundResult.alreadyIn, person: { name: foundResult.data.name } });
     clearSearch();
   };
 
@@ -770,21 +785,34 @@ export default function AttendancePage() {
   const confirmCheckOut = async ({ time, notes, timeChanged }) => {
     const entry = checkoutModal.entry;
     const isStaff = entry.personType === 'Staff';
-    // Members close an Attendance row, staff close a TimeCard.
+    setCheckoutResult({ error: '', busy: true, finished: false });
+    // Members close an Attendance row, staff close a TimeCard. Only a check-out
+    // the server made is shown as done: a refusal stays in the dialog (F-107).
     try {
       if (isStaff) await punchOutApi(entry.id);
       else await checkOutApi(entry.id);
-    } catch { /* keep the local row in step even if the write fails */ }
+    } catch (err) {
+      setCheckoutResult({ error: err?.response?.data?.error || t('attendance.checkOutFailed'), busy: false, finished: false });
+      return;
+    }
 
     // An adjusted time is a claim: it is written to the card, the card is
     // marked pending, and the server raises an approval task for every manager.
+    let adjustError = '';
     if (timeChanged && isStaff) {
       try {
         await adjustTimecard(entry.id, { punchOut: time, note: notes || undefined });
-      } catch (err) { console.error('Time adjustment failed:', err); }
+      } catch (err) {
+        adjustError = err?.response?.data?.error || t('attendance.checkOutFailed');
+      }
     }
-    setCheckins(prev => prev.map(c => c.id === entry.id ? { ...c, checkOut: time, notes: notes || null, pending: timeChanged && isStaff } : c));
+    const outAt = adjustError ? toDisplayTime(nowTime()) : time;
+    setCheckins(prev => prev.map(c => c.id === entry.id ? { ...c, checkOut: outAt, notes: notes || null, pending: timeChanged && isStaff && !adjustError } : c));
     showFlash(checkoutModal.person.name, 'out');
+    if (adjustError) {
+      setCheckoutResult({ error: t('attendance.timeChangeNotSaved', { reason: adjustError }), busy: false, finished: true });
+      return;
+    }
     setCheckoutModal(null);
   };
 
@@ -983,7 +1011,7 @@ export default function AttendancePage() {
             setCheckinModal(null);
             await doCheckIn(timeChanged ? { time, notes } : {});
           }} />
-        <CheckOutModal open={!!checkoutModal} entry={checkoutModal?.entry} person={checkoutModal?.person} onClose={() => setCheckoutModal(null)} onConfirm={confirmCheckOut} />
+        <CheckOutModal open={!!checkoutModal} entry={checkoutModal?.entry} person={checkoutModal?.person} onClose={() => setCheckoutModal(null)} onConfirm={confirmCheckOut} {...checkoutResult} />
         <EditTimeModal open={!!editModal} entry={editModal?.entry} field={editModal?.field} onClose={() => setEditModal(null)} onConfirm={confirmEdit} />
       </div>
     );
@@ -1285,7 +1313,7 @@ export default function AttendancePage() {
                     {isStaffTab && canManage && (
                       <td style={{ ...tdStyle, width: 44, textAlign: 'center', paddingLeft: 6, paddingRight: 6 }}>
                         <RowMenu title={t('common.actions')} items={[
-                          { label: t('attendance.checkOutAction'), icon: <LogOut size={15} />, onClick: () => setCheckoutModal({ entry, person }), hidden: checkedOut, danger: true },
+                          { label: t('attendance.checkOutAction'), icon: <LogOut size={15} />, onClick: () => openCheckout({ entry, person }), hidden: checkedOut, danger: true },
                           { label: t('attendance.editCheckinTime'), icon: <Clock size={15} />, onClick: () => setEditModal({ entry, person, field: 'time' }) },
                           { label: t('attendance.editCheckoutTime'), icon: <Clock size={15} />, onClick: () => setEditModal({ entry, person, field: 'checkOut' }), hidden: !checkedOut },
                         ]} />
@@ -1320,7 +1348,7 @@ export default function AttendancePage() {
           setCheckinModal(null);
           await doCheckIn(timeChanged ? { time, notes } : {});
         }} />
-      <CheckOutModal open={!!checkoutModal} entry={checkoutModal?.entry} person={checkoutModal?.person} onClose={() => setCheckoutModal(null)} onConfirm={confirmCheckOut} />
+      <CheckOutModal open={!!checkoutModal} entry={checkoutModal?.entry} person={checkoutModal?.person} onClose={() => setCheckoutModal(null)} onConfirm={confirmCheckOut} {...checkoutResult} />
       <EditTimeModal open={!!editModal} entry={editModal?.entry} field={editModal?.field} onClose={() => setEditModal(null)} onConfirm={confirmEdit} />
 
       {/* ── QR Scanner Overlay ───────────────────────────────────────────── */}

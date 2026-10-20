@@ -955,6 +955,8 @@ const translations = {
       checkOutBtn: 'Check Out',
       "scanQrCode": "Scan QR code",
       "pickDate": "Pick a date",
+      "checkOutFailed": "Could not check out. Try again.",
+      "timeChangeNotSaved": "Checked out, but the changed time was not saved ({reason}). Ask a manager to correct the time card.",
     },
     payments: {
       title: 'Payments', addPayment: 'Add Payment', paymentHistory: 'Payment History',
@@ -3067,6 +3069,8 @@ const translations = {
       checkOutBtn: 'Sortie',
       "scanQrCode": "Scanner le code QR",
       "pickDate": "Choisir une date",
+      "checkOutFailed": "Sortie impossible. Réessayez.",
+      "timeChangeNotSaved": "Sortie enregistrée, mais l’heure modifiée ne l’a pas été ({reason}). Demandez à un responsable de corriger la fiche de temps.",
     },
     payments: {
       title: 'Paiements', addPayment: 'Ajouter un paiement', paymentHistory: 'Historique des paiements',
