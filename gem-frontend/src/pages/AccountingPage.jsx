@@ -812,6 +812,535 @@ export default function AccountingPage() {
   };
 
   // ── Mobile layout ────────────────────────────────────────────────────────────
+  // Drawn by both layouts. On a phone their buttons (view an expense or a
+  // paystub, edit pay, mark paid) used to do nothing, and the phone had its
+  // own add-expense sheet without "Paid to", so it could not save (F-109, F-110).
+  const sharedDialogs = (
+    <>
+      {/* Add / Edit Expense Modal */}
+      <Modal open={showModal} onClose={() => setShowModal(false)}
+        title={editingExpense ? t('reports.editExpense') : (isSalaryEntry ? 'Issue Staff Pay' : t('reports.addExpense'))}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: isSalaryEntry ? '1fr' : '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.category')}</label>
+              <select style={inputStyle} value={form.category} disabled={!!editingExpense}
+                onChange={e => {
+                  const category = e.target.value;
+                  setSalaryPreview(null);
+                  setErrors({});
+                  setForm(f => ({
+                    ...f, category,
+                    // Salary entries start clean: the amount is worked out, not typed
+                    ...(category === 'Salaries'
+                      ? { amount: '', staffId: '', payMonth: payMonthLabel(new Date()), title: '', paidTo: '' }
+                      : { staffId: '', payMonth: '' }),
+                  }));
+                }}>
+                {['Utilities', 'Rent', 'Maintenance', 'Salaries', 'Supplies', 'Other'].map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            {!isSalaryEntry && (
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.amount')} *</label>
+                <input type="text" inputMode="numeric" style={{ ...inputStyle, borderColor: errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: digitsOnly(e.target.value) }))} placeholder="0" />
+                {errors.amount && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.amount}</div>}
+              </div>
+            )}
+          </div>
+
+          {isSalaryEntry ? (
+            <>
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Staff member *</label>
+                  <select style={{ ...inputStyle, borderColor: errors.staffId ? 'var(--accent-red)' : 'var(--border-subtle)' }}
+                    value={form.staffId}
+                    onChange={e => { const staffId = e.target.value; setForm(f => ({ ...f, staffId })); loadSalaryPreview(staffId, form.payMonth); }}>
+                    <option value="">{t('tasks.selectStaff')}</option>
+                    {staffList.filter(s => s.isActive !== false).map(s => (
+                      <option key={s.id} value={s.id}>{staffName(s)}</option>
+                    ))}
+                  </select>
+                  {errors.staffId && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.staffId}</div>}
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Pay period *</label>
+                  <select style={{ ...inputStyle, borderColor: errors.payMonth ? 'var(--accent-red)' : 'var(--border-subtle)' }}
+                    value={form.payMonth}
+                    onChange={e => { const payMonth = e.target.value; setForm(f => ({ ...f, payMonth })); loadSalaryPreview(form.staffId, payMonth); }}>
+                    {payMonthOptions().map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  {errors.payMonth && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.payMonth}</div>}
+                </div>
+              </div>
+
+              {salaryPreview && (
+                <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '12px 14px', fontSize: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: 4 }}>
+                    <span>Base salary</span><span>{formatMoney(salaryPreview.basePay)}</span>
+                  </div>
+                  {salaryPreview.bonuses.map((b, i) => (
+                    <div key={`b${i}`} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-green)', marginBottom: 3 }}>
+                      <span>{b.label}{b.recurring ? '' : ' (one time)'}</span><span>+{formatMoney(b.amount)}</span>
+                    </div>
+                  ))}
+                  {salaryPreview.deductions.map((d, i) => (
+                    <div key={`d${i}`} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-red)', marginBottom: 3 }}>
+                      <span>{d.label}{d.recurring ? '' : ' (one time)'}</span><span>-{formatMoney(d.amount)}</span>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-subtle)', marginTop: 6, paddingTop: 6, fontWeight: 700, color: 'var(--text-primary)' }}>
+                    <span>Net</span><span>{formatMoney(salaryPreview.net)}</span>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.amount')} *</label>
+                <input type="text" inputMode="numeric" style={{ ...inputStyle, borderColor: errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)' }}
+                  value={form.amount} onChange={e => setForm(f => ({ ...f, amount: digitsOnly(e.target.value) }))} placeholder="0" />
+                {errors.amount && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.amount}</div>}
+              </div>
+
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--accent-gold-dim)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: 8, padding: '9px 12px', lineHeight: 1.5 }}>
+                This records the pay as issued. It appears under Paystubs, where marking it paid books the salary expense.
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('tasks.titleLabel')}</label>
+                <input style={{ ...inputStyle, borderColor: errors.title ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder={t('reports.expenseTitlePh')} />
+                {errors.title && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.title}</div>}
+              </div>
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.date')} *</label>
+                  <input type="date" style={{ ...inputStyle, borderColor: errors.date ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+                  {errors.date && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.date}</div>}
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.paidTo')} *</label>
+                  <input style={{ ...inputStyle, borderColor: errors.paidTo ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.paidTo} onChange={e => setForm(f => ({ ...f, paidTo: e.target.value }))} placeholder={t('reports.vendorName')} />
+                  {errors.paidTo && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.paidTo}</div>}
+                </div>
+              </div>
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('sales.paymentMethod')}</label>
+                  {/* stored as a code (mobile_money); the list shows the gym's own methods by name */}
+                  <select style={inputStyle} value={PAYMENT_METHODS.find(x => x.api === form.method || x.key === canonicalMethod(form.method))?.key || enabledMethods(gymSettings)[0]?.key} onChange={e => setForm(f => ({ ...f, method: e.target.value }))}>
+                    {enabledMethods(gymSettings).map(m => <option key={m.key} value={m.key}>{t(m.labelKey)}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.recordedBy')}</label>
+                  <select style={inputStyle} value={form.recordedBy} onChange={e => setForm(f => ({ ...f, recordedBy: e.target.value }))}>
+                    <option value="">{t('tasks.selectStaff')}</option>
+                    {staffList.filter(s => s.isActive !== false || staffName(s) === form.recordedBy).map(s => <option key={s.id} value={staffName(s)}>{staffName(s)}</option>)}
+                  </select>
+                </div>
+              </div>
+            </>
+          )}
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.notes')}</label>
+            <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+          </div>
+          <div style={{ display: isSalaryEntry ? 'none' : 'block' }}>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.attachReceipt')}</label>
+            <input type="file" accept="image/*" onChange={e => {
+              const file = e.target.files[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = ev => setExpenseImagePreview(ev.target.result);
+                reader.readAsDataURL(file);
+              }
+            }} style={{ ...inputStyle, padding: '7px 14px', cursor: 'pointer' }} />
+            {expenseImagePreview && (
+              <div style={{ marginTop: 8, position: 'relative', display: 'inline-block' }}>
+                <img src={expenseImagePreview} alt="Receipt preview" style={{ maxWidth: '100%', maxHeight: 130, borderRadius: 8, border: '1px solid var(--border-subtle)', display: 'block' }} />
+                <button onClick={() => setExpenseImagePreview(null)} style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: '50%', width: 20, height: 20, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+              </div>
+            )}
+          </div>
+          {errors._api && <div style={{ fontSize: 12, color: 'var(--accent-red)', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '8px 12px' }}>⚠ {errors._api}</div>}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
+            <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
+            {!editingExpense && <button style={secondaryBtn} onClick={() => handleSave(true)}>{t('tasks.saveAndAddAnother')}</button>}
+            <button style={primaryBtn} onClick={() => handleSave(false)}>{isSalaryEntry ? 'Issue Pay' : t('reports.saveExpense')}</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Expense Detail Modal */}
+      {viewingExpense && (
+        <Modal open={!!viewingExpense} onClose={() => { setViewingExpense(null); setViewError(''); }} title={t('reports.expenseRecord')} maxWidth={500}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {[
+                [t('common.title'), viewingExpense.title],
+                [t('reports.category'), viewingExpense.category],
+                [t('common.amount'), formatMoney(Number(viewingExpense.amount))],
+                [t('common.date'), viewingExpense.date ? fmtDate(viewingExpense.date) : '-'],
+                [t('reports.paidTo'), viewingExpense.paidTo || '-'],
+                [t('reports.method'), viewingExpense.method || '-'],
+                [t('reports.recordedBy'), viewingExpense.recordedBy || '-'],
+                // Who put it in GEM, and when: taken from whoever was signed in
+                [t('reports.createdBy'), viewingExpense.createdByName
+                  ? `${viewingExpense.createdByName} · ${fmtDate(viewingExpense.createdAt)}`
+                  : '-'],
+              ].map(([label, value]) => (
+                <div key={label} style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>{label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{value}</div>
+                </div>
+              ))}
+            </div>
+            {viewingExpense.editedByName && (
+              <div style={{ background: 'var(--accent-yellow-dim)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
+                {t('reports.editedStamp', { name: viewingExpense.editedByName, date: fmtDate(viewingExpense.editedAt) })}
+              </div>
+            )}
+            {(viewingExpense.note || viewingExpense.notes) && (
+              <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>{t('common.notes')}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{viewingExpense.note || viewingExpense.notes}</div>
+              </div>
+            )}
+            {viewingExpense.receipt && (
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 8 }}>{t('reports.receiptPhoto')}</div>
+                <img src={viewingExpense.receipt} alt="Receipt" style={{ width: '100%', borderRadius: 8, border: '1px solid var(--border-subtle)', maxHeight: 300, objectFit: 'contain', background: 'var(--bg-elevated)' }} />
+              </div>
+            )}
+            {viewError && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 10, padding: '10px 14px', fontFamily: 'DM Sans' }}>{viewError}</div>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
+              {/* Changing the books happens here, with the entry open in front
+                  of you, and each action is confirmed with the owner's code */}
+              {canEditExpenses && (
+                <button style={secondaryBtn} onClick={() => { setViewingExpense(null); openEdit(viewingExpense); }}><Pencil size={13} /> {t('common.edit')}</button>
+              )}
+              {canEditExpenses && (
+                <button
+                  style={{ ...secondaryBtn, color: 'var(--accent-red)', borderColor: 'var(--accent-red)' }}
+                  onClick={() => { const exp = viewingExpense; setViewingExpense(null); setDeleteExpense(exp); setShowDeleteAuthModal(true); }}
+                >
+                  <Trash2 size={13} /> {t('common.delete')}
+                </button>
+              )}
+              <button style={primaryBtn} onClick={() => {
+                const exp = viewingExpense;
+                const receipt = safeImageSrc(exp.receipt);
+                const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(`${t('reports.expenseRecord')} : ${exp.title || ''}`)}</title><style>
+                  body{font-family:Arial,sans-serif;margin:40px;color:#111;max-width:600px}
+                  h1{font-size:20px;margin-bottom:4px}
+                  .sub{font-size:12px;color:#666;margin-bottom:24px}
+                  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+                  .field label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;display:block;margin-bottom:2px}
+                  .field span{font-size:14px;font-weight:600}
+                  .notes-box{background:#f9f9f9;border-radius:6px;padding:12px;font-size:13px;margin-bottom:24px}
+                  img{max-width:100%;border-radius:6px;border:1px solid #ddd;margin-top:8px}
+                  .footer{margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:12px}
+                </style></head><body>
+                  <h1>${escapeHtml(t('reports.expenseRecord'))}</h1>
+                  <div class="sub">${escapeHtml(t('reports.generatedLabel'))} ${escapeHtml(fmtDate(new Date(), { day: '2-digit', month: 'long', year: 'numeric' }))}</div>
+                  <div class="grid">
+                    <div class="field"><label>${escapeHtml(t('common.title'))}</label><span>${escapeHtml(exp.title || '-')}</span></div>
+                    <div class="field"><label>${escapeHtml(t('reports.category'))}</label><span>${escapeHtml(exp.category || '-')}</span></div>
+                    <div class="field"><label>${escapeHtml(t('common.amount'))}</label><span style="color:#dc2626">${escapeHtml(formatMoney(Number(exp.amount)))}</span></div>
+                    <div class="field"><label>${escapeHtml(t('common.date'))}</label><span>${escapeHtml(fmtDate(exp.date))}</span></div>
+                    <div class="field"><label>${escapeHtml(t('reports.paidTo'))}</label><span>${escapeHtml(exp.paidTo || '-')}</span></div>
+                    <div class="field"><label>${escapeHtml(t('sales.paymentMethod'))}</label><span>${escapeHtml(exp.method || '-')}</span></div>
+                    <div class="field"><label>${escapeHtml(t('reports.recordedBy'))}</label><span>${escapeHtml(exp.recordedBy || '-')}</span></div>
+                  </div>
+                  ${(exp.note || exp.notes) ? `<div class="notes-box"><strong>${escapeHtml(t('common.notes'))}:</strong> ${escapeHtml(exp.note || exp.notes)}</div>` : ''}
+                  ${receipt ? `<div><strong style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888">${escapeHtml(t('reports.receipt'))}</strong><br/><img src="${escapeHtml(receipt)}" /></div>` : ''}
+                  <div class="footer">GEM Gym Management · Expense ID: ${escapeHtml(exp.id)}</div>
+                </body></html>`;
+                openPrintWindow(html, { features: 'width=700,height=900' });
+              }}><Download size={13} /> {t('reports.downloadPdf')}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Paystub detail - read-only view of what this pay was made of */}
+      {viewingPaystub && (() => {
+        const p = viewingPaystub;
+        const bd = p.breakdown || null;
+        const basePay = bd?.basePay ?? p.basicPay;
+        const lists = { bonuses: bd?.bonuses || [], deductions: bd?.deductions || [] };
+        const totals = { bonuses: bd?.totalBonuses ?? p.allowances, deductions: bd?.totalDeductions ?? p.deductions };
+        const meta = [
+          [t('reports.payPeriod'), p.month],
+          [t('reports.issuedLabel'), p.issuedAt ? fmtDate(p.issuedAt) : '-'],
+          [t('reports.paidLabel'), p.paidAt ? fmtDate(p.paidAt) : '-'],
+        ];
+        return (
+          <Modal open onClose={() => setViewingPaystub(null)} title={p.staffName} maxWidth={520}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{String(p.role || '').replace(/_/g, ' ')}</span>
+                <StatusPill status={p.status} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                {meta.map(([label, value]) => (
+                  <div key={label} style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '9px 12px' }}>
+                    <div style={{ fontSize: 9.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 3 }}>{label}</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)' }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '14px 16px', fontSize: 12.5 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: 'var(--text-secondary)' }}>
+                  <span>{t('reports.basicPay')}</span>
+                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(basePay)}</span>
+                </div>
+                {PAY_KINDS.map(g => {
+                  const items = lists[g.key];
+                  const total = totals[g.key];
+                  if (!items.length && !total) return null;
+                  return (
+                    <div key={g.key} style={{ marginTop: 12 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, color: g.color }}>
+                        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase' }}>{g.title}</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{g.sign}{formatMoney(total)}</span>
+                      </div>
+                      {items.length === 0 ? (
+                        <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4, paddingLeft: 10 }}>{t('reports.notItemised')}</div>
+                      ) : items.map((x, i) => (
+                        <div key={`${g.key}${i}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: 'var(--text-muted)', marginTop: 4, paddingLeft: 10 }}>
+                          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.label}{x.recurring ? '' : ' · one time'}</span>
+                          <span style={{ fontFamily: 'JetBrains Mono, monospace', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{formatMoney(x.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, borderTop: '1px solid var(--border-subtle)', marginTop: 12, paddingTop: 10, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  <span>{t('staff.payRecorded')}</span>
+                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(p.grossPay)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginTop: 6, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  <span>{t('staff.toHandOver')}</span>
+                  <span style={{ fontSize: 15, fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums', color: 'var(--accent-gold)' }}>{formatMoney(p.netPay)}</span>
+                </div>
+              </div>
+
+              {p.note && (
+                <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ fontSize: 9.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>{t('common.notes')}</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{p.note}</div>
+                </div>
+              )}
+
+              {canEditPayroll && (
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
+                  <button style={secondaryBtn} onClick={() => { setViewingPaystub(null); openEditPaystub(p); }}><Pencil size={13} /> {t('reports.editPay')}</button>
+                  {p.status !== 'paid' && (
+                    <button style={primaryBtn} onClick={() => { setViewingPaystub(null); requestMarkPaid(p.id); }}>{t('reports.markPaid')}</button>
+                  )}
+                </div>
+              )}
+            </div>
+          </Modal>
+        );
+      })()}
+
+      {/* View / Edit Paystub Modal */}
+      <Modal open={showPaystubModal} onClose={() => { setShowPaystubModal(false); setShowAddDedLine(false); }} title={`${t('reports.paystubs')} : ${editingPaystub?.staffName}`} maxWidth={560}>
+        {editingPaystub && (() => {
+          const lines = paystubDeductionLines[editingPaystub.id] || [];
+          const totalDed = lines.reduce((s, d) => s + d.amount, 0);
+          const basicPay = editingPaystub.basicPay;
+          const allowances = Number(payForm.allowances) || 0;
+          const netPay = basicPay + allowances - totalDed;
+          return (
+            <div>
+              {/* Header info */}
+              <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{editingPaystub.staffName}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{editingPaystub.role} · {editingPaystub.month}</div>
+                  </div>
+                  <StatusPill status={editingPaystub.status} />
+                </div>
+                <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{t('reports.basicPay')}</div>
+                    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '9px 12px', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', opacity: 0.7 }}>{formatMoney(editingPaystub.basicPay)}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{t('reports.allowances')}</div>
+                    <input type="number" value={payForm.allowances ?? editingPaystub.allowances} onChange={e => setPayForm(f => ({ ...f, allowances: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', fontSize: 14, fontWeight: 700 }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Deductions */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>{t('reports.deductions')}</span>
+                  <button style={{ ...secondaryBtn, padding: '4px 10px', fontSize: 11 }} onClick={() => setShowAddDedLine(v => !v)}>
+                    <Plus size={11} />{showAddDedLine ? t('common.cancel') : t('staff.addDeduction')}
+                  </button>
+                </div>
+                <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, overflow: 'hidden' }}>
+                  {lines.length === 0 && !showAddDedLine && (
+                    <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>{t('staff.noDeductions')}</div>
+                  )}
+                  {lines.map(d => (
+                    <div key={d.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{d.label}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('common.notePrefixColon')} {d.note}</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-red)' }}>-{formatMoney(d.amount)}</span>
+                        <button onClick={() => setPaystubDeductionLines(prev => ({ ...prev, [editingPaystub.id]: prev[editingPaystub.id].filter(x => x.id !== d.id) }))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }} onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-red)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}><Trash2 size={13} /></button>
+                      </div>
+                    </div>
+                  ))}
+                  {showAddDedLine && (
+                    <div style={{ padding: '12px 16px', borderTop: lines.length > 0 ? '1px solid var(--border-subtle)' : 'none', background: 'rgba(201,169,110,0.04)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: 8, marginBottom: 8 }}>
+                        <input placeholder={t('staff.deductionLabelPh')} value={newDedLine.label} onChange={e => setNewDedLine(f => ({ ...f, label: e.target.value }))} style={{ ...inputStyle, padding: '7px 10px', fontSize: 12 }} />
+                        <input placeholder={t('staff.amountPh')} type="text" inputMode="numeric" value={newDedLine.amount} onChange={e => setNewDedLine(f => ({ ...f, amount: digitsOnly(e.target.value) }))} style={{ ...inputStyle, padding: '7px 10px', fontSize: 12 }} />
+                      </div>
+                      <div style={{ marginBottom: 8 }}>
+                        <input placeholder={t('staff.deductionNotePh')} value={newDedLine.note} onChange={e => setNewDedLine(f => ({ ...f, note: e.target.value }))} style={{ ...inputStyle, padding: '7px 10px', fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
+                      </div>
+                      <button style={{ ...primaryBtn, padding: '5px 14px', fontSize: 11 }} onClick={() => {
+                        if (!newDedLine.label || !newDedLine.amount || !newDedLine.note) return;
+                        setPaystubDeductionLines(prev => ({
+                          ...prev,
+                          [editingPaystub.id]: [...(prev[editingPaystub.id] || []), { id: Date.now(), label: newDedLine.label, amount: Number(newDedLine.amount), note: newDedLine.note }],
+                        }));
+                        setNewDedLine({ label: '', amount: '', note: '' });
+                        setShowAddDedLine(false);
+                      }}>{t('staff.saveDeduction')}</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Net pay summary */}
+              <div style={{ background: 'linear-gradient(135deg, rgba(201,169,110,0.12), rgba(201,169,110,0.04))', border: '1px solid var(--accent-gold-dim)', borderRadius: 10, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>{t('reports.calcNetPay')}</div>
+                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'Manrope, sans-serif', color: 'var(--accent-gold)' }}>{formatMoney(netPay)}</div>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'right' }}>
+                  <div>{formatMoney(basicPay + allowances)} {t('reports.gross')}</div>
+                  <div>− {formatMoney(totalDed)} {t('reports.deductions').toLowerCase()}</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  {editingPaystub.status === 'paid' && (
+                    <button style={{ ...secondaryBtn, color: 'var(--accent-red)', borderColor: 'var(--accent-red)' }} onClick={() => { requestUnpaid(editingPaystub.id); setShowPaystubModal(false); }}>{t('reports.markUnpaid')}</button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button style={secondaryBtn} onClick={() => { setShowPaystubModal(false); setShowAddDedLine(false); }}>{t('common.cancel')}</button>
+                  <button style={primaryBtn} onClick={handleSavePaystub}>{t('common.saveChanges')}</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* Settling pay: the figure to hand over is the one that stands out, so
+          nobody hands over the full pay when deductions have been withheld */}
+      <Modal open={!!confirmPaid} onClose={() => setConfirmPaid(null)} title={confirmPaid ? t('reports.settleTitle', { name: confirmPaid.staffName, month: confirmPaid.month }) : ''} maxWidth={420}>
+        {confirmPaid && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ background: 'var(--accent-gold-glow)', border: '1px solid var(--accent-gold-dim)', borderRadius: 12, padding: '16px 18px', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('staff.toHandOver')}</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent-gold)', fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums', marginTop: 4 }}>{formatMoney(confirmPaid.netPay)}</div>
+            </div>
+            <div style={{ fontSize: 12.5, fontFamily: 'DM Sans', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                <span>{t('staff.payRecorded')}</span>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(confirmPaid.grossPay)}</span>
+              </div>
+              {confirmPaid.deductions > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-red)' }}>
+                  <span>{t('staff.withheldDeductions')}</span>
+                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>−{formatMoney(confirmPaid.deductions)}</span>
+                </div>
+              )}
+            </div>
+            {confirmPaid.deductions > 0 && (
+              <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
+                {t('staff.handOverExplain', { gross: formatMoney(confirmPaid.grossPay), withheld: formatMoney(confirmPaid.deductions), handOver: formatMoney(confirmPaid.netPay) })}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button style={secondaryBtn} onClick={() => setConfirmPaid(null)}>{t('common.cancel')}</button>
+              <button style={primaryBtn} onClick={() => { const id = confirmPaid.id; setConfirmPaid(null); markPaid(id); }}>
+                {t('reports.confirmHandedOver', { amount: formatMoney(confirmPaid.netPay) })}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <ManagerAuthModal
+        open={showUnpaidAuth}
+        onClose={() => { setShowUnpaidAuth(false); setPendingUnpaidId(null); }}
+        onConfirm={() => {
+          const id = pendingUnpaidId;
+          setShowUnpaidAuth(false);
+          setPendingUnpaidId(null);
+          if (id) markUnpaid(id);
+        }}
+        action="Reverse a settled salary payment"
+        danger
+      />
+
+      <ManagerAuthModal
+        open={showPaystubAuthModal}
+        onClose={() => setShowPaystubAuthModal(false)}
+        onConfirm={() => { setShowPaystubAuthModal(false); commitSavePaystub(); }}
+        action={t('reports.actionEditPaystub', { name: editingPaystub?.staffName })}
+      />
+
+      <ManagerAuthModal
+        open={showExpenseAuthModal}
+        onClose={() => setShowExpenseAuthModal(false)}
+        onConfirm={() => { setShowExpenseAuthModal(false); commitExpenseSave(pendingExpenseSave); }}
+        action={t('reports.actionEditExpense', { title: editingExpense?.title })}
+      />
+
+      <ManagerAuthModal
+        open={showDeleteAuthModal}
+        onClose={() => { setShowDeleteAuthModal(false); setDeleteExpense(null); }}
+        onConfirm={async () => {
+          setShowDeleteAuthModal(false);
+          const exp = deleteExpense;
+          try {
+            await removeExpense(exp.id);
+            setExpenses(prev => prev.filter(e => e.id !== exp.id));
+          } catch (err) {
+            openView(exp);
+            setViewError(err?.response?.data?.error || t('reports.deleteFailed'));
+          }
+          setDeleteExpense(null);
+        }}
+        action={t('reports.actionDeleteExpense', { title: deleteExpense?.title })}
+        danger
+      />
+    </>
+  );
+
   if (isMobile) {
     const EXPENSE_CATS = { Utilities: '#60a5fa', Salaries: '#a78bfa', Equipment: '#f97316', Marketing: '#4ade80', Rent: '#fbbf24', Other: '#9ca3af' };
     const SOURCES = [
@@ -1099,44 +1628,7 @@ export default function AccountingPage() {
           </div>
         )}
 
-        {/* Add expense modal (slide-up sheet) */}
-        {showModal && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end' }}>
-            <div style={{ background: 'var(--bg-secondary)', borderRadius: '20px 20px 0 0', width: '100%', maxHeight: '88vh', overflowY: 'auto', padding: '20px 20px 40px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'Manrope', color: 'var(--text-primary)' }}>{editingExpense ? t('reports.editExpense') : t('reports.addExpense')}</span>
-                <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {[
-                  { label: t('tasks.titleLabel'), key: 'title', type: 'text', error: errors.title },
-                  { label: `${t('common.amount')} *`, key: 'amount', type: 'number', error: errors.amount },
-                  { label: `${t('common.date')} *`, key: 'date', type: 'date', error: errors.date },
-                  { label: t('common.notes'), key: 'notes', type: 'text' },
-                ].map(({ label, key, type, error }) => (
-                  <div key={key}>
-                    <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{label}</label>
-                    <input type={type} value={form[key] || ''} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} style={{ width: '100%', background: 'var(--bg-elevated)', border: `1px solid ${error ? 'var(--accent-red)' : 'var(--border-subtle)'}`, borderRadius: 10, padding: '10px 14px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', boxSizing: 'border-box' }} />
-                    {error && <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{error}</span>}
-                  </div>
-                ))}
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{t('reports.category')}</label>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {Object.keys(EXPENSE_CATS).map(c => (
-                      <button key={c} onClick={() => setForm(f => ({ ...f, category: c }))} style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: form.category === c ? 600 : 400, cursor: 'pointer', fontFamily: 'DM Sans', border: `1px solid ${form.category === c ? EXPENSE_CATS[c] : 'var(--border-subtle)'}`, background: form.category === c ? `${EXPENSE_CATS[c]}22` : 'transparent', color: form.category === c ? EXPENSE_CATS[c] : 'var(--text-secondary)' }}>
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <button onClick={() => handleSave()} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 10, padding: '13px', fontSize: 14, fontWeight: 700, color: '#0a0a0f', cursor: 'pointer', fontFamily: 'DM Sans', marginTop: 4 }}>
-                  {t('reports.saveExpense')}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {sharedDialogs}
       </div>
     );
   }
@@ -1662,527 +2154,7 @@ export default function AccountingPage() {
         );
       })()}
 
-      {/* Add / Edit Expense Modal */}
-      <Modal open={showModal} onClose={() => setShowModal(false)}
-        title={editingExpense ? t('reports.editExpense') : (isSalaryEntry ? 'Issue Staff Pay' : t('reports.addExpense'))}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: isSalaryEntry ? '1fr' : '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.category')}</label>
-              <select style={inputStyle} value={form.category} disabled={!!editingExpense}
-                onChange={e => {
-                  const category = e.target.value;
-                  setSalaryPreview(null);
-                  setErrors({});
-                  setForm(f => ({
-                    ...f, category,
-                    // Salary entries start clean: the amount is worked out, not typed
-                    ...(category === 'Salaries'
-                      ? { amount: '', staffId: '', payMonth: payMonthLabel(new Date()), title: '', paidTo: '' }
-                      : { staffId: '', payMonth: '' }),
-                  }));
-                }}>
-                {['Utilities', 'Rent', 'Maintenance', 'Salaries', 'Supplies', 'Other'].map(c => <option key={c}>{c}</option>)}
-              </select>
-            </div>
-            {!isSalaryEntry && (
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.amount')} *</label>
-                <input type="text" inputMode="numeric" style={{ ...inputStyle, borderColor: errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: digitsOnly(e.target.value) }))} placeholder="0" />
-                {errors.amount && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.amount}</div>}
-              </div>
-            )}
-          </div>
-
-          {isSalaryEntry ? (
-            <>
-              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Staff member *</label>
-                  <select style={{ ...inputStyle, borderColor: errors.staffId ? 'var(--accent-red)' : 'var(--border-subtle)' }}
-                    value={form.staffId}
-                    onChange={e => { const staffId = e.target.value; setForm(f => ({ ...f, staffId })); loadSalaryPreview(staffId, form.payMonth); }}>
-                    <option value="">{t('tasks.selectStaff')}</option>
-                    {staffList.filter(s => s.isActive !== false).map(s => (
-                      <option key={s.id} value={s.id}>{staffName(s)}</option>
-                    ))}
-                  </select>
-                  {errors.staffId && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.staffId}</div>}
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Pay period *</label>
-                  <select style={{ ...inputStyle, borderColor: errors.payMonth ? 'var(--accent-red)' : 'var(--border-subtle)' }}
-                    value={form.payMonth}
-                    onChange={e => { const payMonth = e.target.value; setForm(f => ({ ...f, payMonth })); loadSalaryPreview(form.staffId, payMonth); }}>
-                    {payMonthOptions().map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                  {errors.payMonth && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.payMonth}</div>}
-                </div>
-              </div>
-
-              {salaryPreview && (
-                <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '12px 14px', fontSize: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: 4 }}>
-                    <span>Base salary</span><span>{formatMoney(salaryPreview.basePay)}</span>
-                  </div>
-                  {salaryPreview.bonuses.map((b, i) => (
-                    <div key={`b${i}`} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-green)', marginBottom: 3 }}>
-                      <span>{b.label}{b.recurring ? '' : ' (one time)'}</span><span>+{formatMoney(b.amount)}</span>
-                    </div>
-                  ))}
-                  {salaryPreview.deductions.map((d, i) => (
-                    <div key={`d${i}`} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-red)', marginBottom: 3 }}>
-                      <span>{d.label}{d.recurring ? '' : ' (one time)'}</span><span>-{formatMoney(d.amount)}</span>
-                    </div>
-                  ))}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-subtle)', marginTop: 6, paddingTop: 6, fontWeight: 700, color: 'var(--text-primary)' }}>
-                    <span>Net</span><span>{formatMoney(salaryPreview.net)}</span>
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.amount')} *</label>
-                <input type="text" inputMode="numeric" style={{ ...inputStyle, borderColor: errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)' }}
-                  value={form.amount} onChange={e => setForm(f => ({ ...f, amount: digitsOnly(e.target.value) }))} placeholder="0" />
-                {errors.amount && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.amount}</div>}
-              </div>
-
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--accent-gold-dim)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: 8, padding: '9px 12px', lineHeight: 1.5 }}>
-                This records the pay as issued. It appears under Paystubs, where marking it paid books the salary expense.
-              </div>
-            </>
-          ) : (
-            <>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('tasks.titleLabel')}</label>
-                <input style={{ ...inputStyle, borderColor: errors.title ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder={t('reports.expenseTitlePh')} />
-                {errors.title && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.title}</div>}
-              </div>
-              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.date')} *</label>
-                  <input type="date" style={{ ...inputStyle, borderColor: errors.date ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
-                  {errors.date && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.date}</div>}
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.paidTo')} *</label>
-                  <input style={{ ...inputStyle, borderColor: errors.paidTo ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.paidTo} onChange={e => setForm(f => ({ ...f, paidTo: e.target.value }))} placeholder={t('reports.vendorName')} />
-                  {errors.paidTo && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.paidTo}</div>}
-                </div>
-              </div>
-              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('sales.paymentMethod')}</label>
-                  {/* stored as a code (mobile_money); the list shows the gym's own methods by name */}
-                  <select style={inputStyle} value={PAYMENT_METHODS.find(x => x.api === form.method || x.key === canonicalMethod(form.method))?.key || enabledMethods(gymSettings)[0]?.key} onChange={e => setForm(f => ({ ...f, method: e.target.value }))}>
-                    {enabledMethods(gymSettings).map(m => <option key={m.key} value={m.key}>{t(m.labelKey)}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.recordedBy')}</label>
-                  <select style={inputStyle} value={form.recordedBy} onChange={e => setForm(f => ({ ...f, recordedBy: e.target.value }))}>
-                    <option value="">{t('tasks.selectStaff')}</option>
-                    {staffList.filter(s => s.isActive !== false || staffName(s) === form.recordedBy).map(s => <option key={s.id} value={staffName(s)}>{staffName(s)}</option>)}
-                  </select>
-                </div>
-              </div>
-            </>
-          )}
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.notes')}</label>
-            <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
-          </div>
-          <div style={{ display: isSalaryEntry ? 'none' : 'block' }}>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.attachReceipt')}</label>
-            <input type="file" accept="image/*" onChange={e => {
-              const file = e.target.files[0];
-              if (file) {
-                const reader = new FileReader();
-                reader.onload = ev => setExpenseImagePreview(ev.target.result);
-                reader.readAsDataURL(file);
-              }
-            }} style={{ ...inputStyle, padding: '7px 14px', cursor: 'pointer' }} />
-            {expenseImagePreview && (
-              <div style={{ marginTop: 8, position: 'relative', display: 'inline-block' }}>
-                <img src={expenseImagePreview} alt="Receipt preview" style={{ maxWidth: '100%', maxHeight: 130, borderRadius: 8, border: '1px solid var(--border-subtle)', display: 'block' }} />
-                <button onClick={() => setExpenseImagePreview(null)} style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: '50%', width: 20, height: 20, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
-              </div>
-            )}
-          </div>
-          {errors._api && <div style={{ fontSize: 12, color: 'var(--accent-red)', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '8px 12px' }}>⚠ {errors._api}</div>}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
-            <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
-            {!editingExpense && <button style={secondaryBtn} onClick={() => handleSave(true)}>{t('tasks.saveAndAddAnother')}</button>}
-            <button style={primaryBtn} onClick={() => handleSave(false)}>{isSalaryEntry ? 'Issue Pay' : t('reports.saveExpense')}</button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Expense Detail Modal */}
-      {viewingExpense && (
-        <Modal open={!!viewingExpense} onClose={() => { setViewingExpense(null); setViewError(''); }} title={t('reports.expenseRecord')} maxWidth={500}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              {[
-                [t('common.title'), viewingExpense.title],
-                [t('reports.category'), viewingExpense.category],
-                [t('common.amount'), formatMoney(Number(viewingExpense.amount))],
-                [t('common.date'), viewingExpense.date ? fmtDate(viewingExpense.date) : '-'],
-                [t('reports.paidTo'), viewingExpense.paidTo || '-'],
-                [t('reports.method'), viewingExpense.method || '-'],
-                [t('reports.recordedBy'), viewingExpense.recordedBy || '-'],
-                // Who put it in GEM, and when: taken from whoever was signed in
-                [t('reports.createdBy'), viewingExpense.createdByName
-                  ? `${viewingExpense.createdByName} · ${fmtDate(viewingExpense.createdAt)}`
-                  : '-'],
-              ].map(([label, value]) => (
-                <div key={label} style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>{label}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{value}</div>
-                </div>
-              ))}
-            </div>
-            {viewingExpense.editedByName && (
-              <div style={{ background: 'var(--accent-yellow-dim)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
-                {t('reports.editedStamp', { name: viewingExpense.editedByName, date: fmtDate(viewingExpense.editedAt) })}
-              </div>
-            )}
-            {(viewingExpense.note || viewingExpense.notes) && (
-              <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>{t('common.notes')}</div>
-                <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{viewingExpense.note || viewingExpense.notes}</div>
-              </div>
-            )}
-            {viewingExpense.receipt && (
-              <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 8 }}>{t('reports.receiptPhoto')}</div>
-                <img src={viewingExpense.receipt} alt="Receipt" style={{ width: '100%', borderRadius: 8, border: '1px solid var(--border-subtle)', maxHeight: 300, objectFit: 'contain', background: 'var(--bg-elevated)' }} />
-              </div>
-            )}
-            {viewError && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 10, padding: '10px 14px', fontFamily: 'DM Sans' }}>{viewError}</div>}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
-              {/* Changing the books happens here, with the entry open in front
-                  of you, and each action is confirmed with the owner's code */}
-              {canEditExpenses && (
-                <button style={secondaryBtn} onClick={() => { setViewingExpense(null); openEdit(viewingExpense); }}><Pencil size={13} /> {t('common.edit')}</button>
-              )}
-              {canEditExpenses && (
-                <button
-                  style={{ ...secondaryBtn, color: 'var(--accent-red)', borderColor: 'var(--accent-red)' }}
-                  onClick={() => { const exp = viewingExpense; setViewingExpense(null); setDeleteExpense(exp); setShowDeleteAuthModal(true); }}
-                >
-                  <Trash2 size={13} /> {t('common.delete')}
-                </button>
-              )}
-              <button style={primaryBtn} onClick={() => {
-                const exp = viewingExpense;
-                const receipt = safeImageSrc(exp.receipt);
-                const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(`${t('reports.expenseRecord')} : ${exp.title || ''}`)}</title><style>
-                  body{font-family:Arial,sans-serif;margin:40px;color:#111;max-width:600px}
-                  h1{font-size:20px;margin-bottom:4px}
-                  .sub{font-size:12px;color:#666;margin-bottom:24px}
-                  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
-                  .field label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;display:block;margin-bottom:2px}
-                  .field span{font-size:14px;font-weight:600}
-                  .notes-box{background:#f9f9f9;border-radius:6px;padding:12px;font-size:13px;margin-bottom:24px}
-                  img{max-width:100%;border-radius:6px;border:1px solid #ddd;margin-top:8px}
-                  .footer{margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:12px}
-                </style></head><body>
-                  <h1>${escapeHtml(t('reports.expenseRecord'))}</h1>
-                  <div class="sub">${escapeHtml(t('reports.generatedLabel'))} ${escapeHtml(fmtDate(new Date(), { day: '2-digit', month: 'long', year: 'numeric' }))}</div>
-                  <div class="grid">
-                    <div class="field"><label>${escapeHtml(t('common.title'))}</label><span>${escapeHtml(exp.title || '-')}</span></div>
-                    <div class="field"><label>${escapeHtml(t('reports.category'))}</label><span>${escapeHtml(exp.category || '-')}</span></div>
-                    <div class="field"><label>${escapeHtml(t('common.amount'))}</label><span style="color:#dc2626">${escapeHtml(formatMoney(Number(exp.amount)))}</span></div>
-                    <div class="field"><label>${escapeHtml(t('common.date'))}</label><span>${escapeHtml(fmtDate(exp.date))}</span></div>
-                    <div class="field"><label>${escapeHtml(t('reports.paidTo'))}</label><span>${escapeHtml(exp.paidTo || '-')}</span></div>
-                    <div class="field"><label>${escapeHtml(t('sales.paymentMethod'))}</label><span>${escapeHtml(exp.method || '-')}</span></div>
-                    <div class="field"><label>${escapeHtml(t('reports.recordedBy'))}</label><span>${escapeHtml(exp.recordedBy || '-')}</span></div>
-                  </div>
-                  ${(exp.note || exp.notes) ? `<div class="notes-box"><strong>${escapeHtml(t('common.notes'))}:</strong> ${escapeHtml(exp.note || exp.notes)}</div>` : ''}
-                  ${receipt ? `<div><strong style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888">${escapeHtml(t('reports.receipt'))}</strong><br/><img src="${escapeHtml(receipt)}" /></div>` : ''}
-                  <div class="footer">GEM Gym Management · Expense ID: ${escapeHtml(exp.id)}</div>
-                </body></html>`;
-                openPrintWindow(html, { features: 'width=700,height=900' });
-              }}><Download size={13} /> {t('reports.downloadPdf')}</button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Paystub detail - read-only view of what this pay was made of */}
-      {viewingPaystub && (() => {
-        const p = viewingPaystub;
-        const bd = p.breakdown || null;
-        const basePay = bd?.basePay ?? p.basicPay;
-        const lists = { bonuses: bd?.bonuses || [], deductions: bd?.deductions || [] };
-        const totals = { bonuses: bd?.totalBonuses ?? p.allowances, deductions: bd?.totalDeductions ?? p.deductions };
-        const meta = [
-          [t('reports.payPeriod'), p.month],
-          [t('reports.issuedLabel'), p.issuedAt ? fmtDate(p.issuedAt) : '-'],
-          [t('reports.paidLabel'), p.paidAt ? fmtDate(p.paidAt) : '-'],
-        ];
-        return (
-          <Modal open onClose={() => setViewingPaystub(null)} title={p.staffName} maxWidth={520}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{String(p.role || '').replace(/_/g, ' ')}</span>
-                <StatusPill status={p.status} />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                {meta.map(([label, value]) => (
-                  <div key={label} style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '9px 12px' }}>
-                    <div style={{ fontSize: 9.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 3 }}>{label}</div>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)' }}>{value}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '14px 16px', fontSize: 12.5 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: 'var(--text-secondary)' }}>
-                  <span>{t('reports.basicPay')}</span>
-                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(basePay)}</span>
-                </div>
-                {PAY_KINDS.map(g => {
-                  const items = lists[g.key];
-                  const total = totals[g.key];
-                  if (!items.length && !total) return null;
-                  return (
-                    <div key={g.key} style={{ marginTop: 12 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, color: g.color }}>
-                        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase' }}>{g.title}</span>
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{g.sign}{formatMoney(total)}</span>
-                      </div>
-                      {items.length === 0 ? (
-                        <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4, paddingLeft: 10 }}>{t('reports.notItemised')}</div>
-                      ) : items.map((x, i) => (
-                        <div key={`${g.key}${i}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: 'var(--text-muted)', marginTop: 4, paddingLeft: 10 }}>
-                          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.label}{x.recurring ? '' : ' · one time'}</span>
-                          <span style={{ fontFamily: 'JetBrains Mono, monospace', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{formatMoney(x.amount)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, borderTop: '1px solid var(--border-subtle)', marginTop: 12, paddingTop: 10, fontWeight: 600, color: 'var(--text-secondary)' }}>
-                  <span>{t('staff.payRecorded')}</span>
-                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(p.grossPay)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginTop: 6, fontWeight: 700, color: 'var(--text-primary)' }}>
-                  <span>{t('staff.toHandOver')}</span>
-                  <span style={{ fontSize: 15, fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums', color: 'var(--accent-gold)' }}>{formatMoney(p.netPay)}</span>
-                </div>
-              </div>
-
-              {p.note && (
-                <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px' }}>
-                  <div style={{ fontSize: 9.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>{t('common.notes')}</div>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{p.note}</div>
-                </div>
-              )}
-
-              {canEditPayroll && (
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
-                  <button style={secondaryBtn} onClick={() => { setViewingPaystub(null); openEditPaystub(p); }}><Pencil size={13} /> {t('reports.editPay')}</button>
-                  {p.status !== 'paid' && (
-                    <button style={primaryBtn} onClick={() => { setViewingPaystub(null); requestMarkPaid(p.id); }}>{t('reports.markPaid')}</button>
-                  )}
-                </div>
-              )}
-            </div>
-          </Modal>
-        );
-      })()}
-
-      {/* View / Edit Paystub Modal */}
-      <Modal open={showPaystubModal} onClose={() => { setShowPaystubModal(false); setShowAddDedLine(false); }} title={`${t('reports.paystubs')} : ${editingPaystub?.staffName}`} maxWidth={560}>
-        {editingPaystub && (() => {
-          const lines = paystubDeductionLines[editingPaystub.id] || [];
-          const totalDed = lines.reduce((s, d) => s + d.amount, 0);
-          const basicPay = editingPaystub.basicPay;
-          const allowances = Number(payForm.allowances) || 0;
-          const netPay = basicPay + allowances - totalDed;
-          return (
-            <div>
-              {/* Header info */}
-              <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{editingPaystub.staffName}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{editingPaystub.role} · {editingPaystub.month}</div>
-                  </div>
-                  <StatusPill status={editingPaystub.status} />
-                </div>
-                <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{t('reports.basicPay')}</div>
-                    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '9px 12px', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', opacity: 0.7 }}>{formatMoney(editingPaystub.basicPay)}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{t('reports.allowances')}</div>
-                    <input type="number" value={payForm.allowances ?? editingPaystub.allowances} onChange={e => setPayForm(f => ({ ...f, allowances: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', fontSize: 14, fontWeight: 700 }} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Deductions */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>{t('reports.deductions')}</span>
-                  <button style={{ ...secondaryBtn, padding: '4px 10px', fontSize: 11 }} onClick={() => setShowAddDedLine(v => !v)}>
-                    <Plus size={11} />{showAddDedLine ? t('common.cancel') : t('staff.addDeduction')}
-                  </button>
-                </div>
-                <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, overflow: 'hidden' }}>
-                  {lines.length === 0 && !showAddDedLine && (
-                    <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>{t('staff.noDeductions')}</div>
-                  )}
-                  {lines.map(d => (
-                    <div key={d.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{d.label}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('common.notePrefixColon')} {d.note}</div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-red)' }}>-{formatMoney(d.amount)}</span>
-                        <button onClick={() => setPaystubDeductionLines(prev => ({ ...prev, [editingPaystub.id]: prev[editingPaystub.id].filter(x => x.id !== d.id) }))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }} onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-red)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}><Trash2 size={13} /></button>
-                      </div>
-                    </div>
-                  ))}
-                  {showAddDedLine && (
-                    <div style={{ padding: '12px 16px', borderTop: lines.length > 0 ? '1px solid var(--border-subtle)' : 'none', background: 'rgba(201,169,110,0.04)' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: 8, marginBottom: 8 }}>
-                        <input placeholder={t('staff.deductionLabelPh')} value={newDedLine.label} onChange={e => setNewDedLine(f => ({ ...f, label: e.target.value }))} style={{ ...inputStyle, padding: '7px 10px', fontSize: 12 }} />
-                        <input placeholder={t('staff.amountPh')} type="text" inputMode="numeric" value={newDedLine.amount} onChange={e => setNewDedLine(f => ({ ...f, amount: digitsOnly(e.target.value) }))} style={{ ...inputStyle, padding: '7px 10px', fontSize: 12 }} />
-                      </div>
-                      <div style={{ marginBottom: 8 }}>
-                        <input placeholder={t('staff.deductionNotePh')} value={newDedLine.note} onChange={e => setNewDedLine(f => ({ ...f, note: e.target.value }))} style={{ ...inputStyle, padding: '7px 10px', fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
-                      </div>
-                      <button style={{ ...primaryBtn, padding: '5px 14px', fontSize: 11 }} onClick={() => {
-                        if (!newDedLine.label || !newDedLine.amount || !newDedLine.note) return;
-                        setPaystubDeductionLines(prev => ({
-                          ...prev,
-                          [editingPaystub.id]: [...(prev[editingPaystub.id] || []), { id: Date.now(), label: newDedLine.label, amount: Number(newDedLine.amount), note: newDedLine.note }],
-                        }));
-                        setNewDedLine({ label: '', amount: '', note: '' });
-                        setShowAddDedLine(false);
-                      }}>{t('staff.saveDeduction')}</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Net pay summary */}
-              <div style={{ background: 'linear-gradient(135deg, rgba(201,169,110,0.12), rgba(201,169,110,0.04))', border: '1px solid var(--accent-gold-dim)', borderRadius: 10, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>{t('reports.calcNetPay')}</div>
-                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'Manrope, sans-serif', color: 'var(--accent-gold)' }}>{formatMoney(netPay)}</div>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'right' }}>
-                  <div>{formatMoney(basicPay + allowances)} {t('reports.gross')}</div>
-                  <div>− {formatMoney(totalDed)} {t('reports.deductions').toLowerCase()}</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  {editingPaystub.status === 'paid' && (
-                    <button style={{ ...secondaryBtn, color: 'var(--accent-red)', borderColor: 'var(--accent-red)' }} onClick={() => { requestUnpaid(editingPaystub.id); setShowPaystubModal(false); }}>{t('reports.markUnpaid')}</button>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button style={secondaryBtn} onClick={() => { setShowPaystubModal(false); setShowAddDedLine(false); }}>{t('common.cancel')}</button>
-                  <button style={primaryBtn} onClick={handleSavePaystub}>{t('common.saveChanges')}</button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-      </Modal>
-
-      {/* Settling pay: the figure to hand over is the one that stands out, so
-          nobody hands over the full pay when deductions have been withheld */}
-      <Modal open={!!confirmPaid} onClose={() => setConfirmPaid(null)} title={confirmPaid ? t('reports.settleTitle', { name: confirmPaid.staffName, month: confirmPaid.month }) : ''} maxWidth={420}>
-        {confirmPaid && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ background: 'var(--accent-gold-glow)', border: '1px solid var(--accent-gold-dim)', borderRadius: 12, padding: '16px 18px', textAlign: 'center' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('staff.toHandOver')}</div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--accent-gold)', fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums', marginTop: 4 }}>{formatMoney(confirmPaid.netPay)}</div>
-            </div>
-            <div style={{ fontSize: 12.5, fontFamily: 'DM Sans', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                <span>{t('staff.payRecorded')}</span>
-                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(confirmPaid.grossPay)}</span>
-              </div>
-              {confirmPaid.deductions > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent-red)' }}>
-                  <span>{t('staff.withheldDeductions')}</span>
-                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>−{formatMoney(confirmPaid.deductions)}</span>
-                </div>
-              )}
-            </div>
-            {confirmPaid.deductions > 0 && (
-              <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
-                {t('staff.handOverExplain', { gross: formatMoney(confirmPaid.grossPay), withheld: formatMoney(confirmPaid.deductions), handOver: formatMoney(confirmPaid.netPay) })}
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              <button style={secondaryBtn} onClick={() => setConfirmPaid(null)}>{t('common.cancel')}</button>
-              <button style={primaryBtn} onClick={() => { const id = confirmPaid.id; setConfirmPaid(null); markPaid(id); }}>
-                {t('reports.confirmHandedOver', { amount: formatMoney(confirmPaid.netPay) })}
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      <ManagerAuthModal
-        open={showUnpaidAuth}
-        onClose={() => { setShowUnpaidAuth(false); setPendingUnpaidId(null); }}
-        onConfirm={() => {
-          const id = pendingUnpaidId;
-          setShowUnpaidAuth(false);
-          setPendingUnpaidId(null);
-          if (id) markUnpaid(id);
-        }}
-        action="Reverse a settled salary payment"
-        danger
-      />
-
-      <ManagerAuthModal
-        open={showPaystubAuthModal}
-        onClose={() => setShowPaystubAuthModal(false)}
-        onConfirm={() => { setShowPaystubAuthModal(false); commitSavePaystub(); }}
-        action={t('reports.actionEditPaystub', { name: editingPaystub?.staffName })}
-      />
-
-      <ManagerAuthModal
-        open={showExpenseAuthModal}
-        onClose={() => setShowExpenseAuthModal(false)}
-        onConfirm={() => { setShowExpenseAuthModal(false); commitExpenseSave(pendingExpenseSave); }}
-        action={t('reports.actionEditExpense', { title: editingExpense?.title })}
-      />
-
-      <ManagerAuthModal
-        open={showDeleteAuthModal}
-        onClose={() => { setShowDeleteAuthModal(false); setDeleteExpense(null); }}
-        onConfirm={async () => {
-          setShowDeleteAuthModal(false);
-          const exp = deleteExpense;
-          try {
-            await removeExpense(exp.id);
-            setExpenses(prev => prev.filter(e => e.id !== exp.id));
-          } catch (err) {
-            openView(exp);
-            setViewError(err?.response?.data?.error || t('reports.deleteFailed'));
-          }
-          setDeleteExpense(null);
-        }}
-        action={t('reports.actionDeleteExpense', { title: deleteExpense?.title })}
-        danger
-      />
+      {sharedDialogs}
     </div>
   );
 }

@@ -110,3 +110,47 @@ test('a visitor bundle can be added on a phone', async ({ page }) => {
   await page.getByTitle('Add Bundle').click();
   await expect(page.getByRole('dialog', { name: 'Add Session Bundle' })).toBeVisible();
 });
+
+// F-109, F-110
+test('an expense with its payee can be added and viewed on a phone', async ({ page }) => {
+  const owner = await registerGym();
+  await signIn(page, owner);
+  await page.goto('/accounting');
+  await page.getByTitle('Add Expense').click();
+  const form = page.getByRole('dialog', { name: 'Add Expense' });
+  await form.locator('input[inputmode="numeric"]').first().fill('7500');
+  await form.getByPlaceholder('e.g. Electricity Bill').fill('Phone bill');
+  await form.getByPlaceholder('Vendor name').fill('Telco');
+  await form.locator('input[type="date"]').first().fill(new Date().toISOString().slice(0, 10));
+  await form.getByRole('button', { name: 'Save Expense' }).click();
+  await expect.poll(async () => (await call('GET', '/expenses', { token: owner.token })).some(e => e.title === 'Phone bill' && e.paidTo === 'Telco')).toBe(true);
+  await expect(form).toHaveCount(0);
+
+  // The bottom row's menu sits where the floating + button is; it must still open
+  await page.locator('div').filter({ hasText: 'Phone bill' }).filter({ has: page.getByRole('button', { name: 'Actions' }) }).last().getByRole('button', { name: 'Actions' }).click();
+  await page.getByRole('menuitem', { name: 'View' }).click();
+  await expect(page.getByRole('dialog', { name: 'Expense Record' })).toBeVisible();
+});
+
+test('a paystub can be viewed and settled on a phone', async ({ page }) => {
+  const owner = await registerGym();
+  const staff = await addStaff(owner, { firstName: 'Pat', lastName: 'Payday', role: 'trainer', salary: 90000 });
+  const now = new Date();
+  const month = `${now.toLocaleString('en-US', { month: 'short' })} ${now.getFullYear()}`;
+  const record = await call('POST', '/payroll', { token: owner.token, body: { staffId: staff.id, month } });
+  await signIn(page, owner);
+  await page.goto('/accounting?tab=paystubs');
+  const card = page.locator('div').filter({ hasText: 'Pat Payday' }).filter({ has: page.getByRole('button', { name: 'Actions' }) }).last();
+
+  await card.getByRole('button', { name: 'Actions' }).click();
+  await page.getByRole('menuitem', { name: 'View' }).click();
+  await expect(page.getByRole('dialog', { name: 'Pat Payday' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await card.getByRole('button', { name: 'Actions' }).click();
+  await page.getByRole('menuitem', { name: 'Mark Paid' }).click();
+  const settle = page.getByRole('dialog', { name: `Pay Pat Payday for ${month}` });
+  await expect(settle).toBeVisible();
+  await settle.getByRole('button').last().click();
+  await expect.poll(async () => (await call('GET', `/payroll/staff/${staff.id}`, { token: owner.token })).find(r => r.id === record.id)?.status).toBe('paid');
+});

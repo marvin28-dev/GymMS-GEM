@@ -1,7 +1,12 @@
 import { Plus } from 'lucide-react';
 
+// The button floats over the bottom of the page, so it also leaves that much
+// room under the content: otherwise the last row's 3-dot menu sits under it
+// and cannot be scrolled out from under it.
 export default function FAB({ onClick, icon: Icon = Plus, label }) {
   return (
+    <>
+    <div aria-hidden="true" style={{ height: 64 }} />
     <button
       onClick={onClick}
       title={label}
@@ -33,5 +38,6 @@ export default function FAB({ onClick, icon: Icon = Plus, label }) {
     >
       <Icon size={22} color="#0a0a0f" strokeWidth={2.2} />
     </button>
+    </>
   );
 }
