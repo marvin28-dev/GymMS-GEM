@@ -1,4 +1,4 @@
-﻿import { checkInErrorText } from '../utils/checkin';
+﻿import { checkInErrorText, needsCheckInCode } from '../utils/checkin';
 import { useLiveTick } from '../hooks/useLiveRefresh';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { getCurrencySymbol, formatMoney } from '../utils/currency';
@@ -12,7 +12,6 @@ import MemberStatusTags from '../components/ui/MemberStatusTags';
 import RowMenu from '../components/ui/RowMenu';
 import CodeInput from '../components/ui/CodeInput';
 import VisitKindBadge from '../components/ui/VisitKindBadge';
-import VisitorCodeModal from '../components/ui/VisitorCodeModal';
 import { getAll as getAttendance, checkIn as checkInApi, checkOut as checkOutApi } from '../services/attendance.service';
 import { getAll as getMembers } from '../services/members.service';
 import { getAll as getStaff, findByCode as findStaffByCode } from '../services/staff.service';
@@ -466,7 +465,6 @@ export default function AttendancePage() {
   const [flash, setFlash]                 = useState(null);
   const [showQrScanner, setShowQrScanner] = useState(false);
   const [qrManualInput, setQrManualInput] = useState('');
-  const [visitorCodeOpen, setVisitorCodeOpen] = useState(false);
   const [tableSearch, setTableSearch] = useState('');
   const [codeInput, setCodeInput]   = useState('');
   const [codeError, setCodeError]   = useState('');
@@ -651,12 +649,11 @@ export default function AttendancePage() {
 
   const clearSearch = () => { setSearchTerm(''); setMatches([]); setFoundResult(null); setCheckInError(''); setCodeInput(''); setCodeError(''); };
 
-  // A member with no photo on file can't be verified by sight, so the staff must
-  // enter their access code before checking them in (unless they were already
-  // found BY that code). Members with a photo, and staff, skip this.
+  // A member or visitor with no photo on file can't be verified by sight, so the
+  // staff must enter their access code before checking them in (unless they were
+  // found BY that code). People with a photo, and staff, skip this. Both layouts.
   const needsCodeVerify = foundResult?.type === 'member'
-    && !foundResult.foundByCode
-    && !foundResult.data?.photo;
+    && needsCheckInCode(foundResult.data, { foundByCode: foundResult.foundByCode });
 
   const verifyAndCheckIn = async () => {
     const code = codeInput.trim();
@@ -760,13 +757,9 @@ export default function AttendancePage() {
       await doCheckIn();
       return;
     }
-    const isVisitor = foundResult.data.isVisitor || foundResult.data.status === 'visitor';
-    // Same rule as members: a photo the desk can check by sight lets them straight in
-    if (isVisitor && !foundResult.foundByCode && !foundResult.data.photo) {
-      setVisitorCodeOpen(true);
-    } else {
-      await doCheckIn();
-    }
+    // Without a photo the code comes first, visitors included (verifyAndCheckIn)
+    if (needsCodeVerify) return;
+    await doCheckIn();
   };
 
   const handleCheckOutFromSearch = () => {
@@ -938,7 +931,7 @@ export default function AttendancePage() {
               const code = (isStaff ? '' : d.memberCode) || '';
               const isOut = isStaff && !!foundResult.alreadyIn;
               return (
-                <div style={{ marginTop: 8, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ marginTop: 8, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{name}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{[sub, code].filter(Boolean).join(' · ')}</div>
@@ -947,6 +940,24 @@ export default function AttendancePage() {
                   </div>
                   {foundResult.notClocked ? (
                     <span style={{ fontSize: 11.5, color: 'var(--text-muted)', flexShrink: 0, maxWidth: 150, lineHeight: 1.4 }}>{foundResult.deactivated ? t('attendance.deactivatedNotClocked') : t('attendance.fullTimeNotClocked')}</span>
+                  ) : needsCodeVerify ? (
+                    <div data-code-entry style={{ flexBasis: '100%', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <CodeInput
+                          value={codeInput}
+                          onChange={v => { setCodeInput(v); setCodeError(''); }}
+                          onEnter={verifyAndCheckIn}
+                          placeholder={t('attendance.accessCodePlaceholder')}
+                          style={{ flex: 1, minWidth: 0, background: 'var(--bg-elevated)', border: `1px solid ${codeError ? 'var(--accent-red)' : 'var(--border-subtle)'}`, borderRadius: 8, padding: '9px 12px', fontSize: 16, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none' }}
+                        />
+                        <button onClick={verifyAndCheckIn} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 700, color: '#0a0a0f', cursor: 'pointer', fontFamily: 'DM Sans', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <UserCheck size={15} strokeWidth={2} /> {t('attendance.verifyAndCheckIn')}
+                        </button>
+                      </div>
+                      <span role={codeError ? 'alert' : undefined} style={{ fontSize: 11.5, color: codeError ? 'var(--accent-red)' : 'var(--text-muted)', fontFamily: 'DM Sans' }}>
+                        {codeError ? `⚠ ${codeError}` : t('attendance.noPhotoCodeRequired')}
+                      </span>
+                    </div>
                   ) : (
                     <button
                       onClick={isOut ? handleCheckOutFromSearch : handleCheckIn}
@@ -1414,12 +1425,6 @@ export default function AttendancePage() {
           <div style={{ position:'absolute', top:24, right:24, color:'rgba(255,255,255,0.5)', fontSize:12, fontFamily:'DM Sans' }}>{t('common.clickToClose')}</div>
         </div>
       )}
-      <VisitorCodeModal
-        open={visitorCodeOpen}
-        onClose={() => setVisitorCodeOpen(false)}
-        visitor={foundResult?.type === 'member' ? foundResult.data : null}
-        onSuccess={doCheckIn}
-      />
     </div>
   );
 }

@@ -39,6 +39,10 @@ export function checkInBlockReason(m, t, formatDate) {
 
 export const canCheckIn = (m, t, formatDate) => !checkInBlockReason(m, t, formatDate);
 
+// With no photo to check by sight, the person gives their check-in code first,
+// member or visitor alike. Someone found by typing that code has given it.
+export const needsCheckInCode = (m, { foundByCode = false } = {}) => !foundByCode && !m?.photo;
+
 // How a recorded visit was paid for, in the words and colours every check-in
 // list uses. Visits from before this was recorded have no kind; a visitor's
 // read as a visitor pass, anyone else's as their membership.

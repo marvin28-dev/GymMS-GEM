@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Download, UserPlus, Search, ChevronLeft, ChevronRight, MoreHorizontal, ChevronDown, X, MessageSquare, CreditCard, Check, SquareCheck, Lock, Phone, Eye, UserCheck, Clock, ChevronRight as ArrowRight } from 'lucide-react';
 import RowMenu from '../components/ui/RowMenu';
-import { passesLeft, checkInErrorText } from '../utils/checkin';
+import { passesLeft, checkInErrorText, needsCheckInCode } from '../utils/checkin';
 import { useIsMobile } from '../hooks/useIsMobile';
 import FAB from '../components/FAB';
 import { getAuth, getRole, getPhonePlaceholder, getAddressPlaceholder } from '../utils/auth';
@@ -614,11 +614,13 @@ function MemberCheckinModal({ open, onClose, member, onCheckedIn }) {
   };
 
   const memberPhoto = member.photo || null;
+  // The same photo rule as every check-in: no photo, the code first (F-114)
+  const needsCode = needsCheckInCode(member);
+  const noPasses = isVisitor && passesLeft(member) <= 0;
 
-  if (isVisitor && !codeVerified) {
-    const noPasses = passesLeft(member) <= 0;
+  if (noPasses || (needsCode && !codeVerified)) {
     return (
-      <Modal open={open} onClose={onClose} title={t('members.visitorCheckIn')} maxWidth={380}>
+      <Modal open={open} onClose={onClose} title={isVisitor ? t('members.visitorCheckIn') : t('members.checkInMember')} maxWidth={380}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             {memberPhoto
@@ -626,7 +628,7 @@ function MemberCheckinModal({ open, onClose, member, onCheckedIn }) {
               : <Avatar firstName={member.firstName} lastName={member.lastName} avatarColor={member.avatarColor} size={48} />}
             <div>
               <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)', fontFamily: 'Manrope' }}>{member.firstName} {member.lastName}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{member.memberCode} · {t('members.visitors')} · {passesLeft(member)} {t('members.passesRemaining')}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{isVisitor ? <>{member.memberCode} · {t('members.visitors')} · {passesLeft(member)} {t('members.passesRemaining')}</> : <>{member.memberCode} · {member.package?.name || '-'}</>}</div>
             </div>
           </div>
           {noPasses ? (
@@ -639,7 +641,7 @@ function MemberCheckinModal({ open, onClose, member, onCheckedIn }) {
           ) : (
             <>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                {t('members.askAccessCode')}
+                {isVisitor ? t('members.askAccessCode') : t('attendance.noPhotoCodeRequired')}
               </div>
               <CodeInput
                 autoFocus
