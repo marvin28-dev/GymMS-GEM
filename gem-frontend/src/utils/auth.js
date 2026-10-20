@@ -35,14 +35,21 @@ export function clearAuth() {
   try {
     const auth = getAuth();
     const gymId = auth?.user?.gymId;
+    // Every page's copy of the gym's lists (gem_<page>_<gymId>_...) goes with
+    // the session: on a shared desk computer they hold members' phones,
+    // addresses and balances. Member notes are left alone, because today this
+    // browser holds their only copy.
     if (gymId) {
-      ['members','staff','checkins','payments','events','notifs','packages','gym',
-       'fd_staff','fd_gym'].forEach(k => {
-        localStorage.removeItem(`gem_dash_${gymId}_${k}`);
-      });
+      const scoped = `_${gymId}_`;
+      for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('gem_') && key.includes(scoped)) localStorage.removeItem(key);
+      }
     }
     localStorage.removeItem('gem_fd_staff');
     localStorage.removeItem('gem_fd_gym');
+    // An old, unscoped copy of desk expenses that nothing writes any more
+    localStorage.removeItem('gem_expenses');
   } catch {}
   localStorage.removeItem(KEY);
   localStorage.removeItem('gem_gym_logo');
