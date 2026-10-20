@@ -1,10 +1,13 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import translations from '../i18n/translations';
 
 const LanguageContext = createContext(null);
 
 export function LanguageProvider({ children }) {
   const [lang, setLang] = useState(() => localStorage.getItem('gem-lang') || 'en');
+
+  // The page's own language, so screen readers read French as French
+  useEffect(() => { document.documentElement.lang = lang; }, [lang]);
 
   const switchLang = useCallback((newLang) => {
     setLang(newLang);

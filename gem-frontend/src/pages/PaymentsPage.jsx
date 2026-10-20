@@ -66,23 +66,23 @@ export function TransactionModal({ payment, onClose }) {
       `<div class="row"><span class="label">${escapeHtml(label)}</span><span>${escapeHtml(value ?? '')}</span></div>`;
 
     printReceiptDocument({
-      title: `Receipt ${payment.reference}`,
+      title: `${t('memberProfile.paymentReceiptTitle')} ${payment.reference}`,
       bodyHtml: `
         <h2>${escapeHtml(gym.name.toUpperCase())}</h2>
-        <div class="sub">${escapeHtml(t('payments.paymentReceiptTitle'))}</div>
+        <div class="sub">${escapeHtml(t('memberProfile.paymentReceiptTitle'))}</div>
         <hr/>
-        ${row(t('payments.receiptReference'), payment.reference)}
-        ${row(t('payments.receiptDate'), fmtDate(payment.createdAt || payment.date))}
+        ${row(t('memberProfile.receiptReference'), payment.reference)}
+        ${row(t('memberProfile.receiptDate'), fmtDate(payment.createdAt || payment.date))}
         ${row(t('common.name'), m ? `${m.firstName} ${m.lastName}` : payment.memberId)}
         ${row(t('payments.memberId'), payment.memberId)}
         <hr/>
-        ${row(t('payments.receiptDescription'), payment.note || payment.description || '')}
-        ${row(t('payments.receiptMethod'), methodName(payment.method, t))}
-        ${row(t('payments.receiptRecordedBy'), recordedBy)}
+        ${row(t('memberProfile.receiptDescription'), payment.note || payment.description || '')}
+        ${row(t('memberProfile.receiptMethod'), methodName(payment.method, t))}
+        ${row(t('memberProfile.receiptRecordedBy'), recordedBy)}
         <hr/>
         <div class="amount">${escapeHtml(formatMoney(payment.amount))}</div>
         <div class="status" style="color:${statusColor}">${escapeHtml(payment.status)}</div>
-        <div class="footer">${escapeHtml(t('payments.thankYouReceipt'))}</div>
+        <div class="footer">${escapeHtml(t('memberProfile.thankYouReceipt'))}</div>
         ${gymContactFooterHtml()}
       `,
     });
