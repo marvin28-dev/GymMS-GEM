@@ -11,7 +11,10 @@ test('a visitor with passes counts as active, as on the Members page', async ({ 
   await call('POST', '/members', { token: owner.token, body: { firstName: 'Ada', lastName: 'Active', city: 'Douala', region: 'Littoral', regFeeMethod: 'cash', startDate: day(), endDate: day(30) } });
   await call('POST', '/members', { token: owner.token, body: { firstName: 'Vik', lastName: 'Visitor', city: 'Douala', region: 'Littoral', isVisitor: true, status: 'visitor', passesTotal: 3, passesRemaining: 3, startDate: day(), endDate: day(30), initialPayment: { amount: 3000, method: 'cash' } } });
   await signIn(page, owner);
+  // The count is worked out from the member list, so it is read once that list has come
+  const members = page.waitForResponse(r => /\/api\/members(\?|$)/.test(r.url()) && r.request().method() === 'GET' && r.ok());
   await page.goto('/dashboard');
+  await members;
   await expect(page.getByText('2 active').first()).toBeVisible();
 });
 

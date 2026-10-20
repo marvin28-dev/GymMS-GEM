@@ -12,7 +12,7 @@ test('a refused package save stays in the form with the reason', async ({ page }
   await page.getByRole('button', { name: 'Add Package' }).first().click();
   const dialog = page.getByRole('dialog');
   await dialog.getByPlaceholder('e.g. Premium 12M').fill('Gold Monthly');
-  const amounts = dialog.getByPlaceholder('0.00');
+  const amounts = dialog.getByPlaceholder('0', { exact: true });
   await amounts.nth(0).fill('20000');
   await amounts.nth(1).fill('2000');
   await dialog.getByRole('button', { name: 'Add Package' }).click();
