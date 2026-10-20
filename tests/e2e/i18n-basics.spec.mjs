@@ -25,3 +25,20 @@ test('the Payments receipt prints its labels in the chosen language', async ({ p
   expect(text).toContain('Reçu de paiement');
   expect(text).not.toMatch(/payments\.(receipt|paymentReceipt|thankYou)/);
 });
+
+// F-095: the shared dialogs and buttons speak French too
+test('in French, the confirm dialog, the close button and the + button are French', async ({ page }) => {
+  const owner = await registerGym();
+  await call('POST', '/tasks', { token: owner.token, body: { title: 'Tâche à supprimer', assignedGroup: 'management', dueDate: day(2), category: 'Front Desk', priority: 'Medium' } });
+  await page.addInitScript(() => { if (/^https?:$/.test(location.protocol)) localStorage.setItem('gem-lang', 'fr'); });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, owner);
+  await page.goto('/tasks');
+  await expect(page.getByTitle('Ajouter une tâche')).toBeVisible();
+  await page.getByText('Tâche à supprimer').first().click();
+  await expect(page.getByRole('dialog').getByRole('button', { name: 'Fermer' }).first()).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Supprimer' }).click();
+  const confirm = page.getByRole('dialog', { name: 'Supprimer la tâche' });
+  await expect(confirm.getByRole('button', { name: 'Annuler' })).toBeVisible();
+  await expect(confirm.getByRole('button', { name: 'Cancel' })).toHaveCount(0);
+});

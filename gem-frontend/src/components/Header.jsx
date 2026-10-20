@@ -8,6 +8,7 @@ import { TASKS_PATH } from '../utils/rolePages';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useSessionPhoto } from '../utils/sessionPhoto';
 import GlobalSearch from './GlobalSearch';
+import { roleName } from '../utils/roleNames';
 import LoadFailed from './ui/LoadFailed';
 
 const ROLE_KEYS = {
@@ -44,10 +45,10 @@ export default function Header({ onMenuClick, isMobile: isMobileProp }) {
   const myPhoto = useSessionPhoto();
   const firstName = authUser.firstName || '';
   const lastName = authUser.lastName || '';
-  const displayName = [firstName, lastName].filter(Boolean).join(' ') || 'Manager';
+  const displayName = [firstName, lastName].filter(Boolean).join(' ') || roleName(authUser.role, t);
   const initials = ([firstName[0], lastName[0]].filter(Boolean).join('') || 'ME').toUpperCase();
   const roleKey = ROLE_KEYS[authUser.role];
-  const roleLabel = roleKey ? t(`staff.${roleKey}`) : (authUser.role || 'Manager');
+  const roleLabel = roleKey ? t(`staff.${roleKey}`) : roleName(authUser.role, t);
   const [expandNotifs, setExpandNotifs] = useState(false);
   const [notifsFailed, setNotifsFailed] = useState(false);
 

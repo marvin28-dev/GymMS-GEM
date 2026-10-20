@@ -24,7 +24,7 @@ export function useOpenShifts(enabled = true, { overdueOnly = false } = {}) {
   return openShifts;
 }
 
-const nameOf = (c) => `${c.staff?.firstName || ''} ${c.staff?.lastName || ''}`.trim() || 'A staff member';
+const nameOf = (c, t) => `${c.staff?.firstName || ''} ${c.staff?.lastName || ''}`.trim() || t('common.aStaffMember');
 const clock = (d) => (d ? new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-');
 
 export default function OpenShiftsWarning({ shifts, compact = false }) {
@@ -49,7 +49,7 @@ export default function OpenShiftsWarning({ shifts, compact = false }) {
             : t('attendance.manyStillClockedIn', { n: shifts.length })}
         </div>
         <div style={{ fontSize: compact ? 11 : 12, color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.5 }}>
-          {shifts.map(c => `${nameOf(c)} (${t('attendance.sinceTime', { time: clock(c.punchIn) })})`).join(', ')}
+          {shifts.map(c => `${nameOf(c, t)} (${t('attendance.sinceTime', { time: clock(c.punchIn) })})`).join(', ')}
         </div>
       </div>
     </div>

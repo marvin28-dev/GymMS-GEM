@@ -114,7 +114,7 @@ export default function EodReport({ open, onClose, onPrinted, footer = null }) {
     sales: data.sales.map(s => [fmtTime(s.at), s.items.map(i => `${i.name} ×${i.qty}`).join(', '), methodLabel(s.method), formatMoney(s.total), s.profit == null ? t('eod.noCost') : formatMoney(s.profit)]),
     expenses: data.expenses.map(e => [e.title + (e.pending ? ` (${t('eod.awaitingReview')})` : ''), e.category, e.paidTo || '-', formatMoney(e.amount)]),
     staff: data.staff.map(s => [s.name, s.role ? t(`staff.${({ general_manager: 'generalManager', manager: 'manager', front_desk: 'frontDesk', trainer: 'trainer', other: 'roleOther' })[s.role] || 'roleOther'}`) : '-', s.in ? fmtTime(s.in) : '-', s.open ? t('eod.stillIn') : (s.out ? fmtTime(s.out) : '-')]),
-    issues: data.issues.map(i => [i.equipment + (i.location ? ` (${i.location})` : ''), i.severity, i.status === 'resolved' ? t('eod.fixed') : t('eod.open'), i.reportedToday ? t('eod.reportedToday') : fmtDate(i.reportedAt)]),
+    issues: data.issues.map(i => [i.equipment + (i.location ? ` (${i.location})` : ''), ({ low: t('operations.severityLow'), medium: t('operations.severityMedium'), high: t('operations.severityHigh'), critical: t('operations.severityCritical') })[String(i.severity || '').toLowerCase()] || i.severity || '-', i.status === 'resolved' ? t('eod.fixed') : t('eod.open'), i.reportedToday ? t('eod.reportedToday') : fmtDate(i.reportedAt)]),
   } : {};
   const heads = {
     checkins: [t('eod.time'), t('eod.name'), t('eod.id'), t('eod.type'), ''],

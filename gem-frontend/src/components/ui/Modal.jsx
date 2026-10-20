@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function Modal({ open, onClose, title, children, maxWidth = 560, hideClose = false }) {
+  const { t } = useLanguage();
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; });
   const hideCloseRef = useRef(hideClose);
@@ -83,7 +85,7 @@ export default function Modal({ open, onClose, title, children, maxWidth = 560, 
           {!hideClose && (
           <button
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('common.close')}
             style={{
               background: 'none',
               border: 'none',

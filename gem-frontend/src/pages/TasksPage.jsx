@@ -463,7 +463,7 @@ export default function TasksPage() {
           })}
         </div>
 
-        {!isFitnessRole && <FAB onClick={openAdd} label="Add Task" />}
+        {!isFitnessRole && <FAB onClick={openAdd} label={t('tasks.addTask')} />}
 
         {/* Reuse desktop modal */}
         {showModal && (

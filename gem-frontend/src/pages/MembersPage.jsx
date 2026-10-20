@@ -84,7 +84,7 @@ function AddressFields({ form, set, errors, inp, gymCountry }) {
     <>
       <ModalField label={t('members.houseNumber')}>
         <input autoComplete="off" style={inp(false)} value={form.houseNumber}
-          onChange={e => set('houseNumber', e.target.value)} placeholder="e.g. 12B" />
+          onChange={e => set('houseNumber', e.target.value)} placeholder={t('members.houseNumberPh')} />
       </ModalField>
       <ModalField label={t('members.street')} required error={errors.street}>
         <input autoComplete="street-address" style={inp(errors.street)} value={form.street}
@@ -1935,7 +1935,7 @@ export default function MembersPage() {
         )}
 
         {/* FAB - add member (management/front-desk only) */}
-        {canManage && <FAB onClick={() => setShowAddMember(true)} label="Add Member" />}
+        {canManage && <FAB onClick={() => setShowAddMember(true)} label={t('members.addMember')} />}
 
         {/* Modals */}
         {showAddMember && (

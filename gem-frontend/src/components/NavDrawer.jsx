@@ -7,6 +7,7 @@ import {
 import { getAuth, clearAuth } from '../utils/auth';
 import { pagesFor } from '../utils/rolePages';
 import { useLanguage } from '../contexts/LanguageContext';
+import { roleName } from '../utils/roleNames';
 
 const DRAWER_SECTIONS = [
   {
@@ -164,10 +165,10 @@ export default function NavDrawer({ open, onClose }) {
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>
-              {[firstName, lastName].filter(Boolean).join(' ') || 'Manager'}
+              {[firstName, lastName].filter(Boolean).join(' ') || roleName(userRole, t)}
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>
-              {roleProfile?.name || 'Manager'}
+              {roleName(userRole, t)}
             </div>
           </div>
         </div>

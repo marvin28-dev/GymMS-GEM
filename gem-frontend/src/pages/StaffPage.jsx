@@ -765,7 +765,7 @@ export default function StaffPage() {
           })}
         </div>
 
-        {canAdd && <FAB onClick={openAdd} label="Add Staff" />}
+        {canAdd && <FAB onClick={openAdd} label={t('staff.addStaff')} />}
 
         {modalOpen && (
           <StaffFormModal

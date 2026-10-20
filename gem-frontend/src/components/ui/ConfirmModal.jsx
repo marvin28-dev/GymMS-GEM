@@ -1,4 +1,5 @@
 import Modal from './Modal';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 const primaryBtnStyle = {
   background: 'linear-gradient(135deg, #c9a96e, #b08d4a)',
@@ -42,9 +43,10 @@ export default function ConfirmModal({
   onConfirm,
   title,
   message,
-  confirmLabel = 'Delete',
+  confirmLabel,
   danger = true,
 }) {
+  const { t } = useLanguage();
   return (
     <Modal open={open} onClose={onClose} title={title} maxWidth={420}>
       <p
@@ -60,7 +62,7 @@ export default function ConfirmModal({
       </p>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
         <button style={secondaryBtnStyle} onClick={onClose}>
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           style={danger ? dangerBtnStyle : primaryBtnStyle}
@@ -69,7 +71,7 @@ export default function ConfirmModal({
             onClose();
           }}
         >
-          {confirmLabel}
+          {confirmLabel || t('common.delete')}
         </button>
       </div>
     </Modal>

@@ -16,7 +16,7 @@ export default function AddressInputs({ value = {}, onChange, errors = {}, gymCo
   const set = (k) => (e) => onChange(k, e.target.value);
   return (
     <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-      <GemInput label={t('members.houseNumber')} value={value.houseNumber || ''} onChange={set('houseNumber')} placeholder="e.g. 12B" autoComplete="off" />
+      <GemInput label={t('members.houseNumber')} value={value.houseNumber || ''} onChange={set('houseNumber')} placeholder={t('members.houseNumberPh')} autoComplete="off" />
       <GemInput label={t('members.street')} required error={errors.street} value={value.street || ''} onChange={set('street')} placeholder={getAddressPlaceholder()} autoComplete="street-address" />
       <div>
         <GemInput label={t('common.city')} required error={errors.city} list={`${id}-cities`} value={value.city || ''} onChange={set('city')} placeholder={citiesOf(country)[0] || t('common.city')} autoComplete="address-level2" />

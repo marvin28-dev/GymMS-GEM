@@ -382,7 +382,7 @@ export default function Sidebar({ open, onClose, isMobile }) {
               lineHeight: 1.3,
             }}
           >
-            {[authUser.firstName, authUser.lastName].filter(Boolean).join(' ') || 'Manager'}
+            {[authUser.firstName, authUser.lastName].filter(Boolean).join(' ') || roleLabel}
           </div>
           <div
             style={{
