@@ -720,7 +720,7 @@ export default function SalesPage() {
           </div>
         )}
 
-        <FAB onClick={() => { setEditProduct(null); setShowAddProduct(true); }} label={t('sales.addProduct')} style={{ display: mobileTab === 'products' ? 'flex' : 'none' }} />
+        {mobileTab === 'products' && <FAB onClick={() => { setEditProduct(null); setShowAddProduct(true); }} label={t('sales.addProduct')} />}
         {modals}
       </div>
     );
