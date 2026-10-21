@@ -21,6 +21,7 @@ import { getAll as getPayRecords, setStatus as setPayStatus, create as createPay
 import { previewMonth as previewPay } from '../services/payAdjustments.service';
 import { fmtDate, dayStr, todayStr, payMonthText } from '../utils/date';
 import { expenseCategoryName } from '../utils/expenseCategories';
+import { readStored, store, storeJson, unstore } from '../utils/storage';
 import { revenueOf } from '../utils/revenue';
 import { getAll as getSales } from '../services/sales.service';
 import { useGymSettings } from '../hooks/useGymSettings';
@@ -165,7 +166,7 @@ function loadPaystubExpenseMap() {
   try { return JSON.parse(localStorage.getItem(PAYSTUB_EXPENSE_MAP_KEY) || '{}'); } catch { return {}; }
 }
 function savePaystubExpenseMap(map) {
-  try { localStorage.setItem(PAYSTUB_EXPENSE_MAP_KEY, JSON.stringify(map)); } catch {}
+  storeJson(PAYSTUB_EXPENSE_MAP_KEY, map);
 }
 
 // Front-desk expenses live on the gym record now, not in this browser. A desk
@@ -286,8 +287,8 @@ export default function AccountingPage() {
   const [showDeleteAuthModal, setShowDeleteAuthModal] = useState(false);
 
   const getReceiptKey = (id) => `gem_expense_receipt_${id}`;
-  const loadReceipt = (id) => { try { return localStorage.getItem(getReceiptKey(id)) || null; } catch { return null; } };
-  const saveReceipt = (id, dataUrl) => { try { if (dataUrl) localStorage.setItem(getReceiptKey(id), dataUrl); else localStorage.removeItem(getReceiptKey(id)); } catch {} };
+  const loadReceipt = (id) => readStored(getReceiptKey(id)) || null;
+  const saveReceipt = (id, dataUrl) => (dataUrl ? store(getReceiptKey(id), dataUrl) : unstore(getReceiptKey(id)));
 
   useEffect(() => {
     const onVisible = () => {

@@ -31,7 +31,10 @@ test.describe('on a phone', () => {
   test('a member just added shows in the list at once', async ({ page }) => {
     const owner = await gymWithPackage();
     await signIn(page, owner);
+    // The first load has to finish before reloads are blocked below
+    const firstLoad = page.waitForResponse(r => /\/api\/members(\?|$)/.test(r.url()) && r.request().method() === 'GET');
     await page.goto('/members');
+    await firstLoad;
     await expect(page.getByTitle('Add Member')).toBeVisible();
     // The list must show the new member by itself, not only after the live
     // reload that follows (which this blocks)

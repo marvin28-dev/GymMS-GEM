@@ -1,4 +1,5 @@
 import { getAuth } from './auth';
+import { storeJson } from './storage';
 
 // A per-gym, per-page corner of localStorage behind the "show the last data at
 // once, then refresh quietly" behaviour. A list that fetches on every visit
@@ -27,7 +28,7 @@ export function gymCache(namespace) {
       } catch { return fallback; }
     },
     write(key, val) {
-      try { localStorage.setItem(keyOf(key), JSON.stringify(val)); } catch {}
+      storeJson(keyOf(key), val);
     },
     // Whether anything has ever been cached - drives whether a first visit
     // shows a skeleton or a return visit shows the last data straight away.

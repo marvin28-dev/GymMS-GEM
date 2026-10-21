@@ -14,14 +14,14 @@ import { serverFieldError, fieldErrorStyle, revealFirstError } from '../utils/fo
 //   a note       - what it is about, and the note itself
 // Built for the gym floor on a phone: mostly taps, little typing.
 const decimal = (v) => String(v).replace(',', '.').replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1').slice(0, 7);
-export const SESSION_FOCUS = ['full_body', 'upper', 'lower', 'core', 'cardio', 'strength', 'mobility', 'technique'];
-export const EFFORTS = ['easy', 'moderate', 'hard'];
-export const NOTE_CATEGORIES = ['general', 'injury', 'nutrition', 'motivation'];
+const SESSION_FOCUS = ['full_body', 'upper', 'lower', 'core', 'cardio', 'strength', 'mobility', 'technique'];
+const EFFORTS = ['easy', 'moderate', 'hard'];
+const NOTE_CATEGORIES = ['general', 'injury', 'nutrition', 'motivation'];
 const DURATIONS = [30, 45, 60, 90];
 const MEASURES = [['weight', 'coach.weightKg', 'kg'], ['bodyFat', 'coach.bodyFatPct', '%'], ['waist', 'coach.waistCm', 'cm'], ['hips', 'coach.hipsCm', 'cm'], ['chest', 'coach.chestCm', 'cm']];
 
 // Each popup's own look: its colour, icon, heading and what it is for
-export const KIND_LOOK = {
+const KIND_LOOK = {
   session: { icon: Dumbbell,   color: 'var(--accent-gold)',   dim: 'var(--accent-gold-dim)',   titleKey: 'coach.sessionTitle', hintKey: 'coach.sessionHint', saveKey: 'coach.saveSession' },
   measure: { icon: Ruler,      color: 'var(--accent-blue)',   dim: 'var(--accent-blue-dim)',   titleKey: 'coach.measureTitle', hintKey: 'coach.measureHint', saveKey: 'coach.saveMeasures' },
   note:    { icon: StickyNote, color: 'var(--accent-purple)', dim: 'var(--accent-purple-dim)', titleKey: 'coach.noteTitle',    hintKey: 'coach.noteHint',    saveKey: 'coach.saveNote' },

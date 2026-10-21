@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getCurrencySymbol, formatMoney } from '../utils/currency';
 import { durationText } from '../utils/packageText';
 import { roleName } from '../utils/roleNames';
+import { readStoredJson, storeJson } from '../utils/storage';
 import { digitsOnly } from '../utils/number';
 import { autoPaymentDescription } from '../utils/paymentDescription';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -2399,7 +2400,8 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
   };
 
   // Merge a member record the server returned after an action was applied directly.
-  const reloadMember = async () => { try { const r = await getMemberById(id); if (r?.data) setMember(prev => ({ ...prev, ...r.data })); } catch {} };
+  // A background refresh: if it fails, what is shown stays and the next one tries again
+  const reloadMember = async () => { try { const r = await getMemberById(id); if (r?.data) setMember(prev => ({ ...prev, ...r.data })); } catch { return; } };
   // Merge the record the server returned at once (snappy), then re-fetch so the
   // profile always matches the server after an action like freeze/extend/renew.
   const applyMemberUpdate = (updated) => { if (updated) setMember(m => ({ ...m, ...updated })); reloadMember(); };
@@ -2448,6 +2450,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
   // Notes: localStorage keyed by member id (no DB model). Messages are every
   // email and text this member was really sent.
   const [memberNotes, setMemberNotes] = useState([]);
+  const [notesError, setNotesError] = useState('');
   const [memberMessages, setMemberMessages] = useState([]);
   const [messagesFailed, setMessagesFailed] = useState(false);
   const loadMessages = () => {
@@ -2458,7 +2461,9 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
   };
   useEffect(() => {
     if (!id) return;
-    try { setMemberNotes(JSON.parse(localStorage.getItem(`gem_member_notes_${id}`) || '[]')); } catch {}
+    const stored = readStoredJson(`gem_member_notes_${id}`, []);
+    setMemberNotes(Array.isArray(stored) ? stored : []);
+    setNotesError('');
     loadMessages();
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
   useLiveRefresh(loadMessages, ['communications']);
@@ -3123,6 +3128,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
           </button>
         </div>
       )}
+      {notesError && <div role="alert" style={{ marginBottom: 12, fontSize: 12.5, lineHeight: 1.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 10, padding: '10px 12px' }}>{notesError}</div>}
       {memberNotes.length === 0 ? (
         <div style={cardStyle}>
           <EmptyState icon={StickyNote} title={t('memberProfile.noNotesTitle')} hint={t('memberProfile.noNotesHint')} />
@@ -3438,8 +3444,9 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
         onSave={(form) => {
           const note = { date: fmtDate(new Date()), content: form.note, category: form.category, author: [getAuth()?.user?.firstName, getAuth()?.user?.lastName].filter(Boolean).join(' ') || roleName(getRole(), t) };
           const updated = [note, ...memberNotes];
-          setMemberNotes(updated);
-          try { localStorage.setItem(`gem_member_notes_${id}`, JSON.stringify(updated)); } catch {}
+          setNotesError('');
+          if (storeJson(`gem_member_notes_${id}`, updated)) setMemberNotes(updated);
+          else setNotesError(t('memberProfile.noteNotKept'));
         }} />
       <SendMessageModal open={showMessageModal} onClose={() => setShowMessageModal(false)} members={member ? [member] : []}
         onSent={() => setTimeout(loadMessages, 800)} />

@@ -366,6 +366,9 @@ const translations = {
     },
     idle: { title: 'Are you still there?', body1: 'You’ve been inactive for a while.', body2: 'For your security, you’ll be logged out automatically.', secondsLeft: 'seconds remaining', logOut: 'Log out', stay: 'Yes, I’m still here' },
     common: {
+      crashTitle: 'Something went wrong',
+      crashText: 'This screen ran into a problem. Reload to carry on: what was already saved is kept.',
+      reload: 'Reload',
       eg: 'e.g. {x}',
       unassigned: 'Unassigned',
       preview: 'Preview',
@@ -1601,6 +1604,7 @@ const translations = {
       "notNow": "Not now",
     },
     memberProfile: {
+      noteNotKept: 'The note could not be kept: this browser refused to store it. Notes live only on this computer for now.',
       paymentSaveFailed: 'Failed to save payment.',
       paymentFailedRetry: 'Payment failed. Try again.',
       regFeeRenewalDesc: 'Annual registration fee renewal',
@@ -2635,6 +2639,9 @@ const translations = {
     },
     idle: { title: 'Êtes-vous toujours là ?', body1: 'Vous êtes inactif depuis un moment.', body2: 'Pour votre sécurité, vous serez déconnecté automatiquement.', secondsLeft: 'secondes restantes', logOut: 'Se déconnecter', stay: 'Oui, je suis là' },
     common: {
+      crashTitle: 'Une erreur est survenue',
+      crashText: 'Cet écran a rencontré un problème. Rechargez pour continuer : ce qui était déjà enregistré est conservé.',
+      reload: 'Recharger',
       eg: 'ex. {x}',
       unassigned: 'Non attribué',
       preview: 'Aperçu',
@@ -3872,6 +3879,7 @@ const translations = {
       "notNow": "Pas maintenant",
     },
     memberProfile: {
+      noteNotKept: 'La note n’a pas pu être gardée : ce navigateur a refusé de l’enregistrer. Les notes ne sont pour l’instant gardées que sur cet ordinateur.',
       paymentSaveFailed: 'Impossible d’enregistrer le paiement.',
       paymentFailedRetry: 'Le paiement a échoué. Réessayez.',
       regFeeRenewalDesc: 'Renouvellement annuel des frais d’inscription',

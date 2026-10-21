@@ -2,12 +2,13 @@
 import { useState, useEffect } from 'react';
 import { getCurrencySymbol, formatMoney } from '../utils/currency';
 import { durationText, sessionsText } from '../utils/packageText';
+import { storeJson } from '../utils/storage';
 import { Plus, Pencil, Trash2, Eye, Users } from 'lucide-react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import FAB from '../components/FAB';
 import { useLanguage } from '../contexts/LanguageContext';
 import Modal from '../components/ui/Modal';
-import { ACCESS_TYPES_KEY, DEFAULT_ACCESS_TYPES } from './SettingsPage';
+import { ACCESS_TYPES_KEY, DEFAULT_ACCESS_TYPES } from '../utils/accessTypes';
 import { useGymSettings, legacyList } from '../hooks/useGymSettings';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import ManagerAuthModal from '../components/ui/ManagerAuthModal';
@@ -72,7 +73,7 @@ export default function PackagesPage() {
         setPackages(pkgsRes.data || []);
         const mem = membersRes.data || [];
         setMembersList(mem);
-        try { localStorage.setItem(cacheKey('members'), JSON.stringify(mem)); } catch {}
+        storeJson(cacheKey('members'), mem);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -82,7 +83,7 @@ export default function PackagesPage() {
   // Keep the cache in step with the list, so creating, editing or deleting a
   // package is reflected the next time the page opens, not just the fetch.
   useEffect(() => {
-    try { localStorage.setItem(cacheKey('packages'), JSON.stringify(packages)); } catch {}
+    storeJson(cacheKey('packages'), packages);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [packages]);
 

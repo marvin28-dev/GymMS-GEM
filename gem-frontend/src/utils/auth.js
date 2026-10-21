@@ -1,6 +1,7 @@
 import { countryByName } from './countries';
 import { pagesFor } from './rolePages';
 import { todayStr } from './date';
+import { readStoredJson, store, storeJson, storedKeys, unstore } from './storage';
 
 const KEY          = 'gem_auth';
 const ACTIVITY_KEY = 'gem_last_activity';
@@ -29,32 +30,26 @@ export function setAuth(payload) {
   // was chosen used to land the new account straight on "Are you still there?".
   touchActivity();
   // Signing in says where the gym is, which is what the forms suggest from
-  try {
-    const country = payload?.user?.gymCountry;
-    if (country) localStorage.setItem(COUNTRY_KEY, country);
-  } catch {}
+  const country = payload?.user?.gymCountry;
+  if (country) store(COUNTRY_KEY, country);
 }
 
 export function clearAuth() {
-  try {
-    const auth = getAuth();
-    const gymId = auth?.user?.gymId;
-    // Every page's copy of the gym's lists (gem_<page>_<gymId>_...) goes with
-    // the session: on a shared desk computer they hold members' phones,
-    // addresses and balances. Member notes are left alone, because today this
-    // browser holds their only copy.
-    if (gymId) {
-      const scoped = `_${gymId}_`;
-      for (let i = localStorage.length - 1; i >= 0; i -= 1) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('gem_') && key.includes(scoped)) localStorage.removeItem(key);
-      }
+  const gymId = getAuth()?.user?.gymId;
+  // Every page's copy of the gym's lists (gem_<page>_<gymId>_...) goes with
+  // the session: on a shared desk computer they hold members' phones,
+  // addresses and balances. Member notes are left alone, because today this
+  // browser holds their only copy.
+  if (gymId) {
+    const scoped = `_${gymId}_`;
+    for (const key of storedKeys()) {
+      if (key.startsWith('gem_') && key.includes(scoped)) unstore(key);
     }
-    localStorage.removeItem('gem_fd_staff');
-    localStorage.removeItem('gem_fd_gym');
-    // An old, unscoped copy of desk expenses that nothing writes any more
-    localStorage.removeItem('gem_expenses');
-  } catch {}
+  }
+  unstore('gem_fd_staff');
+  unstore('gem_fd_gym');
+  // An old, unscoped copy of desk expenses that nothing writes any more
+  unstore('gem_expenses');
   localStorage.removeItem(KEY);
   localStorage.removeItem('gem_gym_logo');
   // Superseded by columns on the gym record - cleared so stale values from a
@@ -181,17 +176,15 @@ export function getGymCurrency() {
 // Everything the gym record says about where it is and what it charges in.
 // Called after Settings saves so the change is felt without signing in again.
 export function updateSessionGym(gym) {
-  try {
-    const auth = getAuth();
-    if (!auth?.user || !gym) return;
-    const next = { ...auth, user: { ...auth.user } };
-    if (gym.country !== undefined) next.user.gymCountry = gym.country || null;
-    if (gym.city !== undefined) next.user.gymCity = gym.city || null;
-    if (gym.currency !== undefined) next.user.gymCurrency = gym.currency || null;
-    if (gym.name !== undefined) next.user.gymName = gym.name || null;
-    localStorage.setItem(KEY, JSON.stringify(next));
-    if (gym.country) localStorage.setItem(COUNTRY_KEY, gym.country);
-  } catch {}
+  const auth = getAuth();
+  if (!auth?.user || !gym) return;
+  const next = { ...auth, user: { ...auth.user } };
+  if (gym.country !== undefined) next.user.gymCountry = gym.country || null;
+  if (gym.city !== undefined) next.user.gymCity = gym.city || null;
+  if (gym.currency !== undefined) next.user.gymCurrency = gym.currency || null;
+  if (gym.name !== undefined) next.user.gymName = gym.name || null;
+  storeJson(KEY, next);
+  if (gym.country) store(COUNTRY_KEY, gym.country);
 }
 
 // A street address the way people in that country write one. Falls back to
@@ -201,7 +194,12 @@ export function getAddressPlaceholder() {
 }
 
 export function setPhoneFormat(dial, placeholder) {
-  try { localStorage.setItem(PHONE_FORMAT_KEY, JSON.stringify({ dial, placeholder })); } catch {}
+  storeJson(PHONE_FORMAT_KEY, { dial, placeholder });
+}
+
+// An old browser may not say which time zone it is in
+function browserTimeZone() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; }
 }
 
 const TZ_PHONE = {
@@ -225,15 +223,10 @@ export function getPhonePlaceholder() {
   // because the browser happens to sit in another time zone.
   const home = countryByName(getGymCountry());
   if (home) return `${home.dial} ${home.placeholder}`;
-  try {
-    const fmt = JSON.parse(localStorage.getItem(PHONE_FORMAT_KEY) || 'null');
-    if (fmt?.dial && fmt?.placeholder) return `${fmt.dial} ${fmt.placeholder}`;
-  } catch {}
-  try {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const fmt = TZ_PHONE[tz];
-    if (fmt) return `${fmt.dial} ${fmt.placeholder}`;
-  } catch {}
+  const saved = readStoredJson(PHONE_FORMAT_KEY, null);
+  if (saved?.dial && saved?.placeholder) return `${saved.dial} ${saved.placeholder}`;
+  const fmt = TZ_PHONE[browserTimeZone()];
+  if (fmt) return `${fmt.dial} ${fmt.placeholder}`;
   return 'Phone number';
 }
 

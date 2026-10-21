@@ -148,6 +148,14 @@ const ROLE_LABEL = {
 const ROLE_ORDER = ['Manager', 'Front Desk', 'Trainer', 'Other'];
 const roleLabelFor = (role) => ROLE_LABEL[role] || role || '';
 
+const SectionHeader = ({ title }) => (
+  <div style={{
+    fontSize: 11, textTransform: 'uppercase', letterSpacing: '1.5px',
+    color: 'var(--text-muted)', fontWeight: 600, marginTop: 6,
+    paddingBottom: 8, borderBottom: '1px solid var(--border-subtle)',
+  }}>{title}</div>
+);
+
 // ─── Staff Form Modal ─────────────────────────────────────────────────────────
 function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveError, saveField }) {
   const { t } = useLanguage();
@@ -269,14 +277,6 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
     fontFamily: 'DM Sans, sans-serif',
     fontWeight: 500,
   };
-
-  const SectionHeader = ({ title }) => (
-    <div style={{
-      fontSize: 11, textTransform: 'uppercase', letterSpacing: '1.5px',
-      color: 'var(--text-muted)', fontWeight: 600, marginTop: 6,
-      paddingBottom: 8, borderBottom: '1px solid var(--border-subtle)',
-    }}>{title}</div>
-  );
 
   return (
     <Modal open={open} onClose={onClose} title={mode === 'edit' ? t('staff.editStaff') : t('staff.addStaff')} maxWidth={620}>

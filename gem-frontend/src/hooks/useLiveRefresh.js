@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { LIVE_CHANGED } from '../utils/events';
 
 // Re-runs a screen's loader when another screen changes data it shows. With no
@@ -7,7 +7,7 @@ import { LIVE_CHANGED } from '../utils/events';
 // into view catches up on what it missed while hidden.
 export default function useLiveRefresh(reload, resources = null) {
   const fn = useRef(reload);
-  fn.current = reload;
+  useLayoutEffect(() => { fn.current = reload; });
   const wanted = resources ? resources.join(',') : '';
   useEffect(() => {
     let timer = null;

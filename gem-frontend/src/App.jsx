@@ -1,5 +1,5 @@
 import { startLive } from './utils/live';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
@@ -93,7 +93,7 @@ const WARNING_SECONDS = 30;
 function useInactivityLogout() {
   const navigate = useNavigate();
   const navRef = useRef(navigate);
-  navRef.current = navigate;
+  useLayoutEffect(() => { navRef.current = navigate; });
 
   const [showWarning, setShowWarning] = useState(false);
   const [countdown, setCountdown] = useState(WARNING_SECONDS);
@@ -279,8 +279,10 @@ function InactivityWarning({ countdown, onStay, onLogout }) {
 /* ─────────────────────────────────────────────────────────────────
    App root
    ───────────────────────────────────────────────────────────────── */
+// The app restores its own scroll position on navigation; set once, at load
+if (typeof history !== 'undefined' && 'scrollRestoration' in history) history.scrollRestoration = 'manual';
+
 export default function App() {
-  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   const { showWarning, countdown, stayLoggedIn, logoutNow } = useInactivityLogout();
   useSessionCheck();
   useOneAccountPerBrowser();

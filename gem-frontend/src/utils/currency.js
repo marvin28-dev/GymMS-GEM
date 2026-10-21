@@ -40,7 +40,7 @@ export function symbolGoesFirst() {
 export const formatMoney = (amount) => {
   // fr-FR groups thousands with a narrow no-break space (U+202F) some fonts have
   // no glyph for, which shows as a stray mark; normalise to a plain space.
-  const n = Math.round(Number(amount) || 0).toLocaleString(getMoneyLocale()).replace(/[  ]/g, ' ');
+  const n = Math.round(Number(amount) || 0).toLocaleString(getMoneyLocale()).replace(/[\u202F\u00A0]/g, ' ');
   const symbol = getCurrencySymbol();
   return symbolGoesFirst() ? `${symbol}${n}` : `${n} ${symbol}`;
 };

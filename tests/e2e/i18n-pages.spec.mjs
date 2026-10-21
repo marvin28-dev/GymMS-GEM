@@ -264,8 +264,9 @@ test('in French, the Payments form gives its examples in French', async ({ page 
   await expect(async () => {
     await form.getByPlaceholder('Nom ou code membre...').fill('');
     await form.getByPlaceholder('Nom ou code membre...').fill('Exemple');
-    await form.getByText('Ines Exemple').first().click({ timeout: 1000 });
+    await expect(form.getByText('Ines Exemple').first()).toBeVisible({ timeout: 1000 });
   }).toPass();
+  await form.getByText('Ines Exemple').first().click();
   await expect(form.getByPlaceholder('ex. Renouvellement Premium 12M')).toBeVisible();
   await expect(form.getByPlaceholder(/^e\.g\./)).toHaveCount(0);
 });

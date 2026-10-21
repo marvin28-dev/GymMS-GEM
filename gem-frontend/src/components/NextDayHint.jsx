@@ -12,7 +12,7 @@ const minutes = (hhmm) => {
 };
 
 // True when the end time is at or before the start, so it must mean tomorrow
-export function crossesMidnight(start, end) {
+function crossesMidnight(start, end) {
   const a = minutes(start);
   const b = minutes(end);
   return a !== null && b !== null && b <= a;

@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useLanguage } from '../contexts/LanguageContext';
-import OpenShiftsWarning, { useOpenShifts } from '../components/OpenShiftsWarning';
+import OpenShiftsWarning from '../components/OpenShiftsWarning';
+import useOpenShifts from '../hooks/useOpenShifts';
 import {
   FileText,
   UserCheck,

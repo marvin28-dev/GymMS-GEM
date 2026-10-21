@@ -50,6 +50,7 @@ import NotificationBell from '../components/NotificationBell';
 import TaskAssigneeField from '../components/TaskAssigneeField';
 import { assignFields, assigneeName } from '../utils/departments';
 import { expenseCategoryName } from '../utils/expenseCategories';
+import { storeJson } from '../utils/storage';
 import { TASK_CATEGORIES } from '../utils/taskCategories';
 import { gymCache } from '../utils/gymCache';
 import { fieldErrorStyle, serverFieldError } from '../utils/formErrors';
@@ -594,12 +595,12 @@ export default function FrontDeskPage() {
     getStaff().then(sRes => {
       const data = sRes.data || [];
       setStaffList(data);
-      try { localStorage.setItem('gem_fd_staff', JSON.stringify(data)); } catch {}
+      storeJson('gem_fd_staff', data);
     }).catch(console.error);
     getMyGym().then(gymRes => {
       const data = gymRes.data || null;
       setGymData(data);
-      try { localStorage.setItem('gem_fd_gym', JSON.stringify(data)); } catch {}
+      storeJson('gem_fd_gym', data);
     }).catch(console.error);
 
     const today = getTodayStr();

@@ -49,6 +49,14 @@ const STATUS_META = {
 
 const METHOD_ICONS = { cash: Banknote, card: CreditCard, bank_transfer: ArrowLeftRight, mobile_money: CreditCard };
 
+// One label / value line of the payment details
+const Row = ({ label, value }) => (
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+    <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{label}</span>
+    <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans', fontWeight: 500 }}>{value}</span>
+  </div>
+);
+
 export function TransactionModal({ payment, onClose }) {
   const { t } = useLanguage();
   if (!payment) return null;
@@ -87,13 +95,6 @@ export function TransactionModal({ payment, onClose }) {
       `,
     });
   };
-
-  const Row = ({ label, value }) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{label}</span>
-      <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans', fontWeight: 500 }}>{value}</span>
-    </div>
-  );
 
   return (
     <Modal open={!!payment} onClose={onClose} title={t('payments.transactionDetails')} maxWidth={460}>

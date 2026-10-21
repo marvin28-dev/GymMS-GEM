@@ -31,6 +31,7 @@ import { TransactionModal } from './PaymentsPage';
 
 import { getAuth, getRole } from '../utils/auth';
 import { roleName } from '../utils/roleNames';
+import { storeJson } from '../utils/storage';
 import { getAll as getAttendance, checkIn as checkInApi } from '../services/attendance.service';
 import { getAll as getPayments, create as createPayment } from '../services/payments.service';
 import { getAll as getCalendar } from '../services/calendar.service';
@@ -39,7 +40,8 @@ import { getAll as getStaff } from '../services/staff.service';
 import { create as createTask } from '../services/tasks.service';
 import { create as createEquipmentIssue } from '../services/equipment.service';
 import { getAll as getPackages } from '../services/packages.service';
-import OpenShiftsWarning, { useOpenShifts } from '../components/OpenShiftsWarning';
+import OpenShiftsWarning from '../components/OpenShiftsWarning';
+import useOpenShifts from '../hooks/useOpenShifts';
 import { getMyGym } from '../services/gym.service';
 import { TASK_CATEGORIES } from '../utils/taskCategories';
 import { assignFields } from '../utils/departments';
@@ -1003,7 +1005,7 @@ function GymDashboard() {
   const gymId = auth?.user?.gymId || 'default';
   const cacheKey = (k) => `gem_dash_${gymId}_${k}`;
   const cache = (key, fallback) => { try { const v = JSON.parse(localStorage.getItem(cacheKey(key)) || 'null'); if (v == null) return fallback; if (Array.isArray(fallback) && !Array.isArray(v)) return fallback; return v; } catch { return fallback; } };
-  const setCache = (key, val) => { try { localStorage.setItem(cacheKey(key), JSON.stringify(val)); } catch {} };
+  const setCache = (key, val) => storeJson(cacheKey(key), val);
 
   const [membersList, setMembersList] = useState(() => cache('members', []));
   const [staffList, setStaffList] = useState(() => cache('staff', []));

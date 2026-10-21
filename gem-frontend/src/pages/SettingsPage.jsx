@@ -17,6 +17,8 @@ import TimeInput from '../components/ui/TimeInput';
 import LoadFailed from '../components/ui/LoadFailed';
 import { PAYMENT_METHODS } from '../utils/paymentMethods';
 import { capFirst, getDateLocale } from '../utils/date';
+import { DEFAULT_ACCESS_TYPES, ACCESS_TYPES_KEY } from '../utils/accessTypes';
+import { store, unstore } from '../utils/storage';
 
 const cardStyle = { background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, boxShadow: 'var(--shadow-card)' };
 const primaryBtn = { background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', color: '#0a0a0f', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '8px 16px', cursor: 'pointer', fontFamily: 'DM Sans', display: 'inline-flex', alignItems: 'center', gap: 6 };
@@ -50,12 +52,9 @@ const SECTIONS = [
   { id: 'logs' },
 ];
 
-export const DEFAULT_ACCESS_TYPES = ['Full Access', 'Gym Only', 'Classes Only', 'Full Access + Classes', 'Pool Access', 'Premium (All-Inclusive)'];
-
 const SETUP_VISITED_KEY = 'gem_settings_visited';
 // Sections that show a dot until visited/configured
 const SETUP_SECTIONS = new Set(['gym-profile', 'payment', 'membership', 'packages', 'notifications']);
-export const ACCESS_TYPES_KEY = 'gem_access_types';
 const REQUIRED_CONFIRMS = ['gym-profile', 'payment', 'membership', 'packages', 'notifications'];
 
 const THEMES = [
@@ -263,7 +262,7 @@ export default function SettingsPage() {
     try {
       // Persist to the gym record so it shows on the login screen and other devices
       await updateMyGym({ logo: dataUrl });
-      try { localStorage.setItem(LOGO_KEY, dataUrl); } catch {}
+      store(LOGO_KEY, dataUrl);
     } catch (err) {
       // Not saved, so the logo the gym really has stays on screen
       setLogoPreview(before);
@@ -278,7 +277,7 @@ export default function SettingsPage() {
     if (logoInputRef.current) logoInputRef.current.value = '';
     try {
       await updateMyGym({ logo: null });
-      try { localStorage.removeItem(LOGO_KEY); } catch {}
+      unstore(LOGO_KEY);
     } catch {
       // Still on the gym record, so it stays on screen
       setLogoPreview(before);
@@ -344,7 +343,7 @@ export default function SettingsPage() {
         settings: { freeze: { fee: Number(freezeFee.fee) || 0, intervalDays: Number(freezeFee.intervalDays) || 0 } },
       });
       notifyDataChanged();
-      try { localStorage.setItem('gem_auto_renew', String(autoRenew)); } catch {}
+      store('gem_auto_renew', String(autoRenew));
       markConfirmed('membership');
       snapshotRegFee();
       setRegFeeSaved(true);
@@ -451,10 +450,8 @@ export default function SettingsPage() {
         setGymCode(g.code || '');
         // The gym record is the source of truth for the whole profile
         setLogoPreview(g.logo || null);
-        try {
-          if (g.logo) localStorage.setItem(LOGO_KEY, g.logo);
-          else localStorage.removeItem(LOGO_KEY);
-        } catch {}
+        if (g.logo) store(LOGO_KEY, g.logo);
+        else unstore(LOGO_KEY);
         const loaded = {
           name: g.name || '',
           email: g.email || '',
