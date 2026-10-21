@@ -11,7 +11,6 @@ import { getRole } from '../utils/auth';
 export default function AppLayout() {
   const { pathname } = useLocation();
   const isMobile = useIsMobile();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   // An account with only its own profile has nothing to put in a menu
   const navigable = hasNavigation(getRole());
@@ -20,7 +19,7 @@ export default function AppLayout() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         {/* Mobile top bar: just branding + bell + avatar */}
-        <Header onMenuClick={navigable ? () => setDrawerOpen(true) : undefined} isMobile={true} />
+        <Header isMobile={true} />
 
         {/* Nav drawer slides in from left */}
         {navigable && <NavDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />}
@@ -59,10 +58,7 @@ export default function AppLayout() {
           minWidth: 0,
         }}
       >
-        <Header
-          onMenuClick={navigable ? () => setSidebarOpen(o => !o) : undefined}
-          isMobile={false}
-        />
+        <Header isMobile={false} />
         <main
           key={pathname}
           data-tour="main-content"

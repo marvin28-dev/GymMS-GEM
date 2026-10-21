@@ -66,26 +66,34 @@ export default function NotificationBell({ onOpenLink }) {
 
   const unread = items.filter(n => !n.isRead).length;
 
+  const [actionError, setActionError] = useState('');
+  const failed = (err) => setActionError(err?.response?.data?.error || t('memberProfile.actionFailed'));
+
   const openList = async () => {
     const next = !open;
     setOpen(next);
+    setActionError('');
     if (next && unread) {
+      // Opening the list reads it; if the server did not record that, they stay unread
+      const before = items;
       setItems(list => list.map(n => ({ ...n, isRead: true })));
-      markAllRead().catch(() => {});
+      markAllRead().catch(() => setItems(before));
     }
   };
 
   // Clears this person's own list; a gym-wide notice stays for everyone else
   const clearAll = async () => {
+    setActionError('');
     const previous = items;
     setItems([]);
-    try { await removeAll(); } catch { setItems(previous); }
+    try { await removeAll(); } catch (err) { setItems(previous); failed(err); }
   };
 
   const dismiss = async (id) => {
+    setActionError('');
     const previous = items;
     setItems(list => list.filter(n => n.id !== id));
-    try { await removeNotif(id); } catch { setItems(previous); }
+    try { await removeNotif(id); } catch (err) { setItems(previous); failed(err); }
   };
 
   return (
@@ -124,6 +132,9 @@ export default function NotificationBell({ onOpenLink }) {
               </button>
             )}
           </div>
+          {actionError && (
+            <div role="alert" style={{ padding: '8px 14px', fontSize: 12, lineHeight: 1.4, color: 'var(--accent-red)', fontFamily: 'DM Sans', borderBottom: '1px solid var(--border-subtle)' }}>{actionError}</div>
+          )}
           {items.length === 0 ? (loadFailed ? (
             <div style={{ padding: 12 }}><LoadFailed message={t('notifications.loadFailed')} onRetry={refresh} /></div>
           ) : (

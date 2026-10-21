@@ -32,7 +32,7 @@ function formatNotifTime(iso, t) {
   return t('common.daysAgoShort', { n: Math.floor(hrs / 24) });
 }
 
-export default function Header({ onMenuClick, isMobile: isMobileProp }) {
+export default function Header({ isMobile: isMobileProp }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const isMobileHook = useIsMobile();
@@ -51,6 +51,8 @@ export default function Header({ onMenuClick, isMobile: isMobileProp }) {
   const roleLabel = roleKey ? t(`staff.${roleKey}`) : roleName(authUser.role, t);
   const [expandNotifs, setExpandNotifs] = useState(false);
   const [notifsFailed, setNotifsFailed] = useState(false);
+  const [notifActionError, setNotifActionError] = useState('');
+  const notifFailed = (err) => setNotifActionError(err?.response?.data?.error || t('memberProfile.actionFailed'));
 
   // The header never unmounts, so fetching once on mount meant a new
   // notification only appeared after a full page reload.
@@ -104,19 +106,23 @@ export default function Header({ onMenuClick, isMobile: isMobileProp }) {
   }, []);
 
   const markAllRead = async () => {
-    try { await apiMarkAllRead(); } catch (_) {}
-    setNotifs(n => n.map(x => ({ ...x, unread: false })));
+    setNotifActionError('');
+    try {
+      await apiMarkAllRead();
+      setNotifs(n => n.map(x => ({ ...x, unread: false })));
+    } catch (err) { notifFailed(err); }
   };
   // These have to reach the server. Dropping them from local state alone meant
   // the next fetch brought every one of them straight back.
   const clearAll = async () => {
+    setNotifActionError('');
     const previous = notifs;
     setNotifs([]);
     try {
       await removeAllNotifs();
     } catch (err) {
-      console.error('Failed to clear notifications:', err);
       setNotifs(previous);
+      notifFailed(err);
     }
   };
 
@@ -135,8 +141,8 @@ export default function Header({ onMenuClick, isMobile: isMobileProp }) {
     try {
       await removeNotif(id);
     } catch (err) {
-      console.error('Failed to dismiss notification:', err);
       setNotifs(previous);
+      notifFailed(err);
     }
   };
 
@@ -279,6 +285,9 @@ export default function Header({ onMenuClick, isMobile: isMobileProp }) {
                 )}
               </div>
 
+              {notifActionError && (
+                <div role="alert" style={{ padding: '8px 16px', fontSize: 12, lineHeight: 1.4, color: 'var(--accent-red)', fontFamily: 'DM Sans', borderBottom: '1px solid var(--border-subtle)' }}>{notifActionError}</div>
+              )}
               {/* Items */}
               <div style={{ maxHeight: expandNotifs ? 520 : 280, overflowY: 'auto', transition: 'max-height 0.25s ease' }}>
                 {notifs.length === 0 && notifsFailed && (
