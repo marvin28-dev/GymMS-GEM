@@ -1,7 +1,7 @@
 import { useLiveTick } from '../hooks/useLiveRefresh';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, CreditCard, ClipboardList, Package, Settings, Bell, Trash2, Check, ChevronRight, Eye } from 'lucide-react';
+import { User, CreditCard, ClipboardList, Package, Settings, Bell, Trash2, Check, Eye } from 'lucide-react';
 import RowMenu from '../components/ui/RowMenu';
 import { getAll as getNotifications, markAllRead as apiMarkAllRead, markOneRead as apiMarkOneRead, remove as apiRemoveNotif, removeAll as apiRemoveAll } from '../services/notifications.service';
 import { useIsMobile } from '../hooks/useIsMobile';

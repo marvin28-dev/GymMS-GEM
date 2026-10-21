@@ -1,7 +1,6 @@
 ﻿import RevenueSplit from '../components/ui/RevenueSplit';
 import { useLiveTick } from '../hooks/useLiveRefresh';
 import { useState, useEffect } from 'react';
-import { getCurrencySymbol, getMoneyLocale } from '../utils/currency';
 import { useNavigate } from 'react-router-dom';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -13,7 +12,6 @@ import {
   CreditCard,
   Wallet,
   Megaphone,
-  BarChart2,
   Clock,
   Users,
   ShoppingBag,
@@ -23,9 +21,6 @@ import {
   Wrench,
   AlertTriangle,
   CheckCircle2,
-  Download,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import Modal from '../components/ui/Modal';
@@ -45,10 +40,11 @@ import { getAll as getAttendance } from '../services/attendance.service';
 import { getAll as getMembers } from '../services/members.service';
 import { getAll as getPayments } from '../services/payments.service';
 import { getAll as getExpenses } from '../services/expenses.service';
-import { fmtDate, fmtTime, getDateLocale, todayStr, dayStr } from '../utils/date';
+import { todayStr, dayStr } from '../utils/date';
 import { membershipEndsThisWeek } from '../utils/attention';
 import { TASK_CATEGORIES } from '../utils/taskCategories';
 import { assignFields, assigneeName } from '../utils/departments';
+import { roleName } from '../utils/roleNames';
 import { getRole } from '../utils/auth';
 import { pagesFor } from '../utils/rolePages';
 import { serverFieldError } from '../utils/formErrors';
@@ -88,14 +84,6 @@ const card = {
   boxShadow: 'var(--shadow-card)',
 };
 
-const staffActivity = [
-  { name: 'Sandrine Kom', role: 'Front Desk', activity: 'Checked in 3 members', time: '9:42 AM', color: 'blue' },
-  { name: 'Marvin Ekokobe', role: 'Manager', activity: 'Recorded 2 payments', time: '9:30 AM', color: 'gold' },
-  { name: 'Michel Roko', role: 'Trainer', activity: 'Started PT session', time: '9:15 AM', color: 'green' },
-  { name: 'Claude Nkemeni', role: 'Instructor', activity: 'HIIT class prep', time: '9:00 AM', color: 'purple' },
-  { name: 'Marie Samba', role: 'Instructor', activity: 'Updated class schedule', time: '8:50 AM', color: 'red' },
-];
-
 const priorityColors = {
   high:   { bg: 'var(--accent-red-dim)',    color: 'var(--accent-red)'    },
   medium: { bg: 'var(--accent-yellow-dim)', color: 'var(--accent-yellow)' },
@@ -103,16 +91,6 @@ const priorityColors = {
 };
 
 const emptyTaskForm = { title: '', assignedTo: '', dueDate: '', priority: 'Medium', category: '' };
-
-const ROLE_KEYS = {
-  general_manager: 'generalManager', 'General Manager': 'generalManager',
-  manager: 'manager', 'Manager': 'manager',
-  trainer: 'trainer', 'Trainer': 'trainer',
-  instructor: 'instructor', 'Instructor': 'instructor',
-  front_desk: 'frontDesk', 'Front Desk': 'frontDesk',
-  coach: 'coach', 'Coach': 'coach',
-  other: 'roleOther', 'Other': 'roleOther',
-};
 
 const emptyIssueForm = { equipment: '', location: '', description: '', severity: 'Medium' };
 
@@ -324,7 +302,6 @@ export default function OperationsPage() {
   const allowedPages = pagesFor(getRole()).pages;
   const canOpen = (path) => !allowedPages || allowedPages.includes(path.split('/').filter(Boolean)[0]);
   const linkTo = (path) => (canOpen(path) ? () => navigate(path) : undefined);
-  const translateRole = (role) => { const k = ROLE_KEYS[role]; return k ? t(`staff.${k}`) : (role || ''); };
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   // Show the last overview at once and refresh quietly; a first-ever visit
@@ -546,7 +523,7 @@ export default function OperationsPage() {
                   <Avatar firstName={s.firstName || ''} lastName={s.lastName || ''} avatarColor={s.avatarColor || ['gold','green','blue','purple','red'][i % 5]} size={36} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{sName(s)}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'DM Sans', marginTop: 1 }}>{(() => { const k = ROLE_KEYS[s.role]; return k ? t(`staff.${k}`) : (s.role || ''); })()}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'DM Sans', marginTop: 1 }}>{roleName(s.role, t)}</div>
                   </div>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-green)', flexShrink: 0 }} title={t('common.active')} />
                 </div>

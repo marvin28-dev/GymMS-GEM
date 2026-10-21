@@ -76,7 +76,7 @@ export default function TasksPage() {
   }, [liveTick]);
 
   useEffect(() => { cache.write('list', tasks); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [tasks]);
-  useEffect(() => { cache.write('staff', staffList); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [staffList]);
+  useEffect(() => { cache.write('staff', staffList); }, [staffList]);
 
   // Changing what a task says, or removing it, belongs to whoever set it or to
   // management. A task the system raised belongs to management alone.

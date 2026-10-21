@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { Dumbbell, ArrowRight, Search, Check, Users, CreditCard, Monitor, BarChart3 } from 'lucide-react';
+import { Dumbbell, ArrowRight, Search, Users, CreditCard, Monitor, BarChart3 } from 'lucide-react';
 import { getGymByCode } from '../services/gym.service';
 import { isAuthed } from '../utils/auth';
 import LangToggle from '../components/LangToggle';

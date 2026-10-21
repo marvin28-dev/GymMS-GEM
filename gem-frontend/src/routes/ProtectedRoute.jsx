@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { isAuthed, checkDailyExpiry, getAuth, getRole, getHomeRoute } from "../utils/auth";
+import { isAuthed, checkDailyExpiry, getRole, getHomeRoute } from "../utils/auth";
 import { pagesFor } from "../utils/rolePages";
 
 export default function ProtectedRoute() {

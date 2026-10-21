@@ -6,7 +6,7 @@ import { autoPaymentDescription } from '../utils/paymentDescription';
 import CollectPaymentStep from '../components/CollectPaymentStep';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Download, UserPlus, Search, ChevronLeft, ChevronRight, MoreHorizontal, ChevronDown, X, MessageSquare, CreditCard, Check, SquareCheck, Lock, Phone, Eye, UserCheck, Clock, ChevronRight as ArrowRight } from 'lucide-react';
+import { Download, UserPlus, Search, ChevronLeft, ChevronRight, ChevronDown, X, MessageSquare, CreditCard, Check, SquareCheck, Lock, Phone, Eye, UserCheck, Clock } from 'lucide-react';
 import RowMenu from '../components/ui/RowMenu';
 import { passesLeft, checkInErrorText, needsCheckInCode } from '../utils/checkin';
 import { pageNumbers } from '../utils/pager';
@@ -19,20 +19,18 @@ import { useLanguage } from '../contexts/LanguageContext';
 import CodeInput from '../components/ui/CodeInput';
 
 import Avatar from '../components/ui/Avatar';
-import StatusBadge from '../components/ui/StatusBadge';
 import MemberStatusTags from '../components/ui/MemberStatusTags';
 import Modal from '../components/ui/Modal';
 import SendMessageModal from '../components/SendMessageModal';
-import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import MemberProfilePage from './MemberProfilePage';
 
-import { getAll as getMembers, create as createMember, remove as removeMember } from '../services/members.service';
+import { getAll as getMembers, create as createMember } from '../services/members.service';
 import { getAll as getPackages } from '../services/packages.service';
 import { getMyGym } from '../services/gym.service';
 import { create as createPayment } from '../services/payments.service';
 import { checkIn as checkInApi } from '../services/attendance.service';
 import { uploadPhoto } from '../services/upload.service';
-import { fmtDate, fmtTime, todayStr, addDaysStr, dayStr } from '../utils/date';
+import { fmtDate, todayStr, addDaysStr, dayStr } from '../utils/date';
 import { useGymSettings } from '../hooks/useGymSettings';
 import { enabledMethods } from '../utils/paymentMethods';
 import { memberNeedsAttention, membershipEndsThisWeek, isActiveMember } from '../utils/attention';
@@ -320,100 +318,6 @@ function filterBySearch(list, term) {
 // ─── Confirm Modal ─────────────────────────────────────────────────────────────
 
 // ─── Action Modals ────────────────────────────────────────────────────────────
-
-function MemberEditModal({ open, onClose, member }) {
-  const { t } = useLanguage();
-  const [form, setForm] = useState({});
-  // Country is fixed to the gym's own country rather than hardcoded
-  const [gymCountry, setGymCountry] = useState('');
-  useEffect(() => {
-    if (open) getMyGym().then(r => setGymCountry(r.data?.country || '')).catch(() => {});
-  }, [open]);
-  useEffect(() => {
-    if (member && open) {
-      setForm({
-        firstName: member.firstName || '', lastName: member.lastName || '',
-        gender: member.gender || '', dob: member.dob || '',
-        phone: member.phone || '', email: member.email || '',
-        houseNumber: member.houseNumber || '', street: member.street || '',
-        city: member.city || '', postalCode: member.postalCode || '',
-        emergencyContact: member.emergencyContact || '',
-        emergencyPhone: member.emergencyPhone || '',
-        package: member.package || '',
-        startDate: member.startDate || '', endDate: member.endDate || '',
-      });
-    }
-  }, [member, open]);
-
-  if (!member) return null;
-  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
-  const inp = (err) => ({ ...inputStyle, borderColor: err ? 'var(--accent-red)' : 'var(--border-subtle)' });
-
-  const Section = ({ title }) => (
-    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--text-muted)', fontWeight: 600, paddingBottom: 8, borderBottom: '1px solid var(--border-subtle)', marginTop: 4 }}>{title}</div>
-  );
-  const Field = ({ label, children, span }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, gridColumn: span ? '1 / -1' : undefined }}>
-      <label style={labelStyle}>{label}</label>
-      {children}
-    </div>
-  );
-
-  return (
-    <Modal open={open} onClose={onClose} title={`Edit : ${member.firstName} ${member.lastName}`} maxWidth={620}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '68vh', overflowY: 'auto', paddingRight: 4 }}>
-        <Section title={t('members.personalInfo')} />
-        <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label={`${t('members.firstName')} *`}><input style={inp()} value={form.firstName} onChange={set('firstName')} placeholder={t('members.firstName')} /></Field>
-          <Field label={`${t('members.lastName')} *`}><input style={inp()} value={form.lastName}  onChange={set('lastName')}  placeholder={t('members.lastName')} /></Field>
-          <Field label={`${t('members.gender')} *`}>
-            <select style={inp()} value={form.gender} onChange={set('gender')}>
-              <option value="">{t('common.select')}</option>
-              <option value="Male">{t('common.male')}</option>
-              <option value="Female">{t('common.female')}</option>
-              <option value="Other">{t('common.other')}</option>
-            </select>
-          </Field>
-          <Field label={t('members.dob')}><input type="date" style={inp()} value={form.dob} onChange={set('dob')} /></Field>
-          <Field label={`${t('common.phone')} *`}><input style={inp()} inputMode="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value.replace(/[^\d\s+\-()]/g, '') }))} placeholder={getPhonePlaceholder()} /></Field>
-          <Field label={`${t('common.email')} *`}><input type="email" style={inp()} value={form.email} onChange={set('email')} placeholder="email@example.com" /></Field>
-        </div>
-
-        <Section title={t('common.address')} />
-        <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label={t('members.houseNumber')}><input style={inp()} value={form.houseNumber} onChange={set('houseNumber')} placeholder="e.g. 12B" /></Field>
-          <Field label={`${t('members.street')} *`}><input style={inp()} value={form.street} onChange={set('street')} placeholder={getAddressPlaceholder()} /></Field>
-          <Field label={`${t('common.city')} *`}><input style={inp()} value={form.city} onChange={set('city')} placeholder={t('common.city')} /></Field>
-          <Field label={t('common.postalCode')}><input style={inp()} value={form.postalCode} onChange={set('postalCode')} placeholder="0000" /></Field>
-          <Field label={t('common.country')} span><input style={{ ...inp(), color: 'var(--text-muted)', cursor: 'not-allowed' }} value={gymCountry} readOnly /></Field>
-        </div>
-
-        <Section title={t('members.emergencyContact')} />
-        <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label={t('members.contactName')}><input style={inp()} value={form.emergencyContact} onChange={set('emergencyContact')} placeholder={t('common.fullName')} /></Field>
-          <Field label={t('members.contactPhone')}><input style={inp()} inputMode="tel" value={form.emergencyPhone} onChange={e => setForm(f => ({ ...f, emergencyPhone: e.target.value.replace(/[^\d\s+\-()]/g, '') }))} placeholder={getPhonePlaceholder()} /></Field>
-        </div>
-
-        <Section title={t('members.membershipInfo')} />
-        <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label={t('members.package')}>
-            <select style={inp()} value={form.package} onChange={set('package')}>
-              <option value="">{t('common.select')}</option>
-              <option>{member?.package?.name || ''}</option>
-            </select>
-          </Field>
-          <Field label={t('members.startDate')}><input type="date" style={inp()} value={form.startDate} onChange={set('startDate')} /></Field>
-          <Field label={t('members.endDate')}><input type="date" style={inp()} value={form.endDate} onChange={set('endDate')} /></Field>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid var(--border-subtle)' }}>
-          <button style={secondaryBtn} onClick={onClose}>{t('common.cancel')}</button>
-          <button style={primaryBtn} onClick={onClose}>{t('common.saveChanges')}</button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
 
 function generateRef() {
   const ts = Date.now().toString(36).toUpperCase();
@@ -715,27 +619,6 @@ function MemberCheckinModal({ open, onClose, member, onCheckedIn }) {
   );
 }
 
-function ConfirmModal({ open, onClose, onConfirm, title, message }) {
-  const { t } = useLanguage();
-  if (!open) return null;
-  return (
-    <Modal open={open} onClose={onClose} title={title} maxWidth={420}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{message}</p>
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={secondaryBtn}>{t('common.cancel')}</button>
-          <button
-            onClick={() => { onConfirm(); onClose(); }}
-            style={{ ...primaryBtn, background: 'var(--accent-red)', color: '#fff' }}
-          >
-            {t('common.delete')}
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 // ─── Action Dropdown ──────────────────────────────────────────────────────────
 
 // ─── Add Member Modal ─────────────────────────────────────────────────────────
@@ -835,7 +718,6 @@ export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gy
       // Member owes only the membership fee; registration fee is always collected at signup
       const selectedPkg = memberPackages.find(p => p.id === form.packageId);
       const pkgDebt = selectedPkg?.price || 0;
-      const regFeeAmount = gymData.registrationFee || 0;
       const initialBalance = pkgDebt;
 
       // The photo goes up first and is created with the person: a failed upload
@@ -1582,13 +1464,9 @@ export default function MembersPage() {
   // Fitness staff work with the members, not with their money
   const showsMoney = !isFitness(getRole());
 
-  const [openMenuId, setOpenMenuId]     = useState(null);
   const [showAddMember, setShowAddMember] = useState(false);
   const [showAddVisitor, setShowAddVisitor] = useState(false);
   const [inlineProfileId, setInlineProfileId] = useState(null);
-  const [confirmDelete, setConfirmDelete]   = useState(null);
-  const [authAction, setAuthAction]         = useState(null);
-  const [editMember, setEditMember]         = useState(null);
   const [paymentMember, setPaymentMember]   = useState(null);
   const [checkinMember, setCheckinMember]   = useState(null);
   const [messageMember, setMessageMember]         = useState(null);
@@ -1658,38 +1536,11 @@ export default function MembersPage() {
   });
   const selectedMembers = filtered.filter(m => selectedIds.has(m.id));
 
-  const MANAGER_ACTIONS = {
-    freeze:  { label: (m) => t('members.freezeFor', { name: `${m.firstName} ${m.lastName}` }), danger: false },
-    cancel:  { label: (m) => t('members.cancelFor', { name: `${m.firstName} ${m.lastName}` }), danger: true  },
-    delete:  { label: (m) => t('members.deleteFor', { name: `${m.firstName} ${m.lastName}` }), danger: true  },
-  };
-
   const handleAction = (key, member) => {
     if (key === 'view')     { navigate(`/members/${member.id}`); return; }
-    if (key === 'edit')     { setEditMember(member);    return; }
     if (key === 'payment')  { setPaymentMember(member); return; }
     if (key === 'checkin')  { setCheckinMember(member); return; }
     if (key === 'message')  { setMessageMember(member); return; }
-    if (MANAGER_ACTIONS[key]) {
-      const cfg = MANAGER_ACTIONS[key];
-      setAuthAction({ key, member, label: cfg.label(member), danger: cfg.danger });
-    }
-  };
-
-  const handleAuthConfirmed = () => {
-    if (!authAction) return;
-    const { key, member } = authAction;
-    if (key === 'delete') setConfirmDelete(member);
-    setAuthAction(null);
-  };
-
-  const handleDeleteConfirmed = async (member) => {
-    try {
-      await removeMember(member.id);
-      setMembersList(prev => prev.filter(m => m.id !== member.id));
-    } catch {
-      // silently fail. member stays in list
-    }
   };
 
   // Every cell is escaped: the window shares the app's origin, and names,
@@ -1731,12 +1582,6 @@ export default function MembersPage() {
 
   // ── Mobile layout ────────────────────────────────────────────────────────────
   if (isMobile) {
-    const statusColor = (s) => {
-      if (s === 'active') return { bg: 'rgba(34,197,94,0.12)', color: '#22c55e' };
-      if (s === 'expiring') return { bg: 'rgba(249,115,22,0.12)', color: '#f97316' };
-      if (s === 'visitor') return { bg: 'rgba(99,102,241,0.12)', color: '#818cf8' };
-      return { bg: 'rgba(107,114,128,0.12)', color: '#6b7280' };
-    };
 
     return (
       <div style={{ minHeight: '100%' }}>
@@ -2235,12 +2080,6 @@ export default function MembersPage() {
                     member={member}
                     pinnedEdge={pinnedEdge}
                     showStatus={showStatusCol}
-                    isMenuOpen={openMenuId === member.id}
-                    onMenuToggle={(e) => {
-                      e.stopPropagation();
-                      setOpenMenuId(prev => prev === member.id ? null : member.id);
-                    }}
-                    onMenuClose={() => setOpenMenuId(null)}
                     onAction={handleAction}
                     onRowClick={() => navigate(`/members/${member.id}`)}
                     selectionMode={selectionMode}
@@ -2374,7 +2213,6 @@ export default function MembersPage() {
       {/* Modals */}
       <AddMemberModal open={showAddMember} onClose={() => setShowAddMember(false)} onCreated={(newId) => { setShowAddMember(false); loadData(); setInlineProfileId(newId); }} packagesList={packagesList} gymData={gymData} />
       <AddVisitorModal open={showAddVisitor} onClose={() => setShowAddVisitor(false)} onCreated={(newId) => { setShowAddVisitor(false); loadData(); setInlineProfileId(newId); }} packagesList={packagesList} gymData={gymData} />
-      <MemberEditModal    open={!!editMember}    onClose={() => setEditMember(null)}    member={editMember} />
       <MemberPaymentModal open={!!paymentMember} onClose={() => setPaymentMember(null)} member={paymentMember} />
       <MemberCheckinModal
         open={!!checkinMember}
@@ -2387,22 +2225,6 @@ export default function MembersPage() {
       />
       <SendMessageModal open={!!messageMember} onClose={() => setMessageMember(null)} members={messageMember ? [messageMember] : []} />
       <SendMessageModal open={bulkMessageOpen} onClose={() => setBulkMessageOpen(false)} members={selectedMembers} />
-      <ManagerAuthModal
-        open={!!authAction}
-        onClose={() => setAuthAction(null)}
-        onConfirm={handleAuthConfirmed}
-        action={authAction?.label ?? ''}
-        danger={authAction?.danger ?? false}
-      />
-      <ConfirmModal
-        open={!!confirmDelete}
-        onClose={() => setConfirmDelete(null)}
-        onConfirm={() => { handleDeleteConfirmed(confirmDelete); setConfirmDelete(null); }}
-        title={t('members.deleteMember')}
-        message={confirmDelete
-          ? t('members.deleteMemberConfirm', { name: `${confirmDelete.firstName} ${confirmDelete.lastName}` })
-          : ''}
-      />
     </div>
   );
 }
@@ -2434,7 +2256,7 @@ function PageBtn({ children, active, onClick, disabled }) {
 
 // ─── Member Row ───────────────────────────────────────────────────────────────
 
-function MemberRow({ member, hideExpiry, showStatus, isMenuOpen, onMenuToggle, onMenuClose, onAction, onRowClick, selectionMode, isSelected, onSelect, pinnedEdge }) {
+function MemberRow({ member, hideExpiry, showStatus, onAction, onRowClick, selectionMode, isSelected, onSelect, pinnedEdge }) {
   const { t } = useLanguage();
   const showsMoney = !isFitness(getRole());
   const [hovered, setHovered]     = useState(false);

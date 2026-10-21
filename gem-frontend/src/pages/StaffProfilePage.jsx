@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { getCurrencySymbol, formatMoney } from '../utils/currency';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import { ArrowLeft, ClipboardList, Eye, EyeOff, Plus, RefreshCw, Banknote, TrendingUp, TrendingDown, Calendar, Download, FileText, Lock, Edit2, Camera, IdCard, ChevronLeft, ChevronRight, UserX, UserCheck, Mail, Trash2, CloudUpload, X, Phone } from 'lucide-react';
+import { ClipboardList, EyeOff, Plus, RefreshCw, Banknote, TrendingUp, TrendingDown, Calendar, Download, FileText, Lock, Edit2, Camera, IdCard, ChevronLeft, ChevronRight, UserX, UserCheck, Mail, Trash2, CloudUpload, X, Phone } from 'lucide-react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import StatusBadge from '../components/ui/StatusBadge';
 import RowMenu from '../components/ui/RowMenu';
@@ -14,7 +14,7 @@ import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import { canManage as outranks, canSeePrivateFields } from '../utils/hierarchy';
 import GemInput from '../components/ui/GemInput';
 import GemSelect from '../components/ui/GemSelect';
-import { getOne as getStaffMember, getCode as getStaffCode, regenerateCode as regenerateStaffCode, update as updateStaff, remove as removeStaff, resendInvite as resendStaffInvite } from '../services/staff.service';
+import { getOne as getStaffMember, getCode as getStaffCode, regenerateCode as regenerateStaffCode, update as updateStaff, resendInvite as resendStaffInvite } from '../services/staff.service';
 import { uploadPhoto } from '../services/upload.service';
 import { getAuth, getRole } from '../utils/auth';
 import { jobOf, departmentOfRole, assigneeName } from '../utils/departments';
@@ -29,7 +29,7 @@ import {
 import { getMyGym } from '../services/gym.service';
 import { notifyDataChanged } from '../utils/events';
 import api from '../services/api';
-import { fmtDate, fmtTime, todayStr as getToday, dayStr, ordinalDay, getDateLocale, payMonthText } from '../utils/date';
+import { fmtDate, todayStr as getToday, dayStr, ordinalDay, getDateLocale, payMonthText } from '../utils/date';
 import { roleName } from '../utils/roleNames';
 import { digitsOnly } from '../utils/number';
 import { downloadPaystubPdf } from '../utils/paystubPdf';
@@ -68,15 +68,6 @@ function payMonthOptions(forward = 12) {
   return out;
 }
 
-const ROLE_KEYS = {
-  general_manager: 'generalManager', 'General Manager': 'generalManager',
-  manager: 'manager', 'Manager': 'manager',
-  trainer: 'trainer', 'Trainer': 'trainer',
-  instructor: 'instructor', 'Instructor': 'instructor',
-  front_desk: 'frontDesk', 'Front Desk': 'frontDesk',
-  coach: 'coach', 'Coach': 'coach',
-  other: 'roleOther', 'Other': 'roleOther',
-};
 // The roles the edit form offers, by the value stored on the record. Older
 // coach and instructor records show as trainer until someone changes them.
 const EDITABLE_ROLES = ['manager', 'front_desk', 'trainer', 'other'];
@@ -84,27 +75,6 @@ const roleChoice = (role) => (['coach', 'instructor'].includes(role) ? 'trainer'
 // One list of note categories for both layouts
 const NOTE_CATEGORIES = ['General', 'Performance', 'Warning', 'Commendation', 'Health', 'Financial', 'Other'];
 const noteCategoryName = (c, t) => (NOTE_CATEGORIES.includes(c) ? t(`staff.noteCat${c}`) : c);
-
-function compressImage(dataUrl, maxW = 1000, maxH = 1000, quality = 0.82) {
-  return new Promise(resolve => {
-    const img = new Image();
-    img.onload = () => {
-      let { width, height } = img;
-      if (width > maxW || height > maxH) {
-        const ratio = Math.min(maxW / width, maxH / height);
-        width = Math.round(width * ratio);
-        height = Math.round(height * ratio);
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
-}
 
 const cardStyle = { background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, boxShadow: 'var(--shadow-card)' };
 const primaryBtn = { background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', color: '#0a0a0f', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '8px 16px', cursor: 'pointer', fontFamily: 'DM Sans', display: 'inline-flex', alignItems: 'center', gap: 6 };
@@ -153,8 +123,6 @@ const PRIORITY_COLORS = {
   Medium: { bg: 'var(--accent-yellow-dim)', color: 'var(--accent-yellow)' },
   Low:    { bg: 'var(--accent-blue-dim)',   color: 'var(--accent-blue)' },
 };
-const PAY_RATES = { Manager: 350000, Trainer: 200000, Instructor: 180000, 'Front Desk': 150000, Receptionist: 140000, Other: 120000 };
-const HOURLY_RATES = { Manager: 2200, Trainer: 1300, Instructor: 1100, 'Front Desk': 950, Receptionist: 875, Other: 750 };
 
 const emptySchedule = DAYS.reduce((acc, d) => ({ ...acc, [d]: { start: '08:00', end: '17:00', off: false } }), {});
 
@@ -184,8 +152,6 @@ function weekOptions(count = 8) {
   });
 }
 
-const MOCK_PAY_HISTORY = [];
-
 const StatusPill = ({ status }) => {
   const { t } = useLanguage();
   const map = { paid: { bg: 'rgba(34,197,94,0.15)', color: '#22c55e' }, issued: { bg: 'rgba(201,169,110,0.15)', color: '#c9a96e' }, draft: { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' } };
@@ -206,16 +172,14 @@ export default function StaffProfilePage() {
   const backToList = () => navigate(fromFrontDesk ? '/front-desk' : '/staff');
   const isMobile = useIsMobile();
   const role = getRole();
-  const isFitnessRole = ['trainer', 'instructor', 'coach'].includes(role);
   const isOwnProfile = !paramId;
   // isOwnProfile only covers the /my-profile route. Reaching your own record
   // through the staff list is still yourself, and the same limits apply.
   const isSelf = String(getAuth()?.user?.id ?? '') === String(paramId ?? getAuth()?.user?.id ?? '');
 
   // The access code is a credential: it logs you into the front desk and
-  // authorises sensitive actions, so it is never shown on a bare click. Your
-  // own is released by your password; anybody else's by your own 4-digit code.
-  const needsPasswordForCode = true;
+  // authorises sensitive actions, so View always asks first. Your own is
+  // released by your password; anybody else's by your own 4-digit code.
   // Handing out a new code is the owner's alone, his own included
   const canIssueCodes = role === 'general_manager';
   const [showNewCodeAuth, setShowNewCodeAuth] = useState(false);
@@ -330,7 +294,6 @@ export default function StaffProfilePage() {
   const [noteCategory, setNoteCategory] = useState('General');
   const [notes, setNotes] = useState([]);
 
-  const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const profilePhotoRef = useRef(null);
   // What a refused change says, shown where it was made (F-107, F-120)
@@ -350,7 +313,6 @@ export default function StaffProfilePage() {
       const url = await uploadPhoto(file, 'gem/staff');
       await updateStaff(id, { photo: url });
       setMemberData(prev => ({ ...prev, photoData: url }));
-      setShowPhotoModal(false);
     } catch (err) {
       setPhotoError(err?.response?.data?.error || t('staff.photoFailed'));
     } finally {
@@ -366,7 +328,6 @@ export default function StaffProfilePage() {
     try {
       await updateStaff(id, { photo: null });
       setMemberData(prev => ({ ...prev, photoData: null }));
-      setShowPhotoModal(false);
     } catch (err) {
       setPhotoError(err?.response?.data?.error || t('staff.failedSave'));
     } finally {
@@ -426,7 +387,6 @@ export default function StaffProfilePage() {
   const [editFieldErrors, setEditFieldErrors] = useState({});
   const setEF = (k, v) => setEditForm(f => ({ ...f, [k]: v }));
   const editPhotoRef = useRef(null);
-  const editPhotoIdRef = useRef(null);
   const photoIdRef = useRef(null);
   const [photoIdSaving, setPhotoIdSaving] = useState(false);
   const [photoIdError, setPhotoIdError] = useState('');
@@ -1074,15 +1034,6 @@ export default function StaffProfilePage() {
     </>
   );
 
-  function handleEditPhotoIdChange(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setEF('photoIdFile', file);
-    const reader = new FileReader();
-    reader.onload = ev => setEF('photoIdData', ev.target.result);
-    reader.readAsDataURL(file);
-  }
-
   const saveEdit = async () => {
     const req = t('common.required');
     const fe = { ...(canEditIdentity && !(editForm.name || '').trim() && { name: req }), ...addressErrors(editForm, req) };
@@ -1120,9 +1071,6 @@ export default function StaffProfilePage() {
     if (editForm.photoFile) {
       try { apiFields.photo = await uploadPhoto(editForm.photoFile, 'gem/staff'); } catch (err) { setEditError(err?.response?.data?.error || t('staff.photoFailed')); setEditSaving(false); return; }
     }
-    if (editForm.photoIdFile) {
-      try { apiFields.photoId = await uploadPhoto(editForm.photoIdFile, 'gem/staff/ids'); } catch (err) { setEditError(err?.response?.data?.error || t('staff.photoIdFailed')); setEditSaving(false); return; }
-    }
     try {
       const res = await updateStaff(id, apiFields);
       // Pay & Earnings reads the salary from its own state, not from memberData,
@@ -1143,7 +1091,6 @@ export default function StaffProfilePage() {
         // rather than letting the save blank the field out.
         joinDate: res?.data?.joinDate || prev.joinDate || null,
         ...(apiFields.photo ? { photoData: apiFields.photo } : {}),
-        ...(apiFields.photoId ? { photoIdData: apiFields.photoId } : {}),
       }));
       setShowEditModal(false);
     } catch (err) {
@@ -1721,7 +1668,7 @@ export default function StaffProfilePage() {
   );
 
   if (isMobile) {
-    const rk = ROLE_KEYS[memberData.role]; const roleLabel = rk ? t(`staff.${rk}`) : ((memberData.role || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+    const roleLabel = roleName(memberData.role, t);
     const isActive = memberData.status !== 'inactive';
     const TAB_MAP = { Details: 'Details', Tasks: 'Tasks Assigned', Schedule: 'Schedule', Calendar: 'Calendar', Clients: 'Clients', Pay: 'Pay & Earnings', Notes: 'Notes' };
     const MOBILE_TABS = ['Details', 'Tasks', 'Schedule', 'Calendar', 'Clients', 'Pay', 'Notes'].filter(k => tabShown(TAB_MAP[k]));
@@ -1882,10 +1829,7 @@ export default function StaffProfilePage() {
                   ) : (
                     <>
                       <span style={{ fontSize: 16, fontFamily: 'JetBrains Mono, monospace', letterSpacing: 6, color: 'var(--text-muted)' }}>••••</span>
-                      <button onClick={async () => {
-                        if (needsPasswordForCode) { setShowCodeAuthModal(true); return; }
-                        revealCode();
-                      }} disabled={codeLoading} style={{ background: 'var(--accent-gold-dim)', border: 'none', borderRadius: 6, padding: '3px 9px', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--accent-gold)', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <button onClick={() => setShowCodeAuthModal(true)} disabled={codeLoading} style={{ background: 'var(--accent-gold-dim)', border: 'none', borderRadius: 6, padding: '3px 9px', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--accent-gold)', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', gap: 3 }}>
                         <Lock size={9} />{codeLoading ? '…' : t('staff.viewCode')}
                       </button>
                     </>
@@ -2241,7 +2185,7 @@ export default function StaffProfilePage() {
               </>
             ) : (
               <>
-                <GemSelect label={t('staff.role')} value={roleChoice(editForm.role) || ''} onChange={e => setEF('role', e.target.value)} options={EDITABLE_ROLES.map(r => ({ value: r, label: t(`staff.${ROLE_KEYS[r]}`) }))} />
+                <GemSelect label={t('staff.role')} value={roleChoice(editForm.role) || ''} onChange={e => setEF('role', e.target.value)} options={EDITABLE_ROLES.map(r => ({ value: r, label: roleName(r, t) }))} />
               </>
             )}
             <div style={{ gridColumn: '1 / -1' }}>
@@ -2484,7 +2428,7 @@ export default function StaffProfilePage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{memberData.name}</h1>
               <StatusBadge status={memberData.status} />
-              <span style={{ background: 'var(--accent-gold-dim)', color: 'var(--accent-gold)', fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{(() => { const k = ROLE_KEYS[memberData.role]; return k ? t(`staff.${k}`) : (memberData.role || ''); })()}</span>
+              <span style={{ background: 'var(--accent-gold-dim)', color: 'var(--accent-gold)', fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{roleName(memberData.role, t)}</span>
             </div>
             <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 10 }}>
               {memberData.phone && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}><Phone size={13} color="var(--text-muted)" />{memberData.phone}</span>}
@@ -2640,7 +2584,7 @@ export default function StaffProfilePage() {
           <div className="gem-two-col" style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
             {[
               { labelKey: 'staff.fullName', value: memberData.name },
-              { labelKey: 'staff.role', value: (() => { const k = ROLE_KEYS[memberData.role]; return k ? t(`staff.${k}`) : (memberData.role || ''); })() },
+              { labelKey: 'staff.role', value: roleName(memberData.role, t) },
               { labelKey: 'staff.department', value: (() => { const d = departmentOfRole(memberData.role); return d ? t(d.labelKey) : '-'; })() },
                       { labelKey: 'staff.phone', value: memberData.phone },
               { labelKey: 'staff.email', value: memberData.email },
@@ -2697,10 +2641,7 @@ export default function StaffProfilePage() {
                       ••••
                     </span>
                     <button
-                      onClick={async () => {
-                        if (needsPasswordForCode) { setShowCodeAuthModal(true); return; }
-                        revealCode();
-                      }}
+                      onClick={() => setShowCodeAuthModal(true)}
                       disabled={codeLoading}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 4,
@@ -3240,7 +3181,7 @@ export default function StaffProfilePage() {
           ) : (
             <>
               <GemSelect label={t('staff.role')} value={roleChoice(editForm.role) || ''} onChange={e => setEF('role', e.target.value)}
-                options={EDITABLE_ROLES.map(r => ({ value: r, label: t(`staff.${ROLE_KEYS[r]}`) }))} />
+                options={EDITABLE_ROLES.map(r => ({ value: r, label: roleName(r, t) }))} />
             </>
           )}
           <div style={{ gridColumn: '1 / -1' }}>
@@ -3297,35 +3238,6 @@ export default function StaffProfilePage() {
           </div>
           <GemInput label={t('staff.emergencyContact')} value={editForm.emergencyContact || ''} onChange={e => setEF('emergencyContact', e.target.value)} />
           <GemInput label={t('staff.emergencyPhone')} value={editForm.emergencyPhone || ''} onChange={e => setEF('emergencyPhone', e.target.value)} />
-          <div style={{ gridColumn: '1 / -1', display: 'none' }}>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6, display: 'block', fontFamily: 'DM Sans', fontWeight: 500 }}>{t('staff.photoId')}</label>
-            <input ref={editPhotoIdRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleEditPhotoIdChange} />
-            <div
-              onClick={() => editPhotoIdRef.current?.click()}
-              style={{
-                border: `2px dashed ${editForm.photoIdData ? 'var(--accent-gold)' : 'var(--border)'}`,
-                borderRadius: 10, padding: '10px 14px', cursor: 'pointer',
-                background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', gap: 12,
-                transition: 'border-color 0.15s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-gold)'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = editForm.photoIdData ? 'var(--accent-gold)' : 'var(--border)'}
-            >
-              {editForm.photoIdData ? (
-                <>
-                  <img src={editForm.photoIdData} style={{ width: 72, height: 46, objectFit: 'cover', borderRadius: 6 }} alt="ID" />
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>{t('staff.clickToReplaceId')}</span>
-                </>
-              ) : (
-                <>
-                  <div style={{ width: 48, height: 32, border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <IdCard size={16} color="var(--text-muted)" />
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('staff.clickToUploadId')}</span>
-                </>
-              )}
-            </div>
-          </div>
         </div>
         {editError && (
           <div style={{ background: 'var(--accent-red-dim)', border: '1px solid var(--accent-red)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans', marginTop: 12 }}>
@@ -3365,7 +3277,7 @@ export default function StaffProfilePage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Manrope, sans-serif' }}>{memberData.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{(() => { const k = ROLE_KEYS[memberData.role]; return k ? t(`staff.${k}`) : (memberData.role || ''); })()}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{roleName(memberData.role, t)}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('staff.payPeriod')}</div>
@@ -3465,7 +3377,7 @@ export default function StaffProfilePage() {
                   downloadPaystubPdf({
                     gymName: getAuth()?.user?.gymName || '',
                     employeeName: memberData.name,
-                    role: (() => { const k = ROLE_KEYS[memberData.role]; return k ? t(`staff.${k}`) : (memberData.role || ''); })(),
+                    role: roleName(memberData.role, t),
                     employment: isPartTime ? t('staff.partTime') : t('staff.fullTime'),
                     month,
                     status: selectedPaystub.status,
@@ -3717,36 +3629,6 @@ export default function StaffProfilePage() {
           </div>
         </div>
       </Modal>
-
-      {/* ── Profile Photo Modal ──────────────────────────────────────────── */}
-      {showPhotoModal && (
-        <div
-          onClick={() => setShowPhotoModal(false)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)',
-            zIndex: 2000, display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', padding: 24,
-          }}
-        >
-          <img
-            src={memberData.photoData}
-            alt={memberData.name}
-            onClick={e => e.stopPropagation()}
-            style={{ maxWidth: '80vw', maxHeight: '72vh', borderRadius: 16, objectFit: 'contain', boxShadow: '0 32px 96px rgba(0,0,0,0.7)', marginBottom: 24 }}
-          />
-          <button
-            onClick={e => { e.stopPropagation(); profilePhotoRef.current?.click(); }}
-            style={{ ...primaryBtn, padding: '10px 24px', fontSize: 13, gap: 8 }}
-          >
-            <Camera size={14} />
-            {t('staff.uploadNewPhoto')}
-          </button>
-          <button
-            onClick={() => setShowPhotoModal(false)}
-            style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: 40, height: 40, cursor: 'pointer', color: '#fff', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
-          >×</button>
-        </div>
-      )}
     </div>
   );
 }

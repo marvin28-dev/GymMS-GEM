@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef, useMemo } from 'react';
-import { CloudUpload, Save, Sun, Moon, Check, Palette, Plus, Trash2, Languages, Eye, EyeOff, User, ChevronRight, ChevronDown, ChevronLeft, X, RotateCcw } from 'lucide-react';
+import { CloudUpload, Save, Sun, Moon, Check, Palette, Plus, Trash2, Languages, Eye, EyeOff, ChevronRight, ChevronLeft, X, RotateCcw } from 'lucide-react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getMyGym, updateMyGym } from '../services/gym.service';

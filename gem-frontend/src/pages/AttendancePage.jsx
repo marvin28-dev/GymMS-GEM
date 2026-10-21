@@ -1,11 +1,10 @@
 ﻿import { checkInErrorText, needsCheckInCode } from '../utils/checkin';
 import { useLiveTick } from '../hooks/useLiveRefresh';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { getCurrencySymbol, formatMoney } from '../utils/currency';
-import { createPortal } from 'react-dom';
+import { formatMoney } from '../utils/currency';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Search, UserCheck, X, MoreHorizontal, LogOut, Clock, ChevronLeft, ChevronRight, CheckCircle, AlertCircle, AlertTriangle, QrCode, Calendar } from 'lucide-react';
+import { Search, UserCheck, X, LogOut, Clock, ChevronLeft, ChevronRight, QrCode, Calendar } from 'lucide-react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import Avatar from '../components/ui/Avatar';
 import MemberStatusTags from '../components/ui/MemberStatusTags';
@@ -18,7 +17,7 @@ import { getAll as getMembers } from '../services/members.service';
 import { getAll as getStaff, findByCode as findStaffByCode } from '../services/staff.service';
 import { getAll as getTimecards, punchIn as punchInApi, punchOut as punchOutApi, adjust as adjustTimecard } from '../services/timecards.service';
 import { getAuth, getRole } from '../utils/auth';
-import { fmtDate, fmtTime, getDateLocale, capFirst, todayStr, dayStr } from '../utils/date';
+import { fmtDate, fmtTime, capFirst, todayStr, dayStr } from '../utils/date';
 import CheckinStats from '../components/CheckinStats';
 import { SkeletonCards, SkeletonTableRows } from '../components/Skeleton';
 import { softAll } from '../utils/loadAll';
@@ -143,8 +142,6 @@ function resolvePerson(entry, staffList) {
   };
 }
 
-
-const TYPE_FILTERS = ['Members', 'Visitors', 'Staff'];
 
 // ─── Row 3-dot menu (portal-based so it escapes table overflow clipping) ──────
 
@@ -491,9 +488,6 @@ export default function AttendancePage() {
     setViewDate(dayStr(d));
   };
   const isViewingToday = viewDate === todayISO;
-  const viewDateLabel = isViewingToday
-    ? t('common.today')
-    : capFirst(new Date(viewDate + 'T12:00:00').toLocaleDateString(_locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }));
 
   // ── Search ────────────────────────────────────────────────────────────────
   const handleSearch = (val) => {
@@ -748,19 +742,17 @@ export default function AttendancePage() {
     setCheckoutModal(null);
   };
 
+  // Only a staff time card is edited here: the menu is on the Staff tab alone
   const confirmEdit = async ({ time, notes, field }) => {
     const entry = editModal.entry;
-    const isStaff = entry.personType === 'Staff';
     setEditError('');
-    if (isStaff) {
-      try {
-        await adjustTimecard(entry.id, { [field === 'time' ? 'punchIn' : 'punchOut']: time, note: notes || undefined });
-      } catch (err) {
-        setEditError(err?.response?.data?.error || t('attendance.timeChangeFailed'));
-        return;
-      }
+    try {
+      await adjustTimecard(entry.id, { [field === 'time' ? 'punchIn' : 'punchOut']: time, note: notes || undefined });
+    } catch (err) {
+      setEditError(err?.response?.data?.error || t('attendance.timeChangeFailed'));
+      return;
     }
-    setCheckins(prev => prev.map(c => c.id === entry.id ? { ...c, [field]: clockLabel(time), notes, pending: isStaff } : c));
+    setCheckins(prev => prev.map(c => c.id === entry.id ? { ...c, [field]: clockLabel(time), notes, pending: true } : c));
     setEditModal(null);
   };
 

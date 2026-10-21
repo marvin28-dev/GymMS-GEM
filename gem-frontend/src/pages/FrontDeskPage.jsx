@@ -9,7 +9,7 @@ import {
   AlertTriangle, CheckCircle, AlertCircle, Clock, LogOut, ArrowLeft, UserCircle,
   ShoppingCart, ShoppingBag, Plus, Minus, Trash2, Phone, Mail, Eye, EyeOff,
   CreditCard, Wrench, FileText, Scan, Download, UserPlus, TrendingUp, Receipt, QrCode,
-  RefreshCw, Smartphone, Ticket, LogIn,
+  RefreshCw, Smartphone, LogIn,
 } from 'lucide-react';
 import StatusBadge from '../components/ui/StatusBadge';
 import MemberStatusTags from '../components/ui/MemberStatusTags';
@@ -20,10 +20,8 @@ import Avatar from '../components/ui/Avatar';
 import Modal from '../components/ui/Modal';
 import { AddMemberModal, AddVisitorModal } from './MembersPage';
 import MemberProfilePage from './MemberProfilePage';
-import { getAll as getMembers, sendCode as sendMemberCode, create as createMember } from '../services/members.service';
-import { create as createPayment } from '../services/payments.service';
-import { packageAllowance } from '../utils/packages';
-import { enabledMethods, apiMethod, PAYMENT_METHODS } from '../utils/paymentMethods';
+import { getAll as getMembers, sendCode as sendMemberCode } from '../services/members.service';
+import { enabledMethods, PAYMENT_METHODS } from '../utils/paymentMethods';
 import { checkInBlockReason, passesLeft, checkInErrorText } from '../utils/checkin';
 import { getAll as getStaff, verifyCode as verifyStaffCode, checkActive as checkStaffActive } from '../services/staff.service';
 import { getAll as getPackages } from '../services/packages.service';
@@ -44,7 +42,7 @@ import { create as createExpense } from '../services/expenses.service';
 import { verifyManagerPassword } from '../services/auth.service';
 import { isDemoMode, getAuth, getRole, clearAuth } from '../utils/auth';
 
-import { fmtDate, fmtTime, getDateLocale, capFirst, dayStr, addDaysStr, todayStr as getTodayStr } from '../utils/date';
+import { fmtDate, getDateLocale, capFirst, dayStr, addDaysStr, todayStr as getTodayStr } from '../utils/date';
 import { digitsOnly } from '../utils/number';
 import { useGymSettings, refreshGymSettings } from '../hooks/useGymSettings';
 import { softAll } from '../utils/loadAll';
@@ -67,23 +65,6 @@ const inputStyle   = { width: '100%', background: 'var(--bg-elevated)', border: 
 const labelStyle   = { fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 5, fontFamily: 'DM Sans' };
 
 
-// ─── Mock shop products ────────────────────────────────────────────────────────
-const PRODUCTS = [
-  { id: 1, name: 'Water 500ml',     category: 'Beverages',    price: 500   },
-  { id: 2, name: 'Protein Shake',   category: 'Beverages',    price: 3500  },
-  { id: 3, name: 'Energy Bar',      category: 'Nutrition',    price: 1500  },
-  { id: 4, name: 'Sports Drink',    category: 'Beverages',    price: 2000  },
-  { id: 5, name: 'Whey Protein 1kg',category: 'Supplements',  price: 35000 },
-  { id: 6, name: 'BCAA Mix',        category: 'Supplements',  price: 12000 },
-  { id: 7, name: 'Pre-Workout',     category: 'Supplements',  price: 15000 },
-  { id: 8, name: 'Creatine 500g',   category: 'Supplements',  price: 20000 },
-  { id: 9, name: 'Workout Gloves',  category: 'Gear',         price: 12000 },
-  { id:10, name: 'Resistance Band', category: 'Gear',         price: 7500  },
-  { id:11, name: 'Sports Towel',    category: 'Accessories',  price: 4500  },
-  { id:12, name: 'Gym Bag',         category: 'Accessories',  price: 28000 },
-];
-const PRODUCT_CATS = ['All', 'Beverages', 'Nutrition', 'Supplements', 'Gear', 'Accessories'];
-
 const ROLE_KEYS = {
   general_manager: 'generalManager', 'General Manager': 'generalManager',
   manager: 'manager', 'Manager': 'manager',
@@ -98,7 +79,6 @@ const PROD_CAT_KEYS = {
   'All': 'catAll', 'Beverages': 'catBeverages', 'Nutrition': 'catNutrition',
   'Supplements': 'catSupplements', 'Gear': 'catGear', 'Accessories': 'catAccessories',
 };
-const PM_KEYS = { 'Cash': 'pmCash', 'Card': 'pmCard', 'Mobile Money': 'pmMobileMoney' };
 
 const TIME_FILTER_KEYS = [
   { key: 'timeToday',    maxMinutes: 1440 },
@@ -318,137 +298,16 @@ function LoginPinPad({ onDigit, onBack, onConfirm, confirmEnabled }) {
   );
 }
 
-// ─── Member profile drawer ─────────────────────────────────────────────────────
-function MemberDrawer({ member: m, onClose, onPhoto, onCheckInDirect, onNeedCode, onEmailCode, onTextCode, onAddPayment, onRenew, onOpenFull }) {
-  const { t } = useLanguage();
-  const [checkedIn, setCheckedIn] = useState(false);
-  const [busy, setBusy]           = useState(false);
-  const [codeMsg, setCodeMsg]     = useState(null); // { ok, text }
-  useEffect(() => { setCheckedIn(false); setBusy(false); setCodeMsg(null); }, [m?.id]);
-  if (!m) return null;
-  const canCheckIn = !['suspended','frozen','expired','deactivated','pending'].includes(m.status);
-
-  // By sight when there's a photo; otherwise hand off to the code modal.
-  const handleCheck = async () => {
-    if (!canCheckIn || checkedIn || busy) return;
-    if (m.photo) { setBusy(true); await onCheckInDirect?.(m); setBusy(false); setCheckedIn(true); }
-    else { onNeedCode?.(m); }
-  };
-  const doEmail = async () => { if (busy) return; setBusy(true); const r = await onEmailCode?.(m); setBusy(false); setCodeMsg(r || null); };
-  const doText  = () => { const r = onTextCode?.(m); setCodeMsg(r || null); };
-  return (
-    <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 200 }}/>
-      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 460, background: 'var(--bg-card)', zIndex: 201, overflowY: 'auto', boxShadow: '-8px 0 32px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column' }}>
-        {/* Header */}
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          {m.photo ? <img src={m.photo} alt={m.firstName} style={{ width:44, height:44, borderRadius:'50%', objectFit:'cover', flexShrink:0, cursor:'zoom-in' }} onClick={e=>{e.stopPropagation();onPhoto?.(m.photo);}}/> : <Avatar firstName={m.firstName} lastName={m.lastName} avatarColor={m.avatarColor} size={44}/>}
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-              <span style={{ fontFamily: 'Manrope', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{m.firstName} {m.lastName}</span>
-              <MemberStatusTags member={m}/>
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{m.memberCode || m.id} · {m.package?.name ?? m.package ?? '-'}</div>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 4 }}><X size={16}/></button>
-        </div>
-
-        {/* Content */}
-        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20, flex: 1 }}>
-          {/* Balance - members/visitors only */}
-          {!m._isStaff && (
-            <div style={{ padding: '12px 16px', borderRadius: 10, background: m.balance > 0 ? 'rgba(239,68,68,0.06)' : 'rgba(52,211,153,0.06)', border: `1px solid ${m.balance > 0 ? 'rgba(239,68,68,0.2)' : 'rgba(52,211,153,0.2)'}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-              {m.balance > 0 ? <AlertTriangle size={16} color="var(--accent-red)"/> : <CheckCircle size={16} color="var(--accent-green)"/>}
-              <span style={{ fontSize: 13, fontWeight: 600, color: m.balance > 0 ? 'var(--accent-red)' : 'var(--accent-green)', fontFamily: 'DM Sans' }}>
-                {m.balance > 0 ? `${t('frontDesk.owes')} ${formatMoney(m.balance)}` : t('frontDesk.noBalanceDue')}
-              </span>
-            </div>
-          )}
-
-          {/* Membership info */}
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 10, fontFamily: 'DM Sans' }}>{t('members.membershipInfo').toUpperCase()}</div>
-            <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              {[
-                { label: t('members.package'),   value: m.package?.name ?? m.package ?? '-' },
-                { label: t('common.status'),     value: <MemberStatusTags member={m}/> },
-                { label: t('members.startDate'), value: formatDate(m.startDate) },
-                { label: t('members.endDate'),   value: formatDate(m.endDate) },
-                { label: t('members.lastVisit'), value: formatDate(m.lastVisit) },
-                { label: t('members.accessCode'), value: <span style={{ fontFamily:'monospace', color:'var(--accent-gold)' }}>••••</span> },
-              ].map(i => (
-                <div key={i.label} style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: 8 }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>{i.label}</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{i.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Contact */}
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 10, fontFamily: 'DM Sans' }}>{t('frontDesk.contact').toUpperCase()}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
-                <Phone size={13} color="var(--text-muted)"/>{m.phone}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
-                <Mail size={13} color="var(--text-muted)"/>{m.email}
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          {!m._isStaff && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
-              {checkedIn ? (
-                <div style={{ ...primaryBtn, justifyContent:'center', background:'rgba(52,211,153,0.12)', color:'#34d399', border:'1px solid rgba(52,211,153,0.3)', cursor:'default' }}>
-                  <CheckCircle size={14}/> {t('frontDesk.checkedInSuccess')}
-                </div>
-              ) : (
-                <button
-                  disabled={!canCheckIn || busy}
-                  onClick={handleCheck}
-                  title={m.photo ? '' : t('frontDesk.noPhotoNeedsCode')}
-                  style={{ ...primaryBtn, justifyContent:'center', opacity: canCheckIn && !busy ? 1 : 0.4, cursor: canCheckIn && !busy ? 'pointer' : 'not-allowed' }}
-                >
-                  <UserCheck size={13}/> {m.photo ? t('frontDesk.checkIn') : `${t('frontDesk.checkIn')} · ${t('frontDesk.withCode')}`}
-                </button>
-              )}
-
-              {/* Send the member their check-in code */}
-              <div style={{ display:'flex', gap:8 }}>
-                <button style={{ ...secondaryBtn, flex:1, justifyContent:'center', opacity: busy ? 0.6 : 1, cursor: busy ? 'default' : 'pointer' }} disabled={busy} onClick={doEmail}><Mail size={13}/> {t('frontDesk.sendByEmail')}</button>
-                <button style={{ ...secondaryBtn, flex:1, justifyContent:'center' }} onClick={doText}><Smartphone size={13}/> {t('frontDesk.sendByText')}</button>
-              </div>
-              {codeMsg && <div style={{ fontSize:11, fontFamily:'DM Sans', color: codeMsg.ok ? '#34d399' : 'var(--accent-red)' }}>{codeMsg.text}</div>}
-
-              {/* Money actions open the full profile where those flows live */}
-              <div style={{ display:'flex', gap:8 }}>
-                <button style={{ ...secondaryBtn, flex:1, justifyContent:'center' }} onClick={() => onAddPayment?.(m)}><CreditCard size={13}/> {t('payments.addPayment')}</button>
-                <button style={{ ...secondaryBtn, flex:1, justifyContent:'center' }} onClick={() => onRenew?.(m)}><RefreshCw size={13}/> {t('memberProfile.renew')}</button>
-              </div>
-              <button onClick={() => onOpenFull?.(m)} style={{ background:'none', border:'none', color:'var(--text-muted)', fontSize:12, fontFamily:'DM Sans', cursor:'pointer', padding:'4px 0', textAlign:'center' }}>{t('members.viewProfile')} →</button>
-            </div>
-          )}
-        </div>
-      </div>
-    </>
-  );
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function FrontDeskPage() {
   const gymSettings = useGymSettings();
-  const { t, lang } = useLanguage();
+  const { t } = useLanguage();
   const translateRole = (role) => { const k = ROLE_KEYS[role]; return k ? t(`staff.${k}`) : (role || ''); };
   const tProdCat = (cat) => { const k = PROD_CAT_KEYS[cat]; return k ? t(`frontDesk.${k}`) : cat; };
   const tExpCat = (cat) => expenseCategoryName(cat, t);
-  const tPm = (pm) => { const k = PM_KEYS[pm]; return k ? t(`frontDesk.${k}`) : pm; };
   const isMobile = useIsMobile();
-  const locale = lang === 'fr' ? 'fr-FR' : 'en-US';
   const navigate = useNavigate();
 
   // ── Session ────────────────────────────────────────────────────────────────
@@ -487,7 +346,6 @@ export default function FrontDeskPage() {
 
   // ── Shared UI ──────────────────────────────────────────────────────────────
   const [activeTab,     setActiveTab]     = useState('CHECK-IN');
-  const [memberDrawer,  setMemberDrawer]  = useState(null); // memberId string
 
   // Demo mode: ensure session exists so login screen is never shown
   useEffect(() => {
@@ -541,10 +399,6 @@ export default function FrontDeskPage() {
   const [photoLightbox, setPhotoLightbox] = useState(null); // photo URL or null
 
   // ── SIGN UP ────────────────────────────────────────────────────────────────
-  const emptySignUp = { firstName:'', lastName:'', phone:'', email:'', gender:'Male', packageId:'', payMethod:'Cash', amount:'', notes:'' };
-  const [signUpForm,    setSignUpForm]    = useState(emptySignUp);
-  const [signUpErrors,  setSignUpErrors]  = useState({});
-  const [signUpSuccess, setSignUpSuccess] = useState(null); // registered member name
   const [todaySignups,  setTodaySignups]  = useState([]);
 
   // ── PRODUCT SALE ───────────────────────────────────────────────────────────
@@ -590,10 +444,6 @@ export default function FrontDeskPage() {
   const salesDayRef = useRef(salesDay);
   salesDayRef.current = salesDay;
   const [dayRegs, setDayRegs] = useState([]);
-  const [dayExpenses, setDayExpenses] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('gem_expenses') || '[]').filter(e => e.date === new Date().toISOString().slice(0,10)); }
-    catch { return []; }
-  });
 
   // ── Sign Up modals ────────────────────────────────────────────────────────
   const [showAddMember,  setShowAddMember]  = useState(false);
@@ -612,7 +462,6 @@ export default function FrontDeskPage() {
 
   // ── Inline member profile (avoids navigation glitch) ─────────────────────
   const [fdProfileId, setFdProfileId] = useState(null);
-  const [fdProfileAction, setFdProfileAction] = useState(null); // 'payment' | 'renew' | null
 
   // ── Exit re-auth ──────────────────────────────────────────────────────────
   // Leaving the desk for the app asks the manager for their own account
@@ -697,7 +546,7 @@ export default function FrontDeskPage() {
     shiftStatusApi(sid).then(r => {
       if (r.data?.clockable && r.data.state === 'none') setShiftPrompt({ kind: 'start', staffId: sid, name: r.data.name });
     }).catch(() => {});
-  }, [session?.staffId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session?.staffId]);
   const shiftTime = (d) => new Date(d || Date.now()).toLocaleTimeString(getDateLocale(), { hour: '2-digit', minute: '2-digit' });
   const closeShiftPrompt = () => { if (shiftBusy) return; setShiftPrompt(null); setShiftDone(''); setShiftError(''); };
   const confirmShift = async () => {
@@ -830,7 +679,6 @@ export default function FrontDeskPage() {
     if (activeTab === 'OPERATIONS') { loadFdEod(); refreshMyTasks(); }
     loadDaySales();
   });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadDaySales(salesDay); }, [salesDay]);
   // The open search result is a copy of the member; keep it in step with the list
   useEffect(() => {
@@ -904,7 +752,6 @@ export default function FrontDeskPage() {
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDeskAccount]);
 
   // A desk account has no app shell to go to: a notification that deep-links
@@ -1121,22 +968,10 @@ export default function FrontDeskPage() {
     }
   };
 
-  // Check a member straight in and record it, without touching the search-card
-  // state - so the profile drawer can use it too. Returns the member as the
-  // server left it (passes decremented, etc.).
-  const doMemberCheckIn = async (m) => {
-    let apiRes;
-    try { apiRes = await checkInApi({ memberId: m.id }); } catch { return m; }
-    const after = applyCheckInResult(m, apiRes);
-    addCheckinToList(after, 'member', apiRes?.data?.kind || null, apiRes?.data);
-    return after;
-  };
-
   // Re-send the member their own check-in code. Email goes through the server;
   // a text opens the desk device's own messaging app, prefilled, since the gym
   // has no SMS gateway of its own. Both take the member to act on (defaulting to
-  // the search result) and return { ok, text } so a caller can show its own
-  // message - the drawer uses the return value, the code modal the shared state.
+  // the search result) and return { ok, text }; the code modal shows the shared state.
   const emailCodeToMember = async (m = foundMember) => {
     if (!m || m._isStaff) return { ok: false, text: '' };
     if (!m.email) { const r = { ok: false, text: t('frontDesk.noEmailOnFile') }; setSendCodeSent(false); setSendCodeMsg(r.text); return r; }
@@ -1159,21 +994,6 @@ export default function FrontDeskPage() {
     window.location.href = `sms:${m.phone}?body=${encodeURIComponent(body)}`;
     const r = { ok: true, text: t('frontDesk.codeTextOpened') };
     setSendCodeSent(true); setSendCodeMsg(r.text); return r;
-  };
-
-  // The drawer's check-in: by sight when there is a photo, otherwise the member
-  // must give their code (the same code modal the search card uses).
-  const drawerNeedsCode = (m) => {
-    setMemberDrawer(null);
-    setFoundMember({ ...m, _foundByCode: false });
-    setSearchTerm(m.memberCode || `${m.firstName} ${m.lastName}`);
-    setShowCodeEntry(true);
-  };
-  // Open the full member profile at a particular action (renew / add payment).
-  const openFullProfile = (m, action = null) => {
-    setMemberDrawer(null);
-    setFdProfileAction(action);
-    setFdProfileId(m.id);
   };
 
   const handleCodeVerifyCheckIn = async () => {
@@ -1205,20 +1025,6 @@ export default function FrontDeskPage() {
   const memberCheckins = filteredCheckins.filter(c => c.type === 'member');
   const staffCheckins  = filteredCheckins.filter(c => c.type === 'staff');
   const blockReason    = foundMember ? getCheckInBlock(foundMember) : null;
-
-  // ── Sign Up ────────────────────────────────────────────────────────────────
-  const handleSignUp = () => {
-    const errs = {};
-    if (!signUpForm.firstName.trim()) errs.firstName = t('common.required');
-    if (!signUpForm.lastName.trim())  errs.lastName  = t('common.required');
-    if (!signUpForm.phone.trim())     errs.phone     = t('common.required');
-    if (!signUpForm.packageId)        errs.packageId = t('frontDesk.selectAPackage');
-    if (Object.keys(errs).length) { setSignUpErrors(errs); return; }
-    const name = `${signUpForm.firstName.trim()} ${signUpForm.lastName.trim()}`;
-    setSignUpSuccess(name);
-    setTodaySignups(prev => [{ name, package: packagesList.find(p=>p.id===signUpForm.packageId)?.name, time: new Date().toLocaleTimeString(getDateLocale(),{hour:'2-digit',minute:'2-digit'}) }, ...prev]);
-    setSignUpForm(emptySignUp); setSignUpErrors({});
-  };
 
   // ── Product Sale ───────────────────────────────────────────────────────────
   const cartTotal   = cart.reduce((s,i) => s + i.price * i.qty, 0);
@@ -1272,7 +1078,6 @@ export default function FrontDeskPage() {
   };
 
   // Fresh figures each time the Operations tab is opened
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (activeTab === 'OPERATIONS') loadFdEod(); }, [activeTab]);
 
   // ── Operations ────────────────────────────────────────────────────────────
@@ -1321,7 +1126,6 @@ export default function FrontDeskPage() {
     if (Object.keys(fe).length || expenseSaving) return;
     setExpenseError('');
     const today = getTodayStr();
-    const entry = { id: Date.now(), description: expenseForm.description, amount: amt, category: expenseForm.category, paymentMethod: expenseForm.paymentMethod, paidTo: expenseForm.paidTo, submittedBy: session?.staffName || 'Staff', time: new Date().toLocaleTimeString(getDateLocale(),{hour:'2-digit',minute:'2-digit'}), date: today, status: 'pending', exceedsLimit: false };
     // Every desk expense now waits for a manager's approval before it reaches
     // the books. `source:'frontdesk'` makes the server hold it pending.
     // Only a saved expense is reported as sent: money has left the drawer, so a
@@ -1347,8 +1151,7 @@ export default function FrontDeskPage() {
     } finally {
       setExpenseSaving(false);
     }
-    setDayExpenses(prev => [...prev, entry]);
-    setOpsActivity(prev => [{ type:'expense', text: t('frontDesk.expenseSentLine', { desc: expenseForm.description, amount: formatMoney(amt) }), time: entry.time }, ...prev]);
+    setOpsActivity(prev => [{ type:'expense', text: t('frontDesk.expenseSentLine', { desc: expenseForm.description, amount: formatMoney(amt) }), time: new Date().toLocaleTimeString(getDateLocale(), { hour: '2-digit', minute: '2-digit' }) }, ...prev]);
     setExpenseWasPending(true);
     setExpenseSuccess(true); setExpenseForm(emptyExpense);
     // Close the whole modal after the confirmation, rather than flipping back to
@@ -1605,7 +1408,7 @@ export default function FrontDeskPage() {
       {/* Nav tabs */}
       <div style={{ background:'var(--bg-card)', borderBottom:'1px solid var(--border-subtle)', padding: isMobile ? '0 8px' : '0 28px', display:'flex', flexShrink:0, overflowX: isMobile ? 'auto' : 'visible', scrollbarWidth:'none' }}>
         {TABS.map(tab => (
-          <button key={tab.key} onClick={() => { setActiveTab(tab.key); setFdProfileId(null); setFdProfileAction(null); }} style={{ padding: isMobile ? '11px 14px' : '12px 20px', background:'none', border:'none', borderBottom:`2px solid ${activeTab===tab.key?'var(--accent-gold)':'transparent'}`, color: activeTab===tab.key ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: isMobile ? 11 : 11, fontWeight:700, letterSpacing:'1px', cursor:'pointer', fontFamily:'DM Sans', transition:'color 0.15s', flexShrink:0, whiteSpace:'nowrap' }}>
+          <button key={tab.key} onClick={() => { setActiveTab(tab.key); setFdProfileId(null); }} style={{ padding: isMobile ? '11px 14px' : '12px 20px', background:'none', border:'none', borderBottom:`2px solid ${activeTab===tab.key?'var(--accent-gold)':'transparent'}`, color: activeTab===tab.key ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: isMobile ? 11 : 11, fontWeight:700, letterSpacing:'1px', cursor:'pointer', fontFamily:'DM Sans', transition:'color 0.15s', flexShrink:0, whiteSpace:'nowrap' }}>
             {tab.label}
           </button>
         ))}
@@ -1623,9 +1426,8 @@ export default function FrontDeskPage() {
             <div style={{ flex:1, overflowY:'auto', minWidth:0 }}>
               <MemberProfilePage
                 memberId={fdProfileId}
-                onBack={() => { setFdProfileId(null); setFdProfileAction(null); }}
+                onBack={() => setFdProfileId(null)}
                 fromFrontDesk={true}
-                initialAction={fdProfileAction}
                 seedMember={membersList.find(m => String(m.id) === String(fdProfileId))}
                 seedGym={gymData}
                 seedPackages={packagesList}
@@ -2435,22 +2237,6 @@ export default function FrontDeskPage() {
       )}
 
       {exitGate}
-
-      {/* ── Member quick-view drawer (slide-over) ── */}
-      {memberDrawer && (
-        <MemberDrawer
-          member={memberDrawer}
-          onClose={() => setMemberDrawer(null)}
-          onPhoto={setPhotoLightbox}
-          onCheckInDirect={doMemberCheckIn}
-          onNeedCode={drawerNeedsCode}
-          onEmailCode={emailCodeToMember}
-          onTextCode={textCodeToMember}
-          onAddPayment={(m) => openFullProfile(m, 'payment')}
-          onRenew={(m) => openFullProfile(m, 'renew')}
-          onOpenFull={(m) => openFullProfile(m, null)}
-        />
-      )}
 
     </div>
   );

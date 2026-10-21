@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Dumbbell, ArrowLeft, ArrowRight, Check, Building2, User,
   Mail, Lock, MapPin, Eye, EyeOff, Phone, Sparkles, Users,
-  ShieldCheck, Zap, RefreshCw, CreditCard, Monitor, BarChart3, ChevronRight, ChevronDown, PlayCircle, Globe,
+  ShieldCheck, Zap, RefreshCw, CreditCard, Monitor, BarChart3, ChevronDown, PlayCircle, Globe,
 } from 'lucide-react';
 import { register, checkGymCode as checkGymCodeApi } from '../services/auth.service';
 import { setAuth, setPhoneFormat } from '../utils/auth';
@@ -304,7 +304,7 @@ export default function SignUpPage() {
               {step === 1 && (
                 <GymStep
                   form={form} set={set} errors={errors}
-                  codeStatus={codeStatus} codeEdited={codeEdited}
+                  codeStatus={codeStatus}
                   setCodeEdited={setCodeEdited} regenerateCode={regenerateCode}
                 />
               )}
@@ -742,7 +742,7 @@ function DialCodeSelect({ countries, value, onChange }) {
 
 // ─── Step 1: Gym Setup ────────────────────────────────────────────────────────
 
-function GymStep({ form, set, errors, codeStatus, codeEdited, setCodeEdited, regenerateCode }) {
+function GymStep({ form, set, errors, codeStatus, setCodeEdited, regenerateCode }) {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
   const statusColor = codeStatus === 'available' ? '#22c55e' : codeStatus === 'taken' ? 'var(--accent-red)' : 'var(--text-muted)';

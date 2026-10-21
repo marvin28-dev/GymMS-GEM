@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { getCurrencySymbol, formatMoney } from '../utils/currency';
 import { durationText, sessionsText } from '../utils/packageText';
-import { Plus, Pencil, Trash2, Eye, Users, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, Users } from 'lucide-react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import FAB from '../components/FAB';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -216,11 +216,6 @@ export default function PackagesPage() {
     else { doSave(payload, another); }
   };
 
-  const iconBtn = (hoverColor) => ({
-    background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4,
-    onMouseEnter: e => (e.currentTarget.style.color = hoverColor),
-    onMouseLeave: e => (e.currentTarget.style.color = 'var(--text-muted)'),
-  });
   const th = { padding: '10px 20px', textAlign: 'left', fontSize: 10, textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' };
   const td = { padding: '14px 20px' };
 

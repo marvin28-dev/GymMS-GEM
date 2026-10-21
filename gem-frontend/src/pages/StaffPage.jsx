@@ -3,19 +3,18 @@ import { useState, useRef, useEffect } from 'react';
 import { formatMoney } from '../utils/currency';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import { MoreVertical, UserCircle, Pencil, Trash2, Plus, Camera, IdCard, ChevronRight, UserX, UserCheck } from 'lucide-react';
+import { UserCircle, Pencil, Plus, Camera, IdCard, ChevronRight, UserX, UserCheck } from 'lucide-react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import FAB from '../components/FAB';
 import PageHeader from '../components/ui/PageHeader';
 import Avatar from '../components/ui/Avatar';
 import StatusBadge from '../components/ui/StatusBadge';
 import Modal from '../components/ui/Modal';
-import ConfirmModal from '../components/ui/ConfirmModal';
 import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import RowMenu from '../components/ui/RowMenu';
 import GemInput from '../components/ui/GemInput';
 import GemSelect from '../components/ui/GemSelect';
-import { getAll as getStaffApi, create as createStaff, update as updateStaff, remove as removeStaff } from '../services/staff.service';
+import { getAll as getStaffApi, create as createStaff, update as updateStaff } from '../services/staff.service';
 import { uploadPhoto } from '../services/upload.service';
 import { getRole, getAuth, getPhonePlaceholder } from '../utils/auth';
 import { roleName } from '../utils/roleNames';
@@ -29,28 +28,6 @@ import { addressErrors } from '../utils/address';
 import { serverFieldError, fieldErrorStyle, revealFirstError } from '../utils/formErrors';
 
 const formatDate = (d) => fmtDate(d);
-
-
-function compressImage(dataUrl, maxW = 1000, maxH = 1000, quality = 0.82) {
-  return new Promise(resolve => {
-    const img = new Image();
-    img.onload = () => {
-      let { width, height } = img;
-      if (width > maxW || height > maxH) {
-        const ratio = Math.min(maxW / width, maxH / height);
-        width = Math.round(width * ratio);
-        height = Math.round(height * ratio);
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
-}
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const cardStyle = {
@@ -195,7 +172,6 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
   // a role at or above their own.
   const myRole = getRole();
   const roleLocked = isOwnerAccount || (isOwnRow && !isOwner(myRole));
-  const deptLocked = isOwnRow && !isOwner(myRole);
   const canSetPay = isOwner(myRole);
   const ROLE_LABELS = {
     Manager: t('staff.roleManager'), 'Front Desk': t('staff.roleFrontDesk'),

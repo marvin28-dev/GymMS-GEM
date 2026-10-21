@@ -13,17 +13,14 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import CodeInput from '../components/ui/CodeInput';
 import LoadFailed from '../components/ui/LoadFailed';
-import {
-  ArrowLeft, Edit2, CreditCard, LogIn, Snowflake, XCircle, BookOpen,
+import { Edit2, CreditCard, LogIn, Snowflake, XCircle,
   Package, RefreshCw, MessageSquare, StickyNote, Plus, User,
-  Eye, EyeOff, Save, Lock, Unlock, UserCheck, AlertTriangle,
+  Eye, EyeOff, Save, Lock, UserCheck, AlertTriangle,
   Download, FileText, Users, UserMinus, Ticket, Camera, Trash2, Mail, Smartphone, X, Phone, Check
 } from 'lucide-react';
-import StatusBadge from '../components/ui/StatusBadge';
 import MemberStatusTags from '../components/ui/MemberStatusTags';
 import RowMenu from '../components/ui/RowMenu';
 import VisitKindBadge from '../components/ui/VisitKindBadge';
-import Avatar from '../components/ui/Avatar';
 import Modal from '../components/ui/Modal';
 import GemInput from '../components/ui/GemInput';
 import GemSelect from '../components/ui/GemSelect';
@@ -43,7 +40,6 @@ import { checkInBlockReason, passesLeft, passesOf, checkInErrorText } from '../u
 import { getMyGym } from '../services/gym.service';
 import { getForMember as getMemberMessages } from '../services/communications.service';
 import SendMessageModal from '../components/SendMessageModal';
-import { verifyManager } from '../services/auth.service';
 import { uploadPhoto } from '../services/upload.service';
 import { fmtDate, fmtTime, todayStr, dayStr } from '../utils/date';
 import { getGymInfo, gymContactFooterHtml, printReceiptDocument, escapeHtml } from '../utils/receipt';
@@ -240,153 +236,12 @@ function EditPersonalModal({ open, onClose, member, onSave }) {
   );
 }
 
-// ─── Edit Membership Modal ────────────────────────────────────────────────────
-function EditMembershipModal({ open, onClose, member, onSave }) {
-  const { t } = useLanguage();
-  const gymSettings = useGymSettings();
-  const [form, setForm] = useState({});
-  const [endDateUnlocked, setEndDateUnlocked] = useState(false);
-  const [pin, setPin]         = useState('');
-  const [pinError, setPinError]   = useState('');
-  const [pinLoading, setPinLoading] = useState(false);
-  const [showPinEntry, setShowPinEntry] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  useState(() => {
-    if (member) setForm({
-      startDate: member.startDate || '',
-      endDate:   member.endDate   || '',
-      autoRenew: 'Yes',
-    });
-  }, [member, open]);
-
-  useEffect(() => {
-    if (!open) { setEndDateUnlocked(false); setPin(''); setPinError(''); setShowPinEntry(false); }
-  }, [open]);
-
-  if (!member) return null;
-  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
-
-  const handleUnlock = async () => {
-    if (!pin) return;
-    setPinLoading(true); setPinError('');
-    try {
-      const res = await verifyManager(pin, `Change the membership end date of ${member?.firstName ?? ''} ${member?.lastName ?? ''}`);
-      if (res.data?.authorized) {
-        setEndDateUnlocked(true);
-        setShowPinEntry(false);
-      } else {
-        setPinError('Incorrect code. Try again.');
-        setPin('');
-      }
-    } catch (err) {
-      setPinError(err?.response?.data?.error || t('memberProfile.verificationFailed'));
-      setPin('');
-    } finally {
-      setPinLoading(false);
-    }
-  };
-
-  return (
-    <Modal open={open} onClose={onClose} title={t('memberProfile.editMembershipTitle')} maxWidth={480}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <GemInput label={t('memberProfile.startDate')} type="date" value={form.startDate} onChange={set('startDate')} />
-
-        {/* End date. locked unless manager unlocks */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans', fontWeight: 500 }}>
-              {t('memberProfile.endDateLabel')}
-            </label>
-            {!endDateUnlocked && (
-              <button
-                onClick={() => setShowPinEntry(v => !v)}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans',
-                  transition: 'color 0.15s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-gold)'}
-                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-              >
-                <Lock size={11} /> {t('memberProfile.managerOverride')}
-              </button>
-            )}
-            {endDateUnlocked && (
-              <span style={{ fontSize: 11, color: 'var(--accent-green)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <Unlock size={11} /> {t('memberProfile.unlocked')}
-              </span>
-            )}
-          </div>
-          <input
-            type="date"
-            value={form.endDate}
-            onChange={set('endDate')}
-            readOnly={!endDateUnlocked}
-            style={{
-              background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
-              borderRadius: 10, padding: '9px 14px', fontSize: 13,
-              color: endDateUnlocked ? 'var(--text-primary)' : 'var(--text-muted)',
-              fontFamily: 'DM Sans', outline: 'none', width: '100%', boxSizing: 'border-box',
-              cursor: endDateUnlocked ? 'text' : 'not-allowed',
-              opacity: endDateUnlocked ? 1 : 0.6,
-            }}
-          />
-          {showPinEntry && !endDateUnlocked && (
-            <div style={{
-              background: 'var(--bg-elevated)', border: `1px solid ${pinError ? 'var(--accent-red)' : 'var(--border-subtle)'}`,
-              borderRadius: 10, padding: '12px 14px',
-              display: 'flex', flexDirection: 'column', gap: 8,
-            }}>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t('memberProfile.enterManagerPassword')}</div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="password" value={pin}
-                  onChange={e => { setPin(e.target.value); setPinError(''); }}
-                  onKeyDown={e => e.key === 'Enter' && handleUnlock()}
-                  placeholder={t('memberProfile.loginPasswordPH')}
-                  autoFocus
-                  style={{
-                    flex: 1, background: 'var(--bg-card)', border: `1px solid ${pinError ? 'var(--accent-red)' : 'var(--border-subtle)'}`,
-                    borderRadius: 8, padding: '8px 12px', fontSize: 14,
-                    color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none',
-                  }}
-                />
-                <button style={{ ...primaryBtn, opacity: (pin && !pinLoading) ? 1 : 0.5 }}
-                  disabled={!pin || pinLoading} onClick={handleUnlock}>
-                  {pinLoading ? '…' : t('memberProfile.unlock')}
-                </button>
-              </div>
-              {pinError && <div style={{ fontSize: 12, color: 'var(--accent-red)' }}>{pinError}</div>}
-            </div>
-          )}
-        </div>
-
-        <GemSelect label={t('memberProfile.autoRenewLabel')} value={form.autoRenew} onChange={set('autoRenew')} options={[
-          { value: 'Yes', label: t('memberProfile.yes') },
-          { value: 'No',  label: t('memberProfile.no') },
-        ]} />
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid var(--border-subtle)' }}>
-          <button style={secondaryBtn} onClick={onClose}>{t('memberProfile.cancel')}</button>
-          <button style={primaryBtn} disabled={saving} onClick={async () => {
-            setSaving(true);
-            try { await onSave?.({ startDate: form.startDate, endDate: form.endDate }); onClose(); } catch {} finally { setSaving(false); }
-          }}><Save size={13} /> {saving ? t('memberProfile.saving') : t('memberProfile.saveChanges')}</button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 // ─── Add Payment Modal ────────────────────────────────────────────────────────
 function generateRef() {
   const ts = Date.now().toString(36).toUpperCase();
   const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
   return `TXN-${ts}-${rand}`;
 }
-
-const PAYMENT_METHOD_MAP = { Card: 'card', Cash: 'cash', 'Bank Transfer': 'bank_transfer', 'Mobile Pay': 'mobile_money' };
 
 function AddPaymentModal({ open, onClose, onSave, member }) {
   const { t } = useLanguage();
@@ -831,104 +686,6 @@ function ConvertToVisitorModal({ open, onClose, member, gymData, packagesList = 
             disabled={!canAfford || saving} onClick={handleConfirm}
           >
             <UserMinus size={13} /> {saving ? t('memberProfile.processing') : t('memberProfile.convertToVisitor')}
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-// ─── Convert Visitor to Member Modal ──────────────────────────────────────────
-// Step 1: pay registration fee → status becomes 'registered'
-// After that, the profile shows "Choose Membership" instead of "Renew"
-function ConvertToMemberModal({ open, onClose, member, gymData, onApplied }) {
-  const { t } = useLanguage();
-  const refund = usePaymentRefund(onClose);
-  const regFeeAmount = gymData?.registrationFee || 5000;
-  const [paidNow, setPaidNow]           = useState(0);
-  const [showPayment, setShowPayment]   = useState(false);
-  const [saving, setSaving]             = useState(false);
-  useEffect(() => { if (!open) { setPaidNow(0); setShowPayment(false); setSaving(false); refund.reset(); } }, [open]);
-
-  // The registration fee is paid now - never offset by what the member owes.
-  const effectiveBalance = paidNow;
-  const canAfford = effectiveBalance >= regFeeAmount;
-  const shortfall = Math.max(0, regFeeAmount - effectiveBalance);
-
-  const handleConfirm = async () => {
-    if (!member || !canAfford || saving) return;
-    setSaving(true);
-    try {
-      const res = await updateMember(member.id, {
-        isVisitor: false,
-        status: 'registered',
-        regFeeDate: todayStr(),
-        passesTotal: null,
-        passesRemaining: null,
-      });
-      await refund.sendReceipts();
-      onApplied?.(res?.data || { isVisitor: false, status: 'registered' });
-      refund.confirmClose();
-    } catch { setSaving(false); }
-  };
-
-  return (
-    <Modal open={open} onClose={refund.cancel} hideClose={refund.hasPaid} title={t('memberProfile.convertToMemberTitle')} maxWidth={440}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <DismissibleInfo dismissKey="convert_to_member" color="gold">
-          {t('memberProfile.convertToMemberInfo')}
-        </DismissibleInfo>
-
-        {/* Registration fee summary */}
-        <div style={{
-          background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
-          borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 7,
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-            <span style={{ color: 'var(--text-muted)' }}>{t('memberProfile.registrationFeeLabel')}</span>
-            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{fmtMoney(regFeeAmount)}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-            <span style={{ color: 'var(--text-muted)' }}>{t('memberProfile.currentBalance')}</span>
-            <span style={{ color: effectiveBalance >= regFeeAmount ? '#34d399' : '#ef4444', fontWeight: 500 }}>
-              {fmtMoney(effectiveBalance)}
-            </span>
-          </div>
-          {shortfall > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-              <span style={{ color: 'var(--text-muted)' }}>{t('memberProfile.shortfall')}</span>
-              <span style={{ color: '#ef4444', fontWeight: 600 }}>{fmtMoney(shortfall)}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Add payment if needed */}
-        {!canAfford && !showPayment && (
-          <button onClick={() => setShowPayment(true)} style={{
-            ...secondaryBtn, justifyContent: 'center',
-            borderColor: 'rgba(212,175,55,0.35)', color: 'var(--accent-gold)',
-          }}>
-            <CreditCard size={13} /> {t('memberProfile.addPaymentToCover')}
-          </button>
-        )}
-        {showPayment && shortfall > 0 && (
-          <InlinePaymentSection
-            shortfall={shortfall}
-            memberId={member?.id}
-            type="registration"
-            notify={false}
-            description={t('memberProfile.registrationFeeLabel')}
-            onPaymentAdded={(n, id) => { setPaidNow(p => p + n); refund.addPaid(id); setShowPayment(false); }}
-          />
-        )}
-
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid var(--border-subtle)' }}>
-          <CancelOrRefund refund={refund} saving={saving} />
-          <button
-            style={{ ...primaryBtn, opacity: (canAfford && !saving) ? 1 : 0.4, cursor: (canAfford && !saving) ? 'pointer' : 'not-allowed' }}
-            disabled={!canAfford || saving} onClick={handleConfirm}
-          >
-            <Users size={13} /> {saving ? t('memberProfile.processing') : t('memberProfile.confirmPayRegFee')}
           </button>
         </div>
       </div>
@@ -1713,87 +1470,6 @@ function RenewMembershipModal({ open, onClose, member, packagesList = [], onSave
 }
 
 // ─── Extend Modal ─────────────────────────────────────────────────────────────
-
-// ─── Reusable Manager Auth Section ───────────────────────────────────────────
-
-function ManagerAuthSection({ authorized, onAuthorize, label, purpose }) {
-  const { t } = useLanguage();
-  const displayLabel = label ?? t('memberProfile.managerAuthRequired');
-  const signedInUser = getAuth()?.user;
-  const signedInName = signedInUser ? `${signedInUser.firstName || ''} ${signedInUser.lastName || ''}`.trim() : '';
-  const [pin, setPin]       = useState('');
-  const [error, setError]   = useState('');
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => { setPin(''); setError(''); }, [authorized]);
-
-  if (authorized) {
-    return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.2)',
-        borderRadius: 10, padding: '10px 14px', fontSize: 12, color: 'var(--accent-green)',
-      }}>
-        <Unlock size={13} /> {t('memberProfile.managerAuthorized')}
-      </div>
-    );
-  }
-
-  const attempt = async () => {
-    if (!pin) return;
-    setLoading(true); setError('');
-    try {
-      const res = await verifyManager(pin, purpose);
-      if (res.data?.authorized) {
-        onAuthorize();
-      } else {
-        setError(t('memberProfile.incorrectPassword'));
-        setPin('');
-      }
-    } catch (err) {
-      const msg = err?.response?.data?.error || t('memberProfile.verificationFailed');
-      setError(msg);
-      setPin('');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div style={{
-      background: 'var(--bg-elevated)', border: `1px solid ${error ? 'var(--accent-red)' : 'var(--border-subtle)'}`,
-      borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-        <Lock size={12} /> {displayLabel}
-      </div>
-      {signedInName && (
-        <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: -2 }}>
-          {t('managerAuth.signedInAs', { name: signedInName })}
-        </div>
-      )}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <CodeInput
-          value={pin} autoFocus maxLength={4}
-          onChange={v => { setPin(v); setError(''); }}
-          onEnter={attempt}
-          placeholder={t('managerAuth.codeLabel')}
-          style={{
-            flex: 1, background: 'var(--bg-card)',
-            border: `1px solid ${error ? 'var(--accent-red)' : 'var(--border-subtle)'}`,
-            borderRadius: 8, padding: '8px 12px', fontSize: 14,
-            color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none',
-          }}
-        />
-        <button style={{ ...primaryBtn, opacity: (pin && !loading) ? 1 : 0.5, cursor: (pin && !loading) ? 'pointer' : 'not-allowed' }}
-          disabled={!pin || loading} onClick={attempt}>
-          {loading ? '…' : t('memberProfile.authorize')}
-        </button>
-      </div>
-      {error && <div style={{ fontSize: 12, color: 'var(--accent-red)' }}>{error}</div>}
-    </div>
-  );
-}
 
 // ─── Action confirm (apply directly, or request a manager's approval) ─────────
 // A manager applies the change at once; anyone else sends it to the managers as
@@ -2697,7 +2373,6 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
 
   const [activeTab, setActiveTab] = useState('Personal Details');
   const [showPersonalModal, setShowPersonalModal]         = useState(false);
-  const [showMembershipModal, setShowMembershipModal]     = useState(false);
   const [showChangePackageModal, setShowChangePackageModal] = useState(false);
   const [showRenewModal, setShowRenewModal]               = useState(false);
   const [showExtendModal, setShowExtendModal]             = useState(false);
@@ -2790,7 +2465,6 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
   const [showCode, setShowCode]                               = useState(false);
   const [viewPayment, setViewPayment]                             = useState(null);
   const [showConvertToVisitorModal, setShowConvertToVisitorModal] = useState(false);
-  const [showConvertToMemberModal, setShowConvertToMemberModal]   = useState(false);
   const [showCheckInCodeModal, setShowCheckInCodeModal]           = useState(false);
   const [checkedInFlash, setCheckedInFlash]                       = useState(false);
   const [checkInError, setCheckInError]                           = useState('');
@@ -3066,7 +2740,6 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
     // A visitor stays a visitor when their passes run out (status flips to
     // expired), so this reads the flag, not the status.
     const isVisitor    = !!member.isVisitor || member.status === 'visitor';
-    const isRegistered = member.status === 'registered'; // paid reg fee, no package yet
     const passesTotal  = passesOf(member);
     const passesUsed   = Math.max(0, passesTotal - passesLeft(member));
     // The end date is the last day the passes can be used, so it lapses the day after
@@ -3096,9 +2769,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
 
     const primaryAction = isVisitor
       ? actionBtn(t('memberProfile.convertToMember'),  <Users size={13} />,     () => setShowRenewModal(true), { primary: true })
-      : isRegistered
-        ? actionBtn(t('memberProfile.chooseMembership'), <BookOpen size={13} />, () => setShowRenewModal(true), { primary: true })
-        : isLapsed
+      : isLapsed
           ? actionBtn(t('memberProfile.reactivate'),     <RefreshCw size={13} />, () => setShowRenewModal(true), { primary: true })
           : actionBtn(t('memberProfile.renew'),          <RefreshCw size={13} />, () => setShowRenewModal(true), { primary: true });
 
@@ -3108,7 +2779,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
         {actionBtn(t('memberProfile.buyDayPassBtn'), <Ticket size={13} />, () => setShowDayPassModal(true))}
         {actionBtn(t('memberProfile.convertToMember'), <Users size={13} />, () => setShowRenewModal(true))}
       </>
-    ) : isRegistered ? primaryAction : isLapsed ? (
+    ) : isLapsed ? (
       <>
         {primaryAction}
         {/* A cancelled/deactivated membership can still drop in on a day pass or move to a visitor plan. */}
@@ -3692,8 +3363,6 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
       {/* Modals */}
       <EditPersonalModal    open={showPersonalModal}    onClose={() => setShowPersonalModal(false)}    member={member}
         onSave={async (form) => { await updateMember(member.id, form); setMember(m => ({ ...m, ...form })); }} />
-      <EditMembershipModal  open={showMembershipModal}  onClose={() => setShowMembershipModal(false)}  member={member}
-        onSave={async (form) => { await updateMember(member.id, form); setMember(m => ({ ...m, ...form })); }} />
       <ChangePackageModal   open={showChangePackageModal} onClose={() => setShowChangePackageModal(false)} member={member} packagesList={packagesList}
         onSave={(updates) => setMember(m => ({ ...m, ...updates }))} />
       <RenewMembershipModal open={showRenewModal}       onClose={() => setShowRenewModal(false)}       member={member} packagesList={packagesList}
@@ -3758,14 +3427,13 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
           // Re-fetch member so payments list has full staff info
           try {
             const fresh = await getMemberById(member.id);
-            setMember(m => ({ ...fresh.data, balance: newBalance }));
+            setMember({ ...fresh.data, balance: newBalance });
           } catch {
             setMember(m => ({ ...m, balance: newBalance, payments: [res.data, ...(m.payments || [])] }));
           }
         }} />
       <PaymentDetailModal open={!!viewPayment} onClose={() => setViewPayment(null)} payment={viewPayment} member={member} />
       <ConvertToVisitorModal open={showConvertToVisitorModal} onClose={() => setShowConvertToVisitorModal(false)} member={member} gymData={gymData} packagesList={packagesList} onApplied={applyMemberUpdate} onSettleBalance={() => { setShowConvertToVisitorModal(false); handleAddPayment(); }} />
-      <ConvertToMemberModal  open={showConvertToMemberModal}  onClose={() => setShowConvertToMemberModal(false)}  member={member} gymData={gymData} onApplied={applyMemberUpdate} />
       <AddNoteModal open={showNoteModal} onClose={() => setShowNoteModal(false)}
         onSave={(form) => {
           const note = { date: fmtDate(new Date()), content: form.note, category: form.category, author: [getAuth()?.user?.firstName, getAuth()?.user?.lastName].filter(Boolean).join(' ') || roleName(getRole(), t) };

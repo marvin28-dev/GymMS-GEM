@@ -2,7 +2,7 @@
 import { checkInErrorText } from '../utils/checkin';
 import RevenueSplit from '../components/ui/RevenueSplit';
 import useLiveRefresh from '../hooks/useLiveRefresh';
-import { useState, useEffect, useRef, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext } from 'react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { getCurrencySymbol, formatMoney } from '../utils/currency';
 import { digitsOnly } from '../utils/number';
@@ -15,13 +15,12 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
   Users, CheckSquare, Banknote, AlertCircle,
-  UserPlus, LogIn, CreditCard, ShoppingBag, Plus, FileText, Wrench,
-  ChevronLeft, ChevronRight, Printer, Lock, Search, Calendar, Trash2, ClipboardList,
+  UserPlus, LogIn, CreditCard, Plus, FileText, Wrench,
+  ChevronLeft, ChevronRight, Lock, Search, Calendar,
 } from 'lucide-react';
 
 import Avatar from '../components/ui/Avatar';
 import CodeInput from '../components/ui/CodeInput';
-import StatusBadge from '../components/ui/StatusBadge';
 import MemberStatusTags from '../components/ui/MemberStatusTags';
 import VisitKindBadge from '../components/ui/VisitKindBadge';
 import EodReport from '../components/EodReport';
@@ -35,10 +34,9 @@ import { roleName } from '../utils/roleNames';
 import { getAll as getAttendance, checkIn as checkInApi } from '../services/attendance.service';
 import { getAll as getPayments, create as createPayment } from '../services/payments.service';
 import { getAll as getCalendar } from '../services/calendar.service';
-import { getAll as getNotifications, markAllRead as markNotifsRead } from '../services/notifications.service';
 import { getAll as getMembers } from '../services/members.service';
 import { getAll as getStaff } from '../services/staff.service';
-import { create as createTask, getAll as getTasks } from '../services/tasks.service';
+import { create as createTask } from '../services/tasks.service';
 import { create as createEquipmentIssue } from '../services/equipment.service';
 import { getAll as getPackages } from '../services/packages.service';
 import OpenShiftsWarning, { useOpenShifts } from '../components/OpenShiftsWarning';
@@ -1013,11 +1011,8 @@ function GymDashboard() {
   const [payments, setPayments] = useState(() => { const c = cache('payments', []); return Array.isArray(c) ? c : []; });
   const [shopToday, setShopToday] = useState(() => { const c = cache('shopToday', []); return Array.isArray(c) ? c : []; });
   const [todayEvents, setTodayEvents] = useState(() => cache('events', []));
-  const [notifs, setNotifs] = useState(() => cache('notifs', []));
   const [packagesList, setPackagesList] = useState(() => cache('packages', []));
   const [gymData, setGymData] = useState(() => cache('gym', {}));
-  const [myTasks, setMyTasks] = useState([]);
-  const [loadingData, setLoadingData] = useState(false);
   // A dashboard that has been open before renders its last known figures at
   // once and quietly refreshes them. A first visit has nothing to show, and
   // eight requests landing one after another made the page assemble itself in
@@ -1040,38 +1035,25 @@ function GymDashboard() {
       // The takings are not a trainer's to read, so the call is not made
       isFitness(role) ? Promise.resolve({ data: [] }) : getPayments(),
       getCalendar({ date: todayParam }),
-      getNotifications(),
       getStaff(),
       getPackages(),
       getMyGym(),
       isFitness(role) ? Promise.resolve({ data: [] }) : getSales(todayStr()),
-    ]).then(([mem, att, pay, cal, not, stf, pkg, gymRes, shop]) => {
+    ]).then(([mem, att, pay, cal, stf, pkg, gymRes, shop]) => {
       upd(setMembersList, 'members')(mem);
       upd(setCheckins, 'checkins')(att);
       if (!isFitness(role)) { upd(setPayments, 'payments')(pay); upd(setShopToday, 'shopToday')(shop); }
       upd(setTodayEvents, 'events')(cal);
-      upd(setNotifs, 'notifs')(not);
       upd(setStaffList, 'staff')(stf);
       upd(setPackagesList, 'packages')(pkg);
       const d = gymRes.data || {};
       setGymData(d);
       setCache('gym', d);
     }).finally(() => setReady(true));
-    const myId = auth?.user?.id;
-    if (myId) getTasks().then(r => setMyTasks((r.data || []).filter(t => t.assignedToId != null && String(t.assignedToId) === String(myId)))).catch(() => {});
   };
 
   useEffect(() => { loadDashboard(); }, []);
   useLiveRefresh(loadDashboard);
-
-  const markAllRead = async () => {
-    try {
-      await markNotifsRead();
-      setNotifs(n => n.map(x => ({ ...x, isRead: true })));
-    } catch {
-      setNotifs(n => n.map(x => ({ ...x, isRead: true })));
-    }
-  };
 
   // Everything taken in today, members and shop alike, on the gym's own day
   const todayRev = revenueOf(Array.isArray(payments) ? payments : [], shopToday, d => d === todayStr());
@@ -1083,49 +1065,7 @@ function GymDashboard() {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   }));
 
-  const isFitnessRole = ['trainer', 'instructor', 'coach'].includes(role);
-  const myClassesToday = todayEvents.filter(e => (e.assignedStaff || []).includes(auth?.user?.id));
-  const myPendingTasks = myTasks.filter(t => t.status !== 'Done' && t.status !== 'done' && t.status !== 'completed');
-
-  const kpis = isFitnessRole ? [
-    {
-      label: 'My Classes Today',
-      value: myClassesToday.length,
-      icon: Calendar,
-      iconColor: 'var(--accent-gold)', iconBg: 'var(--accent-gold-dim)', glowColor: '#c9a96e',
-      trend: myClassesToday.length === 0 ? 'none scheduled' : `${myClassesToday.map(e => e.startTime).filter(Boolean).join(', ')}`,
-      trendColor: 'var(--accent-green)', trendBg: 'var(--accent-green-dim)',
-      onClick: () => navigate('/calendar'),
-    },
-    {
-      label: 'My Tasks',
-      value: myPendingTasks.length,
-      icon: ClipboardList,
-      iconColor: 'var(--accent-blue)', iconBg: 'var(--accent-blue-dim)', glowColor: '#60a5fa',
-      trend: myPendingTasks.length === 0 ? 'all done' : `${myPendingTasks.filter(t => t.priority === 'High').length} high priority`,
-      trendColor: myPendingTasks.some(t => t.priority === 'High') ? 'var(--accent-red)' : 'var(--accent-green)',
-      trendBg: myPendingTasks.some(t => t.priority === 'High') ? 'var(--accent-red-dim)' : 'var(--accent-green-dim)',
-      onClick: () => navigate('/my-profile?tab=tasks'),
-    },
-    {
-      label: t('attendance.checkInsLabel'),
-      value: checkins.length,
-      icon: CheckSquare,
-      iconColor: 'var(--accent-green)', iconBg: 'var(--accent-green-dim)', glowColor: '#4ade80',
-      trend: t('dashboard.asOfNow'),
-      trendColor: 'var(--accent-green)', trendBg: 'var(--accent-green-dim)',
-      onClick: () => navigate('/attendance'),
-    },
-    {
-      label: t('dashboard.totalMembers'),
-      value: membersList.length,
-      icon: Users,
-      iconColor: 'var(--accent-purple)', iconBg: 'var(--accent-purple-dim)', glowColor: '#a78bfa',
-      trend: `${activeMembers} ${t('common.active').toLowerCase()}`,
-      trendColor: 'var(--accent-green)', trendBg: 'var(--accent-green-dim)',
-      onClick: () => navigate('/members'),
-    },
-  ] : [
+  const kpis = [
     {
       label: t('dashboard.totalMembers'),
       value: membersList.length,
@@ -1279,7 +1219,6 @@ function GymDashboard() {
 
       {/* Setup checklist */}
       {setupActive && (() => {
-        const gmStaff = staffList.find(s => s.role === 'general_manager');
         const tasks = [
           { label: t('dashboard.setupTask1'), done: setup.items.ownerProfile, path: `/staff/${auth?.user?.id}`, hint: t('dashboard.setupTask1Hint') },
           { label: t('dashboard.setupTask2'), done: setup.items.settings, path: '/settings', hint: t('dashboard.setupTask2Hint') },
@@ -1608,7 +1547,7 @@ function GymDashboard() {
       <AddMemberModal open={showAddMember} onClose={() => setShowAddMember(false)} onCreated={(newId) => { setShowAddMember(false); loadDashboard(); navigate(`/members/${newId}`); }} packagesList={packagesList} gymData={gymData ?? {}} />
       <AddVisitorModal open={showAddVisitor} onClose={() => setShowAddVisitor(false)} onCreated={(newId) => { setShowAddVisitor(false); loadDashboard(); navigate(`/members/${newId}`); }} packagesList={packagesList} gymData={gymData ?? {}} />
       <CheckInModal open={showCheckIn} onClose={() => setShowCheckIn(false)} membersList={membersList} onCheckedIn={(newCheckin) => setCheckins(prev => [newCheckin, ...prev])} />
-      <AddTaskModal open={showAddTask} onClose={() => setShowAddTask(false)} staffList={staffList} onCreated={(task) => { const myId = auth?.user?.id; if (myId && task?.assignedToId != null && String(task.assignedToId) === String(myId)) setMyTasks(prev => [task, ...prev]); }} />
+      <AddTaskModal open={showAddTask} onClose={() => setShowAddTask(false)} staffList={staffList} />
       <ReportIssueModal open={showReportIssue} onClose={() => setShowReportIssue(false)} />
       <EodReport open={showEOD} onClose={() => setShowEOD(false)} />
       <AddPaymentModal open={showAddPayment} onClose={() => setShowAddPayment(false)} membersList={membersList} onSaved={(newPayment) => { if (newPayment) { const paidAmt = Number(newPayment.amount) || 0; const paidMember = membersList.find(m => m.id === newPayment.memberId); setPayments(prev => [{ ...newPayment, amount: paidAmt, member: paidMember ? { id: paidMember.id, firstName: paidMember.firstName, lastName: paidMember.lastName } : null }, ...prev]); if (newPayment.memberId) { setMembersList(prev => prev.map(m => m.id === newPayment.memberId ? { ...m, balance: Math.max(0, Number(m.balance || 0) - paidAmt) } : m)); } } else { loadDashboard(); } }} />

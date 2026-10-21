@@ -87,7 +87,7 @@ export default function TimeInput({ value, onChange, disabled = false, style = {
       window.removeEventListener('resize', follow);
       window.removeEventListener('scroll', follow, true);
     };
-  }); // eslint-disable-line react-hooks/exhaustive-deps
+  });
 
   const onKey = (e) => {
     if (e.key === 'Escape') { if (open) { e.preventDefault(); e.stopPropagation(); hide(); } return; }

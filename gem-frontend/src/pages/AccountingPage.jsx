@@ -2,16 +2,15 @@
 import { useLiveTick } from '../hooks/useLiveRefresh';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getCurrencySymbol, formatMoney } from '../utils/currency';
+import { formatMoney } from '../utils/currency';
 import { digitsOnly } from '../utils/number';
-import { Plus, Download, TrendingUp, TrendingDown, AlertCircle, Banknote, Pencil, Trash2, FileText, ChevronDown, Eye, BarChart2, Save, X, CheckCircle } from 'lucide-react';
+import { Plus, Download, TrendingUp, TrendingDown, AlertCircle, Banknote, Pencil, Trash2, FileText, Eye, BarChart2, CheckCircle } from 'lucide-react';
 import RowMenu from '../components/ui/RowMenu';
 import { useIsMobile } from '../hooks/useIsMobile';
 import FAB from '../components/FAB';
 import { useLanguage } from '../contexts/LanguageContext';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Modal from '../components/ui/Modal';
-import ConfirmModal from '../components/ui/ConfirmModal';
 import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import { getAll as getExpenses, create as createExpense, update as updateExpense, remove as removeExpense, getPending as getPendingExpenses, approve as approveExpenseApi } from '../services/expenses.service';
 import { getRole } from '../utils/auth';
@@ -20,7 +19,7 @@ import { getAll as getPayments } from '../services/payments.service';
 import { getAll as getMembers } from '../services/members.service';
 import { getAll as getPayRecords, setStatus as setPayStatus, create as createPayRecord } from '../services/payroll.service';
 import { previewMonth as previewPay } from '../services/payAdjustments.service';
-import { fmtDate, capFirst, getDateLocale, dayStr, todayStr, payMonthText } from '../utils/date';
+import { fmtDate, dayStr, todayStr, payMonthText } from '../utils/date';
 import { expenseCategoryName } from '../utils/expenseCategories';
 import { revenueOf } from '../utils/revenue';
 import { getAll as getSales } from '../services/sales.service';
@@ -117,17 +116,6 @@ const PERIOD_KEYS = { 'This Week': 'common.thisWeek', 'This Month': 'common.this
 
 const formatYAxis = (v) => v >= 1000000 ? (v / 1000000).toFixed(1) + 'M' : v.toLocaleString();
 
-const PAY_RATES = { general_manager: 450000, manager: 350000, accountant: 280000, trainer: 200000, instructor: 180000, coach: 180000, front_desk: 150000, Other: 120000 };
-
-function generateLastNMonths(n) {
-  const now = new Date();
-  return Array.from({ length: n }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    return fmtDate(d, { month: 'short', year: 'numeric' });
-  });
-}
-const PAYSTUB_MONTHS = generateLastNMonths(6);
-
 // converts 'YYYY-MM' → 'Mar 2026' for matching paystub records
 // Must match how pay periods are stored ("Sep 2026"). A locale-aware format
 // would give "Sept 2026" in en-GB or "sept. 2026" in French and never match.
@@ -180,24 +168,11 @@ function savePaystubExpenseMap(map) {
   try { localStorage.setItem(PAYSTUB_EXPENSE_MAP_KEY, JSON.stringify(map)); } catch {}
 }
 
-function loadFrontDeskExpenses() {
-  try {
-    const raw = localStorage.getItem('gem_expenses');
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
-}
-
 // Front-desk expenses live on the gym record now, not in this browser. A desk
 // expense from the API is shaped for the Front Desk Expenses tab, which still
 // reads description/submittedBy/status.
 function normFdExpense(e) {
   return { ...e, description: e.title, submittedBy: e.recordedBy || e.createdByName || '', status: e.approvalStatus === 'pending' ? 'pending' : 'approved' };
-}
-
-function saveFrontDeskExpenses(list) {
-  try { localStorage.setItem('gem_expenses', JSON.stringify(list)); } catch { /* ignore */ }
 }
 
 // Bonuses and deductions are read as two separate ledgers, never one mixed list.
@@ -277,7 +252,6 @@ export default function AccountingPage() {
   const [activeTab, setActiveTab] = useState('All Expenses');
   const [fdStatusFilter, setFdStatusFilter] = useState('all');
   const [frontDeskExpenses, setFrontDeskExpenses] = useState([]);
-  const expenseLimit = gymSettings.expenseLimit;
   // Notifications and other deep links land here with ?tab=paystubs, so the
   // page opens on the tab the link was about rather than the default.
   const [searchParams] = useSearchParams();

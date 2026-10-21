@@ -376,7 +376,6 @@ export default function SalesPage() {
       .catch(console.error)
       .finally(() => setHistLoading(false));
   };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (histDay !== todayStr()) loadHist(histDay); }, [histDay]);
   useLiveRefresh(() => { loadShop(); if (histDay !== todayStr()) loadHist(histDay); }, ['sales', 'products']);
 
