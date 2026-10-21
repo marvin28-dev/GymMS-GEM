@@ -434,7 +434,7 @@ export default function PaymentsPage() {
               </div>
               <div>
                 <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.description')}</label>
-                <input style={inputStyle} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="e.g. Premium 12M Renewal" />
+                <input style={inputStyle} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder={t('members.paymentDescPh')} />
               </div>
               <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
@@ -446,7 +446,7 @@ export default function PaymentsPage() {
                 </div>
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.packageFor')}</label>
-                  <input style={inputStyle} value={form.packageFor} onChange={e => setForm(f => ({ ...f, packageFor: e.target.value }))} placeholder="e.g. Premium 12M" />
+                  <input style={inputStyle} value={form.packageFor} onChange={e => setForm(f => ({ ...f, packageFor: e.target.value }))} placeholder={t('common.eg', { x: 'Premium 12M' })} />
                 </div>
               </div>
               <div>

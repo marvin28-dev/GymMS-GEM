@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { getAuth } from '../utils/auth';
 import { pagesFor } from '../utils/rolePages';
+import { roleName } from '../utils/roleNames';
 import { getAll as getMembers } from '../services/members.service';
 import { getAll as getTasks } from '../services/tasks.service';
 import { countMembersNeedingAttention, countTasksNeedingAttention } from '../utils/attention';
@@ -214,8 +215,7 @@ export default function Sidebar({ open, onClose, isMobile }) {
   const authUser = auth?.user || {};
   const userRole = authUser.role || '';
   const roleProfile = pagesFor(userRole);
-  const ROLE_KEYS = { general_manager: 'generalManager', manager: 'manager', trainer: 'trainer', instructor: 'instructor', front_desk: 'frontDesk', coach: 'coach', other: 'roleOther', accountant: 'accountant' };
-  const roleLabel = ROLE_KEYS[userRole] ? t(`staff.${ROLE_KEYS[userRole]}`) : (roleProfile?.name || 'Manager');
+  const roleLabel = roleName(userRole, t);
   const allowedPages = roleProfile ? roleProfile.pages : null; // null = all access
 
   const canSee = (path) => {

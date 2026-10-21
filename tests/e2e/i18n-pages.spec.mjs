@@ -251,3 +251,21 @@ test('in French, the member profile\'s days left, renewal text and notes are Fre
   await expect(saved).toContainText('Général');
   await expect(saved).toContainText('par Olive Owner');
 });
+
+test('in French, the Payments form gives its examples in French', async ({ page }) => {
+  const owner = await registerGym();
+  const pkg = await call('POST', '/packages', { token: owner.token, body: { name: 'Plan Exemple', price: 15000, dayPassPrice: 1500, duration: '1 Months', durationDays: 30, status: 'active' } });
+  await call('POST', '/members', { token: owner.token, body: { firstName: 'Ines', lastName: 'Exemple', city: 'Douala', region: 'Littoral', regFeeMethod: 'cash', startDate: localDay(), endDate: localDay(new Date(Date.now() + 30 * 864e5)), packageId: pkg.id, balance: 15000 } });
+  await inFrench(page);
+  await signIn(page, owner);
+  await page.goto('/payments');
+  await page.getByRole('button', { name: 'Ajouter un paiement' }).first().click();
+  const form = page.getByRole('dialog');
+  await expect(async () => {
+    await form.getByPlaceholder('Nom ou code membre...').fill('');
+    await form.getByPlaceholder('Nom ou code membre...').fill('Exemple');
+    await form.getByText('Ines Exemple').first().click({ timeout: 1000 });
+  }).toPass();
+  await expect(form.getByPlaceholder('ex. Renouvellement Premium 12M')).toBeVisible();
+  await expect(form.getByPlaceholder(/^e\.g\./)).toHaveCount(0);
+});
