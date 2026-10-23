@@ -1,0 +1,16 @@
+# Text is stored with LF in the repository whatever each machine writes, so a
+# diff never shows a whole file changed by its line endings (F-027). Each
+# checkout still gets its platform's endings.
+* text=auto
+
+# Never touched as text
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
