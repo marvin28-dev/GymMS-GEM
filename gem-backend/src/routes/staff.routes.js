@@ -17,6 +17,8 @@ router.get('/:id', ctrl.getOne);
 router.post('/', ctrl.create);
 router.post('/:id/resend-invite', only(MANAGEMENT), ctrl.resendInvite);
 router.patch('/:id', ctrl.update);
+// Who may add a note is decided in the controller, by the same rule as editing notes
+router.post('/:id/notes', ctrl.addNote);
 // Deactivating someone is the owner's alone, the same rule as an edit of isActive
 router.delete('/:id', only(OWNER), ctrl.remove);
 

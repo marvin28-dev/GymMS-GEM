@@ -12,6 +12,10 @@ export const create = (data) =>
 export const update = (id, data) =>
   api.patch(`/staff/${id}`, data);
 
+// One note added to the person's file; the server appends it
+export const addNote = (id, note) =>
+  api.post(`/staff/${id}/notes`, note);
+
 export const remove = (id) =>
   api.delete(`/staff/${id}`);
 

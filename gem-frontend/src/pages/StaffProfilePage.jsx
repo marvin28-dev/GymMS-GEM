@@ -14,7 +14,7 @@ import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import { canManage as outranks, canSeePrivateFields } from '../utils/hierarchy';
 import GemInput from '../components/ui/GemInput';
 import GemSelect from '../components/ui/GemSelect';
-import { getOne as getStaffMember, getCode as getStaffCode, regenerateCode as regenerateStaffCode, update as updateStaff, resendInvite as resendStaffInvite } from '../services/staff.service';
+import { getOne as getStaffMember, getCode as getStaffCode, regenerateCode as regenerateStaffCode, update as updateStaff, addNote as addStaffNote, resendInvite as resendStaffInvite } from '../services/staff.service';
 import { uploadPhoto } from '../services/upload.service';
 import { getAuth, getRole } from '../utils/auth';
 import { jobOf, departmentOfRole, assigneeName } from '../utils/departments';
@@ -1120,15 +1120,13 @@ export default function StaffProfilePage() {
   // A note is kept once the server has it; a refusal stays in the dialog
   const saveNote = async () => {
     if (!noteText.trim() || noteSaving) return;
-    const auth = getAuth()?.user || {};
-    const author = [auth.firstName, auth.lastName].filter(Boolean).join(' ') || roleName(getRole(), t);
-    const newNote = { id: Date.now(), date: getToday(), content: noteText, createdBy: author, category: noteCategory };
-    const updated = [...notes, newNote];
     setNoteSaving(true);
     setNoteError('');
     try {
-      await updateStaff(id, { staffNotes: updated });
-      setNotes(updated);
+      // The server adds it to the list as it stands, so a note another manager
+      // added meanwhile is kept, and answers with the whole list
+      const res = await addStaffNote(id, { content: noteText, category: noteCategory, date: getToday() });
+      setNotes(Array.isArray(res.data?.notes) ? res.data.notes : [...notes, res.data.note]);
       setNoteText('');
       setNoteCategory('General');
       setShowNoteModal(false);

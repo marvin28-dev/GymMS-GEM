@@ -756,6 +756,7 @@ const translations = {
       setupRequired: 'Setup required. Click to configure.',
     },
     staff: {
+      noteFailedAfterCreate: 'The note could not be saved. Add it again on their profile, in Notes.',
       adjBonuses: 'Bonuses',
       adjDeductions: 'Deductions',
       adjNoBonuses: 'No bonuses',
@@ -2913,6 +2914,7 @@ const translations = {
       setupRequired: 'Configuration requise. Cliquez pour configurer.',
     },
     staff: {
+      noteFailedAfterCreate: 'La note n’a pas pu être enregistrée. Ajoutez-la de nouveau sur son profil, dans Notes.',
       adjBonuses: 'Primes',
       adjDeductions: 'Déductions',
       adjNoBonuses: 'Aucune prime',

@@ -54,14 +54,15 @@ test('a refused note stays in its dialog; a saved one is kept', async ({ page })
   await page.goto(`/staff/${staff.id}`);
   await page.getByRole('button', { name: 'Notes' }).click();
 
-  await refusePatch(page, `/staff/${staff.id}`);
+  // A note is added on its own (POST .../notes), not by saving the whole record
+  await page.route(`**/api/staff/${staff.id}/notes`, route => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Server is down for the test' }) }));
   await page.getByRole('button', { name: 'Add Note' }).click();
   await page.getByPlaceholder('Enter note...').fill('Always on time');
   await page.getByRole('button', { name: 'Save Note' }).click();
   await expect(page.getByText('Server is down for the test')).toBeVisible();
   await expect(page.getByPlaceholder('Enter note...')).toHaveValue('Always on time');
 
-  await page.unroute(`**/api/staff/${staff.id}`);
+  await page.unroute(`**/api/staff/${staff.id}/notes`);
   await page.getByRole('button', { name: 'Save Note' }).click();
   await expect(page.getByPlaceholder('Enter note...')).toHaveCount(0);
   const saved = await call('GET', `/staff/${staff.id}`, { token: owner.token });

@@ -14,7 +14,7 @@ import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import RowMenu from '../components/ui/RowMenu';
 import GemInput from '../components/ui/GemInput';
 import GemSelect from '../components/ui/GemSelect';
-import { getAll as getStaffApi, create as createStaff, update as updateStaff } from '../services/staff.service';
+import { getAll as getStaffApi, create as createStaff, update as updateStaff, addNote as addStaffNote } from '../services/staff.service';
 import { uploadPhoto } from '../services/upload.service';
 import { getRole, getAuth, getPhonePlaceholder } from '../utils/auth';
 import { roleName } from '../utils/roleNames';
@@ -568,6 +568,7 @@ export default function StaffPage() {
     const lastName = form.lastName.trim();
     const colorIdx = staffList.length % AVATAR_COLORS.length;
     const roleEnum = ROLE_ENUM[form.role] || form.role || 'coach';
+    const note = (form.notes || '').trim() ? { content: form.notes.trim(), category: 'General', date: todayStr() } : null;
     const payload = {
       firstName, lastName,
       email: (form.email || '').trim() || undefined,
@@ -581,14 +582,6 @@ export default function StaffPage() {
       emergencyPhone: form.emergencyPhone || undefined,
       houseNumber: (form.houseNumber || '').trim(), street: (form.street || '').trim(), city: (form.city || '').trim(),
       region: (form.region || '').trim(), postalCode: (form.postalCode || '').trim(), country: form.country || getAuth()?.user?.gymCountry || '',
-      // A note typed here becomes the first entry on their profile
-      ...(form.notes || '').trim() ? { staffNotes: [...(Array.isArray(editingStaff?.staffNotes) ? editingStaff.staffNotes : []), {
-        id: Date.now(),
-        date: todayStr(),
-        content: form.notes.trim(),
-        createdBy: [getAuth()?.user?.firstName, getAuth()?.user?.lastName].filter(Boolean).join(' ') || roleName(getRole(), t),
-        category: 'General',
-      }] } : {},
       // The owner's join date is fixed at account creation and never edited
       ...(editingStaff?.role === 'general_manager' ? {} : { joinDate: form.joinDate || undefined }),
       // The owner account is always active and cannot be deactivated
@@ -600,6 +593,8 @@ export default function StaffPage() {
       if (modalMode === 'edit' && editingStaff) {
         const res = await updateStaff(editingStaff.id, payload);
         setStaffList(prev => prev.map(s => s.id === editingStaff.id ? { ...s, ...res.data } : s));
+        // A note typed here is added to their file, after the notes already there
+        if (note) await addStaffNote(editingStaff.id, note);
         setModalOpen(false);
       } else {
         const res = await createStaff(payload);
@@ -617,6 +612,10 @@ export default function StaffPage() {
         }
         if (Object.keys(photoUpdates).length > 0) {
           try { await updateStaff(s.id, photoUpdates); Object.assign(s, photoUpdates); } catch { photoProblem = t('staff.photoFailedAfterCreate'); }
+        }
+        // A note typed here becomes the first entry on their file
+        if (note) {
+          try { await addStaffNote(s.id, note); } catch { photoProblem = photoProblem || t('staff.noteFailedAfterCreate'); }
         }
         setStaffList(prev => [s, ...prev]);
         setModalOpen(false);

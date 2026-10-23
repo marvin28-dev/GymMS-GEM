@@ -752,4 +752,30 @@ async function resendInvite(req, res) {
   }
 }
 
-module.exports = { getAll, getOne, create, update, remove, getCode, resendInvite, verifyCode, findByCode, checkActive, regenerateCode };
+const NOTE_CATEGORIES = ['General', 'Performance', 'Warning', 'Commendation', 'Health', 'Financial', 'Other'];
+
+// One note added to a staff member's file. The list is appended to in the
+// database itself, so two managers adding notes at the same moment both keep
+// theirs (the page used to send the whole list back). Who may write notes is the
+// same rule as for the staffNotes field; the author is the signed-in account.
+async function addNote(req, res) {
+  const existing = await prisma.staff.findFirst({ where: { id: req.params.id, gymId: req.user.gymId }, select: { id: true, role: true } });
+  if (!existing) return res.status(404).json({ error: 'Staff not found' });
+  const refusal = refuseFields(req.user, existing, ['staffNotes']);
+  if (refusal) return res.status(403).json({ error: refusal });
+
+  const content = String(req.body.content ?? '').trim();
+  if (!content) return res.status(400).json({ error: 'Write the note.', field: 'content' });
+  if (content.length > 2000) return res.status(400).json({ error: 'Keep the note under 2,000 characters.', field: 'content' });
+  const category = NOTE_CATEGORIES.includes(req.body.category) ? req.body.category : 'General';
+  // The writer's own calendar day, which the page sends; the server's otherwise
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(req.body.date || '')) ? req.body.date : new Date().toISOString().slice(0, 10);
+  const author = await prisma.staff.findUnique({ where: { id: req.user.id }, select: { firstName: true, lastName: true } });
+  const note = { id: crypto.randomUUID(), date, content, category, createdBy: fullName(author) || '', createdById: req.user.id };
+
+  await prisma.$executeRaw`UPDATE "Staff" SET "staffNotes" = COALESCE("staffNotes", '[]'::jsonb) || ${JSON.stringify([note])}::jsonb WHERE "id" = ${existing.id} AND "gymId" = ${req.user.gymId}`;
+  const saved = await prisma.staff.findUnique({ where: { id: existing.id }, select: { staffNotes: true } });
+  res.status(201).json({ note, notes: Array.isArray(saved?.staffNotes) ? saved.staffNotes : [note] });
+}
+
+module.exports = { getAll, getOne, create, update, remove, getCode, resendInvite, verifyCode, findByCode, checkActive, regenerateCode, addNote };
