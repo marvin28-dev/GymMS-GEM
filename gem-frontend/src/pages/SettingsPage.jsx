@@ -15,6 +15,7 @@ import { useSetupStatus, setSetupStatus } from '../hooks/useSetupStatus';
 import { confirmSetupSection } from '../services/gym.service';
 import TimeInput from '../components/ui/TimeInput';
 import LoadFailed from '../components/ui/LoadFailed';
+import { SkeletonLine } from '../components/Skeleton';
 import { PAYMENT_METHODS } from '../utils/paymentMethods';
 import { capFirst, getDateLocale } from '../utils/date';
 import { DEFAULT_ACCESS_TYPES, ACCESS_TYPES_KEY } from '../utils/accessTypes';
@@ -502,6 +503,11 @@ export default function SettingsPage() {
       .catch(() => { if (alive) setGymLoadFailed(true); });
     return () => { alive = false; };
   }, [gymLoadTick]);
+  // Until the gym has loaded, these sections would show defaults that look real
+  // and can be changed, and the load would then replace what was changed
+  const sectionLoading = !pristineGym && !gymLoadFailed;
+  const LOADS_FROM_GYM = ['gym-profile', 'payment', 'membership', 'notifications'];
+
   const gymLoadProblem = gymLoadFailed
     ? <LoadFailed message={t('settings.loadFailed')} onRetry={() => setGymLoadTick(n => n + 1)} style={{ marginBottom: 16 }} />
     : null;
@@ -758,6 +764,12 @@ export default function SettingsPage() {
         {/* Content */}
         <div style={{ flex: 1 }}>
 
+          {LOADS_FROM_GYM.includes(activeSection) && sectionLoading && (
+            <div data-settings-loading style={{ ...cardStyle, padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {['40%', '70%', '55%', '65%', '35%'].map((w, i) => <SkeletonLine key={i} width={w} height={14} style={{ animationDelay: `${i * 60}ms` }} />)}
+            </div>
+          )}
+
           {/* ── Gym Identity ──────────────────────────────────────────────── */}
           {activeSection === 'gym-identity' && (() => {
             const authUser = getAuth()?.user || {};
@@ -830,7 +842,7 @@ export default function SettingsPage() {
           })()}
 
           {/* ── Gym Profile ────────────────────────────────────────────────── */}
-          {activeSection === 'gym-profile' && (
+          {activeSection === 'gym-profile' && !sectionLoading && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {!confirmedSections.has('gym-profile') && setupOpen && (
                 <div style={{ background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -1159,7 +1171,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {activeSection === 'payment' && (
+          {activeSection === 'payment' && !sectionLoading && (
             <div style={cardStyle}>
               <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.paymentSettings')}</span>
@@ -1229,7 +1241,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {activeSection === 'membership' && (
+          {activeSection === 'membership' && !sectionLoading && (
             <div style={cardStyle}>
               <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.membershipDefaults')}</span>
@@ -1326,7 +1338,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {activeSection === 'notifications' && (
+          {activeSection === 'notifications' && !sectionLoading && (
             <div style={cardStyle}>
               <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.notificationPreferences')}</span>
