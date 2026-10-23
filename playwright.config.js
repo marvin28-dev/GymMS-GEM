@@ -36,6 +36,13 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    // E2E_BROWSERS=all adds Safari's engine on a desktop, and the phone tests
+    // (the ones that say phone) on an iPhone and an Android phone, touch and all
+    ...(process.env.E2E_BROWSERS === 'all' ? [
+      { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+      { name: 'ios-safari', use: { ...devices['iPhone 15'] }, grep: /phone/i },
+      { name: 'android-chrome', use: { ...devices['Pixel 7'] }, grep: /phone/i },
+    ] : []),
   ],
   webServer: [
     {
