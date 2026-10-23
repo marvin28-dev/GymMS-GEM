@@ -133,6 +133,24 @@ function addIssue(card, code, message) {
   return [...kept, { code, message }];
 }
 
+// One card a day per person. Two desks clocking someone in at the same moment
+// both found none and both wrote one; in a serializable transaction the
+// database refuses the second, and looking again finds the card that won.
+async function createDayCard({ gymId, staffId, dayStart, dayEnd, data }) {
+  const sameDay = { gymId, staffId, date: { gte: dayStart, lte: dayEnd } };
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const existing = await tx.timeCard.findFirst({ where: sameDay });
+      if (existing) return { existing };
+      return { card: await tx.timeCard.create({ data, include: CARD_INCLUDE }) };
+    }, { isolationLevel: 'Serializable' });
+  } catch (err) {
+    const existing = await prisma.timeCard.findFirst({ where: sameDay });
+    if (existing) return { existing };
+    throw err;
+  }
+}
+
 async function punchIn(req, res) {
   const { staffId, date } = req.body;
   if (!staffId) return res.status(400).json({ error: 'staffId is required' });
@@ -161,7 +179,8 @@ async function punchIn(req, res) {
     issues.push({ code: 'adjusted', message: `Clock-in time was set by hand to ${timeLabel(at)}.` });
   }
 
-  const card = await prisma.timeCard.create({
+  const made = await createDayCard({
+    gymId: req.user.gymId, staffId, dayStart, dayEnd,
     data: {
       gymId: req.user.gymId,
       staffId,
@@ -174,8 +193,9 @@ async function punchIn(req, res) {
         adjustmentNote: req.body.note || null,
       } : {}),
     },
-    include: CARD_INCLUDE,
   });
+  if (made.existing) return res.status(409).json({ error: 'Already punched in for this date', timecard: made.existing });
+  const { card } = made;
 
   logActivity(req, {
     category: 'timecards', action: 'timecard.clock_in',
@@ -441,7 +461,9 @@ async function adjust(req, res) {
   if (!existing) return res.status(404).json({ error: 'Time card not found' });
 
   const nextIn = timeOnDay(existing.date, punchInTime);
-  const nextOut = timeOnDay(existing.date, punchOutTime);
+  // A check-out typed for a night shift is the next morning, as on clocking out
+  const typedOut = timeOnDay(existing.date, punchOutTime);
+  const nextOut = typedOut === undefined ? undefined : endOfShift(nextIn ?? existing.punchIn, typedOut);
   if (nextIn === undefined && nextOut === undefined) {
     return res.status(400).json({ error: 'A punchIn or punchOut time is required' });
   }
@@ -531,7 +553,8 @@ async function approve(req, res) {
     approvedAt: new Date(),
   };
   const nextIn = timeOnDay(existing.date, req.body.punchIn);
-  const nextOut = timeOnDay(existing.date, req.body.punchOut);
+  const typedOut = timeOnDay(existing.date, req.body.punchOut);
+  const nextOut = typedOut === undefined ? undefined : endOfShift(nextIn ?? existing.punchIn, typedOut);
   if (nextIn !== undefined) data.punchIn = nextIn;
   if (nextOut !== undefined) data.punchOut = nextOut;
 
@@ -646,13 +669,14 @@ async function autoClockIn({ gymId, staffId, via }) {
   const now = new Date();
   const inCheck = await clockInCheck({ gymId, staffId: s.id, when: now }).catch(quiet('Schedule check'));
   const issues = inCheck.issues;
-  const card = await prisma.timeCard.create({
+  const { card } = await createDayCard({
+    gymId, staffId: s.id, dayStart: start, dayEnd: end,
     data: {
       gymId, staffId: s.id, date: start, punchIn: now,
       ...(issues.length ? { approvalStatus: 'pending', issues } : {}),
     },
-    include: CARD_INCLUDE,
   });
+  if (!card) return null;
   logActivity(null, {
     gymId, actor: { id: s.id, name: fullName(s), role: s.role },
     category: 'timecards', action: 'timecard.auto_clock_in',
