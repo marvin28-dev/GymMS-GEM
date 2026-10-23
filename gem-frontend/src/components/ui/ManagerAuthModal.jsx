@@ -3,6 +3,7 @@ import { ShieldAlert, Eye, EyeOff } from 'lucide-react';
 import { verifyManager, verifyManagerPassword } from '../../services/auth.service';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getAuth } from '../../utils/auth';
+import CodeInput from './CodeInput';
 
 /**
  * ManagerAuthModal
@@ -140,9 +141,27 @@ export default function ManagerAuthModal({ open, onClose, onConfirm, onVerified,
             {t(usePassword ? 'managerAuth.passwordLabel' : 'managerAuth.codeLabel')}
           </label>
           <div style={{ position: 'relative' }}>
+            {!usePassword && !showCode ? (
+              <CodeInput
+                ref={inputRef}
+                value={code}
+                maxLength={4}
+                onChange={(v) => { setCode(v); setError(''); }}
+                onEnter={handleSubmit}
+                placeholder={t('managerAuth.codePh')}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  background: 'var(--bg-elevated)',
+                  border: `1.5px solid ${error ? 'var(--accent-red)' : 'var(--border-subtle)'}`,
+                  borderRadius: 10, padding: '11px 40px 11px 14px',
+                  fontSize: 22, letterSpacing: '0.5em', textAlign: 'center',
+                  color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace', outline: 'none',
+                }}
+              />
+            ) : (
             <input
               ref={inputRef}
-              type={showCode ? 'text' : 'password'}
+              type={usePassword && !showCode ? 'password' : 'text'}
               value={code}
               onChange={e => { setCode(usePassword ? e.target.value : e.target.value.replace(/\D/g, '').slice(0, 4)); setError(''); }}
               onKeyDown={e => e.key === 'Enter' && handleSubmit()}
@@ -169,6 +188,7 @@ export default function ManagerAuthModal({ open, onClose, onConfirm, onVerified,
                 outline: 'none',
               }}
             />
+            )}
             <button
               type="button"
               onClick={() => setShowCode(v => !v)}

@@ -30,12 +30,15 @@ test('a note added on the profile is saved by the server and shown', async ({ pa
   await page.getByRole('button', { name: 'Add Note' }).first().click();
   await page.getByRole('dialog').locator('textarea').fill('Covered the evening shift');
   await page.getByRole('dialog').getByRole('button', { name: 'Save Note' }).click();
-  await expect(page.getByText('Covered the evening shift')).toBeVisible();
+  // Saved once the dialog closes; the typed text would match while it is open
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('p', { hasText: 'Covered the evening shift' })).toBeVisible();
   // Another manager's note, added meanwhile, is not lost by the next one
   await call('POST', `/staff/${desk.id}/notes`, { token: owner.token, body: { content: 'Added elsewhere' } });
   await page.getByRole('button', { name: 'Add Note' }).first().click();
   await page.getByRole('dialog').locator('textarea').fill('Second from the page');
   await page.getByRole('dialog').getByRole('button', { name: 'Save Note' }).click();
-  await expect(page.getByText('Second from the page')).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('p', { hasText: 'Second from the page' })).toBeVisible();
   expect((await notesOf(owner, desk.id)).map(n => n.content)).toEqual(['Covered the evening shift', 'Added elsewhere', 'Second from the page']);
 });

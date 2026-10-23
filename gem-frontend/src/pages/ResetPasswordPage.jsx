@@ -38,6 +38,7 @@ function PasswordInput({ value, onChange, placeholder, error, id }) {
       <input
         id={id}
         type={show ? 'text' : 'password'}
+        autoComplete="new-password"
         value={value}
         onChange={onChange}
         placeholder={placeholder}

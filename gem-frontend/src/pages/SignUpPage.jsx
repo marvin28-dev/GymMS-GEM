@@ -902,7 +902,7 @@ function AccountStep({ form, set, errors, showPw, setShowPw, showConfirm, setSho
         </div>
 
         <Field label={t('signup.email')} icon={Mail} required error={errors.email}>
-          <input type="email" style={inp(errors.email)} value={form.email} onChange={e => set('email', e.target.value)} placeholder={t('signup.emailPh')} />
+          <input type="email" autoComplete="username" style={inp(errors.email)} value={form.email} onChange={e => set('email', e.target.value)} placeholder={t('signup.emailPh')} />
         </Field>
 
         <Field label={t('signup.phone')} icon={Phone} required error={errors.managerPhone}>
@@ -922,6 +922,7 @@ function AccountStep({ form, set, errors, showPw, setShowPw, showConfirm, setSho
           <div style={{ position: 'relative' }}>
             <input
               type={showPw ? 'text' : 'password'}
+              autoComplete="new-password"
               style={{ ...inp(errors.password), paddingRight: 40 }}
               value={form.password}
               onChange={e => set('password', e.target.value)}
@@ -937,6 +938,7 @@ function AccountStep({ form, set, errors, showPw, setShowPw, showConfirm, setSho
           <div style={{ position: 'relative' }}>
             <input
               type={showConfirm ? 'text' : 'password'}
+              autoComplete="new-password"
               style={{ ...inp(errors.confirmPassword), paddingRight: 40 }}
               value={form.confirmPassword}
               onChange={e => set('confirmPassword', e.target.value)}

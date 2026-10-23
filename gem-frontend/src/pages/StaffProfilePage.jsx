@@ -1850,9 +1850,9 @@ export default function StaffProfilePage() {
                 </button>
                 {showChangePw && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-                    <GemInput label={t('staff.currentPassword')} required type="password" value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))} />
-                    <GemInput label={t('staff.newPassword')} required type="password" value={pwForm.next} onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))} />
-                    <GemInput label={t('staff.confirmNewPassword')} required type="password" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} />
+                    <GemInput label={t('staff.currentPassword')} required type="password" autoComplete="current-password" value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))} />
+                    <GemInput label={t('staff.newPassword')} required type="password" autoComplete="new-password" value={pwForm.next} onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))} />
+                    <GemInput label={t('staff.confirmNewPassword')} required type="password" autoComplete="new-password" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} />
                     {pwError && <div style={{ fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{pwError}</div>}
                     {pwSuccess && <div style={{ fontSize: 12, color: '#22c55e', fontFamily: 'DM Sans' }}>{t('staff.pwChangedSuccess')}</div>}
                     <button onClick={handleChangePassword} disabled={pwSaving} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 8, padding: '10px', cursor: pwSaving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700, color: '#0a0a0f', fontFamily: 'DM Sans', opacity: pwSaving ? 0.7 : 1 }}>
@@ -2680,9 +2680,9 @@ export default function StaffProfilePage() {
             </button>
             {showChangePw && (
               <div style={{ padding: '0 20px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
-                <GemInput label={t('staff.currentPassword')} required type="password" value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))} />
-                <GemInput label={t('staff.newPassword')} required type="password" value={pwForm.next} onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))} />
-                <GemInput label={t('staff.confirmNewPassword')} required type="password" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} />
+                <GemInput label={t('staff.currentPassword')} required type="password" autoComplete="current-password" value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))} />
+                <GemInput label={t('staff.newPassword')} required type="password" autoComplete="new-password" value={pwForm.next} onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))} />
+                <GemInput label={t('staff.confirmNewPassword')} required type="password" autoComplete="new-password" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} />
                 {pwError && <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{pwError}</div>}
                 {pwSuccess && <div style={{ gridColumn: '1 / -1', fontSize: 12, color: '#22c55e', fontFamily: 'DM Sans' }}>{t('staff.pwChangedSuccess')}</div>}
                 <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>

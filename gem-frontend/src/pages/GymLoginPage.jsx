@@ -480,7 +480,7 @@ export default function GymLoginPage() {
               <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 7 }}>{t('auth.loginEmailLabel')} *</label>
               <div style={{ position: 'relative' }}>
                 <Mail size={15} color={inputFocus === 'email' ? gym.color : 'var(--text-muted)'} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                <input autoFocus={step === 'email'} type="email" value={form.email} readOnly={step !== 'email'} onChange={e => { set('email', e.target.value); setErrors(er => ({ ...er, email: '' })); }} onFocus={() => setInputFocus('email')} onBlur={() => setInputFocus('')} placeholder={t('auth.loginEmailPh')} style={{ ...inputStyle('email'), fontSize: 16, ...(step !== 'email' ? lockedField : {}) }} />
+                <input autoFocus={step === 'email'} type="email" autoComplete="username" name="email" value={form.email} readOnly={step !== 'email'} onChange={e => { set('email', e.target.value); setErrors(er => ({ ...er, email: '' })); }} onFocus={() => setInputFocus('email')} onBlur={() => setInputFocus('')} placeholder={t('auth.loginEmailPh')} style={{ ...inputStyle('email'), fontSize: 16, ...(step !== 'email' ? lockedField : {}) }} />
               </div>
               {errors.email && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 5 }}>&#9888; {errors.email}</div>}
             </div>
@@ -516,7 +516,7 @@ export default function GymLoginPage() {
               </div>
               <div style={{ position: 'relative' }}>
                 <Lock size={15} color={inputFocus === 'password' ? gym.color : 'var(--text-muted)'} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                <input type={showPw ? 'text' : 'password'} value={form.password} autoComplete="new-password" name="gem-login-secret" autoCorrect="off" spellCheck={false} data-lpignore="true" data-1p-ignore data-form-type="other" onChange={e => { set('password', e.target.value); setErrors(er => ({ ...er, password: '' })); }} onFocus={() => setInputFocus('password')} onBlur={() => setInputFocus('')} placeholder={t('auth.loginPasswordPh')} style={{ ...inputStyle('password'), paddingRight: 44, fontSize: 16 }} />
+                <input type={showPw ? 'text' : 'password'} value={form.password} autoComplete={setupMode ? 'new-password' : 'current-password'} name="password" autoCorrect="off" spellCheck={false} onChange={e => { set('password', e.target.value); setErrors(er => ({ ...er, password: '' })); }} onFocus={() => setInputFocus('password')} onBlur={() => setInputFocus('')} placeholder={t('auth.loginPasswordPh')} style={{ ...inputStyle('password'), paddingRight: 44, fontSize: 16 }} />
                 <button type="button" onClick={() => setShowPw(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 2 }}>
                   {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
@@ -610,7 +610,7 @@ export default function GymLoginPage() {
                 <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: 7 }}>{t('auth.loginEmailLabel')} *</label>
                 <div style={{ position: 'relative' }}>
                   <Mail size={15} color={inputFocus === 'email' ? gym.color : 'var(--text-muted)'} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                  <input autoFocus={step === 'email'} type="email" value={form.email} readOnly={step !== 'email'} onChange={e => { set('email', e.target.value); setErrors(er => ({ ...er, email: '' })); }} onFocus={() => setInputFocus('email')} onBlur={() => setInputFocus('')} placeholder={t('auth.loginEmailPh')} style={{ ...inputStyle('email'), ...(step !== 'email' ? lockedField : {}) }} />
+                  <input autoFocus={step === 'email'} type="email" autoComplete="username" name="email" value={form.email} readOnly={step !== 'email'} onChange={e => { set('email', e.target.value); setErrors(er => ({ ...er, email: '' })); }} onFocus={() => setInputFocus('email')} onBlur={() => setInputFocus('')} placeholder={t('auth.loginEmailPh')} style={{ ...inputStyle('email'), ...(step !== 'email' ? lockedField : {}) }} />
                 </div>
                 {errors.email && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 5 }}>⚠ {errors.email}</div>}
               </div>
@@ -646,7 +646,7 @@ export default function GymLoginPage() {
                 </div>
                 <div style={{ position: 'relative' }}>
                   <Lock size={15} color={inputFocus === 'password' ? gym.color : 'var(--text-muted)'} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                  <input type={showPw ? 'text' : 'password'} value={form.password} autoComplete="new-password" name="gem-login-secret" autoCorrect="off" spellCheck={false} data-lpignore="true" data-1p-ignore data-form-type="other" onChange={e => { set('password', e.target.value); setErrors(er => ({ ...er, password: '' })); }} onFocus={() => setInputFocus('password')} onBlur={() => setInputFocus('')} placeholder={t('auth.loginPasswordPh')} style={{ ...inputStyle('password'), paddingRight: 44 }} />
+                  <input type={showPw ? 'text' : 'password'} value={form.password} autoComplete={setupMode ? 'new-password' : 'current-password'} name="password" autoCorrect="off" spellCheck={false} onChange={e => { set('password', e.target.value); setErrors(er => ({ ...er, password: '' })); }} onFocus={() => setInputFocus('password')} onBlur={() => setInputFocus('')} placeholder={t('auth.loginPasswordPh')} style={{ ...inputStyle('password'), paddingRight: 44 }} />
                   <button type="button" onClick={() => setShowPw(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 2 }}>
                     {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
