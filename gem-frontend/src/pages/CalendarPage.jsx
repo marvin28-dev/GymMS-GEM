@@ -14,7 +14,7 @@ import { getAll as getTasks, update as updateTask } from '../services/tasks.serv
 import { getCoachClients } from '../services/coach.service';
 import { getAuth, getRole } from '../utils/auth';
 import { capFirst, todayStr as getToday, dayStr, addDaysStr } from '../utils/date';
-import { softAll } from '../utils/loadAll';
+import { softAll, failed } from '../utils/loadAll';
 import { gymCache } from '../utils/gymCache';
 import { membershipEnded } from '../utils/coaching';
 import { TASKS_PATH } from '../utils/rolePages';
@@ -151,9 +151,9 @@ export default function CalendarPage() {
 
   const loadGym = useCallback(() => softAll([getCalendar(), getStaff()])
     .then(([calRes, staffRes]) => {
-      const evs = (calRes.data || []).map(mapEvent), stf = staffRes.data || [];
-      setEvents(evs); cache.write('events', evs);
-      setStaffList(stf); cache.write('staff', stf);
+      // A request that failed leaves what is shown, and its saved copy, alone
+      if (!failed(calRes)) { const evs = (calRes.data || []).map(mapEvent); setEvents(evs); cache.write('events', evs); }
+      if (!failed(staffRes)) { const stf = staffRes.data || []; setStaffList(stf); cache.write('staff', stf); }
     })
     .catch(console.error), []); // eslint-disable-line react-hooks/exhaustive-deps
 

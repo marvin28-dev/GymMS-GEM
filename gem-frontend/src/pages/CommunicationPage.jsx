@@ -18,7 +18,7 @@ import {
   retry as retryCommunication, cancelSchedule, remove as removeCommunication,
 } from '../services/communications.service';
 import { fmtDate, todayStr, dayStr } from '../utils/date';
-import { softAll } from '../utils/loadAll';
+import { softAll, failed } from '../utils/loadAll';
 import { gymCache } from '../utils/gymCache';
 import { serverFieldError, fieldErrorStyle, revealFirstError } from '../utils/formErrors';
 import { smsInfo, TOKENS, fillIn, hasFillIns } from '../utils/smsCount';
@@ -78,11 +78,11 @@ export default function CommunicationPage() {
   const liveTick = useLiveTick(['communications', 'members', 'packages']);
   const load = useCallback(() => softAll([getCommunications(), getChannels(), getPackages(), getMembers()])
     .then(([c, ch, p, m]) => {
-      const list = c.data || [];
-      setHistory(list); cache.write('history', list);
-      if (ch.data) setChannels(ch.data);
-      setPackages(p.data || []);
-      setMembers((m.data || []).filter(x => x.status !== 'deactivated'));
+      // A request that failed leaves what is shown, and its saved copy, alone
+      if (!failed(c)) { const list = c.data || []; setHistory(list); cache.write('history', list); }
+      if (!failed(ch) && ch.data) setChannels(ch.data);
+      if (!failed(p)) setPackages(p.data || []);
+      if (!failed(m)) setMembers((m.data || []).filter(x => x.status !== 'deactivated'));
     })
     .catch(console.error)
     .finally(() => setLoading(false)), []); // eslint-disable-line react-hooks/exhaustive-deps

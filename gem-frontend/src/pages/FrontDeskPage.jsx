@@ -45,7 +45,7 @@ import { isDemoMode, getAuth, getRole, clearAuth } from '../utils/auth';
 import { fmtDate, getDateLocale, capFirst, dayStr, addDaysStr, todayStr as getTodayStr } from '../utils/date';
 import { digitsOnly } from '../utils/number';
 import { useGymSettings, refreshGymSettings } from '../hooks/useGymSettings';
-import { softAll } from '../utils/loadAll';
+import { softAll, failed } from '../utils/loadAll';
 import NotificationBell from '../components/NotificationBell';
 import TaskAssigneeField from '../components/TaskAssigneeField';
 import { assignFields, assigneeName } from '../utils/departments';
@@ -388,6 +388,7 @@ export default function FrontDeskPage() {
     if (!longRange) return;
     const dayBack = (n) => addDaysStr(getTodayStr(), -n);
     softAll([getAttendance({ date: dayBack(1) }), getAttendance({ date: dayBack(2) })]).then(([a, b]) => {
+      if (failed(a) || failed(b)) return;
       const now = new Date();
       setOlderCheckins([...(a.data || []), ...(b.data || [])].map(ci => ({
         ...ci,
@@ -609,8 +610,11 @@ export default function FrontDeskPage() {
       // The whole gym calendar, not just today's - the program panel lets you
       // page to any day, so an event on the 16th must be loaded even on the 1st.
       getProducts(), getCalendar(), getAttendance({ date: today }),
-      getEquipmentIssues().catch(() => ({ data: [] })),
+      getEquipmentIssues(),
     ]).then(([mRes, pkRes, prRes, calRes, attRes, eqRes]) => {
+      // The desk's lists are built from each other, so a failed request keeps
+      // all of them (and their saved copies) as they are until the next load
+      if ([mRes, pkRes, prRes, calRes, attRes, eqRes].some(failed)) return;
       setMembersList(mRes.data || []); fdCache.write('members', mRes.data || []);
       setPackagesList(pkRes.data || []); fdCache.write('packages', pkRes.data || []);
       const pkgs = pkRes.data || [];

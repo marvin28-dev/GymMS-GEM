@@ -52,7 +52,7 @@ import { useGymSettings } from '../hooks/useGymSettings';
 import { enabledMethods, PAYMENT_METHODS, canonicalMethod } from '../utils/paymentMethods';
 import { gymAddress } from '../utils/gymAddress';
 import { SkeletonCards, SkeletonLine } from '../components/Skeleton';
-import { softAll } from '../utils/loadAll';
+import { softAll, failed } from '../utils/loadAll';
 
 const MobileCtx = createContext(false);
 
@@ -1026,7 +1026,9 @@ function GymDashboard() {
 
   const loadDashboard = () => {
     const todayParam = today;
+    // A request that failed leaves what is shown, and its saved copy, alone
     const upd = (setter, key) => (res) => {
+      if (failed(res)) return;
       const d = res.data || (Array.isArray(res.data) ? [] : {});
       setter(d);
       setCache(key, d);

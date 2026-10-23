@@ -51,7 +51,7 @@ import { pagesFor } from '../utils/rolePages';
 import { serverFieldError } from '../utils/formErrors';
 import TaskAssigneeField from '../components/TaskAssigneeField';
 import { SkeletonCards } from '../components/Skeleton';
-import { softAll } from '../utils/loadAll';
+import { softAll, failed } from '../utils/loadAll';
 import { gymCache } from '../utils/gymCache';
 
 const sName = s => `${s.firstName || ''} ${s.lastName || ''}`.trim() || s.id;
@@ -337,15 +337,15 @@ export default function OperationsPage() {
   useEffect(() => {
     softAll([getTasks(), getEquipment(), getStaff(), getAttendance(), getMembers(), getPayments(), getExpenses()])
       .then(([tasksRes, equipRes, staffRes, attRes, membRes, payRes, expRes]) => {
-        const tk = tasksRes.data || [], iss = equipRes.data || [], stf = staffRes.data || [],
-          att = attRes.data || [], mem = membRes.data || [], pay = payRes.data || [], exp = expRes.data || [];
-        setTasks(tk); cache.write('tasks', tk);
-        setIssues(iss); cache.write('issues', iss);
-        setStaffList(stf); cache.write('staff', stf);
-        setAttendance(att); cache.write('attendance', att);
-        setMembers(mem); cache.write('members', mem);
-        setPayments(pay); cache.write('payments', pay);
-        setExpenses(exp); cache.write('expenses', exp);
+        // A request that failed leaves what is shown, and its saved copy, alone
+        const apply = (res, set, key) => { if (failed(res)) return; const d = res.data || []; set(d); cache.write(key, d); };
+        apply(tasksRes, setTasks, 'tasks');
+        apply(equipRes, setIssues, 'issues');
+        apply(staffRes, setStaffList, 'staff');
+        apply(attRes, setAttendance, 'attendance');
+        apply(membRes, setMembers, 'members');
+        apply(payRes, setPayments, 'payments');
+        apply(expRes, setExpenses, 'expenses');
       })
       .catch(console.error)
       .finally(() => setLoading(false));

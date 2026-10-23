@@ -38,7 +38,7 @@ import { citiesOf, regionsOf } from '../utils/address';
 import { CountryField } from '../components/AddressInputs';
 import { serverFieldError, fieldErrorStyle, revealFirstError } from '../utils/formErrors';
 import { digitsOnly } from '../utils/number';
-import { softAll } from '../utils/loadAll';
+import { softAll, failed } from '../utils/loadAll';
 import { escapeHtml, openPrintWindow } from '../utils/receipt';
 
 const formatDate = (d) => fmtDate(d);
@@ -1475,14 +1475,14 @@ export default function MembersPage() {
 
   const loadData = () => {
     softAll([
-      getMembers().catch(() => ({ data: [] })),
-      getPackages().catch(() => ({ data: [] })),
-      getMyGym().catch(() => ({ data: {} })),
+      getMembers(),
+      getPackages(),
+      getMyGym(),
     ]).then(([mRes, pRes, gRes]) => {
-      const mem = mRes.data || [], pkg = pRes.data || [], gym = gRes.data || {};
-      setMembersList(mem); cache.write('list', mem);
-      setPackagesList(pkg); cache.write('packages', pkg);
-      setGymData(gym); cache.write('gym', gym);
+      // A request that failed leaves what is shown, and its saved copy, alone
+      if (!failed(mRes)) { const mem = mRes.data || []; setMembersList(mem); cache.write('list', mem); }
+      if (!failed(pRes)) { const pkg = pRes.data || []; setPackagesList(pkg); cache.write('packages', pkg); }
+      if (!failed(gRes)) { const gym = gRes.data && !Array.isArray(gRes.data) ? gRes.data : {}; setGymData(gym); cache.write('gym', gym); }
     }).finally(() => setLoading(false));
   };
 

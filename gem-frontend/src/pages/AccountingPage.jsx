@@ -33,7 +33,7 @@ import { roleName } from '../utils/roleNames';
 const EXPENSE_CATEGORIES = ['Utilities', 'Rent', 'Maintenance', 'Salaries', 'Supplies', 'Other'];
 const EXPENSE_COLORS = { Utilities: '#60a5fa', Rent: '#fbbf24', Maintenance: '#f97316', Salaries: '#a78bfa', Supplies: '#34d399', Other: '#9ca3af', Equipment: '#fb923c', Marketing: '#4ade80' };
 const categoriesIn = (list) => [...new Set([...EXPENSE_CATEGORIES, ...list.map(e => e.category).filter(Boolean)])];
-import { softAll } from '../utils/loadAll';
+import { softAll, failed } from '../utils/loadAll';
 import { escapeHtml, getGymInfo, openPrintWindow, safeImageSrc } from '../utils/receipt';
 import { gymCache } from '../utils/gymCache';
 import { SkeletonCards } from '../components/Skeleton';
@@ -317,16 +317,16 @@ export default function AccountingPage() {
     const yearAgo = new Date(); yearAgo.setMonth(yearAgo.getMonth() - 11, 1);
     softAll([getExpenses(), getStaff(), getPayments(), getMembers(), getPayRecords(), getPendingExpenses(), getExpenses({ source: 'frontdesk', status: 'all' }), getSales({ from: dayStr(yearAgo), to: todayStr() })])
       .then(([eRes, sRes, pRes, mRes, payRes, pendRes, fdRes, salesRes]) => {
-        const exp = eRes.data || [], stf = sRes.data || [], pay = pRes.data || [], mem = mRes.data || [];
-        setExpenses(exp); cache.write('expenses', exp);
-        setMembersList(mem); cache.write('members', mem);
-        setStaffList(stf); cache.write('staff', stf);
-        setPaymentsList(pay); cache.write('payments', pay);
-        if (salesRes) { const sl = salesRes.data || []; setSalesList(sl); cache.write('sales', sl); }
+        // A request that failed leaves what is shown, and its saved copy, alone
+        if (!failed(eRes)) { const exp = eRes.data || []; setExpenses(exp); cache.write('expenses', exp); }
+        if (!failed(mRes)) { const mem = mRes.data || []; setMembersList(mem); cache.write('members', mem); }
+        if (!failed(sRes)) { const stf = sRes.data || []; setStaffList(stf); cache.write('staff', stf); }
+        if (!failed(pRes)) { const pay = pRes.data || []; setPaymentsList(pay); cache.write('payments', pay); }
+        if (salesRes && !failed(salesRes)) { const sl = salesRes.data || []; setSalesList(sl); cache.write('sales', sl); }
         // Real issued payroll, not invented rows
-        setPaystubs((payRes.data || []).map(toPaystub));
-        setPendingApprovals(pendRes?.data || []);
-        setFrontDeskExpenses((fdRes?.data || []).map(normFdExpense));
+        if (!failed(payRes)) setPaystubs((payRes.data || []).map(toPaystub));
+        if (!failed(pendRes)) setPendingApprovals(pendRes?.data || []);
+        if (!failed(fdRes)) setFrontDeskExpenses((fdRes?.data || []).map(normFdExpense));
       })
       .catch(console.error)
       .finally(() => setLoading(false));

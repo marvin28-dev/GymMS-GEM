@@ -20,7 +20,7 @@ import { getAuth, getRole } from '../utils/auth';
 import { fmtDate, fmtTime, capFirst, todayStr, dayStr } from '../utils/date';
 import CheckinStats from '../components/CheckinStats';
 import { SkeletonCards, SkeletonTableRows } from '../components/Skeleton';
-import { softAll } from '../utils/loadAll';
+import { softAll, failed } from '../utils/loadAll';
 import { gymCache } from '../utils/gymCache';
 
 const formatDate = (d) => fmtDate(d);
@@ -448,14 +448,17 @@ export default function AttendancePage() {
   useEffect(() => {
     softAll([getAttendance({ date: todayISO }), getMembers(), getStaff(), getTimecards({ date: todayISO })])
       .then(([attRes, memRes, staffRes, tcRes]) => {
-        const mem = memRes.data || [], stf = staffRes.data || [];
-        const rows = [
-          ...parseAttendanceRows(attRes.data, todayShort),
-          ...parseTimecardRows(tcRes.data, todayShort),
-        ];
-        setMembersList(mem); cache.write('members', mem);
-        setStaffList(stf); cache.write('staff', stf);
-        setCheckins(rows); cache.write('checkins', rows);
+        // A request that failed leaves what is shown, and its saved copy, alone
+        if (!failed(memRes)) { const mem = memRes.data || []; setMembersList(mem); cache.write('members', mem); }
+        if (!failed(staffRes)) { const stf = staffRes.data || []; setStaffList(stf); cache.write('staff', stf); }
+        // Visits and clock-ins are one list, kept as it was unless both arrived
+        if (!failed(attRes) && !failed(tcRes)) {
+          const rows = [
+            ...parseAttendanceRows(attRes.data, todayShort),
+            ...parseTimecardRows(tcRes.data, todayShort),
+          ];
+          setCheckins(rows); cache.write('checkins', rows);
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));

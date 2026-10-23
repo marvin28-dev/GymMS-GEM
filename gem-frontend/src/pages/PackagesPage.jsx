@@ -18,7 +18,7 @@ import { getAll as getPackages, create as createPackage, update as updatePackage
 import { getAll as getMembers } from '../services/members.service';
 import { getRole, getAuth } from '../utils/auth';
 import { useSetupStatus } from '../hooks/useSetupStatus';
-import { softAll } from '../utils/loadAll';
+import { softAll, failed } from '../utils/loadAll';
 import { serverFieldError } from '../utils/formErrors';
 import { isActiveMember } from '../utils/attention';
 import { SkeletonCards, SkeletonTableRows } from '../components/Skeleton';
@@ -70,10 +70,13 @@ export default function PackagesPage() {
   useEffect(() => {
     softAll([getPackages(), getMembers()])
       .then(([pkgsRes, membersRes]) => {
-        setPackages(pkgsRes.data || []);
-        const mem = membersRes.data || [];
-        setMembersList(mem);
-        storeJson(cacheKey('members'), mem);
+        // A request that failed leaves what is shown, and its saved copy, alone
+        if (!failed(pkgsRes)) setPackages(pkgsRes.data || []);
+        if (!failed(membersRes)) {
+          const mem = membersRes.data || [];
+          setMembersList(mem);
+          storeJson(cacheKey('members'), mem);
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));

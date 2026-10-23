@@ -14,7 +14,7 @@ import { getAll as getMembers } from '../services/members.service';
 import { getAll as getStaff } from '../services/staff.service';
 import { fmtDate, todayStr, dayStr } from '../utils/date';
 import { getGymInfo, gymContactFooterHtml, printReceiptDocument, escapeHtml } from '../utils/receipt';
-import { softAll } from '../utils/loadAll';
+import { softAll, failed } from '../utils/loadAll';
 import { useGymSettings } from '../hooks/useGymSettings';
 import { enabledMethods, PAYMENT_METHODS, canonicalMethod } from '../utils/paymentMethods';
 import { gymCache } from '../utils/gymCache';
@@ -218,10 +218,10 @@ export default function PaymentsPage() {
   useEffect(() => {
     softAll([getPayments(), getMembers(), getStaff()])
       .then(([pRes, mRes, sRes]) => {
-        const pay = pRes.data || [], mem = mRes.data || [], stf = sRes.data || [];
-        setPayments(pay); cache.write('list', pay);
-        setMembersList(mem); cache.write('members', mem);
-        setStaffList(stf); cache.write('staff', stf);
+        // A request that failed leaves what is shown, and its saved copy, alone
+        if (!failed(pRes)) { const pay = pRes.data || []; setPayments(pay); cache.write('list', pay); }
+        if (!failed(mRes)) { const mem = mRes.data || []; setMembersList(mem); cache.write('members', mem); }
+        if (!failed(sRes)) { const stf = sRes.data || []; setStaffList(stf); cache.write('staff', stf); }
       })
       .catch(console.error)
       .finally(() => setLoading(false));

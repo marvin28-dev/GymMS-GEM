@@ -16,7 +16,7 @@ import { notifyDataChanged } from '../utils/events';
 import { TASK_CATEGORIES, categoryColor, categoryLabel, normalizeCategory } from '../utils/taskCategories';
 import { assignFields, assignValue, assigneeName } from '../utils/departments';
 import { taskNeedsAttention, taskOverdue } from '../utils/attention';
-import { softAll } from '../utils/loadAll';
+import { softAll, failed } from '../utils/loadAll';
 import { serverFieldError } from '../utils/formErrors';
 import { gymCache } from '../utils/gymCache';
 import { SkeletonCards } from '../components/Skeleton';
@@ -68,8 +68,9 @@ export default function TasksPage() {
   useEffect(() => {
     softAll([getTasks(), getStaff()])
       .then(([tasksRes, staffRes]) => {
-        setTasks(tasksRes.data || []);
-        setStaffList(staffRes.data || []);
+        // A request that failed leaves what is shown alone
+        if (!failed(tasksRes)) setTasks(tasksRes.data || []);
+        if (!failed(staffRes)) setStaffList(staffRes.data || []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
