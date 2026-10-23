@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Route, Routes, Navigate } from "react-router-dom";
 import AppLayout from "../layouts/AppLayout";
 import ProtectedRoute, { RoleGuard } from "./ProtectedRoute";
@@ -5,15 +6,15 @@ import { appRoutes } from "./routeConfig";
 import ScrollToTop from "../components/ScrollToTop";
 import { isAuthed, checkDailyExpiry, getHomeRoute } from "../utils/auth";
 
-import LandingPage from "../pages/LandingPage";
-import SignUpPage from "../pages/SignUpPage";
-import GymCodePage from "../pages/GymCodePage";
-import GymLoginPage from "../pages/GymLoginPage";
-import ForgotPasswordPage from "../pages/ForgotPasswordPage";
-import ResetPasswordPage from "../pages/ResetPasswordPage";
-import FrontDeskPage from "../pages/FrontDeskPage";
-import MemberProfilePage from "../pages/MemberProfilePage";
-import StaffProfilePage from "../pages/StaffProfilePage";
+const LandingPage = lazy(() => import("../pages/LandingPage"));
+const SignUpPage = lazy(() => import("../pages/SignUpPage"));
+const GymCodePage = lazy(() => import("../pages/GymCodePage"));
+const GymLoginPage = lazy(() => import("../pages/GymLoginPage"));
+const ForgotPasswordPage = lazy(() => import("../pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("../pages/ResetPasswordPage"));
+const FrontDeskPage = lazy(() => import("../pages/FrontDeskPage"));
+const MemberProfilePage = lazy(() => import("../pages/MemberProfilePage"));
+const StaffProfilePage = lazy(() => import("../pages/StaffProfilePage"));
 
 export default function AppRoutes() {
   // Clear expired auth before any route logic so isAuthed() reflects reality
@@ -22,6 +23,10 @@ export default function AppRoutes() {
   return (
     <>
     <ScrollToTop />
+    {/* Pages arrive as they are first opened. Moving between pages keeps the
+        current one on screen until the next has arrived (the router navigates
+        in a transition), so only the very first page shows nothing meanwhile. */}
+    <Suspense fallback={null}>
     <Routes>
       {/* Public marketing & auth */}
       <Route path="/" element={isAuthed() ? <Navigate to={getHomeRoute()} replace /> : <LandingPage />} />
@@ -60,6 +65,7 @@ export default function AppRoutes() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
     </>
   );
 }

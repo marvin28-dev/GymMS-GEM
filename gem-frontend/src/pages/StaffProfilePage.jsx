@@ -32,7 +32,6 @@ import api from '../services/api';
 import { fmtDate, todayStr as getToday, dayStr, ordinalDay, getDateLocale, payMonthText } from '../utils/date';
 import { roleName } from '../utils/roleNames';
 import { digitsOnly } from '../utils/number';
-import { downloadPaystubPdf } from '../utils/paystubPdf';
 import { useSetupStatus } from '../hooks/useSetupStatus';
 import NextDayHint from '../components/NextDayHint';
 import CoachClientsPanel from '../components/CoachClientsPanel';
@@ -3370,8 +3369,10 @@ export default function StaffProfilePage() {
               {/* Actions */}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button style={secondaryBtn} onClick={() => setShowPaystubView(false)}>{t('staff.close')}</button>
-                <button style={primaryBtn} onClick={() => {
-                  // A proper payslip, as a PDF
+                <button style={primaryBtn} onClick={async () => {
+                  // A proper payslip, as a PDF. The PDF maker is fetched only when one is
+                  // downloaded: it was half of this page's size (F-024)
+                  const { downloadPaystubPdf } = await import('../utils/paystubPdf');
                   downloadPaystubPdf({
                     gymName: getAuth()?.user?.gymName || '',
                     employeeName: memberData.name,

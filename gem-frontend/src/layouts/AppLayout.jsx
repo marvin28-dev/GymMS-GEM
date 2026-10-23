@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
@@ -36,7 +36,10 @@ export default function AppLayout() {
             padding: navigable ? '0 0 88px' : '0 0 24px',
           }}
         >
-          <Outlet />
+          {/* The sidebar and header stay while a page arrives */}
+          <Suspense fallback={null}>
+            <Outlet />
+          </Suspense>
         </main>
 
         {/* Bottom tab bar */}
@@ -65,7 +68,10 @@ export default function AppLayout() {
           className="page-fade gem-page-main"
           style={{ padding: 28, flex: 1 }}
         >
-          <Outlet />
+          {/* The sidebar and header stay while a page arrives */}
+          <Suspense fallback={null}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

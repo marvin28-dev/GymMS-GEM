@@ -1,20 +1,23 @@
 // src/routes/routeConfig.jsx
-import DashboardPage from "../pages/DashboardPage";
-import MembersPage from "../pages/MembersPage";
-import MemberProfilePage from "../pages/MemberProfilePage";
-import AttendancePage from "../pages/AttendancePage";
-import CalendarPage from "../pages/CalendarPage";
-import TasksPage from "../pages/TasksPage";
-import SalesPage from "../pages/SalesPage";
-import OperationsPage from "../pages/OperationsPage";
-import PaymentsPage from "../pages/PaymentsPage";
-import AccountingPage from "../pages/AccountingPage";
-import PackagesPage from "../pages/PackagesPage";
-import CommunicationPage from "../pages/CommunicationPage";
-import StaffPage from "../pages/StaffPage";
-import StaffProfilePage from "../pages/StaffProfilePage";
-import NotificationsPage from "../pages/NotificationsPage";
-import SettingsPage from "../pages/SettingsPage";
+// Each page is its own file, fetched the first time it is opened (F-024): the
+// whole app as one 2.6 MB script was slow to start on a phone.
+import { lazy } from "react";
+const DashboardPage = lazy(() => import("../pages/DashboardPage"));
+const MembersPage = lazy(() => import("../pages/MembersPage"));
+const MemberProfilePage = lazy(() => import("../pages/MemberProfilePage"));
+const AttendancePage = lazy(() => import("../pages/AttendancePage"));
+const CalendarPage = lazy(() => import("../pages/CalendarPage"));
+const TasksPage = lazy(() => import("../pages/TasksPage"));
+const SalesPage = lazy(() => import("../pages/SalesPage"));
+const OperationsPage = lazy(() => import("../pages/OperationsPage"));
+const PaymentsPage = lazy(() => import("../pages/PaymentsPage"));
+const AccountingPage = lazy(() => import("../pages/AccountingPage"));
+const PackagesPage = lazy(() => import("../pages/PackagesPage"));
+const CommunicationPage = lazy(() => import("../pages/CommunicationPage"));
+const StaffPage = lazy(() => import("../pages/StaffPage"));
+const StaffProfilePage = lazy(() => import("../pages/StaffProfilePage"));
+const NotificationsPage = lazy(() => import("../pages/NotificationsPage"));
+const SettingsPage = lazy(() => import("../pages/SettingsPage"));
 import { Navigate } from "react-router-dom";
 
 export const appRoutes = [
