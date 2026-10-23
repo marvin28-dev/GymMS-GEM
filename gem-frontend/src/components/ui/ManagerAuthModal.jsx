@@ -44,10 +44,12 @@ export default function ManagerAuthModal({ open, onClose, onConfirm, onVerified,
 
   if (!open) return null;
 
-  const fail = (msg) => {
+  // The refused code is cleared once the box has shaken; a new one typed
+  // meanwhile is kept (it used to be wiped, so the next try went in empty)
+  const fail = (msg, tried) => {
     setError(msg);
     setShake(true);
-    setTimeout(() => { setShake(false); setCode(''); inputRef.current?.focus(); }, 600);
+    setTimeout(() => { setShake(false); setCode(c => (c === tried ? '' : c)); inputRef.current?.focus(); }, 600);
   };
 
   const handleSubmit = async () => {
@@ -61,10 +63,10 @@ export default function ManagerAuthModal({ open, onClose, onConfirm, onVerified,
         setCode('');
         (onConfirm || onVerified)?.();
       } else {
-        fail(t(usePassword ? 'managerAuth.incorrectPassword' : 'managerAuth.incorrect'));
+        fail(t(usePassword ? 'managerAuth.incorrectPassword' : 'managerAuth.incorrect'), code);
       }
     } catch (err) {
-      fail(err?.response?.data?.error || t(usePassword ? 'managerAuth.incorrectPassword' : 'managerAuth.incorrect'));
+      fail(err?.response?.data?.error || t(usePassword ? 'managerAuth.incorrectPassword' : 'managerAuth.incorrect'), code);
     } finally {
       setChecking(false);
     }
