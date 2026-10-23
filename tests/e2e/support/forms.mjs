@@ -6,8 +6,9 @@ import { registerGym, call } from './session.mjs';
 export const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 export const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-export async function fillNewMember(page, lastName) {
-  await page.getByRole('button', { name: 'Add Member' }).first().click();
+// `open` is whatever opens the form on the page in use (the Members page by default)
+export async function fillNewMember(page, lastName, open = () => page.getByRole('button', { name: 'Add Member' }).first().click()) {
+  await open();
   const d = page.getByRole('dialog');
   await d.locator('input[type="file"]').first().setInputFiles({ name: 'face.png', mimeType: 'image/png', buffer: PNG });
   await d.getByPlaceholder('First Name').fill('Photo');
@@ -22,6 +23,28 @@ export async function fillNewMember(page, lastName) {
   await d.locator('input[autocomplete="address-level1"]').fill('Littoral');
   await d.locator('select', { has: page.locator('option', { hasText: 'Select package...' }) }).selectOption({ index: 1 });
   await d.locator('input[type="date"][min]').first().fill(localDay());
+  await d.locator('select', { has: page.locator('option', { hasText: 'Walk-in' }) }).selectOption({ label: 'Walk-in' });
+  return d;
+}
+
+// The Add Visitor form up to Create, with the bundle named and its price
+// collected first
+export async function fillNewVisitor(page, lastName, bundle, open = () => page.getByRole('button', { name: 'Add Visitor' }).first().click()) {
+  await open();
+  const d = page.getByRole('dialog');
+  await d.getByPlaceholder('First Name').fill('Vera');
+  await d.getByPlaceholder('Last Name').fill(lastName);
+  await d.locator('select', { has: page.locator('option', { hasText: 'Female' }) }).selectOption({ label: 'Female' });
+  await d.getByPlaceholder('email@example.com').fill(`${lastName.toLowerCase()}.${Date.now()}@example.test`);
+  await d.locator('input[inputmode="tel"]').nth(0).fill('677445566');
+  await d.getByPlaceholder('Full name').fill('Next Of Kin');
+  await d.locator('input[inputmode="tel"]').nth(1).fill('677998877');
+  await d.locator('input[autocomplete="street-address"]').fill('Rue du Marché');
+  await d.locator('input[autocomplete="address-level2"]').fill('Douala');
+  await d.locator('input[autocomplete="address-level1"]').fill('Littoral');
+  await d.getByText(bundle).click();
+  await d.getByRole('button', { name: 'Collect payment' }).click();
+  await d.getByRole('button', { name: /Confirm Payment/ }).click();
   await d.locator('select', { has: page.locator('option', { hasText: 'Walk-in' }) }).selectOption({ label: 'Walk-in' });
   return d;
 }
