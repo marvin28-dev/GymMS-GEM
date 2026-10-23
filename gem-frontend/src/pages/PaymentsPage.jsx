@@ -63,13 +63,16 @@ export function TransactionModal({ payment, onClose }) {
   const m = payment.member;
   const recordedBy = payment.staff ? staffName(payment.staff) : payment.recordedBy || '-';
   const ms = methodStyle(payment.method);
-  const sm = STATUS_META[payment.status] || STATUS_META.Completed;
+  // A recorded payment carries no status of its own: it has been taken
+  const status = STATUS_META[payment.status] ? payment.status : 'Completed';
+  const sm = STATUS_META[status];
+  const statusName = ({ Completed: t('payments.statusCompleted'), Pending: t('payments.statusPending'), Failed: t('payments.statusFailed') })[status];
   const StatusIcon = sm.icon;
   const MethodIcon = METHOD_ICONS[methodOf(payment.method)?.api] || CreditCard;
 
   const handlePrint = () => {
     const gym = getGymInfo();
-    const statusColor = payment.status === 'Completed' ? 'green' : payment.status === 'Failed' ? 'red' : 'orange';
+    const statusColor = status === 'Completed' ? 'green' : status === 'Failed' ? 'red' : 'orange';
     const row = (label, value) =>
       `<div class="row"><span class="label">${escapeHtml(label)}</span><span>${escapeHtml(value ?? '')}</span></div>`;
 
@@ -89,7 +92,7 @@ export function TransactionModal({ payment, onClose }) {
         ${row(t('memberProfile.receiptRecordedBy'), recordedBy)}
         <hr/>
         <div class="amount">${escapeHtml(formatMoney(payment.amount))}</div>
-        <div class="status" style="color:${statusColor}">${escapeHtml(payment.status)}</div>
+        <div class="status" style="color:${statusColor}">${escapeHtml(statusName)}</div>
         <div class="footer">${escapeHtml(t('memberProfile.thankYouReceipt'))}</div>
         ${gymContactFooterHtml()}
       `,
@@ -116,7 +119,7 @@ export function TransactionModal({ payment, onClose }) {
             borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600,
           }}>
             <StatusIcon size={12} strokeWidth={2.5} />
-            {payment.status}
+            {statusName}
           </div>
         </div>
 

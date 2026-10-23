@@ -23,6 +23,9 @@ test('the Payments receipt prints its labels in the chosen language', async ({ p
   await popup.waitForLoadState();
   const text = await popup.locator('body').innerText();
   expect(text).toContain('Reçu de paiement');
+  // The printout shows the status in capitals
+  expect(text).toMatch(/effectué/i);
+  expect(text).not.toMatch(/completed/i);
   expect(text).not.toMatch(/payments\.(receipt|paymentReceipt|thankYou)/);
 });
 

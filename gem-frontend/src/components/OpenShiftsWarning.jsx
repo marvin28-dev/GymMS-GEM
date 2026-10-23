@@ -1,8 +1,9 @@
 import { AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { getDateLocale } from '../utils/date';
 
 const nameOf = (c, t) => `${c.staff?.firstName || ''} ${c.staff?.lastName || ''}`.trim() || t('common.aStaffMember');
-const clock = (d) => (d ? new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-');
+const clock = (d) => (d ? new Date(d).toLocaleTimeString(getDateLocale(), { hour: '2-digit', minute: '2-digit' }) : '-');
 
 export default function OpenShiftsWarning({ shifts, compact = false }) {
   const { t } = useLanguage();

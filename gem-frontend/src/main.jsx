@@ -13,7 +13,7 @@ installNumberGuard();
 // Apply saved theme before first render to avoid flash. There are two themes;
 // a browser still holding one of the ones we dropped falls back to dark rather
 // than rendering against a palette that no longer exists.
-const savedTheme = localStorage.getItem('gem-theme') === 'light' ? 'light' : 'dark';
+const savedTheme = readStored('gem-theme') === 'light' ? 'light' : 'dark';
 document.documentElement.setAttribute('data-theme', savedTheme);
 
 // It sits outside the language provider (that may be what failed), so it

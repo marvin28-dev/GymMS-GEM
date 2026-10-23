@@ -1088,6 +1088,9 @@ const translations = {
       "timeChangeNotSaved": "Checked out, but the changed time was not saved ({reason}). Ask a manager to correct the time card.",
     },
     payments: {
+      statusCompleted: 'Completed',
+      statusPending: 'Pending',
+      statusFailed: 'Failed',
       title: 'Payments', addPayment: 'Add Payment', paymentHistory: 'Payment History',
       totalThisMonth: 'Total This Month', method: 'Method', reference: 'Reference',
       recordedBy: 'Recorded By', description: 'Description',
@@ -3364,6 +3367,9 @@ const translations = {
       "timeChangeNotSaved": "Sortie enregistrée, mais l’heure modifiée ne l’a pas été ({reason}). Demandez à un responsable de corriger la fiche de temps.",
     },
     payments: {
+      statusCompleted: 'Effectué',
+      statusPending: 'En attente',
+      statusFailed: 'Échoué',
       title: 'Paiements', addPayment: 'Ajouter un paiement', paymentHistory: 'Historique des paiements',
       totalThisMonth: 'Total ce mois', method: 'Méthode', reference: 'Référence',
       recordedBy: 'Enregistré par', description: 'Description',
