@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startServer } from './helpers/server.mjs';
-import { registerGym, addStaff, daysFromNow } from './helpers/fixtures.mjs';
+import { registerGym, addStaff, daysFromNow, eventually } from './helpers/fixtures.mjs';
 
 let api, stop, gym, desk;
 const spend = (body, token = gym.token) => api.post('/api/expenses', { title: 'Electricity', category: 'Utilities', amount: 25000, date: daysFromNow(0), paidTo: 'ENEO', method: 'cash', ...body }, { token });
@@ -43,6 +43,15 @@ describe('the front desk', () => {
     expect((await api.get('/api/expenses', { token: gym.token })).body.some(e => e.id === res.body.id)).toBe(false);
     expect((await api.patch(`/api/expenses/${res.body.id}/approve`, {}, { token: gym.token })).status).toBe(200);
     expect((await api.get('/api/expenses', { token: gym.token })).body.some(e => e.id === res.body.id)).toBe(true);
+  });
+
+  it('tells the managers it needs review, and tells the desk once it is reviewed; only management reviews', async () => {
+    const notes = async (who) => (await api.get('/api/notifications', { token: who.token })).body;
+    const res = await spend({ title: 'Light bulbs', amount: 3000, source: 'frontdesk' }, desk.token);
+    expect(await eventually(async () => (await notes(gym)).some(n => n.title === 'Expense needs review' && n.body.includes('Light bulbs')))).toBe(true);
+    expect((await api.patch(`/api/expenses/${res.body.id}/approve`, {}, { token: desk.token })).status).toBe(403);
+    expect((await api.patch(`/api/expenses/${res.body.id}/approve`, {}, { token: gym.token })).status).toBe(200);
+    expect(await eventually(async () => (await notes(desk)).some(n => n.title === 'Expense reviewed'))).toBe(true);
   });
 
   it('cannot log anything over the gym limit', async () => {

@@ -2,7 +2,7 @@
 // fields it is meant to.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startServer } from './helpers/server.mjs';
-import { registerGym, addMember } from './helpers/fixtures.mjs';
+import { registerGym, addMember, eventually } from './helpers/fixtures.mjs';
 
 let api, stop, gymA, gymB;
 
@@ -44,6 +44,15 @@ describe('equipment issues', () => {
     const res = await report({ location: 'Cardio zone' });
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({ equipment: 'Treadmill 3', location: 'Cardio zone', severity: 'high', status: 'open' });
+  });
+
+  it('raises a maintenance task for management, as urgent as the fault, and tells the managers', async () => {
+    await report({ equipment: 'Rowing machine 2', severity: 'critical', location: 'Floor 1' });
+    const task = await eventually(async () => (await api.get('/api/tasks', { token: gymA.token })).body.find(tk => tk.title === 'Fix: Rowing machine 2'));
+    expect(task).toMatchObject({ category: 'Equipment Maintenance', assignedGroup: 'management', priority: 'High' });
+    expect(task.dueDate).toBeTruthy();
+    const told = await eventually(async () => (await api.get('/api/notifications', { token: gymA.token })).body.find(n => n.title === 'New maintenance task' && n.body.includes('Rowing machine 2')));
+    expect(told).toBeTruthy();
   });
 
   it('refuses an issue with no equipment or no description, with the field named', async () => {
