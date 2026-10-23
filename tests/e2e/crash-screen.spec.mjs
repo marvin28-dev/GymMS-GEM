@@ -3,14 +3,17 @@
 import { test, expect } from '@playwright/test';
 import { registerGym, signIn } from './support/session.mjs';
 
-// The dev server serves each page as its own module, so one can be swapped for
-// a page that throws while drawing
+// A notification whose title is not text makes the page throw while drawing
+// it, the same in the built app as on the dev server
+const NOTIFICATIONS = '**/api/notifications';
 async function breakNotificationsPage(page) {
-  await page.route('**/src/pages/NotificationsPage.jsx*', route => route.fulfill({
-    status: 200,
-    contentType: 'application/javascript',
-    body: 'export default function NotificationsPage() { throw new Error("Broken for the test"); }',
-  }));
+  await page.route(NOTIFICATIONS, route => (route.request().method() === 'GET'
+    ? route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ id: 'broken', title: { broken: true }, body: 'Broken for the test', type: 'system', isRead: false, createdAt: new Date().toISOString() }]),
+    })
+    : route.fallback()));
 }
 
 test('a crashed screen says so in French and offers Reload', async ({ page }) => {
@@ -30,7 +33,7 @@ test('Reload on the crash screen loads the page again', async ({ page }) => {
   await signIn(page, owner);
   await page.goto('/notifications');
   await expect(page.getByRole('heading', { name: 'Something went wrong' })).toBeVisible();
-  await page.unroute('**/src/pages/NotificationsPage.jsx*');
+  await page.unroute(NOTIFICATIONS);
   await page.getByRole('button', { name: 'Reload' }).click();
   await expect(page.getByRole('heading', { name: 'Something went wrong' })).toHaveCount(0);
   await expect(page).toHaveURL(/\/notifications$/);

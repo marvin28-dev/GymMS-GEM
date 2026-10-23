@@ -4,15 +4,27 @@ import ports from './tests/e2e/support/ports.cjs';
 
 const { API_URL, WEB_PORT, WEB_ORIGIN } = ports;
 
+// The app is built and served the way it ships: a page is then a few bundled
+// files instead of the dev server's hundreds of modules, which Firefox loads
+// slowly when every test opens pages at once (10 to 30 seconds a page). The
+// dev server is still there for working on a test: E2E_DEV=1.
+const vite = 'node node_modules/vite/bin/vite.js';
+const BUILT = 'node_modules/.e2e-build';
+const webCommand = process.env.E2E_DEV
+  ? `${vite} --port ${WEB_PORT} --strictPort`
+  : `${vite} build --outDir ${BUILT} --emptyOutDir --logLevel warn && ${vite} preview --outDir ${BUILT} --port ${WEB_PORT} --strictPort`;
+
 // The browser tests drive the real app: the backend on the gem_test database
-// (fake email and uploads, nothing leaves the machine) and the Vite dev server
-// pointed at it. Each test makes its own gym, so tests can run side by side.
+// (fake email and uploads, nothing leaves the machine) and the app built to
+// talk to it. Each test makes its own gym, so tests can run side by side.
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // Each worker runs a browser. On an 8 GB machine four at once ran it out of
+  // memory and Firefox stalled (scripts killed as too slow); E2E_WORKERS overrides.
+  workers: process.env.CI ? 1 : Number(process.env.E2E_WORKERS) || 3,
   reporter: [['list'], ['html', { open: 'never' }]],
   timeout: 60_000,
   expect: { timeout: 10_000 },
@@ -33,11 +45,11 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
-      command: `node node_modules/vite/bin/vite.js --port ${WEB_PORT} --strictPort`,
+      command: webCommand,
       cwd: 'gem-frontend',
       url: WEB_ORIGIN,
       env: { VITE_API_URL: API_URL },
-      timeout: 120_000,
+      timeout: 240_000,
       reuseExistingServer: false,
     },
   ],
