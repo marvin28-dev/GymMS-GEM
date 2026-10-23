@@ -271,13 +271,23 @@ async function assign(req, res) {
 
   let refused = null;
   const updated = await prisma.$transaction(async (tx) => {
+    // Two coaches taking the same member at once both pass the check above;
+    // only the one whose claim finds them still free (or already theirs) gets them
+    if (selfTakeOn) {
+      const { count } = await tx.member.updateMany({ where: { id: member.id, OR: [{ coachId: null }, { coachId: req.user.id }] }, data: { coachId } });
+      if (!count) {
+        const now = await tx.member.findUnique({ where: { id: member.id }, select: { coach: { select: { firstName: true, lastName: true } } } });
+        refused = { status: 409, error: `${fullName(now?.coach)} already coaches ${fullName(member)}. Ask a manager to move them.` };
+        throw new Error('refused');
+      }
+    }
     if (withGoals) {
       const r = await saveGoals(tx, { member, body: req.body, actorId: req.user.id, gymId: req.user.gymId, requireBaseline: !member.goalSetAt || selfTakeOn });
       if (r.error) { refused = r; throw new Error('refused'); }
     }
     return tx.member.update({ where: { id: member.id }, data: { coachId }, select: { id: true, coachId: true, coach: { select: { id: true, firstName: true, lastName: true } }, ...GOAL_FIELDS } });
   }).catch(err => { if (refused) return null; throw err; });
-  if (refused) return res.status(400).json({ error: refused.error, field: refused.field });
+  if (refused) return res.status(refused.status || 400).json({ error: refused.error, field: refused.field });
 
   if (changing) {
     logActivity(req, {
