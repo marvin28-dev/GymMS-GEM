@@ -36,9 +36,17 @@ function invalid(data, creating) {
   if (creating || 'price' in data) { if (!(data.price > 0)) return 'Enter a selling price above zero.'; }
   // What the gym paid for one, so the profit on each sale can be worked out
   if (creating && (data.costPrice == null || Number.isNaN(data.costPrice))) return 'Enter the cost price (what the gym pays for one).';
+  // Not a number would be stored as NaN, which wipes the cost and every profit worked out from it
+  if ('costPrice' in data && data.costPrice != null && Number.isNaN(data.costPrice)) return 'Enter the cost price (what the gym pays for one).';
   if ('costPrice' in data && data.costPrice != null && data.costPrice < 0) return 'The cost price cannot be negative.';
   return null;
 }
+
+const codeTakenError = (code) => ({ error: `The code ${code} is already used by another product.`, field: 'code' });
+
+// Two products given one code at the same moment both pass codeTaken; the
+// database's unique index stops the second, which is the same refusal
+const isCodeClash = (err) => err?.code === 'P2002';
 
 async function codeTaken(gymId, code, exceptId) {
   if (!code) return false;
@@ -58,12 +66,14 @@ async function create(req, res) {
   const data = extractKnownFields(req.body);
   const problem = invalid(data, true);
   if (problem) return res.status(400).json({ error: problem });
-  if (await codeTaken(req.user.gymId, data.code)) {
-    return res.status(409).json({ error: `The code ${data.code} is already used by another product.` });
+  if (await codeTaken(req.user.gymId, data.code)) return res.status(409).json(codeTakenError(data.code));
+  let product;
+  try {
+    product = await prisma.product.create({ data: { ...data, gymId: req.user.gymId } });
+  } catch (err) {
+    if (isCodeClash(err)) return res.status(409).json(codeTakenError(data.code));
+    throw err;
   }
-  const product = await prisma.product.create({
-    data: { ...data, gymId: req.user.gymId },
-  });
   logActivity(req, {
     category: 'settings', action: 'product.created',
     summary: `Added the product ${product.name} (${product.code}) at ${money(product.price)}`, target: { type: 'product', id: product.id },
@@ -82,14 +92,15 @@ async function update(req, res) {
   delete data.stock;
   const problem = invalid(data, false);
   if (problem) return res.status(400).json({ error: problem });
-  if (data.code && await codeTaken(req.user.gymId, data.code, existing.id)) {
-    return res.status(409).json({ error: `The code ${data.code} is already used by another product.` });
-  }
+  if (data.code && await codeTaken(req.user.gymId, data.code, existing.id)) return res.status(409).json(codeTakenError(data.code));
 
-  const product = await prisma.product.update({
-    where: { id: req.params.id },
-    data,
-  });
+  let product;
+  try {
+    product = await prisma.product.update({ where: { id: req.params.id }, data });
+  } catch (err) {
+    if (isCodeClash(err)) return res.status(409).json(codeTakenError(data.code));
+    throw err;
+  }
   const changes = changesBetween(existing, product, PRODUCT_FIELDS, {
     format: { price: (v) => money(v), costPrice: (v) => (v == null ? 'none' : money(v)), isActive: (v) => (v === false ? 'Inactive' : 'Active') },
   });
