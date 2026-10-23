@@ -11,12 +11,23 @@ const announce = (detail) => {
   try { window.dispatchEvent(new CustomEvent(LIVE_CHANGED, { detail })); } catch { /* non-browser */ }
 };
 
-function open(t) {
+// The stream is opened with a one-use ticket, so the sign-in token never goes in
+// a URL (where proxies log it). A dropped stream cannot reuse its ticket, so
+// startLive() opens a new one, with a new ticket.
+async function open(t) {
   close();
   token = t;
   openedAt = Date.now();
+  let ticket;
   try {
-    source = new EventSource(`${BASE}/live?token=${encodeURIComponent(t)}`);
+    const res = await fetch(`${BASE}/live/ticket`, { method: 'POST', headers: { Authorization: `Bearer ${t}` } });
+    if (!res.ok) return;
+    ({ ticket } = await res.json());
+  } catch { return; }
+  // Signed out or switched accounts while the ticket was on its way
+  if (token !== t || source) return;
+  try {
+    source = new EventSource(`${BASE}/live?ticket=${encodeURIComponent(ticket)}`);
   } catch { source = null; return; }
   source.onmessage = (e) => {
     let msg;

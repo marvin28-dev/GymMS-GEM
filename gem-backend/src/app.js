@@ -26,6 +26,7 @@ const uploadRoutes = require('./routes/upload.routes');
 const reportRoutes = require('./routes/report.routes');
 
 const app = express();
+app.disable('x-powered-by');
 
 // Behind a proxy (Railway's edge) every request arrives from the proxy, and the
 // visitor's own address is in X-Forwarded-For. Without trusting that one hop,
@@ -66,7 +67,19 @@ app.use((req, res, next) => {
   if (req.body === undefined) req.body = {};
   next();
 });
-app.use('/uploads', express.static('uploads'));
+// The API answers JSON (and the odd PDF) to the site, never pages of its own,
+// so nothing it sends may be framed, sniffed or allowed to load anything (F-005).
+// The site's own headers are set where it is hosted.
+app.use((req, res, next) => {
+  res.set({
+    'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+  });
+  if (req.secure) res.set('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+  next();
+});
 
 app.use('/api', require('./utils/liveHub').announceWrites);
 app.use('/api/live', require('./routes/live.routes'));

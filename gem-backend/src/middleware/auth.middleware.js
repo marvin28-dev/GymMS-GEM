@@ -71,7 +71,7 @@ function requireRole(...roles) {
 // Somebody filed under "Other" - a cleaner, a technician - has an account so
 // they can be paid, clocked and told things. The gym's members, money and
 // records are not theirs to read, so only their own corner of the API answers.
-const OTHER_MAY_REACH = ['/api/auth', '/api/staff', '/api/notifications', '/api/timecards', '/api/payroll', '/api/pay-adjustments'];
+const OTHER_MAY_REACH = ['/api/auth', '/api/live', '/api/staff', '/api/notifications', '/api/timecards', '/api/payroll', '/api/pay-adjustments'];
 
 function confineOther(req, res, next) {
   if (req.user?.role !== 'other') return next();
