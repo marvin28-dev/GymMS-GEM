@@ -2,7 +2,13 @@
 // make a gym of one's own for each test, and open the app already signed in.
 import { createRequire } from 'node:module';
 
-const { API_URL } = createRequire(import.meta.url)('./ports.cjs');
+const { API_URL, OUTBOX_URL } = createRequire(import.meta.url)('./ports.cjs');
+
+// The emails the test backend's fake mailer was given for one address
+export async function mailTo(address) {
+  const res = await fetch(`${OUTBOX_URL}?to=${encodeURIComponent(address)}`);
+  return res.json();
+}
 
 let n = 0;
 let calls = 0;

@@ -55,3 +55,16 @@ globalThis.fetch = (input, init) => {
 };
 
 require(path.join(BACKEND, 'src/index.js'));
+
+// What the fake mailer was given, for the tests that follow an email (a reset
+// link, a welcome): GET /outbox?to=address. Only on this machine's loopback.
+const { outbox } = require('../../api/fakes/resend.cjs');
+const { OUTBOX_PORT } = require('./ports.cjs');
+require('http').createServer((req, res) => {
+  const url = new URL(req.url, 'http://127.0.0.1');
+  if (url.pathname !== '/outbox') { res.writeHead(404).end(); return; }
+  const to = url.searchParams.get('to');
+  const list = to ? outbox.filter(m => [].concat(m.to || []).map(String).includes(to)) : outbox;
+  res.writeHead(200, { 'content-type': 'application/json' });
+  res.end(JSON.stringify(list.map(m => ({ to: m.to, from: m.from, subject: m.subject, html: m.html, text: m.text }))));
+}).listen(OUTBOX_PORT, '127.0.0.1');
