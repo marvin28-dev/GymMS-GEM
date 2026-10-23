@@ -286,9 +286,13 @@ test('J-28: an account deactivated while signed in is signed out on its next req
   await page.goto('/dashboard');
   await expect(page).toHaveURL(/\/dashboard$/);
   await call('PATCH', `/staff/${manager.id}`, { token: owner.token, body: { isActive: false } });
-  // An open screen asks whether its account is still active when it gets focus
-  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-  await expect(page).toHaveURL(new RegExp(`/${owner.gymCode}/login$`));
+  // An open screen asks whether its account is still active when it gets
+  // focus (sent again until the page that listens for it is up)
+  await expect(async () => {
+    // Throws once the sign-out has started navigating, which is the point
+    await page.evaluate(() => window.dispatchEvent(new Event('focus'))).catch(() => null);
+    await expect(page).toHaveURL(new RegExp(`/${owner.gymCode}/login$`), { timeout: 2000 });
+  }).toPass({ timeout: 30_000 });
   expect(await page.evaluate(() => localStorage.getItem('gem_auth'))).toBeNull();
 });
 
