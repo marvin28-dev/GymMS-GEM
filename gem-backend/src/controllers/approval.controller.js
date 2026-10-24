@@ -1,6 +1,7 @@
 const prisma = require('../utils/prisma');
 const { sendMembershipUpdate } = require('../utils/memberEmail');
 const { bestEffort } = require('../utils/bestEffort');
+const { serializable } = require('../utils/serializable');
 
 // ── Actions a manager can be asked to approve ─────────────────────────────────
 // Each returns the Prisma `data` to apply to the member. One place decides what
@@ -172,7 +173,7 @@ async function create(req, res) {
   // transaction, so two desks sending at the same moment cannot both get in.
   let request;
   try {
-    request = await prisma.$transaction(async (tx) => {
+    request = await serializable(async (tx) => {
       const waiting = await tx.approvalRequest.findFirst({ where: { gymId: req.user.gymId, memberId: member.id, status: 'pending' } });
       if (waiting) {
         const err = new Error('pending');
@@ -193,7 +194,7 @@ async function create(req, res) {
           requestedByName,
         },
       });
-    }, { isolationLevel: 'Serializable' });
+    });
   } catch (err) {
     // Two requests racing: the database refuses one of them, with an error
     // whose code varies. Looking again finds the request that won.

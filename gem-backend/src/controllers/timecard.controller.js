@@ -4,6 +4,7 @@ const { sendGroupTaskEmail } = require('../utils/taskEmail');
 const { rankOf } = require('../utils/hierarchy');
 const { logActivity, fullName } = require('../utils/activityLog');
 const { logFailure } = require('../utils/bestEffort');
+const { serializable } = require('../utils/serializable');
 
 const dayLabel = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -139,11 +140,11 @@ function addIssue(card, code, message) {
 async function createDayCard({ gymId, staffId, dayStart, dayEnd, data }) {
   const sameDay = { gymId, staffId, date: { gte: dayStart, lte: dayEnd } };
   try {
-    return await prisma.$transaction(async (tx) => {
+    return await serializable(async (tx) => {
       const existing = await tx.timeCard.findFirst({ where: sameDay });
       if (existing) return { existing };
       return { card: await tx.timeCard.create({ data, include: CARD_INCLUDE }) };
-    }, { isolationLevel: 'Serializable' });
+    });
   } catch (err) {
     const existing = await prisma.timeCard.findFirst({ where: sameDay });
     if (existing) return { existing };

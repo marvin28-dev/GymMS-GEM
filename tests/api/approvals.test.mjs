@@ -106,6 +106,12 @@ describe('the number of days', () => {
 });
 
 describe('a request from the desk', () => {
+  it('gets through for several members sent at the same moment', async () => {
+    const members = await Promise.all([1, 2, 3, 4, 5, 6, 7, 8].map(() => addMember(api, gym.token)));
+    const results = await Promise.all(members.map(m => api.post('/api/approvals', { memberId: m.id, action: 'extend_membership', params: { days: 3 }, note: 'Busy morning' }, { token: desk.token })));
+    expect(results.map(r => r.status)).toEqual(members.map(() => 201));
+  });
+
   it('is applied once, even when two managers approve it at the same moment', async () => {
     const m = await addMember(api, gym.token, { endDate: daysFromNow(20) });
     const asked = await api.post('/api/approvals', { memberId: m.id, action: 'extend_membership', params: { days: 10 }, note: 'Travelled for work' }, { token: desk.token });

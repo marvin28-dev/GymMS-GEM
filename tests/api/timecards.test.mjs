@@ -61,6 +61,14 @@ describe('the clock', () => {
     expect(cards).toHaveLength(3);
   });
 
+  // Postgres may refuse one of two serializable transactions that touch the
+  // table at once, even for different people; that is asked again, not a 500
+  it('clocks in several people at the same moment', async () => {
+    const workers = await Promise.all([1, 2, 3, 4, 5, 6, 7, 8].map(() => addStaff(api, gym, { employmentType: 'Part Time', salary: 1000 })));
+    const results = await Promise.all(workers.map(w => clockIn(w.id, day(-20), '09:00')));
+    expect(results.map(r => r.status)).toEqual(workers.map(() => 201));
+  });
+
   it('closes a shift once', async () => {
     const worker = await addStaff(api, gym, { employmentType: 'Part Time', salary: 1000 });
     const { body: card } = await clockIn(worker.id, day(0));
