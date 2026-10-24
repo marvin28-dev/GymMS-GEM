@@ -14,13 +14,15 @@ function mustRetry(err) {
 // that touch the same table at once, even when they are about different
 // people or gyms. Nothing was written, so the refused one is run again: once
 // the other has finished it sees that one's rows, and decides afresh.
-async function serializable(work, { attempts = 6 } = {}) {
+async function serializable(work, { attempts = 10 } = {}) {
   for (let attempt = 1; ; attempt++) {
     try {
       return await prisma.$transaction(work, { isolationLevel: 'Serializable' });
     } catch (err) {
       if (!mustRetry(err) || attempt >= attempts) throw err;
-      await new Promise(resolve => setTimeout(resolve, attempt * 15 + Math.random() * 25));
+      // A wait that grows with each refusal, at random within it, so the
+      // refused ones do not all come back together and collide again
+      await new Promise(resolve => setTimeout(resolve, Math.random() * Math.min(1000, 25 * 2 ** attempt)));
     }
   }
 }
