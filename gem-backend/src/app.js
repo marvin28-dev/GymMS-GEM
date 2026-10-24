@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
+const prisma = require('./utils/prisma');
 
 const authRoutes = require('./routes/auth.routes');
 const gymRoutes = require('./routes/gym.routes');
@@ -112,7 +113,24 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/coach', require('./routes/coach.routes'));
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+// Asks the database too: a deploy that cannot reach it must not look healthy
+// (F-179). Three seconds is long enough for a slow answer, short enough for a
+// health check.
+app.get('/api/health', async (req, res) => {
+  let timer;
+  try {
+    await Promise.race([
+      prisma.$queryRaw`SELECT 1`,
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('no answer within 3 seconds')), 3000); }),
+    ]);
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('Health check: the database could not be reached:', err.message);
+    res.status(503).json({ status: 'unavailable' });
+  } finally {
+    clearTimeout(timer);
+  }
+});
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 

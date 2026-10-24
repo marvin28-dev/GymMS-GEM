@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startServer } from './helpers/server.mjs';
 
-let api, stop;
+let api, stop, prisma;
 
-beforeAll(async () => { ({ api, stop } = await startServer()); });
+beforeAll(async () => { ({ api, stop, prisma } = await startServer()); });
 afterAll(() => stop());
 
 describe('requests the client got wrong', () => {
@@ -29,6 +29,29 @@ describe('requests the client got wrong', () => {
     const res = await api.get('/api/no-such-thing');
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: 'Not found' });
+  });
+});
+
+// F-179: the health check answered "ok" whatever the database's state, so a
+// deploy that could not reach it looked healthy
+describe('the health check', () => {
+  it('answers ok when the database answers', async () => {
+    const res = await api.get('/api/health');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: 'ok' });
+  });
+
+  it('answers 503 when the database cannot be reached', async () => {
+    const real = prisma.$queryRaw;
+    prisma.$queryRaw = () => Promise.reject(new Error('connection refused (test)'));
+    try {
+      const res = await api.get('/api/health');
+      expect(res.status).toBe(503);
+      expect(res.body).toEqual({ status: 'unavailable' });
+    } finally {
+      prisma.$queryRaw = real;
+    }
+    expect((await api.get('/api/health')).status).toBe(200);
   });
 });
 
