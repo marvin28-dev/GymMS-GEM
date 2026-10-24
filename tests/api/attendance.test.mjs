@@ -109,3 +109,18 @@ describe('the list for one day', () => {
     expect(res.body.some(v => v.memberId === m.id)).toBe(true);
   });
 });
+
+// F-052: the refusal wrote the date in the server's own style and time zone
+// ("11/3/2026" on Railway); it now writes it in full, on the day it was set
+describe('a membership that has not started', () => {
+  it('is refused with its start date written in full', async () => {
+    const start = daysFromNow(10);
+    const m = await addMember(api, gym.token, { startDate: start, endDate: daysFromNow(40) });
+    expect((await getMember(api, gym.token, m.id)).status).toBe('pending');
+    const res = await checkIn({ memberId: m.id });
+    expect(res.status).toBe(403);
+    const [y, mo, d] = start.split('-').map(Number);
+    const month = new Date(Date.UTC(y, mo - 1, d)).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
+    expect(res.body.error).toBe(`Membership not started yet (starts ${d} ${month} ${y})`);
+  });
+});

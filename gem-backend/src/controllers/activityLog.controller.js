@@ -1,8 +1,8 @@
 const prisma = require('../utils/prisma');
 const { CATEGORIES, RETENTION_DAYS } = require('../utils/activityLog');
+const { readTz, startOfLocalDay } = require('../utils/localDay');
 
 const PAGE_MAX = 100;
-const dayStart = (ymd) => new Date(`${ymd}T00:00:00`);
 const isYmd = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
 
 // The owner's view of the log, newest first. There is deliberately no way to
@@ -13,10 +13,12 @@ async function list(req, res) {
 
   const where = { gymId: req.user.gymId };
   if (category && CATEGORIES.includes(category)) where.category = category;
+  // The reader's own days (tz is the browser's getTimezoneOffset), not the server's (F-052)
   if (isYmd(from) || isYmd(to)) {
+    const tz = readTz(req.query);
     where.createdAt = {};
-    if (isYmd(from)) where.createdAt.gte = dayStart(from);
-    if (isYmd(to)) where.createdAt.lt = new Date(dayStart(to).getTime() + 24 * 60 * 60 * 1000);
+    if (isYmd(from)) where.createdAt.gte = startOfLocalDay(from, tz);
+    if (isYmd(to)) where.createdAt.lt = new Date(startOfLocalDay(to, tz).getTime() + 24 * 60 * 60 * 1000);
   }
   const text = String(q || '').trim();
   if (text) {

@@ -81,3 +81,20 @@ describe('the activity log', () => {
     expect((await prisma.activityLog.findUnique({ where: { id: entry.id } })).summary).toBe(entry.summary);
   });
 });
+
+// F-052: a day in the filter is the reader's own day. It was the server's
+// (UTC on Railway), so in Douala an entry made at 00:30 fell on the day before.
+describe('the activity log by day', () => {
+  it("reads a day in the reader's time zone", async () => {
+    const gymId = gym.user.gymId;
+    const day = new Date(Date.now() - 10 * 864e5).toISOString().slice(0, 10);
+    const at = (ymd, hhmm) => new Date(`${ymd}T${hhmm}:00Z`);
+    const before = new Date(at(day, '00:00').getTime() - 864e5).toISOString().slice(0, 10);
+    // 00:30 in Douala (UTC+1) on that day, and 00:30 on the day after
+    const inside = await prisma.activityLog.create({ data: { gymId, category: 'settings', action: 'test.day', summary: 'Just after midnight', createdAt: at(before, '23:30') } });
+    const after = await prisma.activityLog.create({ data: { gymId, category: 'settings', action: 'test.day', summary: 'The next day', createdAt: at(day, '23:30') } });
+    const ids = (await logs(`?from=${day}&to=${day}&tz=-60&limit=100`)).body.items.map(e => e.id);
+    expect(ids).toContain(inside.id);
+    expect(ids).not.toContain(after.id);
+  });
+});

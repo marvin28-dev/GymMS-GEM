@@ -31,6 +31,10 @@ function asVisit(record) {
 
 const FITNESS_ROLES = ['trainer', 'instructor', 'coach'];
 
+// A membership date is a day, stored at midnight UTC, so it is written out in
+// UTC: the server's own zone and style put it a day off or as 11/3/2026 (F-052)
+const fullDay = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+
 // Fitness staff work with members, not with their money: what a member owes,
 // and owed at each visit, is left out of what they are sent
 function forRole(visit, role) {
@@ -172,7 +176,7 @@ async function checkIn(req, res) {
       else if (dayPasses > 0) kind = 'day_pass';
       else {
         const why = (member.passesRemaining || 0) > 0 && bundleExpired
-          ? `visitor passes expired on ${new Date(member.endDate).toLocaleDateString()}`
+          ? `visitor passes expired on ${fullDay(member.endDate)}`
           : 'no passes remaining';
         return { status: 403, body: { error: `Cannot check in - ${why}. Renew passes or buy a day pass.`, member } };
       }
@@ -204,7 +208,7 @@ async function checkIn(req, res) {
       }
     }
     if (member.status === 'pending' && !kind) {
-      const startLabel = member.startDate ? new Date(member.startDate).toLocaleDateString() : 'unknown date';
+      const startLabel = member.startDate ? fullDay(member.startDate) : 'unknown date';
       return { status: 403, body: { error: `Membership not started yet (starts ${startLabel})`, member } };
     }
 
