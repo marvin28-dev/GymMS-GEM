@@ -50,6 +50,18 @@ function resolveNotifLink(n) {
   return typeMap[n.type] || '/dashboard';
 }
 
+function formatTime(iso, t) {
+  if (!iso) return '';
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return t('common.justNow');
+  if (mins < 60) return t('common.minsAgo', { n: mins });
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return t('common.hoursAgo', { n: hrs });
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return t('common.yesterday');
+  return t('common.daysAgoLong', { n: days });
+}
+
 export default function NotificationsPage() {
   const { t } = useLanguage();
   const nav = useNavigate();
@@ -57,36 +69,23 @@ export default function NotificationsPage() {
   const isFitnessRole = ['trainer', 'instructor', 'coach'].includes(getRole());
   const [notifs, setNotifs] = useState([]);
 
-  function formatTime(iso) {
-    if (!iso) return '';
-    const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-    if (mins < 1) return t('common.justNow');
-    if (mins < 60) return t('common.minsAgo', { n: mins });
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return t('common.hoursAgo', { n: hrs });
-    const days = Math.floor(hrs / 24);
-    if (days === 1) return t('common.yesterday');
-    return t('common.daysAgoLong', { n: days });
-  }
-
   // A list that could not be loaded says so, rather than "No notifications";
   // a refused change says so, rather than happening on screen only (F-102, F-107)
-  const [loadError, setLoadError] = useState('');
+  const [loadError, setLoadError] = useState(false);
   const [actionError, setActionError] = useState('');
   const failed = (err) => setActionError(err?.response?.data?.error || t('memberProfile.actionFailed'));
   const liveTick = useLiveTick();
   useEffect(() => {
     getNotifications()
       .then(res => {
-        setLoadError('');
+        setLoadError(false);
         setNotifs((res.data || []).map(n => ({
           ...n,
           unread: !n.isRead,
           text: n.body,
-          time: formatTime(n.createdAt),
         })));
       })
-      .catch(() => setLoadError(t('notifications.loadFailed')));
+      .catch(() => setLoadError(true));
   }, [liveTick]);
   const [activeCategory, setActiveCategory] = useState('All');
 
@@ -126,7 +125,7 @@ export default function NotificationsPage() {
       setNotifs(prev => prev.filter(n => n.id !== id));
     } catch (err) { failed(err); }
   };
-  const problem = actionError || loadError;
+  const problem = actionError || (loadError ? t('notifications.loadFailed') : '');
   const problemBox = problem ? (
     <div role="alert" style={{ marginBottom: 14, fontSize: 12.5, color: 'var(--accent-red)', background: 'var(--accent-red-dim)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: 10, padding: '10px 14px', fontFamily: 'DM Sans' }}>{problem}</div>
   ) : null;
@@ -214,7 +213,7 @@ export default function NotificationsPage() {
                     <span style={{ fontSize: 13, fontWeight: n.unread ? 600 : 500, color: 'var(--text-primary)', fontFamily: 'DM Sans', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title}</span>
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'DM Sans', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.text}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{n.time}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{formatTime(n.createdAt, t)}</div>
                 </div>
                 <div style={{ flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                   <RowMenu title={t('common.actions')} items={[
@@ -307,7 +306,7 @@ export default function NotificationsPage() {
                     )}
                   </div>
                   <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{n.text}</p>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>{n.time}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>{formatTime(n.createdAt, t)}</span>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
