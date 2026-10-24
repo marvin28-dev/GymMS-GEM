@@ -113,6 +113,29 @@ describe('sending an email', () => {
     expect((await api.post(`/api/communications/${res.body.id}/retry`, {}, { token: gym.token })).status).toBe(400);
   });
 
+  // F-054: each request took the message after only reading its status, so
+  // two at the same moment both went ahead and mailed people twice
+  it('retries once when Retry is pressed twice at the same moment', async () => {
+    const resend = backend('resend');
+    resend.refuse(people.ben.email);
+    const res = await send(gym, { subject: 'Hello {firstName} retried' });
+    await finished(res.body.id);
+    resend.reset();
+    const both = await Promise.all([1, 2].map(() => api.post(`/api/communications/${res.body.id}/retry`, {}, { token: gym.token })));
+    expect(both.map(r => r.status).sort()).toEqual([202, 409]);
+    await eventually(async () => (await prisma.communication.findUnique({ where: { id: res.body.id } })).status === 'sent', { timeout: 8000 });
+    expect(mailFor(people.ben.email, 'Hello Ben retried')).toHaveLength(1);
+  });
+
+  it('sends a draft once when Send is pressed twice at the same moment', async () => {
+    const draft = await send(gym, { action: 'draft', subject: 'Draft {firstName} once' });
+    expect(draft.status).toBe(201);
+    const both = await Promise.all([1, 2].map(() => send(gym, { id: draft.body.id, subject: 'Draft {firstName} once' })));
+    expect(both.map(r => r.status).sort()).toEqual([202, 409]);
+    await finished(draft.body.id);
+    expect(mailFor(people.ada.email, 'Draft Ada once')).toHaveLength(1);
+  });
+
   it('shows on each member\'s profile what they were sent', async () => {
     const res = await send(gym, { audience: { type: 'members', memberIds: [people.cy.id] }, channel: 'email' });
     await finished(res.body.id);

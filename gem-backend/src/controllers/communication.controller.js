@@ -143,8 +143,14 @@ async function create(req, res) {
     status: action === 'draft' ? 'draft' : action === 'schedule' ? 'scheduled' : 'sending',
     scheduledAt, total: people.length, sentById: req.user.id,
   };
+  // A draft or scheduled message is taken only while it still is one, so two
+  // sends at once, or an edit as the scheduler picks it up, cannot both go (F-054)
+  if (existing) {
+    const { count } = await prisma.communication.updateMany({ where: { id: existing.id, status: { in: ['draft', 'scheduled'] } }, data });
+    if (!count) return res.status(409).json({ error: 'This message has already been sent.' });
+  }
   const comm = existing
-    ? await prisma.communication.update({ where: { id: existing.id }, data, include: SENT_BY })
+    ? await prisma.communication.findUnique({ where: { id: existing.id }, include: SENT_BY })
     : await prisma.communication.create({ data: { gymId: req.user.gymId, ...data }, include: SENT_BY });
 
   const what = { email: 'an email', sms: 'a text', both: 'an email and a text' }[channel];
@@ -177,7 +183,9 @@ async function retry(req, res) {
   if (!failed.length) return res.status(400).json({ error: 'Nothing failed, so there is nothing to retry.' });
   const status = channelStatus();
   if (failed.some(d => d.channel === 'sms') && !status.sms.ready) return res.status(400).json({ error: 'Texting is not set up yet.' });
-  await prisma.communication.update({ where: { id: comm.id }, data: { status: 'sending' } });
+  // Taken only if no other retry has taken it meanwhile (F-054)
+  const { count } = await prisma.communication.updateMany({ where: { id: comm.id, status: { not: 'sending' } }, data: { status: 'sending' } });
+  if (!count) return res.status(409).json({ error: 'It is still being sent.' });
   logActivity(req, { category: 'members', action: 'message.retried', summary: `Retried "${comm.subject}" for ${failed.length} failed deliveries`, target: { type: 'communication', id: comm.id } });
   deliverCommunication(comm.id, { only: failed }).catch(async (err) => {
     console.error('Retrying message failed:', err.message);
