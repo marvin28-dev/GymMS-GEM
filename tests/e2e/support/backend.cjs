@@ -54,6 +54,7 @@ globalThis.fetch = (input, init) => {
   return realFetch(input, init);
 };
 
+process.env.TZ = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
 require(path.join(BACKEND, 'src/index.js'));
 
 // What the fake mailer was given, for the tests that follow an email (a reset

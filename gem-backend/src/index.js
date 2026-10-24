@@ -1,3 +1,8 @@
+// Before anything reads the clock: the server's days and times are Cameroon's
+// unless TZ is set. Railway runs in UTC, an hour behind, so a clock-in on time
+// was flagged early and typed times came back an hour late (D-19).
+process.env.TZ = process.env.TZ || 'Africa/Douala';
+
 const app = require('./app');
 const { checkConfig } = require('./utils/config');
 const { startPayrollReminders } = require('./jobs/payrollReminders');
