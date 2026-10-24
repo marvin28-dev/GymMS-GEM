@@ -46,6 +46,7 @@ import { fmtDate, fmtTime, todayStr, dayStr } from '../utils/date';
 import { getGymInfo, gymContactFooterHtml, printReceiptDocument, escapeHtml } from '../utils/receipt';
 import { packageAllowance } from '../utils/packages';
 import DialogBox from '../components/ui/DialogBox';
+import Avatar from '../components/ui/Avatar';
 
 const formatDate = (d) => fmtDate(d);
 
@@ -3233,8 +3234,11 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18, padding: '22px 24px' }}>
           <input ref={memberPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleMemberPhotoUpload} />
           {member.photo ? (
-            <img src={member.photo} onClick={() => setShowPhotoModal(true)} alt={member.firstName} title={t('members.changePhoto')}
+            <img src={member.photo} onClick={() => setShowPhotoModal(true)} alt={member.firstName} title={canManage ? t('members.changePhoto') : t('members.profilePhoto')}
               style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, cursor: 'pointer', border: '2px solid var(--accent-gold)', opacity: photoUploading ? 0.5 : 1 }} />
+          ) : !canManage ? (
+            // Editing a member is the desk's and management's; a coach trains them (F-130)
+            <Avatar firstName={member.firstName || ''} lastName={member.lastName || ''} avatarColor={member.avatarColor} size={64} />
           ) : (
             <button type="button" onClick={() => memberPhotoRef.current?.click()} title={t('members.uploadProfilePhoto')} disabled={photoUploading}
               style={{ width: 64, height: 64, borderRadius: '50%', flexShrink: 0, border: '2px dashed var(--border)', background: 'var(--bg-elevated)', cursor: photoUploading ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}
@@ -3471,7 +3475,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
             onClick={e => e.stopPropagation()}
             style={{ maxWidth: '80vw', maxHeight: '72vh', borderRadius: 16, objectFit: 'contain', boxShadow: '0 32px 96px rgba(0,0,0,0.7)', marginBottom: 24 }}
           />
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }} onClick={e => e.stopPropagation()}>
+          {canManage && <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }} onClick={e => e.stopPropagation()}>
             <button
               onClick={() => memberPhotoRef.current?.click()}
               disabled={photoUploading}
@@ -3488,7 +3492,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
               <Trash2 size={14} />
               {t('memberProfile.removePhoto')}
             </button>
-          </div>
+          </div>}
           <button
             onClick={() => setShowPhotoModal(false)}
             style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: 40, height: 40, cursor: 'pointer', color: '#fff', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
