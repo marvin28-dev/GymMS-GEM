@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 
 const authRoutes = require('./routes/auth.routes');
 const gymRoutes = require('./routes/gym.routes');
@@ -59,6 +60,10 @@ app.use(cors({
   origin: (origin, callback) => callback(null, !origin || isLocalDevOrigin(origin) || ALLOWED_ORIGINS.includes(origin)),
   credentials: true,
 }));
+// Lists of members, payments and check-ins shrink several times over, which
+// counts on a phone's data (F-177). Never the live stream: compressing holds
+// its events back until enough has gathered.
+app.use(compression({ filter: (req, res) => !String(res.getHeader('Content-Type') || '').startsWith('text/event-stream') && compression.filter(req, res) }));
 // Logos and photos are sent as base64 data URIs, which overflow the 100kb default
 app.use(express.json({ limit: '5mb' }));
 // Express 5 leaves req.body undefined when a request carries no JSON, and the
