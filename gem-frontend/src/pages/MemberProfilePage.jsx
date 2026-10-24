@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getCurrencySymbol, formatMoney } from '../utils/currency';
 import { durationText } from '../utils/packageText';
 import { roleName } from '../utils/roleNames';
-import { readStoredJson, storeJson } from '../utils/storage';
+import { readStored, readStoredJson, store, storeJson } from '../utils/storage';
 import { digitsOnly } from '../utils/number';
 import { autoPaymentDescription } from '../utils/paymentDescription';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -1899,7 +1899,7 @@ function CancelMembershipModal({ open, onClose, member, onApplied }) {
 function DismissibleInfo({ dismissKey, children, color = 'gold' }) {
   const { t } = useLanguage();
   const lsKey = `gem_dismiss_${dismissKey}`;
-  const [hidden, setHidden] = useState(() => localStorage.getItem(lsKey) === '1');
+  const [hidden, setHidden] = useState(() => readStored(lsKey) === '1');
   if (hidden) return null;
   const colors = {
     gold:  { bg: 'rgba(212,175,55,0.07)',  border: 'rgba(212,175,55,0.25)',  text: 'var(--text-secondary)' },
@@ -1915,7 +1915,7 @@ function DismissibleInfo({ dismissKey, children, color = 'gold' }) {
     }}>
       <div style={{ marginBottom: 8 }}>{children}</div>
       <button
-        onClick={() => { localStorage.setItem(lsKey, '1'); setHidden(true); }}
+        onClick={() => { store(lsKey, '1'); setHidden(true); }}
         style={{
           background: 'none', border: 'none', cursor: 'pointer',
           fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans',
