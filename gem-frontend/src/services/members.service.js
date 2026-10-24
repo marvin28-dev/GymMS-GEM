@@ -17,3 +17,8 @@ export const remove = (id) =>
 
 export const sendCode = (id) =>
   api.post(`/members/${id}/send-code`);
+
+// A membership change with the money for it, in one request: renew,
+// change-package, day-pass, visitor-bundle, convert-to-visitor, registration-fee
+export const act = (id, action, data) =>
+  api.post(`/members/${id}/${action}`, { ...data, tz: new Date().getTimezoneOffset() });

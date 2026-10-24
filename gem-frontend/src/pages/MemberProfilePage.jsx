@@ -30,10 +30,10 @@ import { isFitness } from '../utils/rolePages';
 import AddressInputs from '../components/AddressInputs';
 import { formatAddress } from '../utils/address';
 import { serverFieldError, revealFirstError } from '../utils/formErrors';
-import { getOne as getMemberById, update as updateMember, sendCode as sendMemberCode } from '../services/members.service';
+import { getOne as getMemberById, update as updateMember, sendCode as sendMemberCode, act as memberAction } from '../services/members.service';
 import { applyDirect as applyMemberAction, create as createApproval, listForMember as listApprovals, approve as approveRequest, reject as rejectRequest, cancel as cancelRequest } from '../services/approvals.service';
 import { getAll as getPackages } from '../services/packages.service';
-import { create as createPayment, remove as removePayment, sendReceipt as sendPaymentReceiptApi, removeKeepalive as removePaymentKeepalive } from '../services/payments.service';
+import { create as createPayment } from '../services/payments.service';
 import { useGymSettings } from '../hooks/useGymSettings';
 import { enabledMethods, PAYMENT_METHODS, canonicalMethod } from '../utils/paymentMethods';
 import { checkIn as checkInApi } from '../services/attendance.service';
@@ -481,99 +481,38 @@ function PaymentDetailModal({ open, onClose, payment, member }) {
   );
 }
 
-// When a prerequisite payment is collected inside an action modal and the user
-// then backs out, the money must not stay in the books. This tracks every
-// payment collected in the modal and, on cancel, refunds (deletes) them before
-// closing - so the gym is never left holding income for an action it didn't do.
-function usePaymentRefund(rawClose) {
-  const [paidIds, setPaidIds]     = useState([]);
-  const [refunding, setRefunding] = useState(false);
-  // A ref mirrors paidIds so the unload / unmount handlers (which capture a
-  // stale closure) always see the current set.
-  const paidRef = useRef([]);
-  const settledRef = useRef(false); // true once confirmed or cancelled - no revert then
-  useEffect(() => { paidRef.current = paidIds; }, [paidIds]);
-
-  const addPaid = (id) => { if (id) setPaidIds(ids => [...ids, id]); };
-  const reset   = () => { setPaidIds([]); paidRef.current = []; settledRef.current = false; };
-  const cancel  = async () => {
-    if (refunding) return;
-    settledRef.current = true;
-    if (paidIds.length) {
-      setRefunding(true);
-      try { for (const id of paidIds) { await removePayment(id).catch(() => {}); } }
-      finally { setRefunding(false); }
-      setPaidIds([]); paidRef.current = [];
-    }
-    rawClose();
+// What is paid in an action dialog. The server takes it only when the action is
+// confirmed, together with the change itself (D-20), so cancelling leaves
+// nothing to refund (F-181).
+function usePendingPayments() {
+  const [list, setList] = useState([]);
+  return {
+    list,
+    total: list.reduce((n, p) => n + p.amount, 0),
+    any: list.length > 0,
+    add: (p) => setList(l => [...l, p]),
+    reset: () => setList([]),
   };
-  const confirmClose = () => { settledRef.current = true; setPaidIds([]); paidRef.current = []; rawClose(); };
-  // The receipt email is held until the action is confirmed, then sent for each
-  // payment collected in the modal (best-effort, never blocks the close).
-  const sendReceipts = async () => { for (const id of paidIds) { await sendPaymentReceiptApi(id).catch(() => {}); } };
-
-  // Closing/refreshing the tab mid-transaction (payment taken, action not yet
-  // confirmed) must not strand the money. While a payment is pending we warn
-  // with the browser's native "leave site" prompt and, on actual unload, fire a
-  // keepalive refund for each collected payment so it is removed from the books.
-  useEffect(() => {
-    if (!paidIds.length) return;
-    // beforeunload only asks the browser to confirm leaving (it must NOT refund
-    // yet - the person may choose to stay). The actual refund goes out on
-    // pagehide, which fires only once the page is really being torn down.
-    const onBeforeUnload = (e) => { e.preventDefault(); e.returnValue = ''; return ''; };
-    const onPageHide = () => { for (const id of paidRef.current) removePaymentKeepalive(id); };
-    window.addEventListener('beforeunload', onBeforeUnload);
-    window.addEventListener('pagehide', onPageHide);
-    return () => {
-      window.removeEventListener('beforeunload', onBeforeUnload);
-      window.removeEventListener('pagehide', onPageHide);
-    };
-  }, [paidIds.length]);
-
-  // If the modal is torn down with money still pending and neither confirmed nor
-  // cancelled (e.g. a parent force-closed it), refund what was collected.
-  useEffect(() => () => {
-    if (!settledRef.current && paidRef.current.length) {
-      for (const id of paidRef.current) removePayment(id).catch(() => {});
-    }
-  }, []);
-
-  return { paidIds, addPaid, reset, cancel, confirmClose, sendReceipts, refunding, hasPaid: paidIds.length > 0 };
 }
 
-// The cancel control for an action modal: a plain "Cancel" until money has been
-// taken, then a "Refund payment & cancel" that undoes the income first.
-function CancelOrRefund({ refund, saving }) {
-  const { t } = useLanguage();
-  const { hasPaid, refunding, cancel } = refund;
-  return (
-    <button
-      onClick={cancel}
-      disabled={saving || refunding}
-      style={{
-        ...secondaryBtn,
-        opacity: (saving || refunding) ? 0.6 : 1,
-        cursor: (saving || refunding) ? 'not-allowed' : 'pointer',
-        ...(hasPaid ? { borderColor: 'rgba(239,68,68,0.4)', color: 'var(--accent-red)' } : {}),
-      }}
-    >
-      {hasPaid ? (refunding ? t('memberProfile.refunding') : t('memberProfile.refundAndCancel')) : t('memberProfile.cancel')}
-    </button>
-  );
+// Why the server refused an action, shown above the dialog's buttons
+const actionError = (err, t) => err?.response?.data?.error || t('memberProfile.actionFailed');
+function ActionError({ text }) {
+  return text ? <div role="alert" data-field-error style={{ fontSize: 12.5, color: 'var(--accent-red)', lineHeight: 1.5 }}>{text}</div> : null;
 }
 
 // ─── Convert to Visitor Modal ─────────────────────────────────────────────────
 function ConvertToVisitorModal({ open, onClose, member, gymData, packagesList = [], onApplied, onSettleBalance }) {
   const { t } = useLanguage();
-  const refund = usePaymentRefund(onClose);
+  const pending = usePendingPayments();
+  const paidNow = pending.total;
   const outstanding = Math.max(0, Number(member?.balance) || 0);
   const visitorPkgs = packagesList.filter(p => p.isVisitor);
   const [selectedId, setSelectedId]   = useState('');
-  const [paidNow, setPaidNow]         = useState(0);
   const [showPayment, setShowPayment] = useState(false);
   const [saving, setSaving]           = useState(false);
-  useEffect(() => { if (open) { setSelectedId(visitorPkgs[0]?.id || ''); setPaidNow(0); setShowPayment(false); setSaving(false); refund.reset(); } }, [open]);
+  const [error, setError]             = useState('');
+  useEffect(() => { if (open) { setSelectedId(visitorPkgs[0]?.id || ''); pending.reset(); setShowPayment(false); setSaving(false); setError(''); } }, [open]);
 
   const pkg = visitorPkgs.find(p => p.id === selectedId) || visitorPkgs[0] || null;
   const price = pkg?.price ?? 0;
@@ -589,19 +528,12 @@ function ConvertToVisitorModal({ open, onClose, member, gymData, packagesList = 
 
   const handleConfirm = async () => {
     if (!member || !pkg || !canAfford || saving) return;
-    setSaving(true);
+    setSaving(true); setError('');
     try {
-      const today = todayStr();
-      const data = {
-        isVisitor: true, status: 'visitor', packageId: pkg.id,
-        startDate: today, endDate: pkg.durationDays ? addDays(today, pkg.durationDays) : null,
-        passesTotal: sessions, passesRemaining: sessions, balance: remainderDebt,
-      };
-      const res = await updateMember(member.id, data);
-      await refund.sendReceipts();
-      onApplied?.(res?.data || data);
-      refund.confirmClose();
-    } catch { setSaving(false); }
+      const res = await memberAction(member.id, 'convert-to-visitor', { packageId: pkg.id, payments: pending.list });
+      onApplied?.(res.data.member);
+      onClose();
+    } catch (err) { setError(actionError(err, t)); setSaving(false); }
   };
 
   const row = (label, value, color) => (
@@ -633,7 +565,7 @@ function ConvertToVisitorModal({ open, onClose, member, gymData, packagesList = 
   }
 
   return (
-    <Modal open={open} onClose={refund.cancel} hideClose={refund.hasPaid} title={t('memberProfile.convertToVisitorTitle')} maxWidth={440}>
+    <Modal open={open} onClose={onClose} title={t('memberProfile.convertToVisitorTitle')} maxWidth={440}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
           <strong style={{ color: '#ef4444' }}>{t('memberProfile.convertWarning')}</strong> {t('memberProfile.convertWarningText')}
@@ -648,7 +580,7 @@ function ConvertToVisitorModal({ open, onClose, member, gymData, packagesList = 
             <GemSelect
               label={t('memberProfile.visitorPackageLabel')}
               value={pkg?.id || ''}
-              onChange={e => { setSelectedId(e.target.value); setPaidNow(0); setShowPayment(false); refund.reset(); }}
+              onChange={e => { setSelectedId(e.target.value); setShowPayment(false); pending.reset(); }}
               options={visitorPkgs.map(p => ({ value: p.id, label: `${p.name} - ${fmtMoney(p.price)}` }))}
             />
             <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 7 }}>
@@ -672,19 +604,18 @@ function ConvertToVisitorModal({ open, onClose, member, gymData, packagesList = 
                 shortfall={toMinimum} minAmount={toMinimum}
                 defaultAmount={price - paidNow} maxAmount={price - paidNow}
                 pctBase={price} pctAlready={paidNow} minPct={minPct}
-                memberId={member?.id} type="product" notify={false}
-                description={`${t('memberProfile.convertToVisitor')} - ${pkg?.name || ''}`}
-                onPaymentAdded={(n, id) => { setPaidNow(p => p + n); refund.addPaid(id); setShowPayment(false); }}
+                onPaymentAdded={(n, p) => { pending.add(p); setShowPayment(false); }}
               />
             )}
             {price > 0 && paidNow >= minRequired && (
-              <div style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#34d399', fontWeight: 600 }}>✓ {t('memberProfile.paymentReceived')}</div>
+              <div style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#34d399', fontWeight: 600 }}>✓ {t('memberProfile.paymentReady')}</div>
             )}
           </>
         )}
 
+        <ActionError text={error} />
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid var(--border-subtle)' }}>
-          <CancelOrRefund refund={refund} saving={saving} />
+          <button style={secondaryBtn} onClick={onClose} disabled={saving}>{t('memberProfile.cancel')}</button>
           <button
             style={{ ...primaryBtn, background: 'var(--accent-red)', border: 'none', opacity: (canAfford && !saving) ? 1 : 0.4, cursor: (canAfford && !saving) ? 'pointer' : 'not-allowed' }}
             disabled={!canAfford || saving} onClick={handleConfirm}
@@ -828,9 +759,11 @@ function SendCodeModal({ open, onClose, member, gymName }) {
 // ─── Renew Registration Fee Modal ────────────────────────────────────────────
 function RenewRegFeeModal({ open, onClose, member, gymData, onSave }) {
   const { t } = useLanguage();
-  const gymSettings = useGymSettings();
-  const feeAmount  = gymData?.registrationFee || 5000;
-  const [method, setMethod]   = useState('Cash');
+  const methods = enabledMethods(useGymSettings());
+  // The gym's own fee; a gym that charges none is never asked for one (D-29)
+  const feeAmount  = Number(gymData?.registrationFee) || 0;
+  const [picked, setPicked]   = useState('');
+  const method = methods.some(m => m.key === picked) ? picked : methods[0]?.key || 'Cash';
   const [ref]                 = useState(generateRef());
   const [saving, setSaving]   = useState(false);
   const [apiError, setApiError] = useState('');
@@ -877,8 +810,8 @@ function RenewRegFeeModal({ open, onClose, member, gymData, onSave }) {
         </div>
 
         {/* Method */}
-        <GemSelect label={t('memberProfile.paymentMethodLabel')} value={method} onChange={e => setMethod(e.target.value)}
-          options={enabledMethods(gymSettings).map(m => ({ value: m.key, label: t(m.labelKey) }))} />
+        <GemSelect label={t('memberProfile.paymentMethodLabel')} value={method} onChange={e => setPicked(e.target.value)}
+          options={methods.map(m => ({ value: m.key, label: t(m.labelKey) }))} />
         <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{t('memberProfile.refLabel')} {ref}</div>
 
         {apiError && <div style={{ fontSize: 12, color: 'var(--accent-red)' }}>{apiError}</div>}
@@ -892,9 +825,8 @@ function RenewRegFeeModal({ open, onClose, member, gymData, onSave }) {
             onClick={async () => {
               setSaving(true); setApiError('');
               try {
-                await createPayment({ amount: feeAmount, method, reference: ref, memberId: member.id, type: 'registration', description: t('memberProfile.regFeeRenewalDesc') });
-                await updateMember(member.id, { regFeeDate: today, status: member.status === 'suspended' ? 'active' : member.status });
-                onSave?.({ regFeeDate: today, status: member.status === 'suspended' ? 'active' : member.status });
+                const res = await memberAction(member.id, 'registration-fee', { payments: [{ amount: feeAmount, method, reference: ref }] });
+                onSave?.(res.data.member);
                 onClose();
               } catch (err) {
                 setApiError(err?.response?.data?.error || t('memberProfile.paymentFailedRetry'));
@@ -998,17 +930,6 @@ function addDays(dateStr, n) {
   return dayStr(d);
 }
 
-function deriveStatus(startDate, endDate) {
-  const now = new Date();
-  const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const start = startDate ? new Date(toDateStr(startDate) + 'T00:00:00') : null;
-  const end   = endDate   ? new Date(toDateStr(endDate)   + 'T00:00:00') : null;
-  if (start && start > now) return 'pending';
-  if (end && end < now) return 'expired';
-  if (end && end >= now && end <= in7Days) return 'expiring';
-  return 'active';
-}
-
 function calcEndDate(startDate, pkgName) {
   const months = PKG_MONTHS[pkgName];
   if (!months) return startDate;
@@ -1048,17 +969,18 @@ function fmtMoney(n) {
 // the balance it really leaves the member on. minAmount, when set, is the least
 // that may be taken; pctBase/pctAlready/minPct show the share paid as the staff
 // types, red under the minimum and green once it is met.
-function InlinePaymentSection({ shortfall, maxAmount, minAmount = 0, defaultAmount, pctBase, pctAlready = 0, minPct, memberId, type = 'membership', onPaymentAdded, confirmLabel, savingLabel, description, notify = true }) {
+function InlinePaymentSection({ shortfall, maxAmount, minAmount = 0, defaultAmount, pctBase, pctAlready = 0, minPct, onPaymentAdded, confirmLabel, savingLabel, saving = false }) {
   const { t } = useLanguage();
-  const gymSettings = useGymSettings();
+  const methods = enabledMethods(useGymSettings());
   const cap = maxAmount ?? shortfall;
   const start = defaultAmount ?? shortfall;
   const [amount, setAmount]       = useState(String(start > 0 ? start : ''));
-  const [method, setMethod]       = useState('Cash');
+  const [picked, setPicked]       = useState('');
   const [ref]                     = useState(generateRef());
   const [submitted, setSubmitted] = useState(false);
-  const [saving, setSaving]       = useState(false);
-  const [apiError, setApiError]   = useState('');
+  // One the gym takes, also before its settings have arrived (D-26)
+  const method = methods.some(m => m.key === picked) ? picked : methods[0]?.key || 'Cash';
+  const methodName = t(methods.find(m => m.key === method)?.labelKey || 'memberProfile.methodLabel');
 
   const isRenewal = !!confirmLabel;
   const n = parseInt(amount, 10) || 0;
@@ -1076,7 +998,7 @@ function InlinePaymentSection({ shortfall, maxAmount, minAmount = 0, defaultAmou
         display: 'flex', alignItems: 'center', gap: 10, fontSize: 13,
         color: 'var(--accent-green)',
       }}>
-        <span style={{ fontSize: 18 }}>✓</span> Payment of {fmtMoney(n)} recorded.
+        <span style={{ fontSize: 18 }}>✓</span> {t('memberProfile.paymentToTake', { amount: fmtMoney(n), method: methodName })}
       </div>
     );
   }
@@ -1096,8 +1018,8 @@ function InlinePaymentSection({ shortfall, maxAmount, minAmount = 0, defaultAmou
       </div>
       <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <GemInput label={t('memberProfile.amountInShort', { currency: getCurrencySymbol() })} required type="text" inputMode="numeric" value={amount} onChange={e => setAmount(digitsOnly(e.target.value))} />
-        <GemSelect label={t('memberProfile.methodLabel')} value={method} onChange={e => setMethod(e.target.value)}
-          options={enabledMethods(gymSettings).map(m => ({ value: m.key, label: t(m.labelKey) }))} />
+        <GemSelect label={t('memberProfile.methodLabel')} value={method} onChange={e => setPicked(e.target.value)}
+          options={methods.map(m => ({ value: m.key, label: t(m.labelKey) }))} />
       </div>
       {pct != null && n > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1110,20 +1032,13 @@ function InlinePaymentSection({ shortfall, maxAmount, minAmount = 0, defaultAmou
       {overMax && <div style={{ fontSize: 12, color: 'var(--accent-red)' }}>{t('memberProfile.amountOverMax', { amount: fmtMoney(cap) })}</div>}
       {underMin && <div style={{ fontSize: 12, color: 'var(--accent-red)' }}>{minPct != null ? t('memberProfile.amountUnderPct', { pct: minPct, amount: fmtMoney(minAmount) }) : t('memberProfile.amountUnderMin', { amount: fmtMoney(minAmount) })}</div>}
       <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{t('memberProfile.refLabel')} {ref}</div>
-      {apiError && <div style={{ fontSize: 12, color: 'var(--accent-red)' }}>{apiError}</div>}
       <button
         disabled={saving || !validAmount}
-        onClick={async () => {
+        onClick={() => {
           if (!validAmount) return;
-          setSaving(true); setApiError('');
-          try {
-            const res = await createPayment({ amount: n, method, reference: ref, memberId, type, description: description || undefined, notify, pendingCharge: cap > 0 ? cap : undefined });
-            setSubmitted(true);
-            onPaymentAdded(n, res?.data?.id);
-          } catch (err) {
-            setApiError(err?.response?.data?.error || t('memberProfile.paymentFailedRetry'));
-            setSaving(false);
-          }
+          // Taken by the server with the change itself, once it is confirmed
+          setSubmitted(true);
+          onPaymentAdded(n, { amount: n, method, reference: ref });
         }}
         style={{
           ...primaryBtn,
@@ -1210,13 +1125,14 @@ function BalanceStatus({ effectiveBalance, pkg, onShowPayment, showingPayment })
 
 function ChangePackageModal({ open, onClose, member, packagesList = [], onSave }) {
   const { t } = useLanguage();
-  const refund = usePaymentRefund(onClose);
+  const pending = usePendingPayments();
+  const extraBalance = pending.total;
   const [selectedPkg, setSelectedPkg]   = useState('');
-  const [extraBalance, setExtraBalance] = useState(0);
   const [showPayment, setShowPayment]   = useState(false);
   const [saving, setSaving]             = useState(false);
+  const [error, setError]               = useState('');
 
-  useEffect(() => { if (!open) { setSelectedPkg(''); setExtraBalance(0); setShowPayment(false); setSaving(false); refund.reset(); } }, [open]);
+  useEffect(() => { if (!open) { setSelectedPkg(''); pending.reset(); setShowPayment(false); setSaving(false); setError(''); } }, [open]);
 
   const pkg = packagesList.find(p => p.name === selectedPkg) || null;
   const today = todayStr();
@@ -1226,7 +1142,7 @@ function ChangePackageModal({ open, onClose, member, packagesList = [], onSave }
   const shortfall = pkg ? Math.max(0, minPayment - effectiveBalance) : 0;
 
   return (
-    <Modal open={open} onClose={refund.cancel} hideClose={refund.hasPaid} title={t('memberProfile.changePackageTitle')} maxWidth={500}>
+    <Modal open={open} onClose={onClose} title={t('memberProfile.changePackageTitle')} maxWidth={500}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{
           background: 'var(--bg-elevated)', borderRadius: 10, padding: '10px 14px',
@@ -1272,35 +1188,23 @@ function ChangePackageModal({ open, onClose, member, packagesList = [], onSave }
             shortfall={shortfall}
             minAmount={shortfall}
             maxAmount={Math.max(0, pkg.price - extraBalance)}
-            memberId={member.id}
-            type="product"
-            notify={false}
-            description={`${t('memberProfile.changePackageTitle')} - ${pkg?.name || ''}`}
-            onPaymentAdded={(n, id) => { setExtraBalance(e => e + n); refund.addPaid(id); setShowPayment(false); }}
+            onPaymentAdded={(n, p) => { pending.add(p); setShowPayment(false); }}
           />
         )}
+        <ActionError text={error} />
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid var(--border-subtle)' }}>
-          <CancelOrRefund refund={refund} saving={saving} />
+          <button style={secondaryBtn} onClick={onClose} disabled={saving}>{t('memberProfile.cancel')}</button>
           <button
             style={{ ...primaryBtn, opacity: (!pkg || !canAfford || saving) ? 0.4 : 1, cursor: (!pkg || !canAfford || saving) ? 'not-allowed' : 'pointer' }}
             disabled={!pkg || !canAfford || saving}
             onClick={async () => {
               if (!pkg) return;
-              setSaving(true);
+              setSaving(true); setError('');
               try {
-                const newEndDate = calcEndDateFromPkg(today, pkg);
-                const newBalance = Math.max(0, pkg.price - extraBalance);
-                await updateMember(member.id, {
-                  packageId: pkg.id,
-                  startDate: today,
-                  endDate: newEndDate,
-                  balance: newBalance,
-                  status: 'active',
-                });
-                await refund.sendReceipts();
-                onSave?.({ packageId: pkg.id, package: pkg, startDate: today, endDate: newEndDate, balance: newBalance, status: deriveStatus(today, newEndDate) });
-                refund.confirmClose();
-              } catch { setSaving(false); }
+                const res = await memberAction(member.id, 'change-package', { packageId: pkg.id, payments: pending.list });
+                onSave?.(res.data.member);
+                onClose();
+              } catch (err) { setError(actionError(err, t)); setSaving(false); }
             }}
           >
             <Package size={13} /> {saving ? t('memberProfile.saving') : t('memberProfile.confirmChange')}
@@ -1317,11 +1221,13 @@ function RenewMembershipModal({ open, onClose, member, packagesList = [], onSave
   const { t } = useLanguage();
   const outstanding = Math.max(0, Number(member?.balance) || 0);
   const todayIso = todayStr();
+  const pending = usePendingPayments();
+  const extraBalance = pending.total;
   const [selectedPkg, setSelectedPkg]   = useState('');
   const [startDate, setStartDate]       = useState('');
-  const [extraBalance, setExtraBalance] = useState(0);
   const [showPayment, setShowPayment]   = useState(false);
   const [saving, setSaving]             = useState(false);
+  const [error, setError]               = useState('');
 
   // Set when it opens, so a reload of the member does not undo the choices
   useOnOpen(open, () => {
@@ -1329,9 +1235,10 @@ function RenewMembershipModal({ open, onClose, member, packagesList = [], onSave
     const isExpiredOrLapsed = !member.endDate || new Date(member.endDate) < new Date();
     const isDeactivated = member.status === 'deactivated' || member.status === 'cancelled';
     setStartDate((isExpiredOrLapsed || isDeactivated) ? todayStr() : member.endDate.slice(0, 10));
-    setExtraBalance(0);
+    pending.reset();
     setShowPayment(false);
     setSaving(false);
+    setError('');
   });
 
   const pkg = packagesList.find(p => p.name === selectedPkg) || null;
@@ -1343,32 +1250,20 @@ function RenewMembershipModal({ open, onClose, member, packagesList = [], onSave
 
   // Shared by the confirm button and the inline payment flow, so a member who
   // owes nothing can still be renewed without going through a payment step.
-  const commitRenewal = async (balanceUsed) => {
+  // The server takes the payments and writes the new term together.
+  const commitRenewal = async (payments) => {
     if (!pkg || !startDate) return;
-    setSaving(true);
+    setSaving(true); setError('');
     try {
-      const memberBalance = Math.max(0, pkg.price - balanceUsed);
-      // Renewal re-issues the allowance from the package as it stands today,
-      // so unused sessions do not carry into the new term
-      const allowance = packageAllowance(pkg);
-      await updateMember(member.id, {
-        packageId: pkg.id,
-        startDate,
-        endDate: endDate || undefined,
-        balance: memberBalance,
-        status: 'active',
-        isVisitor: false,
-        passesTotal: allowance,
-        passesRemaining: allowance,
-        _notify: 'renew_membership',
-      });
-      onSave?.({
-        packageId: pkg.id, package: pkg, startDate, endDate,
-        balance: memberBalance, status: deriveStatus(startDate, endDate),
-        passesTotal: allowance, passesRemaining: allowance,
-      });
+      const res = await memberAction(member.id, 'renew', { packageId: pkg.id, startDate, payments });
+      onSave?.(res.data.member);
       onClose();
-    } catch { setSaving(false); }
+    } catch (err) {
+      // Nothing was taken: the payment step comes back to try again
+      pending.reset();
+      setError(actionError(err, t));
+      setSaving(false);
+    }
   };
 
   return (
@@ -1443,25 +1338,24 @@ function RenewMembershipModal({ open, onClose, member, packagesList = [], onSave
             shortfall={shortfall}
             minAmount={shortfall}
             maxAmount={Math.max(0, pkg.price - extraBalance)}
-            memberId={member.id}
-            type="membership"
             confirmLabel="renew"
             savingLabel={t('memberProfile.processingRenewing')}
-            onPaymentAdded={async (n) => {
-              const newBalance = extraBalance + n;
-              setExtraBalance(newBalance);
+            saving={saving}
+            onPaymentAdded={(n, p) => {
+              pending.add(p);
               setShowPayment(false);
-              await commitRenewal(newBalance);
+              commitRenewal([...pending.list, p]);
             }}
           />
         )}
+        <ActionError text={error} />
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 8, borderTop: '1px solid var(--border-subtle)' }}>
           <button style={secondaryBtn} onClick={onClose}>{t('memberProfile.cancel')}</button>
           {pkg && canAfford && !showPayment && (
             <button
               style={{ ...primaryBtn, opacity: saving || !startDate || startDate < todayIso ? 0.6 : 1 }}
               disabled={saving || !startDate || startDate < todayIso}
-              onClick={() => commitRenewal(effectiveBalance)}
+              onClick={() => commitRenewal(pending.list)}
             >
               <RefreshCw size={13} /> {saving ? t('memberProfile.processing') : t('memberProfile.confirmRenew')}
             </button>
@@ -1932,7 +1826,9 @@ function DismissibleInfo({ dismissKey, children, color = 'gold' }) {
 
 function DayPassModal({ open, onClose, member, packagesList = [], onApplied, onSettleBalance }) {
   const { t } = useLanguage();
-  const refund = usePaymentRefund(onClose);
+  const pending = usePendingPayments();
+  const paidNow = pending.total;
+  const [error, setError] = useState('');
   const isVisitor = !!member?.isVisitor || member?.status === 'visitor';
   // A day pass is always for a monthly package, priced at its day-pass rate. A
   // lapsed member buys one on their own package; a visitor picks which monthly
@@ -1941,13 +1837,12 @@ function DayPassModal({ open, onClose, member, packagesList = [], onApplied, onS
   const ownPkg = packagesList.find(p => String(p.id) === String(member?.packageId))
     || (member?.package && typeof member.package === 'object' ? member.package : null);
   const [pickedId, setPickedId]         = useState('');
-  const [paidNow, setPaidNow]           = useState(0);
   const [showPayment, setShowPayment]   = useState(false);
   const [saving, setSaving]             = useState(false);
   const [purchased, setPurchased]       = useState(false);
   const [checkingIn, setCheckingIn]     = useState(false);
   useEffect(() => {
-    if (!open) { setPaidNow(0); setShowPayment(false); setSaving(false); setPurchased(false); setCheckingIn(false); refund.reset(); }
+    if (!open) { pending.reset(); setShowPayment(false); setSaving(false); setPurchased(false); setCheckingIn(false); setError(''); }
     // A visitor's own package comes first, so a top-up starts on the right one
     else setPickedId(isVisitor ? ((monthlyPkgs.find(p => String(p.id) === String(member?.packageId)) || monthlyPkgs[0])?.id || '') : '');
   }, [open]);
@@ -1969,28 +1864,15 @@ function DayPassModal({ open, onClose, member, packagesList = [], onApplied, onS
 
   const handleConfirm = async () => {
     if (!member || !canAfford || saving) return;
-    setSaving(true);
+    setSaving(true); setError('');
     try {
-      // A spent visitor reads as expired; a day pass puts them back in use.
-      const today = todayStr();
-      // Once every pass is spent the count starts again: a single pass bought
-      // after a used-up bundle of 11 reads 1/1, not 1/12. Passes left on a
-      // bundle that has run out are gone with it.
-      const data = isVisitor
-        ? {
-            dayPasses: held + 1, status: 'visitor',
-            passesTotal: visitorUnused > 0 ? passesOf(member) + 1 : 1,
-            ...(visitorUnused > 0 ? {} : { passesRemaining: 0 }),
-            ...(!member.endDate || dayStr(member.endDate) < today ? { endDate: today } : {}),
-          }
-        : { dayPasses: held + 1 };
-      const res = await updateMember(member.id, data);
-      await refund.sendReceipts();
-      onApplied?.(res?.data || data);
+      // The server works out the passes (a spent visitor's count starts again)
+      const res = await memberAction(member.id, 'day-pass', { packageId: pkg?.id, payments: pending.list });
+      onApplied?.(res.data.member);
       // Don't close yet - offer to check them in now so the staff don't forget.
       setPurchased(true);
       setSaving(false);
-    } catch { setSaving(false); }
+    } catch (err) { setError(actionError(err, t)); setSaving(false); }
   };
 
   const [checkInErr, setCheckInErr] = useState('');
@@ -2006,7 +1888,7 @@ function DayPassModal({ open, onClose, member, packagesList = [], onApplied, onS
       setCheckingIn(false);
       return;
     }
-    refund.confirmClose();
+    onClose();
   };
 
   const line = (label, value, color) => (
@@ -2041,14 +1923,14 @@ function DayPassModal({ open, onClose, member, packagesList = [], onApplied, onS
   // After buying a pass: offer check in now / later so the staff don't forget.
   if (purchased) {
     return (
-      <Modal open={open} onClose={refund.confirmClose} hideClose title={t('memberProfile.buyDayPassTitle')} maxWidth={420}>
+      <Modal open={open} onClose={onClose} hideClose title={t('memberProfile.buyDayPassTitle')} maxWidth={420}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 10, padding: '14px 16px', fontSize: 13, color: '#34d399', fontWeight: 600 }}>
             ✓ {t('memberProfile.passAddedCheckInPrompt')}
           </div>
           {checkInErr && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', lineHeight: 1.5 }}>{checkInErr}</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button style={secondaryBtn} disabled={checkingIn} onClick={refund.confirmClose}>{t('memberProfile.checkInLater')}</button>
+            <button style={secondaryBtn} disabled={checkingIn} onClick={onClose}>{t('memberProfile.checkInLater')}</button>
             <button style={primaryBtn} disabled={checkingIn} onClick={checkInNow}>
               <LogIn size={13} /> {checkingIn ? t('memberProfile.processing') : t('memberProfile.checkInNow')}
             </button>
@@ -2059,7 +1941,7 @@ function DayPassModal({ open, onClose, member, packagesList = [], onApplied, onS
   }
 
   return (
-    <Modal open={open} onClose={refund.cancel} hideClose={refund.hasPaid} title={t('memberProfile.buyDayPassTitle')} maxWidth={460}>
+    <Modal open={open} onClose={onClose} title={t('memberProfile.buyDayPassTitle')} maxWidth={460}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <DismissibleInfo dismissKey={isVisitor ? 'buy_day_pass_visitor' : 'buy_day_pass'} color="gold">
           {isVisitor ? t('memberProfile.buyDayPassVisitorInfo') : t('memberProfile.buyDayPassInfo')}
@@ -2071,7 +1953,7 @@ function DayPassModal({ open, onClose, member, packagesList = [], onApplied, onS
             required
             value={pickedId}
             onChange={e => { setPickedId(e.target.value); setShowPayment(false); }}
-            disabled={refund.hasPaid}
+            disabled={pending.any}
             options={monthlyPkgs.map(p => ({ value: p.id, label: `${p.name} - ${fmtMoney(p.dayPassPrice)}` }))}
           />
         ) : (
@@ -2111,18 +1993,15 @@ function DayPassModal({ open, onClose, member, packagesList = [], onApplied, onS
           <InlinePaymentSection
             shortfall={shortfall}
             minAmount={shortfall}
-            memberId={member?.id}
-            type="product"
-            notify={false}
-            description={`${t('memberProfile.dayPass')} - ${pkg?.name || ''}`}
-            onPaymentAdded={(n, id) => { setPaidNow(p => p + n); refund.addPaid(id); setShowPayment(false); }}
+            onPaymentAdded={(n, p) => { pending.add(p); setShowPayment(false); }}
           />
         )}
         {hasPrice && totalPrice > 0 && paidNow >= totalPrice && (
-          <div style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#34d399', fontWeight: 600 }}>✓ {t('memberProfile.paymentReceived')}</div>
+          <div style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#34d399', fontWeight: 600 }}>✓ {t('memberProfile.paymentReady')}</div>
         )}
+        <ActionError text={error} />
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid var(--border-subtle)' }}>
-          <CancelOrRefund refund={refund} saving={saving} />
+          <button style={secondaryBtn} onClick={onClose} disabled={saving}>{t('memberProfile.cancel')}</button>
           <button
             style={{ ...primaryBtn, opacity: (canAfford && !saving) ? 1 : 0.4, cursor: (canAfford && !saving) ? 'pointer' : 'not-allowed' }}
             disabled={!canAfford || saving}
@@ -2143,18 +2022,19 @@ function DayPassModal({ open, onClose, member, packagesList = [], onApplied, onS
 // extended from whichever is later, today or the current end date.
 function RenewPassesModal({ open, onClose, member, gymData, packagesList = [], onApplied, onSettleBalance }) {
   const { t } = useLanguage();
-  const refund = usePaymentRefund(onClose);
+  const pending = usePendingPayments();
+  const paidNow = pending.total;
   const outstanding = Math.max(0, Number(member?.balance) || 0);
   const bundles = packagesList.filter(p => p.isVisitor && p.isActive !== false && (p.status || 'active') === 'active');
   const [selectedId, setSelectedId]   = useState('');
-  const [paidNow, setPaidNow]         = useState(0);
   const [showPayment, setShowPayment] = useState(false);
   const [saving, setSaving]           = useState(false);
+  const [error, setError]             = useState('');
   useEffect(() => {
     if (open) {
       const current = bundles.find(p => String(p.id) === String(member?.packageId));
       setSelectedId((current || bundles[0])?.id || '');
-      setPaidNow(0); setShowPayment(false); setSaving(false); refund.reset();
+      pending.reset(); setShowPayment(false); setSaving(false); setError('');
     }
   }, [open]);
 
@@ -2181,19 +2061,12 @@ function RenewPassesModal({ open, onClose, member, gymData, packagesList = [], o
 
   const handleConfirm = async () => {
     if (!canConfirm) return;
-    setSaving(true);
+    setSaving(true); setError('');
     try {
-      const data = {
-        isVisitor: true, status: 'visitor', packageId: pkg.id,
-        passesTotal: newPasses + dayPassesHeld, passesRemaining: newPasses,
-        endDate: newEnd, balance: remainderDebt,
-        ...(stillValid ? {} : { startDate: today }),
-      };
-      const res = await updateMember(member.id, data);
-      await refund.sendReceipts();
-      onApplied?.(res?.data || data);
-      refund.confirmClose();
-    } catch { setSaving(false); }
+      const res = await memberAction(member.id, 'visitor-bundle', { packageId: pkg.id, payments: pending.list });
+      onApplied?.(res.data.member);
+      onClose();
+    } catch (err) { setError(actionError(err, t)); setSaving(false); }
   };
 
   const line = (label, value, color) => (
@@ -2225,7 +2098,7 @@ function RenewPassesModal({ open, onClose, member, gymData, packagesList = [], o
   }
 
   return (
-    <Modal open={open} onClose={refund.cancel} hideClose={refund.hasPaid} title={t('memberProfile.renewPassesTitle')} maxWidth={460}>
+    <Modal open={open} onClose={onClose} title={t('memberProfile.renewPassesTitle')} maxWidth={460}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {bundles.length === 0 ? (
           <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '14px 16px', fontSize: 13, color: 'var(--text-muted)' }}>
@@ -2237,7 +2110,7 @@ function RenewPassesModal({ open, onClose, member, gymData, packagesList = [], o
               label={t('memberProfile.visitorPackageLabel')}
               required
               value={selectedId}
-              disabled={refund.hasPaid}
+              disabled={pending.any}
               onChange={e => { setSelectedId(e.target.value); setShowPayment(false); }}
               options={bundles.map(p => ({ value: p.id, label: `${p.name} - ${fmtMoney(p.price)}` }))}
             />
@@ -2265,18 +2138,17 @@ function RenewPassesModal({ open, onClose, member, gymData, packagesList = [], o
                 shortfall={toMinimum} minAmount={toMinimum}
                 defaultAmount={price - paidNow} maxAmount={price - paidNow}
                 pctBase={price} pctAlready={paidNow} minPct={minPct}
-                memberId={member?.id} type="product" notify={false}
-                description={`${t('memberProfile.visitorBundle')} - ${pkg?.name || ''}`}
-                onPaymentAdded={(n, id) => { setPaidNow(p => p + n); refund.addPaid(id); setShowPayment(false); }}
+                onPaymentAdded={(n, p) => { pending.add(p); setShowPayment(false); }}
               />
             )}
             {price > 0 && paidNow >= minRequired && (
-              <div style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#34d399', fontWeight: 600 }}>✓ {t('memberProfile.paymentReceived')}</div>
+              <div style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#34d399', fontWeight: 600 }}>✓ {t('memberProfile.paymentReady')}</div>
             )}
           </>
         )}
+        <ActionError text={error} />
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid var(--border-subtle)' }}>
-          <CancelOrRefund refund={refund} saving={saving} />
+          <button style={secondaryBtn} onClick={onClose} disabled={saving}>{t('memberProfile.cancel')}</button>
           <button
             style={{ ...primaryBtn, opacity: canConfirm ? 1 : 0.4, cursor: canConfirm ? 'pointer' : 'not-allowed' }}
             disabled={!canConfirm} onClick={handleConfirm}
@@ -2545,7 +2417,8 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
   }
 
   const getRegFeeStatus = () => {
-    if (!gymData?.registrationFeeRequired) return 'not-required';
+    // A gym with no fee set charges none, whatever the switch says (D-29)
+    if (!gymData?.registrationFeeRequired || !(Number(gymData?.registrationFee) > 0)) return 'not-required';
     if (gymData?.registrationFeeFrequency === 'one-time') return 'ok';
     if (!member?.regFeeDate) return 'ok';
     const paidOn  = new Date(String(member.regFeeDate).slice(0, 10) + 'T00:00:00');

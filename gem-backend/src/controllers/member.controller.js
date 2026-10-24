@@ -356,6 +356,8 @@ async function create(req, res) {
   res.status(201).json(member);
 }
 
+const MEMBERSHIP_FIELDS = ['balance', 'status', 'packageId', 'isVisitor', 'startDate', 'endDate', 'lastVisit', 'regFeeDate', 'freezeStartDate', 'preFreezEndDate', 'passesTotal', 'passesRemaining', 'dayPasses'];
+
 async function update(req, res) {
   const existing = await prisma.member.findFirst({
     where: {
@@ -364,6 +366,16 @@ async function update(req, res) {
     },
   });
   if (!existing) return res.status(404).json({ error: 'Member not found' });
+
+  // A membership, its money and its passes change through the actions that
+  // take the payment with them (renew, day pass, visitor bundle...); only a
+  // manager may set them directly (D-20, F-057)
+  if (!['general_manager', 'manager'].includes(req.user.role)) {
+    const touched = MEMBERSHIP_FIELDS.filter(k => k in req.body);
+    if (touched.length) {
+      return res.status(403).json({ error: 'Only a manager can change a membership, balance or passes directly. Use Renew, Day pass or Visitor bundle on the profile.', fields: touched });
+    }
+  }
 
   if (req.body.email !== undefined) {
     const clash = await findEmailConflict(req.user.gymId, req.body.email, { scope: 'member', excludeMemberId: existing.id });
