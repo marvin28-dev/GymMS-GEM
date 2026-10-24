@@ -180,3 +180,13 @@ describe('a sale', () => {
     expect(next.body.some(s => s.id === sale.id)).toBe(false);
   });
 });
+
+describe('how a sale was paid', () => {
+  it('refuses a method the app does not know and leaves the stock alone (D-54)', async () => {
+    const p = (await product({ stock: 5 })).body;
+    const res = await sell([{ productId: p.id, quantity: 1 }], { method: 'Bitcoin' });
+    expect(res.status).toBe(400);
+    expect(res.body.field).toBe('method');
+    expect(await stockOf(p.id)).toBe(5);
+  });
+});

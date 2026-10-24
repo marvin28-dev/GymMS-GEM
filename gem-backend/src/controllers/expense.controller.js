@@ -22,7 +22,7 @@ async function getAll(req, res) {
   res.json(expenses);
 }
 
-const { toPaymentMethod } = require('../utils/paymentMethod');
+const { readPaymentMethod } = require('../utils/paymentMethod');
 
 // The fields of an expense, checked: { data } or { error, field }. A new one
 // needs a title, an amount, a date and who was paid; an edit changes only what
@@ -54,7 +54,14 @@ function readExpense(body, creating) {
     if (!data.paidTo) return { error: 'Paid to is required', field: 'paidTo' };
   }
   if (creating || sent('category')) data.category = String(body.category ?? '').trim() || 'Other';
-  if (sent('method')) data.method = body.method ? toPaymentMethod(body.method) : null;
+  if (sent('method')) {
+    if (!body.method) data.method = null;
+    else {
+      const paidBy = readPaymentMethod(body.method);
+      if (paidBy.error) return paidBy;
+      data.method = paidBy.method;
+    }
+  }
   if (sent('notes') || sent('note')) data.note = String(body.notes ?? body.note ?? '').trim() || null;
   if (sent('recordedBy')) data.recordedBy = String(body.recordedBy ?? '').trim() || null;
   return { data };

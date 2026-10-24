@@ -10,4 +10,14 @@ const METHODS = {
 
 const toPaymentMethod = (name) => METHODS[name] || 'cash';
 
-module.exports = { toPaymentMethod, METHODS };
+// How a request says it was paid. Naming nothing is cash, as the forms always
+// meant; a name not in the table is refused instead of being counted as cash
+// in the drawer (D-54).
+function readPaymentMethod(name, field = 'method') {
+  if (name === undefined || name === null || String(name).trim() === '') return { method: 'cash' };
+  const method = METHODS[String(name).trim()];
+  if (method) return { method };
+  return { error: `"${String(name).slice(0, 40)}" is not a way of paying this app records. Choose cash, card, bank transfer or mobile money.`, field };
+}
+
+module.exports = { toPaymentMethod, readPaymentMethod, METHODS };

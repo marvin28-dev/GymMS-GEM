@@ -1,7 +1,7 @@
 const prisma = require('../utils/prisma');
 const { logActivity, money } = require('../utils/activityLog');
 
-const { toPaymentMethod } = require('../utils/paymentMethod');
+const { readPaymentMethod } = require('../utils/paymentMethod');
 const { DAY, readTz, startOfLocalDay } = require('../utils/localDay');
 
 // Days are the gym's local days: tz is the browser's getTimezoneOffset.
@@ -59,7 +59,9 @@ async function create(req, res) {
   items.forEach(i => merged.set(i.productId, (merged.get(i.productId) || 0) + i.quantity));
   items = [...merged].map(([productId, quantity]) => ({ productId, quantity }));
 
-  const dbMethod = toPaymentMethod(method);
+  const paidBy = readPaymentMethod(method);
+  if (paidBy.error) return res.status(400).json(paidBy);
+  const dbMethod = paidBy.method;
   const discountPct = Math.max(0, Math.min(100, Number(discount) || 0));
 
   // Validate all products exist and have enough stock

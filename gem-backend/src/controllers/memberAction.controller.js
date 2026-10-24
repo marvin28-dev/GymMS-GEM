@@ -1,7 +1,7 @@
 const prisma = require('../utils/prisma');
 const { bestEffort } = require('../utils/bestEffort');
 const { generatePaymentRef } = require('../utils/paymentRef');
-const { toPaymentMethod } = require('../utils/paymentMethod');
+const { readPaymentMethod } = require('../utils/paymentMethod');
 const { readTz } = require('../utils/localDay');
 const { logActivity, fullName, money } = require('../utils/activityLog');
 const { sendPaymentReceipt, sendMembershipUpdate } = require('../utils/memberEmail');
@@ -65,7 +65,9 @@ function readPayments(raw) {
   for (const p of list) {
     const amount = Number(p?.amount);
     if (!Number.isFinite(amount) || amount <= 0) return { error: 'Enter an amount above zero.', field: 'amount' };
-    payments.push({ amount, method: toPaymentMethod(p.method), reference: p.reference ? String(p.reference).slice(0, 60) : null });
+    const paidBy = readPaymentMethod(p.method);
+    if (paidBy.error) return paidBy;
+    payments.push({ amount, method: paidBy.method, reference: p.reference ? String(p.reference).slice(0, 60) : null });
   }
   return { payments, paid: payments.reduce((n, p) => n + p.amount, 0) };
 }

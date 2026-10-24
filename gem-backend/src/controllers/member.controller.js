@@ -5,7 +5,7 @@ const { generatePaymentRef } = require('../utils/paymentRef');
 const { sendMemberWelcome, sendPaymentReceipt, sendAccessCode, sendMembershipUpdate } = require('../utils/memberEmail');
 const { findEmailConflict, emailConflictMessage } = require('../utils/emailGuard');
 
-const { toPaymentMethod } = require('../utils/paymentMethod');
+const { readPaymentMethod } = require('../utils/paymentMethod');
 
 const { logActivity, changesBetween, describeChanges, fullName, money } = require('../utils/activityLog');
 
@@ -236,6 +236,10 @@ async function create(req, res) {
   if (chargesFee && !req.body.regFeeMethod) {
     return res.status(400).json({ error: 'Collect the registration fee before adding the member.' });
   }
+  const feeMethod = readPaymentMethod(req.body.regFeeMethod, 'regFeeMethod');
+  const firstMethod = readPaymentMethod(firstPayment?.method);
+  if (chargesFee && feeMethod.error) return res.status(400).json(feeMethod);
+  if (isVisitor && firstMethod.error) return res.status(400).json(firstMethod);
 
   const data = {
     gymId,
@@ -291,7 +295,7 @@ async function create(req, res) {
           payment = await tx.payment.create({
             data: {
               memberId: member.id, gymId, staffId: req.user.id,
-              amount: fee, method: toPaymentMethod(req.body.regFeeMethod), type: 'registration', note: 'Registration fee',
+              amount: fee, method: feeMethod.method, type: 'registration', note: 'Registration fee',
               // Every payment carries a reference. A registration fee leaves the
               // membership balance untouched, so "balance after" is what they owe
               // on the membership (0 when nothing is due, never blank).
@@ -305,7 +309,7 @@ async function create(req, res) {
           payment = await tx.payment.create({
             data: {
               memberId: member.id, gymId, staffId: req.user.id,
-              amount: firstAmount, method: toPaymentMethod(firstPayment.method),
+              amount: firstAmount, method: firstMethod.method,
               type: 'product', note: firstPayment.description || 'Visitor bundle',
               reference: generatePaymentRef(), balanceAfter: owes,
             },

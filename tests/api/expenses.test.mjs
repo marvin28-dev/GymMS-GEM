@@ -74,3 +74,11 @@ describe('changing an expense', () => {
     expect(res.body.field).toBe('amount');
   });
 });
+
+describe('how an expense was paid', () => {
+  it('refuses a method the app does not know (D-54)', async () => {
+    const res = await spend({ method: 'Bitcoin' });
+    expect(res.status).toBe(400);
+    expect(res.body.field).toBe('method');
+  });
+});

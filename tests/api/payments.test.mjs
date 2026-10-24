@@ -74,3 +74,19 @@ describe('undoing a payment', () => {
     expect((await getMember(api, gym.token, m.id)).balance).toBe(20000);
   });
 });
+
+// D-54: a payment method the app does not know was filed as cash, so the drawer
+// counted money that came in another way
+describe('how a payment was made', () => {
+  it('refuses a method the app does not know, and takes no method as cash', async () => {
+    const m = await addMember(api, gym.token, { balance: 20000 });
+    const odd = await pay(m.id, { method: 'Bitcoin' });
+    expect(odd.status).toBe(400);
+    expect(odd.body.field).toBe('method');
+    expect((await getMember(api, gym.token, m.id)).balance).toBe(20000);
+    const none = await api.post('/api/payments', { memberId: m.id, amount: 1000, type: 'membership' }, { token: gym.token });
+    expect(none.status).toBe(201);
+    expect(none.body.method).toBe('cash');
+    expect((await pay(m.id, { method: 'Mobile Money', amount: 1000 })).body.method).toBe('mobile_money');
+  });
+});

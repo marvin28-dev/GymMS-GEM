@@ -5,7 +5,7 @@ const { bestEffort } = require('../utils/bestEffort');
 
 const { generatePaymentRef } = require('../utils/paymentRef');
 
-const { toPaymentMethod } = require('../utils/paymentMethod');
+const { readPaymentMethod } = require('../utils/paymentMethod');
 const { DAY, readTz, startOfLocalDay } = require('../utils/localDay');
 
 const TYPE_MAP = {
@@ -49,6 +49,8 @@ async function create(req, res) {
   if (amount === null || amount === '' || !Number.isFinite(payAmount) || payAmount <= 0) {
     return res.status(400).json({ error: 'Enter an amount above zero.', field: 'amount' });
   }
+  const paidBy = readPaymentMethod(method);
+  if (paidBy.error) return res.status(400).json(paidBy);
   const paymentType = TYPE_MAP[type] || 'other';
   // A product/pass purchase (day pass, visitor bundle, shop item) is its own
   // transaction - it never pays down the member's membership dues. Only
@@ -84,7 +86,7 @@ async function create(req, res) {
         gymId: req.user.gymId,
         staffId: req.user.id,
         amount: payAmount,
-        method: toPaymentMethod(method),
+        method: paidBy.method,
         type: paymentType,
         note: description || note || null,
         reference: ref,
