@@ -22,7 +22,7 @@ async function send(bytes, { folder = 'gem/members', type = 'image/png', name = 
 
 describe('uploads', () => {
   it('stores a picture in one of the app\'s folders', async () => {
-    for (const folder of ['gem', 'gem/members', 'gem/staff', 'gem/staff/ids']) {
+    for (const folder of ['gem', 'gem/members', 'gem/staff', 'gem/staff/ids', 'gem/logos']) {
       const res = await send(PNG, { folder });
       expect(res.status, folder).toBe(200);
       expect(res.body.url).toContain(folder);

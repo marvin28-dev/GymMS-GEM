@@ -3,6 +3,7 @@
 // Save, and the payment methods ticked are the only ones the forms offer.
 import { test, expect } from '@playwright/test';
 import { registerGym, signIn, call } from './support/session.mjs';
+import { PNG } from './support/forms.mjs';
 
 test.describe.configure({ timeout: 120_000 });
 
@@ -97,4 +98,22 @@ test('J-26: the payment section waits for the gym before anything can be changed
   release();
   await expect(page.getByLabel('Credit/Debit Card')).toBeChecked();
   await expect(page.locator('[data-settings-loading]')).toHaveCount(0);
+});
+
+// F-128: a logo is filed with the photos and the gym keeps only its address,
+// so the record read on every page load stays small
+test('J-26: a new logo is kept as an address and shows on the gym\'s sign-in page', async ({ page, browser }) => {
+  const owner = await registerGym();
+  await openGymProfile(page, owner);
+  await page.locator('input[type="file"][accept^="image/png"]').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: PNG });
+  await expect(page.getByAltText('Gym logo')).toBeVisible();
+  await expect.poll(async () => (await call('GET', '/gyms/me', { token: owner.token })).logo).toMatch(/^https:\/\/res\.cloudinary\.test\/gem\/logos\//);
+  const { logo } = await call('GET', '/gyms/me', { token: owner.token });
+
+  const visitor = await browser.newContext();
+  const signInPage = await visitor.newPage();
+  await signInPage.route('https://res.cloudinary.test/**', route => route.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
+  await signInPage.goto(`/${owner.gymCode}/login`);
+  await expect(signInPage.locator(`img[src="${logo}"]`).first()).toBeVisible();
+  await visitor.close();
 });

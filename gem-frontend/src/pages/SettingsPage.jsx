@@ -3,6 +3,7 @@ import { CloudUpload, Save, Sun, Moon, Check, Palette, Plus, Trash2, Languages, 
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getMyGym, updateMyGym } from '../services/gym.service';
+import { uploadPhoto } from '../services/upload.service';
 import { legacyList, refreshGymSettings } from '../hooks/useGymSettings';
 import { getAuth, updateSessionGym } from '../utils/auth';
 import { COUNTRIES, countryByName } from '../utils/countries';
@@ -257,6 +258,14 @@ export default function SettingsPage() {
     reader.readAsDataURL(file);
   });
 
+  // The shrunk logo as a file to upload
+  const logoFile = (dataUrl) => {
+    const [head, body] = dataUrl.split(',');
+    const type = /^data:([^;,]+)/.exec(head)?.[1] || 'image/png';
+    const bytes = Uint8Array.from(atob(body), c => c.charCodeAt(0));
+    return new File([bytes], type === 'image/png' ? 'logo.png' : 'logo.jpg', { type });
+  };
+
   const handleLogoFile = async (file) => {
     setLogoError('');
     let dataUrl;
@@ -264,9 +273,11 @@ export default function SettingsPage() {
     const before = logoPreview;
     setLogoPreview(dataUrl);
     try {
-      // Persist to the gym record so it shows on the login screen and other devices
-      await updateMyGym({ logo: dataUrl });
-      store(LOGO_KEY, dataUrl);
+      // Filed with the photos, and the gym record keeps its address: the record
+      // is read on every page load and by the public sign-in page (F-128)
+      const url = await uploadPhoto(logoFile(dataUrl), 'gem/logos');
+      await updateMyGym({ logo: url });
+      store(LOGO_KEY, url);
     } catch (err) {
       // Not saved, so the logo the gym really has stays on screen
       setLogoPreview(before);

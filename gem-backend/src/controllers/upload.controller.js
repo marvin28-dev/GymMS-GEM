@@ -1,7 +1,7 @@
 const cloudinary = require('../utils/cloudinary');
 
 // The folders the app files pictures in; nothing else may be asked for (F-011)
-const FOLDERS = new Set(['gem', 'gem/members', 'gem/staff', 'gem/staff/ids']);
+const FOLDERS = new Set(['gem', 'gem/members', 'gem/staff', 'gem/staff/ids', 'gem/logos']);
 
 // What kind of picture the file is by its first bytes, since the type it
 // declares comes from the client
