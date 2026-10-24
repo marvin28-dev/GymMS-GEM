@@ -1554,6 +1554,7 @@ const translations = {
       "notNow": "Not now",
     },
     memberProfile: {
+      amountAdded: '(+{amount} added)',
       noteNotKept: 'The note could not be kept: this browser refused to store it. Notes live only on this computer for now.',
       paymentSaveFailed: 'Failed to save payment.',
       paymentFailedRetry: 'Payment failed. Try again.',
@@ -3732,6 +3733,7 @@ const translations = {
       "notNow": "Pas maintenant",
     },
     memberProfile: {
+      amountAdded: '(+{amount} ajoutés)',
       noteNotKept: 'La note n’a pas pu être gardée : ce navigateur a refusé de l’enregistrer. Les notes ne sont pour l’instant gardées que sur cet ordinateur.',
       paymentSaveFailed: 'Impossible d’enregistrer le paiement.',
       paymentFailedRetry: 'Le paiement a échoué. Réessayez.',

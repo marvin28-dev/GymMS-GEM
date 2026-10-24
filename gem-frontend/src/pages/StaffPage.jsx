@@ -773,7 +773,7 @@ export default function StaffPage() {
       {/* Not while the list is still on its way: an empty list is the loading
           state too, and the banner appearing then vanishing shoved the table
           down the page a moment after it drew. */}
-      {!staffLoading && displayStaff.length === 0 && setup && !setup.complete && (
+      {!staffLoading && rosterStaff.length === 0 && setup && !setup.complete && (
         <div style={{ background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: 12, padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
           <span style={{ fontSize: 18, flexShrink: 0 }}>👥</span>
           <div>

@@ -1237,7 +1237,7 @@ function ChangePackageModal({ open, onClose, member, packagesList = [], onSave }
         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
           {t('memberProfile.current')} <strong style={{ color: 'var(--text-primary)' }}>{member.package?.name ?? member.package}</strong>
           &ensp;·&ensp; {t('memberProfile.balance')}: <strong style={{ color: extraBalance > 0 ? 'var(--accent-green)' : 'var(--accent-gold)' }}>{fmtMoney(effectiveBalance)}</strong>
-          {extraBalance > 0 && <span style={{ color: 'var(--accent-green)' }}> (+{fmtMoney(extraBalance)} added)</span>}
+          {extraBalance > 0 && <span style={{ color: 'var(--accent-green)' }}> {t('memberProfile.amountAdded', { amount: fmtMoney(extraBalance) })}</span>}
         </div>
         <GemSelect
           label={t('memberProfile.newPackageLabel')}
@@ -1392,7 +1392,7 @@ function RenewMembershipModal({ open, onClose, member, packagesList = [], onSave
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
           {t('memberProfile.balance')}: <strong style={{ color: extraBalance > 0 ? 'var(--accent-green)' : 'var(--accent-gold)' }}>{fmtMoney(effectiveBalance)}</strong>
-          {extraBalance > 0 && <span style={{ color: 'var(--accent-green)' }}> (+{fmtMoney(extraBalance)} added)</span>}
+          {extraBalance > 0 && <span style={{ color: 'var(--accent-green)' }}> {t('memberProfile.amountAdded', { amount: fmtMoney(extraBalance) })}</span>}
           &ensp;·&ensp; {t('memberProfile.expiresLabel')} <strong style={{ color: 'var(--text-primary)' }}>{formatDate(member.endDate)}</strong>
         </div>
         <GemSelect

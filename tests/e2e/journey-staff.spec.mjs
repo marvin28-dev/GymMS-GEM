@@ -134,3 +134,15 @@ for (const lang of ['en', 'fr']) {
     await expect(page.getByText(staff.accessCode, { exact: true })).toHaveCount(0);
   });
 }
+
+// F-173 (b): with every employee deactivated, the Active tab is empty, but the
+// gym has staff; it was told to "Add your first staff member"
+test('J-07: a gym whose staff are all deactivated is not asked to add its first one', async ({ page }) => {
+  const owner = await registerGym();
+  const gone = await addStaff(owner, { firstName: 'Gil', lastName: 'Gone' });
+  await call('PATCH', `/staff/${gone.id}`, { token: owner.token, body: { isActive: false } });
+  await signIn(page, owner);
+  await page.goto('/staff');
+  await expect(page.getByRole('tab', { name: /Deactivated/ })).toBeVisible();
+  await expect(page.getByText('Add your first staff member')).toHaveCount(0);
+});
