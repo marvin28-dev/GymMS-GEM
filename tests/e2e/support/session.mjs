@@ -1,8 +1,25 @@
 // Helpers for the browser tests: talk to the test backend the way the app does,
 // make a gym of one's own for each test, and open the app already signed in.
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 
-const { API_URL, OUTBOX_URL } = createRequire(import.meta.url)('./ports.cjs');
+const local = createRequire(import.meta.url);
+const { API_URL, OUTBOX_URL } = local('./ports.cjs');
+
+// The demo gym "elite" is made by the seed, as on a demo server (sign-up
+// refuses its code). The seed only adds what is missing, so running it again is
+// harmless; two browsers seeding at once may clash, so it is tried again.
+export function seedDemoGym() {
+  const { BACKEND, testDatabaseUrl, redact } = local('../../support/testDb.cjs');
+  let run;
+  for (let i = 0; i < 4; i += 1) {
+    run = spawnSync(process.execPath, ['prisma/seed.js'], { cwd: BACKEND, env: { ...process.env, DATABASE_URL: testDatabaseUrl() }, encoding: 'utf8' });
+    if (run.status === 0 && !/Error/.test(run.stderr)) return;
+  }
+  throw new Error(`The demo seed failed:
+${redact(run.stdout)}
+${redact(run.stderr)}`);
+}
 
 // The emails the test backend's fake mailer was given for one address
 export async function mailTo(address) {

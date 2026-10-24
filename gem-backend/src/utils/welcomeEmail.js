@@ -46,7 +46,7 @@ async function sendWelcomeEmail({ staff, gym }) {
       to: staff.email,
       subject: `Your ${gym.name} account on GEM`,
       html: welcomeHtml({ staff, gym, loginUrl }),
-    });
+    }, gym);
     return { sent: true };
   } catch (err) {
     console.error(`Welcome email to ${staff.email} failed:`, err.message);

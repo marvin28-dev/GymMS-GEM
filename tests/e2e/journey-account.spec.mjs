@@ -1,7 +1,7 @@
 // Journeys J-01 to J-08 and J-28: the public pages and everything about
 // getting into an account and out of it, driven the way a person does.
 import { test, expect } from '@playwright/test';
-import { registerGym, addStaff, signIn, call, mailTo, uniqueCode } from './support/session.mjs';
+import { registerGym, addStaff, signIn, call, mailTo, uniqueCode, seedDemoGym } from './support/session.mjs';
 
 // The sign-up form picks the gym's country from the time zone
 test.use({ timezoneId: 'Africa/Douala' });
@@ -112,11 +112,10 @@ const DEMO_STAFF = [
 const signInDemo = (email) => call('POST', '/auth/login', { body: { gymCode: DEMO.gymCode, email, password: DEMO.password } });
 async function ensureDemoGym() {
   let owner;
-  for (let i = 0; i < 5 && !owner; i += 1) {
-    try { owner = await signInDemo('marvin@elite.cm'); break; } catch (e) { if (!/answered 404/.test(e.message)) throw e; }
-    try {
-      await registerGym({ gymCode: DEMO.gymCode, gymName: 'Elite Fitness (test)', firstName: 'Marvin', lastName: 'Ekokobe', email: 'marvin@elite.cm', password: DEMO.password });
-    } catch (e) { if (!/answered 409/.test(e.message)) throw e; }
+  try { owner = await signInDemo('marvin@elite.cm'); } catch (e) { if (!/answered 404/.test(e.message)) throw e; }
+  if (!owner) {
+    seedDemoGym();
+    owner = await signInDemo('marvin@elite.cm');
   }
   for (const s of DEMO_STAFF) {
     for (let i = 0; i < 10; i += 1) {

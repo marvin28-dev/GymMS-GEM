@@ -10,6 +10,7 @@ const { DEACTIVATED } = require('../middleware/auth.middleware');
 const { attemptCounter, refuseTooMany } = require('../utils/attempts');
 const { bestEffort } = require('../utils/bestEffort');
 const { newResetToken, hashResetToken } = require('../utils/resetToken');
+const { isDemoGym, demoCode } = require('../utils/sendEmail');
 
 const asActor = (s) => ({ id: s.id, name: fullName(s), role: s.role });
 const MINUTE = 60 * 1000;
@@ -68,7 +69,8 @@ async function register(req, res) {
   const named = /^[A-Za-z]{3}$/.test(String(req.body.currency || '')) ? String(req.body.currency).toUpperCase() : null;
   const currency = named || currencyForCountry(country);
 
-  const existing = await prisma.gym.findUnique({ where: { code: gymCode } });
+  // The demo's code is the web app's demo screen, whether or not the demo exists here
+  const existing = gymCode === demoCode() || await prisma.gym.findUnique({ where: { code: gymCode } });
   if (existing) return res.status(409).json({ error: 'Gym code already taken', field: 'gymCode' });
 
   const passwordHash = await bcrypt.hash(String(password), 10);
@@ -429,7 +431,7 @@ async function verifyManager(req, res) {
 async function checkGymCode(req, res) {
   const code = (req.params.code || '').toLowerCase().trim();
   if (!code || !/^[a-z0-9-]+$/.test(code)) return res.json({ available: false });
-  const existing = await prisma.gym.findUnique({ where: { code } });
+  const existing = code === demoCode() || await prisma.gym.findUnique({ where: { code } });
   res.json({ available: !existing });
 }
 
@@ -465,6 +467,7 @@ async function forgotPassword(req, res) {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
 
+    if (isDemoGym(gym)) return res.status(400).json({ error: 'The demo gym sends no email. Its sign-in details are on its sign-in screen.' });
     const { error: sendError } = await getResend().emails.send({
       from: E.sender(gym.name),
       // The address on the account, not as it was typed (spaces and all)

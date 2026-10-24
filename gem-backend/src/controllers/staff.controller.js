@@ -39,7 +39,7 @@ async function sendResetLinkEmail(staff, gymId, sentBy) {
   const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await prisma.staff.update({ where: { id: staff.id }, data: { resetToken: hash, resetTokenExpiry: expiry } });
 
-  const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, logo: true, phone: true, email: true, website: true, location: true, city: true, country: true } });
+  const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, code: true, logo: true, phone: true, email: true, website: true, location: true, city: true, country: true } });
   const gymName = gym?.name || 'your gym';
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
   const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
@@ -57,7 +57,7 @@ async function sendResetLinkEmail(staff, gymId, sentBy) {
         E.note('<strong style="color:#b4232a;">This link expires in 24 hours.</strong> If you did not expect it, ignore this email and your password stays as it is.', 'red'),
       ].join(''),
     }),
-  });
+  }, gym);
 }
 
 // The labels a form may send, and the role each is stored as. "Other" used to

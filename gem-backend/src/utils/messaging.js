@@ -5,6 +5,7 @@ const { formatMoney, currencyOf } = require('./money');
 const { readPhone } = require('./phone');
 const { smsStatus, sendSms } = require('./sms');
 const { broadcast } = require('./liveHub');
+const { isDemoGym } = require('./sendEmail');
 
 // Who a message can go to. Deactivated members are never written to.
 const AUDIENCES = ['all', 'active', 'ending', 'inactive', 'owing', 'package', 'members'];
@@ -137,6 +138,7 @@ async function deliverCommunication(id, { only = null } = {}) {
   for (const t of targets) {
     const name = `${t.m.firstName || ''} ${t.m.lastName || ''}`.trim();
     const base = { communicationId: comm.id, gymId: comm.gymId, memberId: t.m.id, name, channel: t.channel, rowId: t.row?.id };
+    if (isDemoGym(gym)) { rows.push({ ...base, status: 'skipped', error: 'Demo gym: nothing is sent' }); continue; }
     if (t.channel === 'email') {
       if (!hasEmail(t.m)) { rows.push({ ...base, status: 'skipped', error: 'No email address' }); continue; }
       const subject = personalise(comm.subject, t.m, gym), text = personalise(comm.body, t.m, gym);

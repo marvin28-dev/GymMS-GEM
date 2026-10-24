@@ -20,7 +20,7 @@ async function getGym(gymId) {
   return prisma.gym.findUnique({
     where: { id: gymId },
     select: {
-      name: true, logo: true, location: true, phone: true, email: true, currency: true,
+      name: true, code: true, logo: true, location: true, phone: true, email: true, currency: true,
       city: true, country: true, website: true, facebook: true, instagram: true, twitter: true,
     },
   });
@@ -40,7 +40,7 @@ async function send({ gym, to, subject, html, attachments }) {
     subject,
     html,
     ...(attachments?.length ? { attachments } : {}),
-  });
+  }, gym);
   return true;
 }
 

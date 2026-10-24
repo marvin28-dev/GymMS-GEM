@@ -1,7 +1,7 @@
 const prisma = require('../utils/prisma');
 const E = require('../utils/emailLayout');
 const { Resend } = require('resend');
-const { deliver } = require('../utils/sendEmail');
+const { deliver, isDemoGym } = require('../utils/sendEmail');
 const { autoIssueForGym, payDateThisMonth, addedAfter } = require('./autoPayroll');
 const { computeMonthlyPay } = require('../controllers/payAdjustment.controller');
 const { shortfallOf } = require('../controllers/payroll.controller');
@@ -67,6 +67,7 @@ async function getUnpaidBuckets(gym, period, now) {
 }
 
 async function sendOverdueEmail(owner, gymName, count, period, gymCode) {
+  if (isDemoGym({ code: gymCode })) return false;
   if (!process.env.RESEND_API_KEY || !owner?.email) return false;
 
   const resend = new Resend(process.env.RESEND_API_KEY);

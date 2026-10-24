@@ -55,7 +55,7 @@ async function sendTaskAssignedEmail({ task, assigneeId, gymId, assignedByName }
     to: assignee.email,
     subject: `New task at ${gym.name}: ${task.title}`,
     html: E.layout({ brand: E.gymBrand(gym), gym, preheader: `${task.title}${due ? `, due ${due}` : ''}`, eyebrow: 'New task', title: 'You have a new task', body }),
-  });
+  }, gym);
   return true;
 }
 
@@ -88,7 +88,7 @@ async function sendGroupTaskEmail({ task, recipients, gymId }) {
     html: E.layout({ brand: E.gymBrand(gym), gym, preheader: task.title, eyebrow: 'Task for management', title: 'A task for management', body }),
   });
 
-  return deliverEach(resend, to, message);
+  return deliverEach(resend, to, message, gym);
 }
 
 module.exports = { sendTaskAssignedEmail, sendGroupTaskEmail };
