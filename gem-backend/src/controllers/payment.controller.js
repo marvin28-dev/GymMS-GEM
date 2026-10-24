@@ -35,6 +35,25 @@ async function getAll(req, res) {
   res.json(payments);
 }
 
+const BACKDATE_DAYS = 90;
+
+// A manager may record money taken on an earlier day (paper receipts kept while
+// the internet was down), at most 90 days back and never ahead. The payment is
+// put at midday of that local day. Today's is dated now.
+function readPaidOn(req) {
+  const day = req.body.paidOn;
+  if (day === undefined || day === null || day === '') return {};
+  if (!DAY.test(String(day))) return { error: 'Choose the day the payment was taken.' };
+  const tz = readTz(req.body);
+  const today = new Date(Date.now() - tz * 60000).toISOString().slice(0, 10);
+  if (day === today) return {};
+  if (day > today) return { error: 'A payment cannot be dated in the future.' };
+  if (!['general_manager', 'manager'].includes(req.user.role)) return { status: 403, error: 'Only a manager can record a payment on an earlier day.' };
+  const start = startOfLocalDay(day, tz);
+  if (Date.now() - start.getTime() > BACKDATE_DAYS * 86400000) return { error: `A payment can be dated at most ${BACKDATE_DAYS} days back.` };
+  return { at: new Date(start.getTime() + 12 * 3600000) };
+}
+
 async function create(req, res) {
   const { reference, description, memberId, amount, method, type, note } = req.body;
   // A prerequisite payment collected inside an action modal (day pass, convert,
@@ -66,6 +85,8 @@ async function create(req, res) {
     return res.status(400).json({ error: `Cannot collect more than the ${money(pendingCharge)} required.`, field: 'amount' });
   }
   const ref = reference ? String(reference).slice(0, 60) : generatePaymentRef();
+  const dated = readPaidOn(req);
+  if (dated.error) return res.status(dated.status || 400).json({ error: dated.error, field: 'paidOn' });
 
   // The payment and the balance it leaves are written together, with the
   // member's row locked: two desks paying for one member at once take turns,
@@ -91,6 +112,7 @@ async function create(req, res) {
         note: description || note || null,
         reference: ref,
         balanceAfter: pendingCharge != null ? currentBalance + (pendingCharge - payAmount) : newBalance,
+        ...(dated.at ? { createdAt: dated.at } : {}),
       },
       include: { staff: { select: { id: true, firstName: true, lastName: true } } },
     });
@@ -105,7 +127,7 @@ async function create(req, res) {
     category: 'money', action: 'payment.recorded',
     summary: `Recorded a payment of ${money(payAmount)} from ${memberName} (${method || 'Cash'})`,
     target: { type: 'member', id: memberId },
-    details: { reference: ref, type: paymentType, ...(skipBalance ? {} : { balanceAfter: money(newBalance) }) },
+    details: { reference: ref, type: paymentType, ...(dated.at ? { paidOn: req.body.paidOn } : {}), ...(skipBalance ? {} : { balanceAfter: money(newBalance) }) },
   });
   bestEffort(prisma.notification.create({
     data: {

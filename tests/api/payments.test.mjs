@@ -101,6 +101,43 @@ describe('undoing a payment', () => {
   });
 });
 
+// D-27: the Payments page asked for a date and the server never read it; a
+// manager may now date money taken on an earlier day, nobody else
+describe('the day a payment was taken', () => {
+  const tz = -60;
+  const localDay = (ms) => new Date(ms - tz * 60000).toISOString().slice(0, 10);
+  const daysAgo = (n) => localDay(Date.now() - n * 864e5);
+
+  it('is the day a manager gives, at midday, within the last 90 days and never ahead', async () => {
+    const m = await addMember(api, gym.token, { balance: 20000 });
+    const res = await pay(m.id, { paidOn: daysAgo(3), tz });
+    expect(res.status).toBe(201);
+    expect(localDay(new Date(res.body.createdAt).getTime())).toBe(daysAgo(3));
+    expect(new Date(res.body.createdAt).getUTCHours()).toBe(11);
+    expect((await getMember(api, gym.token, m.id)).balance).toBe(15000);
+
+    for (const paidOn of [daysAgo(-1), daysAgo(100), '03/10/2026']) {
+      const refused = await pay(m.id, { paidOn, tz });
+      expect(refused.status).toBe(400);
+      expect(refused.body.field).toBe('paidOn');
+    }
+    expect((await getMember(api, gym.token, m.id)).balance).toBe(15000);
+  });
+
+  it("is today's for the desk, which cannot choose another day", async () => {
+    const desk = await addStaff(api, gym);
+    const m = await addMember(api, gym.token, { balance: 20000 });
+    const asDesk = (body) => api.post('/api/payments', { memberId: m.id, amount: 1000, method: 'cash', type: 'membership', tz, ...body }, { token: desk.token });
+    const refused = await asDesk({ paidOn: daysAgo(1) });
+    expect(refused.status).toBe(403);
+    expect(refused.body.field).toBe('paidOn');
+    const today = await asDesk({ paidOn: daysAgo(0) });
+    expect(today.status).toBe(201);
+    expect(Date.now() - new Date(today.body.createdAt).getTime()).toBeLessThan(60000);
+    expect((await getMember(api, gym.token, m.id)).balance).toBe(19000);
+  });
+});
+
 // D-54: a payment method the app does not know was filed as cash, so the drawer
 // counted money that came in another way
 describe('how a payment was made', () => {

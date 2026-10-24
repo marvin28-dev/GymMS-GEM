@@ -112,8 +112,8 @@ async function payFromSearch(page, form, member, amount, { date } = {}) {
     await expect(form.getByText(`Owen ${member.lastName}`)).toBeVisible({ timeout: 1000 });
   }).toPass();
   await form.getByText(`Owen ${member.lastName}`).click();
-  // The Payments page asks which day it was taken; the Dashboard's is today
-  if (date) await form.locator('input[type="date"]').first().fill(date);
+  // A manager on the Payments page may give an earlier day; it starts on today
+  if (date) await form.getByLabel('Payment Date').fill(date);
   await form.locator('input[inputmode="numeric"]').first().fill(String(amount));
   await form.getByRole('button', { name: 'Save Payment' }).click();
 }
@@ -135,8 +135,26 @@ test('J-18: a payment taken on the Payments page comes off what the member owes'
   await page.goto('/payments');
   await page.getByRole('button', { name: 'Add Payment' }).first().click();
   const form = page.getByRole('dialog', { name: 'Add Payment' });
-  await payFromSearch(page, form, member, 2500, { date: localDay() });
+  await payFromSearch(page, form, member, 2500);
   await expectPaid(owner, member, 2500, 7500);
   // The new payment is listed with the member's name
   await expect(page.getByRole('row').filter({ hasText: `Owen ${member.lastName}` })).toBeVisible();
+});
+
+// D-27: the form asked for a date, "Received by" and "Package for" and sent
+// none of them; a manager's earlier day is now kept
+test('J-18: a manager records on the Payments page money taken on an earlier day', async ({ page }) => {
+  const owner = await gymWithPackage();
+  const member = await memberOwing(owner, `Backdate${uniqueCode('q').slice(-5)}`);
+  const twoDaysAgo = localDay(new Date(Date.now() - 2 * 864e5));
+  await signIn(page, owner);
+  await page.goto('/payments');
+  await page.getByRole('button', { name: 'Add Payment' }).first().click();
+  const form = page.getByRole('dialog', { name: 'Add Payment' });
+  await expect(form.getByText('Received By')).toHaveCount(0);
+  await payFromSearch(page, form, member, 4000, { date: twoDaysAgo });
+  await expectPaid(owner, member, 4000, 6000);
+  const [p] = await paymentsOf(owner, member.id);
+  expect(localDay(new Date(p.createdAt))).toBe(twoDaysAgo);
+  await expect(page.getByRole('row').filter({ hasText: `Owen ${member.lastName}` })).toContainText(twoDaysAgo);
 });

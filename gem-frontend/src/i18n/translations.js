@@ -1069,6 +1069,9 @@ const translations = {
       "timeChangeNotSaved": "Checked out, but the changed time was not saved ({reason}). Ask a manager to correct the time card.",
     },
     payments: {
+      dateHint: 'Leave it on today unless the money was taken on an earlier day.',
+      dateNotFuture: 'A payment cannot be dated in the future.',
+      dateTooOld: 'A payment can be dated at most 90 days back.',
       statusCompleted: 'Completed',
       statusPending: 'Pending',
       statusFailed: 'Failed',
@@ -3251,6 +3254,9 @@ const translations = {
       "timeChangeNotSaved": "Sortie enregistrée, mais l’heure modifiée ne l’a pas été ({reason}). Demandez à un responsable de corriger la fiche de temps.",
     },
     payments: {
+      dateHint: 'Laissez la date du jour, sauf si l\'argent a été reçu un autre jour.',
+      dateNotFuture: 'Un paiement ne peut pas être daté dans le futur.',
+      dateTooOld: 'Un paiement peut remonter à 90 jours au plus.',
       statusCompleted: 'Effectué',
       statusPending: 'En attente',
       statusFailed: 'Échoué',

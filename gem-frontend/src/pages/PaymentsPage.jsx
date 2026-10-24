@@ -12,13 +12,15 @@ import Avatar from '../components/ui/Avatar';
 import EmptyState from '../components/ui/EmptyState';
 import { getAll as getPayments, create as createPayment } from '../services/payments.service';
 import { getAll as getMembers } from '../services/members.service';
-import { getAll as getStaff } from '../services/staff.service';
 import { fmtDate, todayStr, dayStr } from '../utils/date';
 import { getGymInfo, gymContactFooterHtml, printReceiptDocument, escapeHtml } from '../utils/receipt';
 import { softAll, failed } from '../utils/loadAll';
 import { useGymSettings } from '../hooks/useGymSettings';
 import { enabledMethods, PAYMENT_METHODS, canonicalMethod } from '../utils/paymentMethods';
 import { gymCache } from '../utils/gymCache';
+import { getAuth } from '../utils/auth';
+import { isManagement } from '../utils/hierarchy';
+import { serverFieldError } from '../utils/formErrors';
 
 const staffName = (s) => s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim();
 
@@ -40,7 +42,8 @@ const methodOf = (m) => PAYMENT_METHODS.find(x => x.api === m || x.key === canon
 const methodName = (m, t) => { const pm = methodOf(m); return pm ? t(pm.labelKey) : (m || '-'); };
 const methodStyle = (m) => METHOD_STYLES[methodOf(m)?.api] || { bg: 'var(--bg-elevated)', color: 'var(--text-muted)' };
 
-const emptyForm = { memberId: '', date: '', amount: '', method: 'Cash', reference: '', description: '', receivedBy: '', packageFor: '', notes: '' };
+const emptyForm = { memberId: '', date: '', amount: '', method: 'Cash', reference: '', description: '' };
+const BACKDATE_DAYS = 90;
 
 const STATUS_META = {
   Completed: { icon: CheckCircle, color: 'var(--accent-green)', bg: 'var(--accent-green-dim)' },
@@ -126,7 +129,7 @@ export function TransactionModal({ payment, onClose }) {
 
         {/* Details */}
         <Row label={t('payments.reference')} value={<span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{payment.reference}</span>} />
-        <Row label={t('common.date')} value={(payment.createdAt || payment.date || '').slice(0, 10)} />
+        <Row label={t('common.date')} value={dayStr(payment.createdAt || payment.date)} />
         <Row label={t('attendance.member')} value={m ? `${m.firstName} ${m.lastName}` : '-'} />
         <Row label={t('payments.memberId')} value={<span style={{ fontFamily: 'monospace', fontSize: 12 }}>{payment.memberId}</span>} />
         <Row label={t('payments.description')} value={payment.note || payment.description} />
@@ -175,7 +178,6 @@ export default function PaymentsPage() {
   const cache = gymCache('payments');
   const [payments, setPayments] = useState(() => cache.read('list', []));
   const [membersList, setMembersList] = useState(() => cache.read('members', []));
-  const [staffList, setStaffList] = useState(() => cache.read('staff', []));
   const [loading, setLoading] = useState(() => !cache.has('list'));
   const [search, setSearch] = useState('');
   const [methodFilter, setMethodFilter] = useState('All');
@@ -217,12 +219,11 @@ export default function PaymentsPage() {
 
   const liveTick = useLiveTick();
   useEffect(() => {
-    softAll([getPayments(), getMembers(), getStaff()])
-      .then(([pRes, mRes, sRes]) => {
+    softAll([getPayments(), getMembers()])
+      .then(([pRes, mRes]) => {
         // A request that failed leaves what is shown, and its saved copy, alone
         if (!failed(pRes)) { const pay = pRes.data || []; setPayments(pay); cache.write('list', pay); }
         if (!failed(mRes)) { const mem = mRes.data || []; setMembersList(mem); cache.write('members', mem); }
-        if (!failed(sRes)) { const stf = sRes.data || []; setStaffList(stf); cache.write('staff', stf); }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -277,10 +278,16 @@ export default function PaymentsPage() {
 
   const matchingMembers = memberSearch ? membersList.filter(m => `${m.firstName} ${m.lastName} ${m.memberCode || m.id}`.toLowerCase().includes(memberSearch.toLowerCase())).slice(0, 5) : [];
 
+  // Only a manager dates a payment on an earlier day; everyone else's is today's
+  const canBackdate = isManagement(getAuth()?.user?.role);
+  const earliestDay = dayStr(new Date(Date.now() - BACKDATE_DAYS * 864e5));
+  const paidOn = form.date || today;
+
   const validate = () => {
     const req = t('common.required');
     const e = {};
-    if (!form.date) e.date = req;
+    if (canBackdate && paidOn > today) e.date = t('payments.dateNotFuture');
+    else if (canBackdate && paidOn < earliestDay) e.date = t('payments.dateTooOld');
     if (!form.amount) e.amount = req;
     // This records a payment towards what the member owes, so it can never be more than that
     else if (selectedMember && Number(form.amount) > Math.max(0, Number(selectedMember.balance) || 0)) {
@@ -300,14 +307,15 @@ export default function PaymentsPage() {
         method: form.method,
         reference: form.reference || undefined,
         description: form.description || undefined,
-        notes: form.notes || undefined,
         towardBalance: true,
+        ...(canBackdate && paidOn !== today ? { paidOn, tz: new Date().getTimezoneOffset() } : {}),
       };
       const res = await createPayment(payload);
       setPayments(prev => [res.data, ...prev]);
       setShowModal(false);
     } catch (err) {
-      setErrors({ amount: err?.response?.data?.error || t('payments.saveFailed') });
+      const { field, message } = serverFieldError(err, t('payments.saveFailed'));
+      setErrors({ [field === 'paidOn' ? 'date' : field === 'amount' ? 'amount' : 'form']: message });
     }
   };
 
@@ -413,12 +421,16 @@ export default function PaymentsPage() {
                 >{t('payments.payInFull')}</button>
               </div>
 
-              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: canBackdate ? '1fr 1fr' : '1fr', gap: 12 }}>
+                {canBackdate && (
                 <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.paymentDate')} *</label>
-                  <input type="date" style={{ ...inputStyle, borderColor: errors.date ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
-                  {errors.date && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.date}</div>}
+                  <label htmlFor="payment-date" style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.paymentDate')}</label>
+                  <input id="payment-date" type="date" min={earliestDay} max={today} style={{ ...inputStyle, borderColor: errors.date ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={paidOn} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+                  {errors.date
+                    ? <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.date}</div>
+                    : <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{t('payments.dateHint')}</div>}
                 </div>
+                )}
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.amount')} *</label>
                   <input type="text" inputMode="numeric" style={{ ...inputStyle, borderColor: errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: digitsOnly(e.target.value) }))} placeholder="0" />
@@ -441,23 +453,7 @@ export default function PaymentsPage() {
                 <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.description')}</label>
                 <input style={inputStyle} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder={t('members.paymentDescPh')} />
               </div>
-              <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.receivedBy')}</label>
-                  <select style={inputStyle} value={form.receivedBy} onChange={e => setForm(f => ({ ...f, receivedBy: e.target.value }))}>
-                    <option value="">{t('payments.selectStaff')}</option>
-                    {staffList.filter(s => s.isActive !== false || staffName(s) === form.receivedBy).map(s => <option key={s.id} value={staffName(s)}>{staffName(s)}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('payments.packageFor')}</label>
-                  <input style={inputStyle} value={form.packageFor} onChange={e => setForm(f => ({ ...f, packageFor: e.target.value }))} placeholder={t('common.eg', { x: 'Premium 12M' })} />
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.notes')}</label>
-                <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
-              </div>
+              {errors.form && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)' }}>{errors.form}</div>}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
                 <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
                 <button style={primaryBtn} onClick={handleSave}>{t('payments.savePayment')}</button>
@@ -521,7 +517,7 @@ export default function PaymentsPage() {
             <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>{t('payments.noPaymentsYet')}</div>
           ) : paginatedPayments.map(p => {
             const name = p.member ? `${p.member.firstName} ${p.member.lastName}` : t('common.anonymous');
-            const date = (p.createdAt || '').slice(0, 10);
+            const date = dayStr(p.createdAt);
             const pillStyle = methodStyle(p.method);
             return (
               // Opens the same details and receipt as a desktop row (F-153)
@@ -689,7 +685,7 @@ export default function PaymentsPage() {
                     onClick={() => setSelectedPayment(p)}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-hover)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <td style={{ padding: '12px 20px', fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{(p.createdAt || '').slice(0, 10)}</td>
+                    <td style={{ padding: '12px 20px', fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{dayStr(p.createdAt)}</td>
                     <td style={{ padding: '12px 20px' }}>
                       {m ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
