@@ -30,15 +30,22 @@ test('the public pages pass', async ({ page }) => {
   }
 });
 
-test('the app\'s screens pass', async ({ page }) => {
-  const owner = await registerGym();
-  const member = await call('POST', '/members', { token: owner.token, body: { firstName: 'Axe', lastName: 'Member', city: 'Douala', region: 'Littoral', startDate: localDay(), endDate: localDay(new Date(Date.now() + 30 * 864e5)) } });
-  await signIn(page, owner);
-  for (const path of ['/dashboard', '/members', `/members/${member.id}`, '/payments', '/staff', '/settings?section=gym-profile', '/settings?section=payment', '/calendar', '/tasks', '/sales', '/accounting', '/communication', '/attendance', '/packages', '/notifications', '/operations']) {
-    await page.goto(path);
-    await expect(page.locator('main')).toBeVisible();
-    await page.waitForTimeout(700);
-    expect(await problems(page), path).toEqual([]);
+// One test a screen, so each has its own time and names the screen that failed
+test.describe('the app\'s screens pass', () => {
+  for (const screen of ['/dashboard', '/members', '/members/:id', '/payments', '/staff', '/settings?section=gym-profile', '/settings?section=payment', '/calendar', '/tasks', '/sales', '/accounting', '/communication', '/attendance', '/packages', '/notifications', '/operations']) {
+    test(screen, async ({ page }) => {
+      const owner = await registerGym();
+      let path = screen;
+      if (screen === '/members/:id') {
+        const member = await call('POST', '/members', { token: owner.token, body: { firstName: 'Axe', lastName: 'Member', city: 'Douala', region: 'Littoral', startDate: localDay(), endDate: localDay(new Date(Date.now() + 30 * 864e5)) } });
+        path = `/members/${member.id}`;
+      }
+      await signIn(page, owner);
+      await page.goto(path);
+      await expect(page.locator('main')).toBeVisible();
+      await page.waitForTimeout(700);
+      expect(await problems(page), path).toEqual([]);
+    });
   }
 });
 

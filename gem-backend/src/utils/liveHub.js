@@ -36,4 +36,14 @@ function announceWrites(req, res, next) {
   next();
 }
 
-module.exports = { subscribe, broadcast, announceWrites };
+// The server is stopping: each screen's browser reconnects on its own
+function endAll() {
+  for (const set of streams.values()) {
+    for (const res of set) {
+      try { res.end(); } catch { /* already closed */ }
+    }
+  }
+  streams.clear();
+}
+
+module.exports = { subscribe, broadcast, announceWrites, endAll };

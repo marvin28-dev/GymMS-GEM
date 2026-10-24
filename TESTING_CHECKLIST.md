@@ -1110,3 +1110,9 @@ Texting is paused. When it is switched on:
 ### TEST 25.11 - After the start-command decision (D-1)
 1. Deploy to Railway.
 2. **Verify:** the demo gym "elite" was not created or reset, and existing data is untouched.
+
+### TEST 25.12 - A deploy while a desk is working (F-180)
+1. Open the front desk, and the member list on a second computer.
+2. Deploy a new version of the backend on Railway.
+3. **Verify:** the old server's log says "SIGTERM: finishing the requests under way, then stopping"; both screens carry on without a reload, and a payment taken on one shows on the other within a few seconds of the new server starting.
+4. On Railway, open the service's health check (`/api/health`). **Verify:** it answers `{"status":"ok"}`.
