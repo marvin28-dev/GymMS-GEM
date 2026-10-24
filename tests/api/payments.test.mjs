@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startServer } from './helpers/server.mjs';
-import { registerGym, addMember, getMember } from './helpers/fixtures.mjs';
+import { registerGym, addMember, getMember, addStaff } from './helpers/fixtures.mjs';
 
-let api, stop, gym;
+let api, stop, gym, prisma;
 const pay = (memberId, body = {}) => api.post('/api/payments', { memberId, amount: 5000, method: 'cash', type: 'membership', ...body }, { token: gym.token });
 
 beforeAll(async () => {
-  ({ api, stop } = await startServer());
+  ({ api, stop, prisma } = await startServer());
   gym = await registerGym(api);
 });
 afterAll(() => stop());
@@ -71,6 +71,32 @@ describe('undoing a payment', () => {
     const made = [];
     for (let i = 0; i < 4; i++) made.push((await pay(m.id, { amount: 1000 })).body.id);
     await Promise.all(made.map(id => api.del(`/api/payments/${id}`, { token: gym.token })));
+    expect((await getMember(api, gym.token, m.id)).balance).toBe(20000);
+  });
+
+  // D-21: the desk could delete any payment, however old and whoever took it
+  it('lets the desk take back only its own payment from the last 15 minutes', async () => {
+    const desk = await addStaff(api, gym);
+    const other = await addStaff(api, gym);
+    const m = await addMember(api, gym.token, { balance: 20000 });
+    const asDesk = (id) => api.del(`/api/payments/${id}`, { token: desk.token });
+    const take = (who) => api.post('/api/payments', { memberId: m.id, amount: 1000, method: 'cash', type: 'membership' }, { token: who.token });
+
+    const own = await take(desk);
+    expect((await asDesk(own.body.id)).status).toBe(200);
+
+    const theirs = await take(other);
+    const refused = await asDesk(theirs.body.id);
+    expect(refused.status).toBe(403);
+    expect(refused.body.error).toMatch(/manager/);
+
+    const old = await take(desk);
+    await prisma.payment.update({ where: { id: old.body.id }, data: { createdAt: new Date(Date.now() - 20 * 60 * 1000) } });
+    expect((await asDesk(old.body.id)).status).toBe(403);
+    expect((await getMember(api, gym.token, m.id)).balance).toBe(18000);
+
+    expect((await api.del(`/api/payments/${theirs.body.id}`, { token: gym.token })).status).toBe(200);
+    expect((await api.del(`/api/payments/${old.body.id}`, { token: gym.token })).status).toBe(200);
     expect((await getMember(api, gym.token, m.id)).balance).toBe(20000);
   });
 });

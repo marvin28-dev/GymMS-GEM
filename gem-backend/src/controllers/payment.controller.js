@@ -155,10 +155,19 @@ async function sendReceipt(req, res) {
 // (dues) payment paid down a real debt, so refunding it restores that debt;
 // product / registration / other payments never reduced the balance here, so
 // removing the row is enough.
+const UNDO_WINDOW_MS = 15 * 60 * 1000;
+
 async function remove(req, res) {
   const { id } = req.params;
   const payment = await prisma.payment.findFirst({ where: { id, gymId: req.user.gymId } });
   if (!payment) return res.status(404).json({ error: 'Payment not found' });
+
+  // The desk may take back only a payment it took itself, within 15 minutes
+  // (a slip at the till); anything else is a manager's to remove (D-21)
+  if (!['general_manager', 'manager'].includes(req.user.role)) {
+    if (payment.staffId !== req.user.id) return res.status(403).json({ error: 'Only a manager can remove a payment someone else took.' });
+    if (Date.now() - new Date(payment.createdAt).getTime() > UNDO_WINDOW_MS) return res.status(403).json({ error: 'A payment older than 15 minutes can only be removed by a manager.' });
+  }
 
   // The payment goes and its amount goes back on the debt in one step, added
   // in the database: two undone at once both count, and a payment removed by
