@@ -27,7 +27,7 @@ Backend:
 cd gem-backend
 cp .env.example .env      # then set DATABASE_URL and JWT_SECRET at least
 npm install
-npx prisma db push        # creates the tables in the database named in .env
+npm run db:deploy         # creates the tables from the migrations
 npm run db:seed           # optional: the demo gym "elite"
 npm run dev               # http://localhost:5000
 ```
@@ -83,6 +83,26 @@ Lint: `npm run lint` in `gem-frontend` and in `gem-backend`.
 ## Deploying
 
 The web app builds with `npm run build` (set `VITE_API_URL` to the API's
-address). The backend's `npm start` currently pushes the schema and seeds the
-demo gym before starting; read F-001 and D-1 in `AUDIT_PROGRESS.md` before the
-next deploy.
+address) and is served by Vercel.
+
+The backend's settings for Railway are in `gem-backend/railway.json`: before
+each start it runs `node scripts/migrate.js`, which applies the migrations in
+`prisma/migrations`; then `node src/index.js`; `/api/health` is the health
+check (it answers 503 when the database cannot be reached), and the old server
+gets 15 seconds to finish its requests. If Railway's root directory for the
+service is the repository root, set the service's config file path to
+`gem-backend/railway.json`.
+
+The first time, the live database has no migration history (it was kept by
+`prisma db push`). `migrate.js` then finds which known schema it has, marks
+those migrations as applied and applies the rest; a database it does not
+recognise is left as it is and the deploy stops, so the running version stays
+up. Take a backup before that first deploy.
+
+Changing the schema: edit `prisma/schema.prisma`, then
+`npx prisma migrate dev --name what-changed` on your own database, and commit
+the new folder in `prisma/migrations`. Never `db push` to the live database.
+
+The server's clock is Cameroon's (`Africa/Douala`) unless `TZ` is set. The demo
+gym "elite" is made only by `npm run db:seed`, which refuses to run on Railway
+unless `SEED_DEMO=yes`; nothing is ever emailed or texted for it.

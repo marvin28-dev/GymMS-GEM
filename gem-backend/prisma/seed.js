@@ -6,6 +6,15 @@ const bcrypt = require('bcryptjs');
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
+// The demo's accounts all use the password admin123, so it is never made on a
+// live server by accident (D-1, D-2). SEED_DEMO=yes makes it anyway, for a
+// separate demo deployment with a database of its own.
+const LIVE = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
+if (LIVE && process.env.SEED_DEMO !== 'yes') {
+  console.error('Not seeding: this looks like a live server. Set SEED_DEMO=yes to make the demo gym here.');
+  process.exit(1);
+}
+
 async function main() {
   // ── Gym ──────────────────────────────────────────────────────────────────────
   const gym = await prisma.gym.upsert({
@@ -71,14 +80,14 @@ async function main() {
 
   // ── Members ───────────────────────────────────────────────────────────────────
   const memberSeed = [
-    { memberCode: 'GEM-0001', firstName: 'Armand',     lastName: 'Kamga',     phone: '+237 655 123 456', email: 'armand.k@gmail.com',     gender: 'Male',   avatarColor: 'gold',   accessCode: '4271', packageId: 'pkg-p12', status: 'active',   startDate: '2026-01-15', endDate: '2027-01-14', balance: 0,      regFeeDate: '2026-01-15' },
-    { memberCode: 'GEM-0002', firstName: 'Sophie',     lastName: 'Ngono',     phone: '+237 677 234 567', email: 'sophie.n@gmail.com',     gender: 'Female', avatarColor: 'blue',   accessCode: '8364', packageId: 'pkg-s6',  status: 'active',   startDate: '2025-11-01', endDate: '2026-04-30', balance: 0,      regFeeDate: '2025-11-01' },
-    { memberCode: 'GEM-0003', firstName: 'Patrick',    lastName: 'Mekontchou',phone: '+237 677 321 654', email: 'patrick.m@gmail.com',    gender: 'Male',   avatarColor: 'blue',   accessCode: '2938', packageId: 'pkg-p12', status: 'active',   startDate: '2025-09-10', endDate: '2026-09-09', balance: 0,      regFeeDate: '2025-09-10' },
-    { memberCode: 'GEM-0004', firstName: 'Marcel',     lastName: 'Fonkoua',   phone: '+237 699 345 678', email: 'marcel.f@gmail.com',     gender: 'Male',   avatarColor: 'green',  accessCode: '5129', packageId: 'pkg-p12', status: 'expiring', startDate: '2025-04-01', endDate: '2026-03-31', balance: 45000,  regFeeDate: '2025-04-01' },
-    { memberCode: 'GEM-0005', firstName: 'Théodore',   lastName: 'Nkolo',     phone: '+237 699 410 223', email: 'theodore.n@gmail.com',   gender: 'Male',   avatarColor: 'red',    accessCode: '3741', packageId: 'pkg-s6',  status: 'suspended',startDate: '2025-02-10', endDate: '2026-08-09', balance: 0,      regFeeDate: '2025-02-10' },
-    { memberCode: 'GEM-0006', firstName: 'Bertrand',   lastName: 'Fotso',     phone: '+237 699 111 222', email: 'bertrand.f@gmail.com',   gender: 'Male',   avatarColor: 'blue',   accessCode: '1144', packageId: 'pkg-p12', status: 'frozen',   startDate: '2025-06-01', endDate: '2026-08-31', balance: 0,      regFeeDate: '2025-06-01', freezeStartDate: '2026-03-01', preFreezEndDate: '2026-07-31' },
-    { memberCode: 'GEM-0007', firstName: 'René',       lastName: 'Nguimkeu',  phone: '+237 655 789 012', email: 'rene.n@gmail.com',       gender: 'Male',   avatarColor: 'blue',   accessCode: '9245', packageId: 'pkg-p12', status: 'expired',  startDate: '2025-02-01', endDate: '2026-01-31', balance: 360000, regFeeDate: '2025-02-01' },
-    { memberCode: 'GEM-0008', firstName: 'Dieudonne',  lastName: 'Wamba',     phone: '+237 677 567 890', email: 'dieudonne.w@gmail.com',  gender: 'Male',   avatarColor: 'purple', accessCode: '3856', packageId: 'pkg-vp',  status: 'visitor',  startDate: '2026-03-22', endDate: null,         balance: 0,      passesTotal: 5, passesRemaining: 3, isVisitor: true },
+    { memberCode: 'GEM-0001', firstName: 'Armand',     lastName: 'Kamga',     phone: '+237 655 123 456', email: 'armand.k@example.com',     gender: 'Male',   avatarColor: 'gold',   accessCode: '4271', packageId: 'pkg-p12', status: 'active',   startDate: '2026-01-15', endDate: '2027-01-14', balance: 0,      regFeeDate: '2026-01-15' },
+    { memberCode: 'GEM-0002', firstName: 'Sophie',     lastName: 'Ngono',     phone: '+237 677 234 567', email: 'sophie.n@example.com',     gender: 'Female', avatarColor: 'blue',   accessCode: '8364', packageId: 'pkg-s6',  status: 'active',   startDate: '2025-11-01', endDate: '2026-04-30', balance: 0,      regFeeDate: '2025-11-01' },
+    { memberCode: 'GEM-0003', firstName: 'Patrick',    lastName: 'Mekontchou',phone: '+237 677 321 654', email: 'patrick.m@example.com',    gender: 'Male',   avatarColor: 'blue',   accessCode: '2938', packageId: 'pkg-p12', status: 'active',   startDate: '2025-09-10', endDate: '2026-09-09', balance: 0,      regFeeDate: '2025-09-10' },
+    { memberCode: 'GEM-0004', firstName: 'Marcel',     lastName: 'Fonkoua',   phone: '+237 699 345 678', email: 'marcel.f@example.com',     gender: 'Male',   avatarColor: 'green',  accessCode: '5129', packageId: 'pkg-p12', status: 'expiring', startDate: '2025-04-01', endDate: '2026-03-31', balance: 45000,  regFeeDate: '2025-04-01' },
+    { memberCode: 'GEM-0005', firstName: 'Théodore',   lastName: 'Nkolo',     phone: '+237 699 410 223', email: 'theodore.n@example.com',   gender: 'Male',   avatarColor: 'red',    accessCode: '3741', packageId: 'pkg-s6',  status: 'suspended',startDate: '2025-02-10', endDate: '2026-08-09', balance: 0,      regFeeDate: '2025-02-10' },
+    { memberCode: 'GEM-0006', firstName: 'Bertrand',   lastName: 'Fotso',     phone: '+237 699 111 222', email: 'bertrand.f@example.com',   gender: 'Male',   avatarColor: 'blue',   accessCode: '1144', packageId: 'pkg-p12', status: 'frozen',   startDate: '2025-06-01', endDate: '2026-08-31', balance: 0,      regFeeDate: '2025-06-01', freezeStartDate: '2026-03-01', preFreezEndDate: '2026-07-31' },
+    { memberCode: 'GEM-0007', firstName: 'René',       lastName: 'Nguimkeu',  phone: '+237 655 789 012', email: 'rene.n@example.com',       gender: 'Male',   avatarColor: 'blue',   accessCode: '9245', packageId: 'pkg-p12', status: 'expired',  startDate: '2025-02-01', endDate: '2026-01-31', balance: 360000, regFeeDate: '2025-02-01' },
+    { memberCode: 'GEM-0008', firstName: 'Dieudonne',  lastName: 'Wamba',     phone: '+237 677 567 890', email: 'dieudonne.w@example.com',  gender: 'Male',   avatarColor: 'purple', accessCode: '3856', packageId: 'pkg-vp',  status: 'visitor',  startDate: '2026-03-22', endDate: null,         balance: 0,      passesTotal: 5, passesRemaining: 3, isVisitor: true },
   ];
 
   for (const m of memberSeed) {

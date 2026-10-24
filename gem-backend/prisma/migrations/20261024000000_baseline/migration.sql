@@ -1,8 +1,11 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
 CREATE TYPE "StaffRole" AS ENUM ('general_manager', 'manager', 'accountant', 'front_desk', 'coach', 'instructor', 'trainer');
 
 -- CreateEnum
-CREATE TYPE "MemberStatus" AS ENUM ('active', 'expiring', 'suspended', 'frozen', 'expired', 'deactivated', 'visitor');
+CREATE TYPE "MemberStatus" AS ENUM ('active', 'expiring', 'pending', 'suspended', 'frozen', 'expired', 'deactivated', 'visitor');
 
 -- CreateEnum
 CREATE TYPE "PaymentMethod" AS ENUM ('cash', 'card', 'bank_transfer', 'mobile_money');
@@ -57,8 +60,14 @@ CREATE TABLE "Staff" (
     "joinDate" TIMESTAMP(3),
     "accessCode" TEXT,
     "shiftStart" TEXT,
+    "schedule" JSONB,
     "passwordHash" TEXT NOT NULL,
     "avatarColor" TEXT,
+    "photo" TEXT,
+    "photoId" TEXT,
+    "emergencyContact" TEXT,
+    "emergencyPhone" TEXT,
+    "salary" DOUBLE PRECISION,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -77,6 +86,7 @@ CREATE TABLE "Member" (
     "email" TEXT,
     "gender" TEXT,
     "avatarColor" TEXT,
+    "photo" TEXT,
     "accessCode" TEXT,
     "status" "MemberStatus" NOT NULL DEFAULT 'active',
     "balance" DOUBLE PRECISION NOT NULL DEFAULT 0,
@@ -89,6 +99,15 @@ CREATE TABLE "Member" (
     "passesTotal" INTEGER,
     "passesRemaining" INTEGER,
     "isVisitor" BOOLEAN NOT NULL DEFAULT false,
+    "dob" TEXT,
+    "houseNumber" TEXT,
+    "street" TEXT,
+    "city" TEXT,
+    "postalCode" TEXT,
+    "emergencyContact" TEXT,
+    "emergencyPhone" TEXT,
+    "howHeard" TEXT,
+    "notes" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "packageId" TEXT,
@@ -128,6 +147,8 @@ CREATE TABLE "Payment" (
     "method" "PaymentMethod" NOT NULL,
     "type" "PaymentType" NOT NULL,
     "note" TEXT,
+    "reference" TEXT,
+    "balanceAfter" DOUBLE PRECISION,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Payment_pkey" PRIMARY KEY ("id")
@@ -142,6 +163,7 @@ CREATE TABLE "Product" (
     "price" DOUBLE PRECISION NOT NULL,
     "stock" INTEGER NOT NULL DEFAULT 0,
     "description" TEXT,
+    "photo" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -176,6 +198,7 @@ CREATE TABLE "Attendance" (
     "id" TEXT NOT NULL,
     "gymId" TEXT NOT NULL,
     "memberId" TEXT NOT NULL,
+    "staffId" TEXT,
     "checkIn" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "checkOut" TIMESTAMP(3),
     "note" TEXT,
@@ -192,6 +215,7 @@ CREATE TABLE "Task" (
     "priority" "Priority" NOT NULL DEFAULT 'medium',
     "status" "TaskStatus" NOT NULL DEFAULT 'todo',
     "dueDate" TIMESTAMP(3),
+    "dueTime" TEXT,
     "assignedToId" TEXT,
     "createdById" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -211,6 +235,7 @@ CREATE TABLE "Expense" (
     "paidTo" TEXT,
     "method" "PaymentMethod",
     "note" TEXT,
+    "recordedBy" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Expense_pkey" PRIMARY KEY ("id")
@@ -252,9 +277,14 @@ CREATE TABLE "CalendarEvent" (
     "time" TEXT,
     "duration" TEXT,
     "instructorId" TEXT,
+    "staffIds" TEXT,
     "location" TEXT,
     "spots" INTEGER,
     "color" TEXT,
+    "description" TEXT,
+    "repeat" TEXT,
+    "repeatUntil" TEXT,
+    "seriesId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -337,6 +367,9 @@ ALTER TABLE "Attendance" ADD CONSTRAINT "Attendance_gymId_fkey" FOREIGN KEY ("gy
 
 -- AddForeignKey
 ALTER TABLE "Attendance" ADD CONSTRAINT "Attendance_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "Member"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Attendance" ADD CONSTRAINT "Attendance_staffId_fkey" FOREIGN KEY ("staffId") REFERENCES "Staff"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Task" ADD CONSTRAINT "Task_gymId_fkey" FOREIGN KEY ("gymId") REFERENCES "Gym"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

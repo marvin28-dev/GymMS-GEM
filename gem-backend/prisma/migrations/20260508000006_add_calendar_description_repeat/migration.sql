@@ -1,2 +1,0 @@
-ALTER TABLE "CalendarEvent" ADD COLUMN IF NOT EXISTS "description" TEXT;
-ALTER TABLE "CalendarEvent" ADD COLUMN IF NOT EXISTS "repeat" TEXT;
