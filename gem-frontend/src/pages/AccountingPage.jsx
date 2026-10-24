@@ -25,7 +25,7 @@ import { readStored, store, storeJson, unstore } from '../utils/storage';
 import { revenueOf } from '../utils/revenue';
 import { getAll as getSales } from '../services/sales.service';
 import { useGymSettings } from '../hooks/useGymSettings';
-import { enabledMethods, canonicalMethod, PAYMENT_METHODS } from '../utils/paymentMethods';
+import { enabledMethods, acceptedMethod, canonicalMethod, PAYMENT_METHODS } from '../utils/paymentMethods';
 import { roleName } from '../utils/roleNames';
 
 // One list of expense categories for every form, filter and breakdown. Entries
@@ -492,15 +492,23 @@ export default function AccountingPage() {
     }
   };
 
+  // A new expense starts on a method the gym takes; an old one keeps the
+  // method it was paid by, even one the gym no longer takes (D-26)
+  const takenMethods = enabledMethods(gymSettings);
+  const storedMethod = PAYMENT_METHODS.find(x => x.api === form.method || x.key === canonicalMethod(form.method))?.key;
+  const keepsOld = !!editingExpense && !!storedMethod && !takenMethods.some(m => m.key === storedMethod);
+  const expenseMethods = keepsOld ? [...takenMethods, PAYMENT_METHODS.find(m => m.key === storedMethod)] : takenMethods;
+  const expenseMethod = keepsOld ? storedMethod : acceptedMethod(storedMethod || form.method, takenMethods);
+
   const commitExpenseSave = async (another = false) => {
     if (!editingExpense && form.category === 'Salaries') return commitPayrollSave(another);
     try {
       if (editingExpense) {
-        const res = await updateExpense(editingExpense.id, form);
+        const res = await updateExpense(editingExpense.id, { ...form, method: expenseMethod });
         saveReceipt(editingExpense.id, expenseImagePreview);
         setExpenses(prev => prev.map(ex => ex.id === editingExpense.id ? res.data : ex));
       } else {
-        const res = await createExpense(form);
+        const res = await createExpense({ ...form, method: expenseMethod });
         saveReceipt(res.data.id, expenseImagePreview);
         setExpenses(prev => [res.data, ...prev]);
       }
@@ -917,8 +925,8 @@ export default function AccountingPage() {
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('sales.paymentMethod')}</label>
                   {/* stored as a code (mobile_money); the list shows the gym's own methods by name */}
-                  <select style={inputStyle} value={PAYMENT_METHODS.find(x => x.api === form.method || x.key === canonicalMethod(form.method))?.key || enabledMethods(gymSettings)[0]?.key} onChange={e => setForm(f => ({ ...f, method: e.target.value }))}>
-                    {enabledMethods(gymSettings).map(m => <option key={m.key} value={m.key}>{t(m.labelKey)}</option>)}
+                  <select style={inputStyle} value={expenseMethod} onChange={e => setForm(f => ({ ...f, method: e.target.value }))}>
+                    {expenseMethods.map(m => <option key={m.key} value={m.key}>{t(m.labelKey)}</option>)}
                   </select>
                 </div>
                 <div>

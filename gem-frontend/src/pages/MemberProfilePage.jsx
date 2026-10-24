@@ -35,7 +35,7 @@ import { applyDirect as applyMemberAction, create as createApproval, listForMemb
 import { getAll as getPackages } from '../services/packages.service';
 import { create as createPayment } from '../services/payments.service';
 import { useGymSettings } from '../hooks/useGymSettings';
-import { enabledMethods, PAYMENT_METHODS, canonicalMethod } from '../utils/paymentMethods';
+import { enabledMethods, acceptedMethod, PAYMENT_METHODS, canonicalMethod } from '../utils/paymentMethods';
 import { checkIn as checkInApi } from '../services/attendance.service';
 import { checkInBlockReason, passesLeft, passesOf, checkInErrorText } from '../utils/checkin';
 import { getMyGym } from '../services/gym.service';
@@ -275,7 +275,7 @@ function AddPaymentModal({ open, onClose, onSave, member }) {
     try {
       await onSave?.({
         amount:      payAmt,
-        method:      form.method,
+        method:      acceptedMethod(form.method, enabledMethods(gymSettings)),
         type:        form.type,
         description: form.description || undefined,
         reference:   form.reference,
@@ -335,7 +335,7 @@ function AddPaymentModal({ open, onClose, onSave, member }) {
           </div>
           <div>
             <label style={lbl}>{t('memberProfile.methodLabel')}</label>
-            <select style={inp} value={form.method} onChange={set('method')}>
+            <select style={inp} value={acceptedMethod(form.method, enabledMethods(gymSettings))} onChange={set('method')}>
               {enabledMethods(gymSettings).map(m => <option key={m.key} value={m.key}>{t(m.labelKey)}</option>)}
             </select>
           </div>

@@ -29,3 +29,20 @@ test("a new gym's Settings start with every payment method ticked", async ({ pag
   await expect(page.getByLabel('Mobile Money')).toBeChecked();
   await expect(page.getByLabel('Cash')).toBeChecked();
 });
+
+// D-26: the forms started on Cash. Where the gym takes no cash the box showed
+// the first method it does take, and the payment was saved as cash.
+test('a gym that takes no cash never has a payment saved as cash', async ({ page }) => {
+  const owner = await registerGym();
+  await call('PATCH', '/gyms/me', { token: owner.token, body: { settings: { payment: { methods: ['Mobile Money'] } } } });
+  const member = await call('POST', '/members', { token: owner.token, body: { firstName: 'Nora', lastName: 'Nocash', city: 'Douala', region: 'Littoral', regFeeMethod: 'mobile_money', startDate: day(), endDate: day(30), balance: 8000 } });
+  await signIn(page, owner);
+
+  await page.goto(`/members/${member.id}`);
+  await page.getByRole('button', { name: 'Add Payment' }).first().click();
+  const form = page.getByRole('dialog', { name: 'Add Payment' });
+  await expect(form.locator('select').filter({ has: page.locator('option', { hasText: 'Mobile Money' }) }).first()).toHaveValue('Mobile Money');
+  await form.locator('input[inputmode="numeric"]').first().fill('3000');
+  await form.getByRole('button', { name: /Save Payment|Record Payment/ }).click();
+  await expect.poll(async () => (await call('GET', '/payments', { token: owner.token })).filter(p => p.memberId === member.id && p.amount === 3000).map(p => p.method)).toEqual(['mobile_money']);
+});

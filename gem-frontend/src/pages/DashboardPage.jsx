@@ -49,7 +49,7 @@ import TaskAssigneeField from '../components/TaskAssigneeField';
 import { isFitness } from '../utils/rolePages';
 import { useSetupStatus } from '../hooks/useSetupStatus';
 import { useGymSettings } from '../hooks/useGymSettings';
-import { enabledMethods, PAYMENT_METHODS, canonicalMethod } from '../utils/paymentMethods';
+import { enabledMethods, acceptedMethod, PAYMENT_METHODS, canonicalMethod } from '../utils/paymentMethods';
 import { gymAddress } from '../utils/gymAddress';
 import { SkeletonCards, SkeletonLine } from '../components/Skeleton';
 import { softAll, failed } from '../utils/loadAll';
@@ -773,7 +773,7 @@ function AddPaymentModal({ open, onClose, membersList = [], onSaved }) {
         memberId: selectedMember.id,
         amount: Number(form.amount),
         type: form.type,
-        method: form.method,
+        method: acceptedMethod(form.method, enabledMethods(gymSettings)),
         description: form.description,
         reference: ref,
         towardBalance: reducesBalance,
@@ -906,7 +906,7 @@ function AddPaymentModal({ open, onClose, membersList = [], onSaved }) {
               </div>
               <div>
                 <label style={lbl}>{t('payments.method')} *</label>
-                <select style={inp} value={form.method} onChange={e => setForm(f => ({ ...f, method: e.target.value }))}>
+                <select style={inp} value={acceptedMethod(form.method, enabledMethods(gymSettings))} onChange={e => setForm(f => ({ ...f, method: e.target.value }))}>
                   {enabledMethods(gymSettings).map(m => <option key={m.key} value={m.key}>{t(m.labelKey)}</option>)}
                 </select>
               </div>

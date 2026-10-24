@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { CreditCard, Check } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useGymSettings } from '../hooks/useGymSettings';
-import { enabledMethods } from '../utils/paymentMethods';
+import { enabledMethods, acceptedMethod } from '../utils/paymentMethods';
 import { formatMoney, getCurrencySymbol } from '../utils/currency';
 import { digitsOnly } from '../utils/number';
 
@@ -21,7 +21,8 @@ export default function CollectPaymentStep({ amountDue, minAmount, minPct, colle
   const min = minAmount ?? amountDue;
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(String(amountDue || ''));
-  const [method, setMethod] = useState(methods[0]?.key || 'Cash');
+  const [picked, setPicked] = useState('');
+  const method = acceptedMethod(picked, methods);
 
   // A different price (another bundle picked) starts the step over
   useEffect(() => { setAmount(String(amountDue || '')); setOpen(false); }, [amountDue]);
@@ -80,7 +81,7 @@ export default function CollectPaymentStep({ amountDue, minAmount, minPct, colle
         </div>
         <div>
           <label style={lbl}>{t('memberProfile.methodLabel')}</label>
-          <select value={method} onChange={e => setMethod(e.target.value)} style={inp}>
+          <select value={method} onChange={e => setPicked(e.target.value)} style={inp}>
             {methods.map(m => <option key={m.key} value={m.key}>{t(m.labelKey)}</option>)}
           </select>
         </div>

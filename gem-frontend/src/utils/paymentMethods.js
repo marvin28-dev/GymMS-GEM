@@ -33,4 +33,12 @@ export function enabledMethods(settings) {
   return list.length ? list : PAYMENT_METHODS;
 }
 
+// The method a form holds, or the gym's first one when the gym does not take
+// it: a form started on Cash showed the first method the gym takes and saved
+// Cash (D-26)
+export function acceptedMethod(wanted, methods) {
+  const key = canonicalMethod(wanted);
+  return methods.some(m => m.key === key) ? key : (methods[0]?.key || 'Cash');
+}
+
 export const apiMethod = (name) => PAYMENT_METHODS.find(m => m.key === canonicalMethod(name))?.api || 'cash';

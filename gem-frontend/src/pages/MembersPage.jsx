@@ -32,7 +32,7 @@ import { checkIn as checkInApi } from '../services/attendance.service';
 import { uploadPhoto } from '../services/upload.service';
 import { fmtDate, todayStr, addDaysStr, dayStr } from '../utils/date';
 import { useGymSettings } from '../hooks/useGymSettings';
-import { enabledMethods } from '../utils/paymentMethods';
+import { enabledMethods, acceptedMethod } from '../utils/paymentMethods';
 import { memberNeedsAttention, membershipEndsThisWeek, isActiveMember } from '../utils/attention';
 import { citiesOf, regionsOf } from '../utils/address';
 import { CountryField } from '../components/AddressInputs';
@@ -355,7 +355,7 @@ function MemberPaymentModal({ open, onClose, member }) {
     if (overpay) { setAmountError(t('memberProfile.amountOverMax', { amount: formatMoney(owedBalance) })); return; }
     setSaving(true); setError(''); setAmountError('');
     try {
-      await createPayment({ memberId: member.id, amount: payAmt, method: form.method, description: form.description || undefined, type: form.type, reference: form.reference, towardBalance: reducesBalance });
+      await createPayment({ memberId: member.id, amount: payAmt, method: acceptedMethod(form.method, enabledMethods(gymSettings)), description: form.description || undefined, type: form.type, reference: form.reference, towardBalance: reducesBalance });
       onClose();
     } catch (err) {
       setError(err.response?.data?.error || t('payments.saveFailed'));
@@ -409,7 +409,7 @@ function MemberPaymentModal({ open, onClose, member }) {
               </div>
               <div>
                 <label style={lbl}>{t('payments.method')} *</label>
-                <select style={inp} value={form.method} onChange={set('method')}>
+                <select style={inp} value={acceptedMethod(form.method, enabledMethods(gymSettings))} onChange={set('method')}>
                   {enabledMethods(gymSettings).map(m => <option key={m.key} value={m.key}>{t(m.labelKey)}</option>)}
                 </select>
               </div>

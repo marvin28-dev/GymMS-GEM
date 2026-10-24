@@ -21,7 +21,7 @@ import Modal from '../components/ui/Modal';
 import { AddMemberModal, AddVisitorModal } from './MembersPage';
 import MemberProfilePage from './MemberProfilePage';
 import { getAll as getMembers, sendCode as sendMemberCode } from '../services/members.service';
-import { enabledMethods, PAYMENT_METHODS } from '../utils/paymentMethods';
+import { enabledMethods, acceptedMethod, PAYMENT_METHODS } from '../utils/paymentMethods';
 import { checkInBlockReason, passesLeft, checkInErrorText } from '../utils/checkin';
 import { getAll as getStaff, verifyCode as verifyStaffCode, checkActive as checkStaffActive } from '../services/staff.service';
 import { getAll as getPackages } from '../services/packages.service';
@@ -1063,7 +1063,7 @@ export default function FrontDeskPage() {
     try {
       const res = await createSale({
         items: cart.map(i => ({ productId: i.id, quantity: i.qty })),
-        method: payMethod,
+        method: acceptedMethod(payMethod, enabledMethods(gymSettings)),
       });
       // The server says what is left, so the shelf count is never guessed
       const left = Object.fromEntries((res.data.stock || []).map(s => [s.id, s.stock]));
@@ -1143,7 +1143,7 @@ export default function FrontDeskPage() {
         amount: amt,
         category: expenseForm.category,
         date: today,
-        method: expenseForm.paymentMethod,
+        method: acceptedMethod(expenseForm.paymentMethod, enabledMethods(gymSettings)),
         paidTo: expenseForm.paidTo?.trim() || undefined,
         recordedBy: session?.staffName || undefined,
         source: 'frontdesk',
@@ -1873,7 +1873,7 @@ export default function FrontDeskPage() {
                   <span style={{ fontSize:13, fontWeight:600, color:'var(--text-secondary)', fontFamily:'DM Sans' }}>{t('frontDesk.totalLabel')}</span>
                   <span style={{ fontSize:15, fontWeight:800, color:'var(--text-primary)', fontFamily:'Manrope' }}>{formatMoney(cartTotal)}</span>
                 </div>
-                <select style={{ ...inputStyle, marginBottom:10 }} value={payMethod} onChange={e=>setPayMethod(e.target.value)}>
+                <select style={{ ...inputStyle, marginBottom:10 }} value={acceptedMethod(payMethod, enabledMethods(gymSettings))} onChange={e=>setPayMethod(e.target.value)}>
                   {enabledMethods(gymSettings).map(m=><option key={m.key} value={m.key}>{t(m.labelKey)}</option>)}
                 </select>
                 <button style={{ ...primaryBtn, width:'100%', justifyContent:'center', opacity: selling ? 0.6 : 1, cursor: selling ? 'not-allowed' : 'pointer' }} disabled={selling} onClick={handleSale}><CreditCard size={13}/> {selling ? t('common.saving') : t('frontDesk.recordSale')}</button>
@@ -1998,7 +1998,7 @@ export default function FrontDeskPage() {
                 </div>
               </div>
               <div><label style={labelStyle}>{t('frontDesk.paymentMethodLabel')}</label>
-                <select style={inputStyle} value={expenseForm.paymentMethod} onChange={e=>setExpenseForm(f=>({...f,paymentMethod:e.target.value}))}>
+                <select style={inputStyle} value={acceptedMethod(expenseForm.paymentMethod, enabledMethods(gymSettings))} onChange={e=>setExpenseForm(f=>({...f,paymentMethod:e.target.value}))}>
                   {enabledMethods(gymSettings).map(m=><option key={m.key} value={m.key}>{t(m.labelKey)}</option>)}
                 </select>
               </div>
