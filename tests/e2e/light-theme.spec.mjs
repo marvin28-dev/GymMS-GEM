@@ -25,6 +25,9 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 800 }], ['pho
   test(`on ${size}, sign-up's Sign in button and dial-code list are drawn in the light theme`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.goto('/signup');
+    // The fonts come from Google; one arriving mid-click moves the button, and
+    // Firefox then fires no click (seen once in a final run)
+    await page.evaluate(() => document.fonts.ready);
     const signIn = page.getByRole('button', { name: 'Sign in', exact: true });
     await expect(signIn).toBeVisible();
     expect(await style(signIn, 'borderTopColor')).toBe(LIGHT.borderSubtle);

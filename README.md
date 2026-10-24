@@ -66,7 +66,9 @@ otherwise the server in `gem-backend/.env` with the database name changed to
 `gem_test`. They refuse any database whose name does not end in `_test`, and a
 server that is not on this computer unless `TEST_DATABASE_URL` names it. Its
 tables follow the schema automatically. Email and photo uploads are replaced by
-fakes, and nothing in the tests reaches the internet. `npm run test:db:reset`
+fakes, so no email, text or upload leaves the computer; the browser tests
+only fetch the web fonts from Google (the demo videos are blocked).
+`npm run test:db:reset`
 empties the test database, for when a schema change cannot be applied in place.
 
 Browser test options: `E2E_DEV=1` uses the Vite dev server instead of a build,
