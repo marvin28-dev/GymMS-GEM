@@ -5,6 +5,7 @@ const { rankOf } = require('../utils/hierarchy');
 const { logActivity, fullName } = require('../utils/activityLog');
 const { logFailure } = require('../utils/bestEffort');
 const { serializable } = require('../utils/serializable');
+const { MANAGEMENT, DESK } = require('../middleware/access');
 
 const dayLabel = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -22,6 +23,15 @@ async function getAll(req, res) {
   const { staffId, date, openOnly, overdueOnly } = req.query;
   const where = { gymId: req.user.gymId };
   if (staffId) where.staffId = staffId;
+  // A history is the person's own, or management's (F-173 e). One day's list
+  // is open to everyone, as the Attendance page shows it, and the desk reads
+  // anyone's open shift to clock them out.
+  const mine = !staffId || String(staffId) === String(req.user.id);
+  const allowed = MANAGEMENT.includes(req.user.role) || date || (openOnly === 'true' && DESK.includes(req.user.role));
+  if (!allowed) {
+    if (!mine) return res.status(403).json({ error: "Only management can read someone else's time cards." });
+    where.staffId = req.user.id;
+  }
   // Shifts nobody has closed yet, for the end-of-day and dashboard warnings
   if (openOnly === 'true') where.punchOut = null;
   if (date) {

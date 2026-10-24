@@ -159,3 +159,28 @@ describe("the desk's shift prompt", () => {
     expect((await api.get(`/api/timecards/shift?staffId=${desk.id}`, { token: desk.token })).body).toEqual({ clockable: false });
   });
 });
+
+// F-173 (e): anyone could read anyone's time card history. The day's list
+// (the Attendance page) and the desk's open shifts stay open; a history is
+// the person's own, or management's
+describe('who may read time cards', () => {
+  it('keeps a person\'s history to them and management, and the day\'s list to everyone', async () => {
+    const worker = await addStaff(api, gym, { employmentType: 'Part Time', salary: 1000 });
+    const trainer = await addStaff(api, gym, { role: 'trainer', employmentType: 'Part Time', salary: 1000 });
+    const desk = await addStaff(api, gym, { role: 'front_desk' });
+    const { body: card } = await clockIn(worker.id, day(-30), '09:00');
+    await clockIn(trainer.id, day(-31), '09:00');
+    const read = (query, who) => api.get(`/api/timecards?${query}`, { token: who.token });
+
+    expect((await read(`staffId=${worker.id}`, trainer)).status).toBe(403);
+    const own = await read('', trainer);
+    expect(own.status).toBe(200);
+    expect(own.body.length).toBeGreaterThan(0);
+    expect(own.body.every(c => c.staffId === trainer.id)).toBe(true);
+
+    expect((await read(`date=${day(-30)}`, trainer)).body.some(c => c.id === card.id)).toBe(true);
+    expect((await read(`staffId=${worker.id}&openOnly=true`, desk)).status).toBe(200);
+    expect((await read(`staffId=${worker.id}`, worker)).body.some(c => c.id === card.id)).toBe(true);
+    expect((await read(`staffId=${worker.id}`, gym)).body.some(c => c.id === card.id)).toBe(true);
+  });
+});
