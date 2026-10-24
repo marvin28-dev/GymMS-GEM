@@ -34,12 +34,15 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 800 }], ['pho
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/signup-welcome-${size}.png` });
 
     await page.getByRole('button', { name: 'Start free trial' }).click();
-    // The list closes when the page scrolls, so the button is brought into view first
+    // The list closes when the page scrolls. A button left partly below the
+    // screen is scrolled the rest of the way by the click itself, which closed
+    // the list as it opened, so it is put in the middle of the screen first
     const dial = page.getByRole('button', { name: /\+237/ }).first();
-    await dial.scrollIntoViewIfNeeded();
+    await dial.evaluate(el => el.scrollIntoView({ block: 'center' }));
     const top = () => dial.evaluate(el => Math.round(el.getBoundingClientRect().top));
     let last = await top();
-    await expect.poll(async () => { const now = await top(); const settled = now === last; last = now; return settled; }).toBe(true);
+    await expect.poll(async () => { const now = await top(); const settled = now === last; last = now; return settled; }, { intervals: [200] }).toBe(true);
+    await expect.poll(() => dial.evaluate(el => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; })).toBe(true);
     await dial.click();
     const nigeria = page.getByRole('button', { name: /Nigeria/ });
     await expect(nigeria).toBeVisible();
