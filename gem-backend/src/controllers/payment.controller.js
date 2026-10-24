@@ -6,6 +6,7 @@ const { bestEffort } = require('../utils/bestEffort');
 const { generatePaymentRef } = require('../utils/paymentRef');
 
 const { toPaymentMethod } = require('../utils/paymentMethod');
+const { DAY, readTz, startOfLocalDay } = require('../utils/localDay');
 
 const TYPE_MAP = {
   Membership: 'membership', membership: 'membership',
@@ -16,14 +17,20 @@ const TYPE_MAP = {
   Other: 'other', other: 'other',
 };
 
+// ?date=YYYY-MM-DD&tz= is that whole local day and ?limit=N the latest N, so a
+// screen showing today's takings or the last few payments is not sent every
+// payment the gym ever took (F-099). Without them, every payment as before.
 async function getAll(req, res) {
+  const day = DAY.test(String(req.query.date || '')) ? startOfLocalDay(req.query.date, readTz(req.query)) : null;
+  const limit = Math.min(500, Math.max(0, parseInt(req.query.limit, 10) || 0));
   const payments = await prisma.payment.findMany({
-    where: { gymId: req.user.gymId },
+    where: { gymId: req.user.gymId, ...(day ? { createdAt: { gte: day, lt: new Date(day.getTime() + 86400000) } } : {}) },
     include: {
       member: { select: { id: true, firstName: true, lastName: true, avatarColor: true, photo: true } },
       staff:  { select: { id: true, firstName: true, lastName: true, photo: true } },
     },
     orderBy: { createdAt: 'desc' },
+    ...(limit ? { take: limit } : {}),
   });
   res.json(payments);
 }

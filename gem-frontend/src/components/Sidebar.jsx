@@ -202,8 +202,9 @@ export default function Sidebar({ open, onClose, isMobile }) {
   // or owing, tasks waiting or overdue - so a number by a nav item always means
   // "there is something here to deal with", and is hidden when there is nothing.
   const refreshBadges = useCallback(() => {
-    getMembers().then(res => setBadges(b => ({ ...b, members: countMembersNeedingAttention(res.data || []) }))).catch(() => {});
-    getTasks().then(res => setBadges(b => ({ ...b, tasks: countTasksNeedingAttention(res.data || []) }))).catch(() => {});
+    // Only what the counts read: a few fields per member and the open tasks (F-099)
+    getMembers({ view: 'attention' }).then(res => setBadges(b => ({ ...b, members: countMembersNeedingAttention(res.data || []) }))).catch(() => {});
+    getTasks({ open: 1 }).then(res => setBadges(b => ({ ...b, tasks: countTasksNeedingAttention(res.data || []) }))).catch(() => {});
   }, []);
 
   useEffect(() => { refreshBadges(); }, [location.pathname, refreshBadges]);

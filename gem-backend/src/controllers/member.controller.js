@@ -68,6 +68,14 @@ function withoutMoney(member, role) {
   return rest;
 }
 
+// What the "needs attention" counts and the Daily Overview read of each member.
+// The sidebar asks on every page change, so it is sent these alone rather than
+// every member's whole record (F-099).
+const ATTENTION_SELECT = {
+  id: true, status: true, isVisitor: true, balance: true, startDate: true, endDate: true, createdAt: true,
+  package: { select: { price: true } },
+};
+
 async function getAll(req, res) {
   const { status } = req.query;
   const where = { gymId: req.user.gymId };
@@ -75,7 +83,9 @@ async function getAll(req, res) {
 
   const members = await prisma.member.findMany({
     where,
-    include: { package: { select: { id: true, name: true, price: true } }, coach: { select: { id: true, firstName: true, lastName: true } } },
+    ...(req.query.view === 'attention'
+      ? { select: ATTENTION_SELECT }
+      : { include: { package: { select: { id: true, name: true, price: true } }, coach: { select: { id: true, firstName: true, lastName: true } } } }),
     orderBy: { createdAt: 'desc' },
   });
 

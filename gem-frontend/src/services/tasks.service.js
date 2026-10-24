@@ -1,7 +1,7 @@
 import api from './api';
 
-export const getAll = () =>
-  api.get('/tasks');
+export const getAll = (params) =>
+  api.get('/tasks', { params });
 
 export const create = (data) =>
   api.post('/tasks', data);

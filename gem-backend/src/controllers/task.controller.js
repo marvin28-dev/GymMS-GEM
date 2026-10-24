@@ -86,8 +86,9 @@ function mapTask(task) {
 
 async function getAll(req, res) {
   try {
+    // ?open=1 leaves out what is settled, for the sidebar's count (F-099)
     const tasks = await prisma.task.findMany({
-      where: { gymId: req.user.gymId },
+      where: { gymId: req.user.gymId, ...(req.query.open ? { status: { notIn: ['done', 'accepted', 'declined'] } } : {}) },
       include: {
         assignedTo: { select: { id: true, firstName: true, lastName: true } },
         createdBy: { select: { id: true, firstName: true, lastName: true } },

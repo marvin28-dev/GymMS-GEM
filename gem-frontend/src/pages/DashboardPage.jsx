@@ -1012,7 +1012,9 @@ function GymDashboard() {
   const [membersList, setMembersList] = useState(() => cache('members', []));
   const [staffList, setStaffList] = useState(() => cache('staff', []));
   const [checkins, setCheckins] = useState(() => cache('checkins', []));
+  // Today's payments for the takings, and the latest three for the list (F-099)
   const [payments, setPayments] = useState(() => { const c = cache('payments', []); return Array.isArray(c) ? c : []; });
+  const [recentPayments, setRecentPayments] = useState(() => { const c = cache('recentPayments', []); return Array.isArray(c) ? c : []; });
   const [shopToday, setShopToday] = useState(() => { const c = cache('shopToday', []); return Array.isArray(c) ? c : []; });
   const [todayEvents, setTodayEvents] = useState(() => cache('events', []));
   const [packagesList, setPackagesList] = useState(() => cache('packages', []));
@@ -1039,16 +1041,17 @@ function GymDashboard() {
       getMembers(),
       getAttendance({ date: todayParam }),
       // The takings are not a trainer's to read, so the call is not made
-      isFitness(role) ? Promise.resolve({ data: [] }) : getPayments(),
+      isFitness(role) ? Promise.resolve({ data: [] }) : getPayments({ date: todayParam }),
       getCalendar({ date: todayParam }),
       getStaff(),
       getPackages(),
       getMyGym(),
       isFitness(role) ? Promise.resolve({ data: [] }) : getSales(todayStr()),
-    ]).then(([mem, att, pay, cal, stf, pkg, gymRes, shop]) => {
+      isFitness(role) ? Promise.resolve({ data: [] }) : getPayments({ limit: 3 }),
+    ]).then(([mem, att, pay, cal, stf, pkg, gymRes, shop, recent]) => {
       upd(setMembersList, 'members')(mem);
       upd(setCheckins, 'checkins')(att);
-      if (!isFitness(role)) { upd(setPayments, 'payments')(pay); upd(setShopToday, 'shopToday')(shop); }
+      if (!isFitness(role)) { upd(setPayments, 'payments')(pay); upd(setShopToday, 'shopToday')(shop); upd(setRecentPayments, 'recentPayments')(recent); }
       upd(setTodayEvents, 'events')(cal);
       upd(setStaffList, 'staff')(stf);
       upd(setPackagesList, 'packages')(pkg);
@@ -1121,7 +1124,7 @@ function GymDashboard() {
   ].filter(Boolean);
 
   const checkinRows = checkins.slice(0, isMobile ? 5 : 8);
-  const paymentRows = payments.slice(0, 3);
+  const paymentRows = recentPayments.slice(0, 3);
 
   const thStyle = {
     fontSize: 10, textTransform: 'uppercase', letterSpacing: '1.5px',
@@ -1556,7 +1559,7 @@ function GymDashboard() {
       <AddTaskModal open={showAddTask} onClose={() => setShowAddTask(false)} staffList={staffList} />
       <ReportIssueModal open={showReportIssue} onClose={() => setShowReportIssue(false)} />
       <EodReport open={showEOD} onClose={() => setShowEOD(false)} />
-      <AddPaymentModal open={showAddPayment} onClose={() => setShowAddPayment(false)} membersList={membersList} onSaved={(newPayment) => { if (newPayment) { const paidAmt = Number(newPayment.amount) || 0; const paidMember = membersList.find(m => m.id === newPayment.memberId); setPayments(prev => [{ ...newPayment, amount: paidAmt, member: paidMember ? { id: paidMember.id, firstName: paidMember.firstName, lastName: paidMember.lastName } : null }, ...prev]); if (newPayment.memberId) { setMembersList(prev => prev.map(m => m.id === newPayment.memberId ? { ...m, balance: Math.max(0, Number(m.balance || 0) - paidAmt) } : m)); } } else { loadDashboard(); } }} />
+      <AddPaymentModal open={showAddPayment} onClose={() => setShowAddPayment(false)} membersList={membersList} onSaved={(newPayment) => { if (newPayment) { const paidAmt = Number(newPayment.amount) || 0; const paidMember = membersList.find(m => m.id === newPayment.memberId); const row = { ...newPayment, amount: paidAmt, member: paidMember ? { id: paidMember.id, firstName: paidMember.firstName, lastName: paidMember.lastName } : null }; setPayments(prev => [row, ...prev]); setRecentPayments(prev => [row, ...prev].slice(0, 3)); if (newPayment.memberId) { setMembersList(prev => prev.map(m => m.id === newPayment.memberId ? { ...m, balance: Math.max(0, Number(m.balance || 0) - paidAmt) } : m)); } } else { loadDashboard(); } }} />
       <TransactionModal payment={selectedPayment} onClose={() => setSelectedPayment(null)} />
 
       {/* No-packages warning */}

@@ -41,7 +41,7 @@ import { getAll as getAttendance } from '../services/attendance.service';
 import { getAll as getMembers } from '../services/members.service';
 import { getAll as getPayments } from '../services/payments.service';
 import { getAll as getExpenses } from '../services/expenses.service';
-import { todayStr, dayStr } from '../utils/date';
+import { todayStr, dayStr, addDaysStr } from '../utils/date';
 import { membershipEndsThisWeek } from '../utils/attention';
 import { TASK_CATEGORIES } from '../utils/taskCategories';
 import { assignFields, assigneeName } from '../utils/departments';
@@ -335,7 +335,12 @@ export default function OperationsPage() {
 
   const liveTick = useLiveTick();
   useEffect(() => {
-    softAll([getTasks(), getEquipment(), getStaff(), getAttendance(), getMembers(), getPayments(), getExpenses()])
+    // Only today's visits are used; just after midnight, yesterday's late ones
+    // still count towards "check-ins in the last hour" (F-051, F-099)
+    const visits = [getAttendance({ date: today })];
+    if (new Date().getHours() < 1) visits.push(getAttendance({ date: addDaysStr(today, -1) }));
+    const visitsRes = Promise.all(visits).then(all => ({ data: all.flatMap(r => r.data || []) }));
+    softAll([getTasks(), getEquipment(), getStaff(), visitsRes, getMembers({ view: 'attention' }), getPayments({ date: today }), getExpenses()])
       .then(([tasksRes, equipRes, staffRes, attRes, membRes, payRes, expRes]) => {
         // A request that failed leaves what is shown, and its saved copy, alone
         const apply = (res, set, key) => { if (failed(res)) return; const d = res.data || []; set(d); cache.write(key, d); };
