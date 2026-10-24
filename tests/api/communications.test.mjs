@@ -206,6 +206,20 @@ describe('scheduling and drafts', () => {
     expect(await deliveries(res.body.id)).toHaveLength(4);
   });
 
+  // F-178: a send cut off by a restart stayed "sending" for good, which
+  // refuses Retry and Edit; an hour after it began it is marked failed
+  it('marks a send cut off by a restart as failed after an hour, and leaves one under way alone', async () => {
+    const sending = (minutesAgo) => prisma.communication.create({ data: {
+      gymId: gym.user.gymId, subject: 'Cut off', body: 'Hello', channel: 'email', status: 'sending',
+      audience: { type: 'all' }, updatedAt: new Date(Date.now() - minutesAgo * 60e3),
+    } });
+    const cutOff = await sending(61);
+    const underWay = await sending(2);
+    await backend('./jobs/scheduledMessages.js').runScheduledMessages();
+    expect((await prisma.communication.findUnique({ where: { id: cutOff.id } })).status).toBe('failed');
+    expect((await prisma.communication.findUnique({ where: { id: underWay.id } })).status).toBe('sending');
+  });
+
   it('turns a cancelled schedule back into a draft, and a sent message cannot be edited', async () => {
     const later = await send(gym, { action: 'schedule', scheduledAt: new Date(Date.now() + 3600e3).toISOString() });
     expect((await api.post(`/api/communications/${later.body.id}/cancel`, {}, { token: gym.token })).status).toBe(200);
