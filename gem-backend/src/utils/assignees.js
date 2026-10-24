@@ -18,4 +18,8 @@ async function refuseAssignees(gymId, ids) {
     : `These accounts are deactivated, so they cannot be given new work: ${names}.`;
 }
 
-module.exports = { refuseAssignees };
+// Older accounts still carry these, and they do a trainer's job
+const SAME_JOB = { instructor: 'trainer', coach: 'trainer' };
+const jobOf = (role) => SAME_JOB[role] || role;
+
+module.exports = { refuseAssignees, jobOf };

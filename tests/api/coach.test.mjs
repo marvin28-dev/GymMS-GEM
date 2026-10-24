@@ -4,7 +4,7 @@
 // each kind of progress entry asks for its own things.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startServer, outbox } from './helpers/server.mjs';
-import { registerGym, addStaff, addMember, uniqueCode, eventually } from './helpers/fixtures.mjs';
+import { registerGym, addStaff, addMember, uniqueCode, eventually, daysFromNow } from './helpers/fixtures.mjs';
 
 let api, stop, prisma, gym, coachA, coachB, desk;
 const GOALS = { goalType: 'lose_weight', goalWeight: 75, goalWaist: 80, goalSessionsPerWeek: 3 };
@@ -171,5 +171,20 @@ describe('a coach\'s clients', () => {
     expect((await api.get(`/api/coach/clients/${coachA.id}`, { token: coachB.token })).status).toBe(403);
     const overview = await api.get('/api/coach/overview?tz=-60', { token: coachA.token });
     expect(overview.body.clients.some(c => c.id === m.id)).toBe(true);
+  });
+});
+
+// F-173 (c): older coach and instructor accounts do a trainer's job, and a
+// task given to the trainers is theirs too; the dashboard did not count it
+describe('the coach dashboard', () => {
+  it('counts a task given to the trainers for an older instructor account', async () => {
+    const older = await addStaff(api, gym, { role: 'trainer', firstName: 'Ivy', lastName: 'Instructor' });
+    await prisma.staff.update({ where: { id: older.id }, data: { role: 'instructor' } });
+    const { body: { token } } = await api.post('/api/auth/login', { gymCode: gym.gymCode, email: older.email, password: older.password });
+    const open = async () => (await api.get('/api/coach/overview?tz=-60', { token })).body.openTasks;
+    const before = await open();
+    const task = await api.post('/api/tasks', { title: 'Wipe the mats', assignedRole: 'trainer', dueDate: daysFromNow(2), priority: 'medium', category: 'Equipment Maintenance' }, { token: gym.token });
+    expect(task.status).toBe(201);
+    expect(await open()).toBe(before + 1);
   });
 });

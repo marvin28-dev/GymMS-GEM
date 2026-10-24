@@ -1,7 +1,7 @@
 const prisma = require('../utils/prisma');
 const LEGACY_CATEGORIES = { Cleaning: 'Equipment Maintenance', Maintenance: 'Equipment Maintenance', Equipment: 'Equipment Maintenance' };
 const normalizeCategory = (c) => LEGACY_CATEGORIES[c] || c;
-const { refuseAssignees } = require('../utils/assignees');
+const { refuseAssignees, jobOf } = require('../utils/assignees');
 const { sendTaskAssignedEmail } = require('../utils/taskEmail');
 const { parseDateOnly } = require('../utils/dates');
 const { logFailure } = require('../utils/bestEffort');
@@ -16,9 +16,6 @@ const asGroup = (value) => (Object.keys(GROUP_ROLES).includes(String(value || ''
 // A task can be given to one person or to everyone who does a particular job.
 const ASSIGNABLE_ROLES = ['manager', 'front_desk', 'trainer'];
 const ROLE_LABELS = { manager: 'All managers', front_desk: 'The front desk', trainer: 'All trainers' };
-// Older accounts still carry these, and they do a trainer's job
-const SAME_JOB = { instructor: 'trainer', coach: 'trainer' };
-const jobOf = (role) => SAME_JOB[role] || role;
 const asRole = (value) => ASSIGNABLE_ROLES.find(r => r === jobOf(String(value || '').trim().toLowerCase())) || null;
 
 // Whose task is this? Management sees the lot; everyone else sees their own

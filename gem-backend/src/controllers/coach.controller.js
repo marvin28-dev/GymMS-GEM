@@ -3,6 +3,7 @@ const { logActivity, fullName } = require('../utils/activityLog');
 const { membershipEnded } = require('../utils/membership');
 const { sendCoachIntro } = require('../utils/memberEmail');
 const { logFailure } = require('../utils/bestEffort');
+const { jobOf } = require('../utils/assignees');
 
 // The coach's side of the gym: who they train, what they are working towards,
 // what they have on today, and the progress they record. Everything is read
@@ -175,7 +176,7 @@ async function overview(req, res) {
         orderBy: { time: 'asc' },
       }),
       prisma.timeCard.findFirst({ where: { gymId, staffId: me, punchIn: { gte: dayStart, lt: dayEnd } }, orderBy: { punchIn: 'desc' }, select: { punchIn: true, punchOut: true } }),
-      prisma.task.count({ where: { gymId, status: { in: ['todo', 'in_progress'] }, eventId: null, OR: [{ assignedToId: me }, { assignedRole: req.user.role }] } }),
+      prisma.task.count({ where: { gymId, status: { in: ['todo', 'in_progress'] }, eventId: null, OR: [{ assignedToId: me }, { assignedRole: jobOf(req.user.role) }] } }),
       prisma.staff.findUnique({ where: { id: me }, select: { firstName: true, lastName: true } }),
     ]);
 
