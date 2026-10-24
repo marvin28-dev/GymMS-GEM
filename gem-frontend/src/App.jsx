@@ -1,11 +1,10 @@
 import { startLive } from './utils/live';
-import { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
 import { Clock } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 import { useDialogFocus } from './hooks/useDialogFocus';
 import AppRoutes from './routes/AppRoutes';
-import { isAuthed, isDemoMode, clearAuth, touchActivity, isInactive, getHomeRoute, getAuth, updateSessionGym } from './utils/auth';
+import { isAuthed, isDemoMode, clearAuth, touchActivity, isInactive, getHomeRoute, getAuth, updateSessionGym, signInPath } from './utils/auth';
 import { setSessionPhoto } from './utils/sessionPhoto';
 import { readStored } from './utils/storage';
 import api from './services/api';
@@ -92,10 +91,12 @@ const WARNING_SECONDS = 30;
    - Pauses activity tracking while the warning is visible (so only
      the explicit "I'm still here" button can dismiss it)
    ───────────────────────────────────────────────────────────────── */
+// Signing out loads the gym's own sign-in page afresh, as the server's sign-out
+// does: nothing of the last person stays in memory at a shared desk, and the
+// page guard cannot send them to the gym-code page first (F-173 a)
+const leaveFor = (to) => window.location.replace(to);
+
 function useInactivityLogout() {
-  const navigate = useNavigate();
-  const navRef = useRef(navigate);
-  useLayoutEffect(() => { navRef.current = navigate; });
 
   const [showWarning, setShowWarning] = useState(false);
   const [countdown, setCountdown] = useState(WARNING_SECONDS);
@@ -133,8 +134,9 @@ function useInactivityLogout() {
       warningActive.current = false;
       setShowWarning(false);
       setCountdown(WARNING_SECONDS);
+      const to = signInPath();
       clearAuth();
-      navRef.current('/login', { replace: true });
+      leaveFor(to);
       return;
     }
     const t = setTimeout(() => setCountdown(c => c - 1), 1000);
@@ -152,8 +154,9 @@ function useInactivityLogout() {
     warningActive.current = false;
     setShowWarning(false);
     setCountdown(WARNING_SECONDS);
+    const to = signInPath();
     clearAuth();
-    navRef.current('/login', { replace: true });
+    leaveFor(to);
   };
 
   return { showWarning, countdown, stayLoggedIn, logoutNow };

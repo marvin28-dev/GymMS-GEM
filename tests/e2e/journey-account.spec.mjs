@@ -268,7 +268,9 @@ test('J-08: with no answer the countdown signs you out', async ({ page }) => {
   // step can land before the last one was drawn (seen in WebKit), so there is
   // room for more than the 30; it stops at the sign-in page.
   for (let i = 0; i < 90 &&!/\/login$/.test(page.url()); i += 1) await page.clock.runFor(1000);
-  await expect(page).toHaveURL(/\/login$/);
+  // The gym's own sign-in page, as when the server signs someone out, so the
+  // next person at a shared desk does not type the gym code again (F-173 a)
+  await expect(page).toHaveURL(new RegExp(`/${owner.gymCode}/login$`));
   expect(await page.evaluate(() => localStorage.getItem('gem_auth'))).toBeNull();
 });
 

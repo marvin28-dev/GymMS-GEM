@@ -37,6 +37,13 @@ export function setAuth(payload) {
   return true;
 }
 
+// The gym's own sign-in page for whoever is signed in, read before the
+// session is cleared; the gym-code page when nobody is
+export function signInPath() {
+  const code = getAuth()?.user?.gymCode;
+  return code ? `/${encodeURIComponent(code)}/login` : '/login';
+}
+
 export function clearAuth() {
   const gymId = getAuth()?.user?.gymId;
   // Every page's copy of the gym's lists (gem_<page>_<gymId>_...) goes with
