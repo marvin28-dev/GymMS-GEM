@@ -1045,3 +1045,68 @@ Step-by-step instructions for every test. Do them in order — later tests depen
 2. Rapidly click Next through 5+ steps
 3. **Verify:** Spotlight and card transitions are smooth
 4. **Verify:** No visual glitches, overlapping cards, or stuck overlays
+
+---
+
+## 25. CHECKS ONLY A PERSON CAN MAKE (production audit, October 2026)
+
+The automated tests cover every journey in Chromium, Firefox and WebKit, and
+the phone layouts on emulated phones (see `AUDIT_PROGRESS.md`, section 3a).
+These checks need real devices, real inboxes or a real person.
+
+### TEST 25.1 - A real iPhone (Safari)
+1. On an iPhone, open the gym's sign-in page and sign in as the owner.
+2. Add a member, taking the photo with the camera.
+3. Open the front desk and check a member in with the keypad.
+4. Pick a date and a time in a form (the date box and the time list).
+5. Download a payment receipt and a payslip as PDF.
+6. **Verify:** nothing is cut off or wider than the screen, the keyboard never covers the box being typed in, the PDFs open.
+
+### TEST 25.2 - A real Android phone (Chrome)
+1. Repeat 25.1 on an Android phone.
+2. Type an amount in any money box.
+3. **Verify:** the number keyboard opens and only digits go in.
+4. Try to pinch-zoom a page. Today zoom is switched off (decision D-49); note whether that is a problem for anyone at the gym.
+
+### TEST 25.3 - Safari on a Mac
+1. Sign in, add a payment, open the end-of-day report and print it.
+2. **Verify:** everything works as in Chrome.
+
+### TEST 25.4 - Email reaching real inboxes
+Only once a sending domain is verified in Resend and `EMAIL_FROM_ADDRESS` is set.
+1. Record a payment for a member whose email is your own Gmail address; repeat with Outlook and Yahoo addresses you own.
+2. **Verify:** the receipt arrives within a minute, not in spam, with the PDF attached and readable.
+3. Open it on a phone's mail app. **Verify:** the layout fits, accents (é, è) and the currency read correctly.
+4. Send a password reset to yourself. **Verify:** the link opens the reset page and works once.
+
+### TEST 25.5 - Text messages
+Texting is paused. When it is switched on:
+1. Set `SMS_PROVIDER=log` first and send a message to one member. **Verify:** it appears in the server log.
+2. Switch to Twilio and send one text to a staff phone. **Verify:** it arrives with the gym's name as sender.
+
+### TEST 25.6 - Printing on a real printer
+1. Print the end-of-day report, a payment receipt and the members export from Chrome, Firefox and Safari.
+2. **Verify:** one clean page per document, nothing cut at the edges, French text intact.
+
+### TEST 25.7 - A screen reader
+1. Windows: NVDA with Firefox. iPhone: VoiceOver.
+2. Sign in, open Members, open a row's actions menu, add a payment, make a form error on purpose.
+3. **Verify:** each field is read with its name, a dialog is announced with its title, the error is read out, and the row menu can be used with the arrow keys.
+
+### TEST 25.8 - A slow connection
+1. In Chrome's developer tools, set the network to "Slow 4G" and empty the cache.
+2. Open the app, then Members, then the front desk.
+3. **Verify:** each page shows its frame (sidebar, header) at once and its content when it arrives; nothing looks frozen.
+
+### TEST 25.9 - Two desks at once
+1. Open the front desk on one computer and the member's profile on another.
+2. Take a payment on one. **Verify:** the other shows it within a few seconds, without a reload.
+
+### TEST 25.10 - A tab left open across a deploy
+1. Open the app, leave the tab open, and deploy a new version.
+2. In the old tab, open a page you had not opened before.
+3. **Verify:** either the page opens, or the "Something went wrong" screen offers Reload and Reload works.
+
+### TEST 25.11 - After the start-command decision (D-1)
+1. Deploy to Railway.
+2. **Verify:** the demo gym "elite" was not created or reset, and existing data is untouched.

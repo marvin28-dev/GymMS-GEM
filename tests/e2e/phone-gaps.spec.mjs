@@ -165,7 +165,7 @@ test("a staff member's task can be opened and marked done from their profile on 
   });
   await signIn(page, owner);
   await page.goto(`/staff/${staff.id}`);
-  await page.getByRole('button', { name: 'Tasks' }).first().click();
+  await page.getByRole('main').getByRole('button', { name: 'Tasks' }).first().click();
   await page.getByText('Profile phone task').first().click();
   const details = page.getByRole('dialog', { name: 'Task Details' });
   await expect(details).toBeVisible();

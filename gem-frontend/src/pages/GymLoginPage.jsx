@@ -482,7 +482,7 @@ export default function GymLoginPage() {
                 <Mail size={15} color={inputFocus === 'email' ? gym.color : 'var(--text-muted)'} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                 <input autoFocus={step === 'email'} type="email" autoComplete="username" name="email" value={form.email} readOnly={step !== 'email'} onChange={e => { set('email', e.target.value); setErrors(er => ({ ...er, email: '' })); }} onFocus={() => setInputFocus('email')} onBlur={() => setInputFocus('')} placeholder={t('auth.loginEmailPh')} style={{ ...inputStyle('email'), fontSize: 16, ...(step !== 'email' ? lockedField : {}) }} />
               </div>
-              {errors.email && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 5 }}>&#9888; {errors.email}</div>}
+              {errors.email && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 5 }}>&#9888; {errors.email}</div>}
             </div>
 
             {step !== 'email' && (
@@ -512,16 +512,16 @@ export default function GymLoginPage() {
             {step !== 'email' && (<div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{setupMode ? t('auth.createPassword') : t('auth.loginPasswordLabel')} *</label>
-                {!setupMode && <span style={{ fontSize: 12, color: gym.color, cursor: 'pointer', fontWeight: 500 }} onClick={() => nav('/forgot-password', { state: { gymCode } })}>{t('auth.loginForgot')}</span>}
+                {!setupMode && <button type="button" style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontSize: 12, color: gym.color, cursor: 'pointer', fontWeight: 500 }} onClick={() => nav('/forgot-password', { state: { gymCode } })}>{t('auth.loginForgot')}</button>}
               </div>
               <div style={{ position: 'relative' }}>
                 <Lock size={15} color={inputFocus === 'password' ? gym.color : 'var(--text-muted)'} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                 <input type={showPw ? 'text' : 'password'} value={form.password} autoComplete={setupMode ? 'new-password' : 'current-password'} name="password" autoCorrect="off" spellCheck={false} onChange={e => { set('password', e.target.value); setErrors(er => ({ ...er, password: '' })); }} onFocus={() => setInputFocus('password')} onBlur={() => setInputFocus('')} placeholder={t('auth.loginPasswordPh')} style={{ ...inputStyle('password'), paddingRight: 44, fontSize: 16 }} />
-                <button type="button" onClick={() => setShowPw(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 2 }}>
+                <button type="button" aria-label={showPw ? t('common.hidePassword') : t('common.showPassword')} onClick={() => setShowPw(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 2 }}>
                   {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
-              {errors.password && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 5 }}>&#9888; {errors.password}</div>}
+              {errors.password && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 5 }}>&#9888; {errors.password}</div>}
             </div>)}
 
             {step !== 'email' && setupMode && (
@@ -547,7 +547,7 @@ export default function GymLoginPage() {
 
           <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'var(--text-muted)' }}>
             {t('auth.loginWrongGym')}{' '}
-            <span style={{ color: gym.color, cursor: 'pointer', fontWeight: 600 }} onClick={() => nav('/login')}>{t('auth.loginSearchGym')}</span>
+            <button type="button" style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: gym.color, cursor: 'pointer', fontWeight: 600 }} onClick={() => nav('/login')}>{t('auth.loginSearchGym')}</button>
           </p>
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -612,7 +612,7 @@ export default function GymLoginPage() {
                   <Mail size={15} color={inputFocus === 'email' ? gym.color : 'var(--text-muted)'} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                   <input autoFocus={step === 'email'} type="email" autoComplete="username" name="email" value={form.email} readOnly={step !== 'email'} onChange={e => { set('email', e.target.value); setErrors(er => ({ ...er, email: '' })); }} onFocus={() => setInputFocus('email')} onBlur={() => setInputFocus('')} placeholder={t('auth.loginEmailPh')} style={{ ...inputStyle('email'), ...(step !== 'email' ? lockedField : {}) }} />
                 </div>
-                {errors.email && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 5 }}>⚠ {errors.email}</div>}
+                {errors.email && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 5 }}>⚠ {errors.email}</div>}
               </div>
 
               {step !== 'email' && (
@@ -642,16 +642,16 @@ export default function GymLoginPage() {
               {step !== 'email' && (<div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
                   <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)' }}>{setupMode ? t('auth.createPassword') : t('auth.loginPasswordLabel')} *</label>
-                  {!setupMode && <span style={{ fontSize: 12, color: gym.color, cursor: 'pointer', fontWeight: 500 }} onClick={() => nav('/forgot-password', { state: { gymCode } })}>{t('auth.loginForgotFull')}</span>}
+                  {!setupMode && <button type="button" style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontSize: 12, color: gym.color, cursor: 'pointer', fontWeight: 500 }} onClick={() => nav('/forgot-password', { state: { gymCode } })}>{t('auth.loginForgotFull')}</button>}
                 </div>
                 <div style={{ position: 'relative' }}>
                   <Lock size={15} color={inputFocus === 'password' ? gym.color : 'var(--text-muted)'} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                   <input type={showPw ? 'text' : 'password'} value={form.password} autoComplete={setupMode ? 'new-password' : 'current-password'} name="password" autoCorrect="off" spellCheck={false} onChange={e => { set('password', e.target.value); setErrors(er => ({ ...er, password: '' })); }} onFocus={() => setInputFocus('password')} onBlur={() => setInputFocus('')} placeholder={t('auth.loginPasswordPh')} style={{ ...inputStyle('password'), paddingRight: 44 }} />
-                  <button type="button" onClick={() => setShowPw(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 2 }}>
+                  <button type="button" aria-label={showPw ? t('common.hidePassword') : t('common.showPassword')} onClick={() => setShowPw(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 2 }}>
                     {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
-                {errors.password && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 5 }}>⚠ {errors.password}</div>}
+                {errors.password && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 5 }}>⚠ {errors.password}</div>}
               </div>)}
 
               {step !== 'email' && setupMode && (
@@ -686,7 +686,7 @@ export default function GymLoginPage() {
 
           <p style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: 'var(--text-muted)' }}>
             {t('auth.loginWrongGym')}{' '}
-            <span style={{ color: gym.color, cursor: 'pointer', fontWeight: 600 }} onClick={() => nav('/login')}>{t('auth.loginSearchGym')}</span>
+            <button type="button" style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: gym.color, cursor: 'pointer', fontWeight: 600 }} onClick={() => nav('/login')}>{t('auth.loginSearchGym')}</button>
           </p>
 
           {/* Contact */}

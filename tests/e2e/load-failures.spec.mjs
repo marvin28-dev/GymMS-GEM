@@ -90,9 +90,9 @@ test("a staff profile says when its tasks or calendar could not be loaded", asyn
   await signIn(page, owner);
   await page.goto(`/staff/${staff.id}`);
 
-  await page.getByRole('button', { name: 'Tasks' }).first().click();
+  await page.getByRole('main').getByRole('button', { name: 'Tasks' }).first().click();
   await expect(page.getByText('Tasks could not be loaded, so this list may be incomplete.')).toBeVisible();
-  await page.getByRole('button', { name: 'Calendar' }).first().click();
+  await page.getByRole('main').getByRole('button', { name: 'Calendar' }).first().click();
   await expect(page.getByText('The calendar could not be loaded, so this list may be incomplete.')).toBeVisible();
   await page.unroute('**/api/calendar');
   await page.unroute('**/api/tasks');

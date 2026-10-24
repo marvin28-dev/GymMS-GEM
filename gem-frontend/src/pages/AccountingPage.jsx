@@ -831,7 +831,7 @@ export default function AccountingPage() {
               <div>
                 <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.amount')} *</label>
                 <input type="text" inputMode="numeric" style={{ ...inputStyle, borderColor: errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: digitsOnly(e.target.value) }))} placeholder="0" />
-                {errors.amount && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.amount}</div>}
+                {errors.amount && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.amount}</div>}
               </div>
             )}
           </div>
@@ -849,7 +849,7 @@ export default function AccountingPage() {
                       <option key={s.id} value={s.id}>{staffName(s)}</option>
                     ))}
                   </select>
-                  {errors.staffId && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.staffId}</div>}
+                  {errors.staffId && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.staffId}</div>}
                 </div>
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.payPeriodField')}</label>
@@ -858,7 +858,7 @@ export default function AccountingPage() {
                     onChange={e => { const payMonth = e.target.value; setForm(f => ({ ...f, payMonth })); loadSalaryPreview(form.staffId, payMonth); }}>
                     {payMonthOptions().map(m => <option key={m} value={m}>{payMonthText(m)}</option>)}
                   </select>
-                  {errors.payMonth && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.payMonth}</div>}
+                  {errors.payMonth && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.payMonth}</div>}
                 </div>
               </div>
 
@@ -887,7 +887,7 @@ export default function AccountingPage() {
                 <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.amount')} *</label>
                 <input type="text" inputMode="numeric" style={{ ...inputStyle, borderColor: errors.amount ? 'var(--accent-red)' : 'var(--border-subtle)' }}
                   value={form.amount} onChange={e => setForm(f => ({ ...f, amount: digitsOnly(e.target.value) }))} placeholder="0" />
-                {errors.amount && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.amount}</div>}
+                {errors.amount && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.amount}</div>}
               </div>
 
               <div style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--accent-gold-dim)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: 8, padding: '9px 12px', lineHeight: 1.5 }}>
@@ -899,18 +899,18 @@ export default function AccountingPage() {
               <div>
                 <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('tasks.titleLabel')}</label>
                 <input style={{ ...inputStyle, borderColor: errors.title ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder={t('reports.expenseTitlePh')} />
-                {errors.title && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.title}</div>}
+                {errors.title && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.title}</div>}
               </div>
               <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('common.date')} *</label>
                   <input type="date" style={{ ...inputStyle, borderColor: errors.date ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
-                  {errors.date && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.date}</div>}
+                  {errors.date && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.date}</div>}
                 </div>
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.paidTo')} *</label>
                   <input style={{ ...inputStyle, borderColor: errors.paidTo ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.paidTo} onChange={e => setForm(f => ({ ...f, paidTo: e.target.value }))} placeholder={t('reports.vendorName')} />
-                  {errors.paidTo && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.paidTo}</div>}
+                  {errors.paidTo && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.paidTo}</div>}
                 </div>
               </div>
               <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -952,7 +952,7 @@ export default function AccountingPage() {
               </div>
             )}
           </div>
-          {errors._api && <div style={{ fontSize: 12, color: 'var(--accent-red)', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '8px 12px' }}>⚠ {errors._api}</div>}
+          {errors._api && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '8px 12px' }}>⚠ {errors._api}</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
             <button style={secondaryBtn} onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
             {!editingExpense && <button style={secondaryBtn} onClick={() => handleSave(true)}>{t('tasks.saveAndAddAnother')}</button>}
@@ -1189,7 +1189,7 @@ export default function AccountingPage() {
                       </div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-red)' }}>-{formatMoney(d.amount)}</span>
-                        <button onClick={() => setPaystubDeductionLines(prev => ({ ...prev, [editingPaystub.id]: prev[editingPaystub.id].filter(x => x.id !== d.id) }))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }} onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-red)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}><Trash2 size={13} /></button>
+                        <button aria-label={t('common.remove')} onClick={() => setPaystubDeductionLines(prev => ({ ...prev, [editingPaystub.id]: prev[editingPaystub.id].filter(x => x.id !== d.id) }))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }} onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-red)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}><Trash2 size={13} /></button>
                       </div>
                     </div>
                   ))}
@@ -1632,7 +1632,7 @@ export default function AccountingPage() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {mainTab === 'overview' && (
-            <select value={period} onChange={e => setPeriod(e.target.value)} style={toolbarControl}>
+            <select aria-label={t('common.period')} value={period} onChange={e => setPeriod(e.target.value)} style={toolbarControl}>
               {PERIOD_OPTIONS.map(o => <option key={o} value={o} style={{ color: 'var(--text-primary)', background: 'var(--bg-card)' }}>{t(PERIOD_KEYS[o])}</option>)}
             </select>
           )}
@@ -1768,7 +1768,7 @@ export default function AccountingPage() {
                   ))}
                 </div>
               ) : (
-                <select style={{ ...inputStyle, width: 160, margin: '8px 0' }} value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
+                <select aria-label={t('common.filterByCategory')} style={{ ...inputStyle, width: 160, margin: '8px 0' }} value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
                   <option value="All Categories">{t('reports.allCategories')}</option>
                   {categoriesIn(expenses).map(c => <option key={c} value={c}>{expenseCategoryName(c, t)}</option>)}
                 </select>

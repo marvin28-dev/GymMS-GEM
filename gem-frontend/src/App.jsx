@@ -3,6 +3,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
+import { useDialogFocus } from './hooks/useDialogFocus';
 import AppRoutes from './routes/AppRoutes';
 import { isAuthed, isDemoMode, clearAuth, touchActivity, isInactive, getHomeRoute, getAuth, updateSessionGym } from './utils/auth';
 import { setSessionPhoto } from './utils/sessionPhoto';
@@ -164,6 +165,10 @@ function InactivityWarning({ countdown, onStay, onLogout }) {
   const { t } = useLanguage();
   const pct = `${(countdown / WARNING_SECONDS) * 100}%`;
   const urgent = countdown <= 10;
+  // A real dialog for the keyboard and screen readers, with the way to stay
+  // signed in already in focus (F-083)
+  const boxRef = useRef(null);
+  useDialogFocus(true, boxRef);
 
   return (
     <div style={{
@@ -174,7 +179,8 @@ function InactivityWarning({ countdown, onStay, onLogout }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontFamily: 'DM Sans, sans-serif',
     }}>
-      <div style={{
+      <div ref={boxRef} role="alertdialog" aria-modal="true" aria-labelledby="idle-title" aria-describedby="idle-body" tabIndex={-1} style={{
+        outline: 'none',
         background: 'var(--bg-card)',
         border: '1px solid var(--border-subtle)',
         borderTop: `3px solid ${urgent ? '#f87171' : '#f59e0b'}`,
@@ -199,13 +205,13 @@ function InactivityWarning({ countdown, onStay, onLogout }) {
         </div>
 
         {/* Heading */}
-        <div style={{
+        <div id="idle-title" style={{
           fontFamily: 'Manrope, sans-serif', fontSize: 21, fontWeight: 800,
           color: 'var(--text-primary)', marginBottom: 10,
         }}>
           {t('idle.title')}
         </div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.75, marginBottom: 28 }}>
+        <div id="idle-body" style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.75, marginBottom: 28 }}>
           {t('idle.body1')}<br />
           {t('idle.body2')}
         </div>
@@ -253,6 +259,7 @@ function InactivityWarning({ countdown, onStay, onLogout }) {
             {t('idle.logOut')}
           </button>
           <button
+            autoFocus
             onClick={onStay}
             style={{
               flex: 2, padding: '12px 0',

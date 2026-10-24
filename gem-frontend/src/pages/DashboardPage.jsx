@@ -53,6 +53,7 @@ import { enabledMethods, PAYMENT_METHODS, canonicalMethod } from '../utils/payme
 import { gymAddress } from '../utils/gymAddress';
 import { SkeletonCards, SkeletonLine } from '../components/Skeleton';
 import { softAll, failed } from '../utils/loadAll';
+import DialogBox from '../components/ui/DialogBox';
 
 const MobileCtx = createContext(false);
 
@@ -231,6 +232,7 @@ const methodName = (m, t) => { const pm = PAYMENT_METHODS.find(x => x.api === m 
 const payTypeName = (p, t) => p.note || p.description || ({ membership: t('eod.typeMembership'), registration: t('eod.typeRegistration'), product: t('eod.typePass'), other: t('eod.typeOther') }[p.type] || p.type);
 
 function MiniCalendar({ lang = 'en' }) {
+  const { t } = useLanguage();
   const now = new Date();
   const [current, setCurrent] = useState({ year: now.getFullYear(), month: now.getMonth() });
   const cells = buildCalendar(current.year, current.month);
@@ -262,7 +264,7 @@ function MiniCalendar({ lang = 'en' }) {
         </span>
         <div style={{ display: 'flex', gap: 4 }}>
           {[ChevronLeft, ChevronRight].map((Icon, i) => (
-            <button key={i} onClick={i === 0 ? prevMonth : nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center' }}
+            <button key={i} aria-label={t(i === 0 ? 'common.previousMonth' : 'common.nextMonth')} onClick={i === 0 ? prevMonth : nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center' }}
               onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
               onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
             >
@@ -380,7 +382,7 @@ function ReportIssueModal({ open, onClose }) {
           <div>
             <label style={mLabel}>{t('operations.equipmentArea')}</label>
             <input style={{ ...mInputStyle, borderColor: errors.equipment ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.equipment} onChange={set('equipment')} placeholder={t('operations.equipmentPlaceholder')} />
-            {errors.equipment && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.equipment}</div>}
+            {errors.equipment && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.equipment}</div>}
           </div>
           <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
@@ -397,7 +399,7 @@ function ReportIssueModal({ open, onClose }) {
           <div>
             <label style={mLabel}>{t('common.description')} *</label>
             <textarea style={{ ...mInputStyle, minHeight: 80, resize: 'vertical', borderColor: errors.description ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.description} onChange={set('description')} placeholder={t('operations.descriptionPlaceholder')} />
-            {errors.description && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.description}</div>}
+            {errors.description && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.description}</div>}
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
             <button style={mSecondaryBtn} onClick={handleClose}>{t('common.cancel')}</button>
@@ -455,7 +457,7 @@ function AddTaskModal({ open, onClose, staffList = [], onCreated }) {
         <div>
           <label style={mLabel}>{t('tasks.titleLabel')}</label>
           <input style={{ ...mInputStyle, borderColor: errors.title ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.title} onChange={set('title')} placeholder={t('tasks.taskTitlePlaceholder')} />
-          {errors.title && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.title}</div>}
+          {errors.title && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.title}</div>}
         </div>
         <div>
           <label style={mLabel}>{t('tasks.descriptionLabel')}</label>
@@ -465,7 +467,7 @@ function AddTaskModal({ open, onClose, staffList = [], onCreated }) {
           <div>
             <label style={mLabel}>{t('tasks.dueDate')}</label>
             <input type="date" style={{ ...mInputStyle, borderColor: errors.dueDate ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.dueDate} onChange={e => { set('dueDate')(e); setErrors(er => ({ ...er, dueDate: '' })); }} />
-            {errors.dueDate && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.dueDate}</div>}
+            {errors.dueDate && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.dueDate}</div>}
           </div>
           <div>
             <label style={mLabel}>{t('tasks.priority')}</label>
@@ -487,7 +489,7 @@ function AddTaskModal({ open, onClose, staffList = [], onCreated }) {
               labelStyle={mLabel}
               required
             />
-            {errors.assignedTo && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.assignedTo}</div>}
+            {errors.assignedTo && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.assignedTo}</div>}
           </div>
           <div>
             <label style={mLabel}>{t('tasks.category')} *</label>
@@ -499,7 +501,7 @@ function AddTaskModal({ open, onClose, staffList = [], onCreated }) {
               <option value="">{t('tasks.selectCategory')}</option>
               {TASK_CATEGORIES.map(c => <option key={c.value} value={c.value}>{t(c.labelKey)}</option>)}
             </select>
-            {errors.category && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.category}</div>}
+            {errors.category && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.category}</div>}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
@@ -700,10 +702,10 @@ function CheckInModal({ open, onClose, membersList = [], onCheckedIn }) {
       </div>
     </Modal>
     {photoLightbox && (
-      <div onClick={() => setPhotoLightbox(null)} style={{ position:'fixed', inset:0, zIndex:2000, background:'rgba(0,0,0,0.88)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'zoom-out' }}>
+      <DialogBox label={t('members.profilePhoto')} onClose={() => setPhotoLightbox(null)} onClick={() => setPhotoLightbox(null)} style={{ position:'fixed', inset:0, zIndex:2000, background:'rgba(0,0,0,0.88)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'zoom-out' }}>
         <img src={photoLightbox} alt={t('members.profilePhoto')} style={{ maxWidth:'80vw', maxHeight:'80vh', borderRadius:16, objectFit:'contain', boxShadow:'0 32px 80px rgba(0,0,0,0.6)', border:'2px solid rgba(255,255,255,0.1)' }}/>
         <div style={{ position:'absolute', top:24, right:24, color:'rgba(255,255,255,0.5)', fontSize:12, fontFamily:'DM Sans' }}>{t('common.clickToClose')}</div>
-      </div>
+      </DialogBox>
     )}
     <VisitorCodeModal
       open={visitorCodeOpen}
@@ -900,7 +902,7 @@ function AddPaymentModal({ open, onClose, membersList = [], onSaved }) {
                   onChange={e => { setForm(f => ({ ...f, amount: digitsOnly(e.target.value) })); setErrors(v => ({ ...v, amount: '' })); }}
                   placeholder="0"
                 />
-                {errors.amount && <span style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4, display: 'block' }}>{errors.amount}</span>}
+                {errors.amount && <span role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4, display: 'block' }}>{errors.amount}</span>}
               </div>
               <div>
                 <label style={lbl}>{t('payments.method')} *</label>
@@ -1308,10 +1310,10 @@ function GymDashboard() {
               const m = ci.member;
               if (!m) return null;
               return (
-                <div key={ci.id || idx} onClick={() => navigate(`/members/${m.id}`)}
+                <button type="button" key={ci.id || idx} onClick={() => navigate(`/members/${m.id}`)}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: idx < checkinRows.length - 1 ? '1px solid var(--border-subtle)' : 'none', cursor: 'pointer', transition: 'background 0.12s' }}
+                  style={{ border: 'none', background: 'transparent', width: '100%', textAlign: 'left', font: 'inherit', color: 'inherit', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: idx < checkinRows.length - 1 ? '1px solid var(--border-subtle)' : 'none', cursor: 'pointer', transition: 'background 0.12s' }}
                 >
                   {m.photo ? <img src={m.photo} alt={m.firstName} style={{ width:34, height:34, borderRadius:'50%', objectFit:'cover', flexShrink:0 }}/> : <Avatar firstName={m.firstName} lastName={m.lastName} avatarColor={m.avatarColor} size={34} />}
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -1325,7 +1327,7 @@ function GymDashboard() {
                       <VisitKindBadge kind={ci.kind} isVisitor={m.isVisitor} />
                     </div>
                   </div>
-                </div>
+                </button>
               );
             })}
           </SectionCard>
@@ -1369,10 +1371,10 @@ function GymDashboard() {
               const m = p.member;
               const mc = METHOD_COLORS[p.method] || { bg: 'var(--bg-elevated)', color: 'var(--text-muted)' };
               return (
-                <div key={p.id || idx} onClick={() => setSelectedPayment(p)}
+                <button type="button" key={p.id || idx} onClick={() => setSelectedPayment(p)}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: idx < paymentRows.length - 1 ? '1px solid var(--border-subtle)' : 'none', cursor: 'pointer', transition: 'background 0.12s' }}
+                  style={{ border: 'none', background: 'transparent', width: '100%', textAlign: 'left', font: 'inherit', color: 'inherit', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: idx < paymentRows.length - 1 ? '1px solid var(--border-subtle)' : 'none', cursor: 'pointer', transition: 'background 0.12s' }}
                 >
                   {m && (m.photo ? <img src={m.photo} alt={m.firstName} style={{ width:34, height:34, borderRadius:'50%', objectFit:'cover', flexShrink:0 }}/> : <Avatar firstName={m.firstName} lastName={m.lastName} size={34} />)}
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -1385,7 +1387,7 @@ function GymDashboard() {
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, marginLeft: 6 }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-green)', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap' }}>{formatMoney(p.amount)}</span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </SectionCard>}
@@ -1563,7 +1565,7 @@ function GymDashboard() {
           style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
           onClick={() => setShowNoPackageWarn(false)}
         >
-          <div
+          <DialogBox label={t('tasks.noPackagesYet')} onClose={() => setShowNoPackageWarn(false)}
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 18, padding: 32, maxWidth: 380, width: '90%', boxShadow: '0 24px 64px rgba(0,0,0,0.5)', textAlign: 'center' }}
             onClick={e => e.stopPropagation()}
           >
@@ -1582,7 +1584,7 @@ function GymDashboard() {
                 onClick={() => { setShowNoPackageWarn(false); navigate('/packages'); }}
               >{t('tasks.goToPackages')} →</button>
             </div>
-          </div>
+          </DialogBox>
         </div>
       )}
 

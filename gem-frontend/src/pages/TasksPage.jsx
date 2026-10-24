@@ -21,6 +21,7 @@ import { serverFieldError } from '../utils/formErrors';
 import { gymCache } from '../utils/gymCache';
 import { SkeletonCards } from '../components/Skeleton';
 import TaskAssigneeField from '../components/TaskAssigneeField';
+import DialogBox from '../components/ui/DialogBox';
 
 
 const cardStyle = { background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, boxShadow: 'var(--shadow-card)' };
@@ -389,6 +390,7 @@ export default function TasksPage() {
         {/* Category */}
         <div style={{ padding: '0 16px 10px' }}>
           <select
+            aria-label={t('common.filterByCategory')}
             value={categoryFilter}
             onChange={e => setCategoryFilter(e.target.value)}
             style={{
@@ -469,10 +471,10 @@ export default function TasksPage() {
         {/* Reuse desktop modal */}
         {showModal && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end' }}>
-            <div style={{ background: 'var(--bg-secondary)', borderRadius: '20px 20px 0 0', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '20px 20px 40px' }}>
+            <DialogBox label={editingTask ? t('tasks.editTask') : t('tasks.addTask')} onClose={() => setShowModal(false)} style={{ background: 'var(--bg-secondary)', borderRadius: '20px 20px 0 0', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '20px 20px 40px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'Manrope', color: 'var(--text-primary)' }}>{editingTask ? t('tasks.editTask') : t('tasks.addTask')}</span>
-                <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
+                <button aria-label={t('common.close')} onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}><X size={18} /></button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {[
@@ -482,7 +484,7 @@ export default function TasksPage() {
                   <div key={key}>
                     <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{label}</label>
                     <input type={type} value={form[key] || ''} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} style={sheetFieldStyle(error)} />
-                    {error && <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{error}</span>}
+                    {error && <span role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)' }}>{error}</span>}
                   </div>
                 ))}
                 <div>
@@ -501,7 +503,7 @@ export default function TasksPage() {
                     labelStyle={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}
                     required
                   />
-                  {errors.assignedTo && <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{errors.assignedTo}</span>}
+                  {errors.assignedTo && <span role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)' }}>{errors.assignedTo}</span>}
                 </div>
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontFamily: 'DM Sans' }}>{t('tasks.category')} *</label>
@@ -513,14 +515,14 @@ export default function TasksPage() {
                     <option value="">{t('tasks.selectCategory')}</option>
                     {TASK_CATEGORIES.map(c => <option key={c.value} value={c.value}>{t(c.labelKey)}</option>)}
                   </select>
-                  {errors.category && <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{errors.category}</span>}
+                  {errors.category && <span role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)' }}>{errors.category}</span>}
                 </div>
                 {errors._form && <div role="alert" data-field-error style={{ fontSize: 12.5, color: 'var(--accent-red)', fontFamily: 'DM Sans', lineHeight: 1.5 }}>{errors._form}</div>}
                 <button onClick={() => handleSave(false)} disabled={saving} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 10, padding: '13px', fontSize: 14, fontWeight: 700, color: '#0a0a0f', cursor: 'pointer', fontFamily: 'DM Sans', marginTop: 4 }}>
                   {saving ? t('tasks.savingTask') : editingTask ? t('common.saveChanges') : t('tasks.addTask')}
                 </button>
               </div>
-            </div>
+            </DialogBox>
           </div>
         )}
 
@@ -569,6 +571,7 @@ export default function TasksPage() {
         </div>
         {/* A select rather than chips: eight categories would swamp the row */}
         <select
+          aria-label={t('common.filterByCategory')}
           value={categoryFilter}
           onChange={e => setCategoryFilter(e.target.value)}
           style={{
@@ -652,7 +655,7 @@ export default function TasksPage() {
           <div>
             <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('tasks.titleLabel')}</label>
             <input style={{ ...inputStyle, borderColor: errors.title ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder={t('tasks.taskTitlePlaceholder')} />
-            {errors.title && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.title}</div>}
+            {errors.title && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.title}</div>}
           </div>
           <div>
             <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('tasks.descriptionLabel')}</label>
@@ -662,7 +665,7 @@ export default function TasksPage() {
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('tasks.dueDate')}</label>
               <input type="date" style={{ ...inputStyle, borderColor: errors.dueDate ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} />
-              {errors.dueDate && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.dueDate}</div>}
+              {errors.dueDate && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.dueDate}</div>}
             </div>
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('tasks.priority')}</label>
@@ -682,7 +685,7 @@ export default function TasksPage() {
                 labelStyle={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}
                 required
               />
-              {errors.assignedTo && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.assignedTo}</div>}
+              {errors.assignedTo && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.assignedTo}</div>}
             </div>
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('tasks.category')} *</label>
@@ -694,7 +697,7 @@ export default function TasksPage() {
                 <option value="">{t('tasks.selectCategory')}</option>
                 {TASK_CATEGORIES.map(c => <option key={c.value} value={c.value}>{t(c.labelKey)}</option>)}
               </select>
-              {errors.category && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.category}</div>}
+              {errors.category && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.category}</div>}
             </div>
           </div>
           {errors._form && <div role="alert" data-field-error style={{ fontSize: 12.5, color: 'var(--accent-red)', fontFamily: 'DM Sans', lineHeight: 1.5 }}>{errors._form}</div>}

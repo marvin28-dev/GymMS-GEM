@@ -131,6 +131,7 @@ export default function NavDrawer({ open, onClose }) {
           </span>
           <button
             type="button"
+            aria-label={t('common.close')}
             onClick={onClose}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
@@ -193,10 +194,13 @@ export default function NavDrawer({ open, onClose }) {
                   const Icon = item.icon;
                   const active = pathname === item.path || pathname.startsWith(item.path + '/');
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={item.path}
                       onClick={() => go(item.path)}
+                      aria-current={active ? 'page' : undefined}
                       style={{
+                        border: 'none', width: '100%', textAlign: 'left', boxSizing: 'border-box', lineHeight: 'inherit',
                         display: 'flex', alignItems: 'center', gap: 12,
                         padding: '12px 20px', cursor: 'pointer',
                         background: active ? 'var(--accent-gold-dim)' : 'transparent',
@@ -217,7 +221,7 @@ export default function NavDrawer({ open, onClose }) {
                       )}
                       <Icon size={17} strokeWidth={active ? 2.2 : 1.8} />
                       {t(item.labelKey)}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -232,9 +236,11 @@ export default function NavDrawer({ open, onClose }) {
             padding: '12px 0',
           }}
         >
-          <div
+          <button
+            type="button"
             onClick={() => { clearAuth(); navigate('/login'); }}
             style={{
+              border: 'none', width: '100%', textAlign: 'left', boxSizing: 'border-box', lineHeight: 'inherit', background: 'none',
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '12px 20px', cursor: 'pointer',
               color: 'var(--accent-red)', fontSize: 14, fontFamily: 'DM Sans',
@@ -242,7 +248,7 @@ export default function NavDrawer({ open, onClose }) {
           >
             <LogOut size={17} strokeWidth={1.8} />
             {t('common.signOut')}
-          </div>
+          </button>
         </div>
       </div>
     </>

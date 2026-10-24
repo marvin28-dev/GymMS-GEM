@@ -213,9 +213,12 @@ export default function Header({ isMobile: isMobileProp }) {
 
         {/* Bell */}
         <div ref={notifsRef} style={{ position: 'relative' }}>
-          <div
+          <button
+            type="button"
+            aria-label={t('header.notifications')}
+            aria-expanded={showNotifs}
             onClick={() => { setShowNotifs(v => !v); setShowAvatar(false); }}
-            style={{ position: 'relative', cursor: 'pointer', padding: 4, borderRadius: 8 }}
+            style={{ position: 'relative', cursor: 'pointer', padding: 4, borderRadius: 8, border: 'none', background: 'transparent', display: 'flex', lineHeight: 'inherit' }}
             onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
@@ -234,7 +237,7 @@ export default function Header({ isMobile: isMobileProp }) {
                 }}
               />
             )}
-          </div>
+          </button>
 
           {/* Notifications dropdown */}
           {showNotifs && (
@@ -310,7 +313,7 @@ export default function Header({ isMobile: isMobileProp }) {
                     <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>
                       {NOTIF_ICONS[n.type] || '🔔'}
                     </span>
-                    <div onClick={() => handleNotifClick(n)} role="button" style={{ cursor: 'pointer', flex: 1, minWidth: 0 }}>
+                    <button type="button" onClick={() => handleNotifClick(n)} style={{ cursor: 'pointer', flex: 1, minWidth: 0, padding: 0, background: 'none', fontFamily: 'inherit', border: 'none', width: '100%', textAlign: 'left', boxSizing: 'border-box', lineHeight: 'inherit' }}>
                       <div style={{
                         fontSize: 13, color: n.unread ? 'var(--text-primary)' : 'var(--text-secondary)',
                         lineHeight: 1.4, fontFamily: 'DM Sans',
@@ -319,7 +322,7 @@ export default function Header({ isMobile: isMobileProp }) {
                         {n.text}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{n.time}</div>
-                    </div>
+                    </button>
                     {n.unread && (
                       <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-gold)', marginTop: 5, flexShrink: 0 }} />
                     )}
@@ -367,9 +370,13 @@ export default function Header({ isMobile: isMobileProp }) {
 
         {/* Avatar */}
         <div ref={avatarRef} style={{ position: 'relative' }}>
-          <div
+          <button
+            type="button"
+            aria-label={t('header.accountMenu')}
+            aria-expanded={showAvatar}
             onClick={() => { setShowAvatar(v => !v); setShowNotifs(false); }}
             style={{
+              padding: 0,
               width: 34,
               height: 34,
               borderRadius: '50%',
@@ -391,7 +398,7 @@ export default function Header({ isMobile: isMobileProp }) {
             {myPhoto
               ? <img src={myPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               : initials}
-          </div>
+          </button>
 
           {/* Avatar dropdown */}
           {showAvatar && (
@@ -438,28 +445,31 @@ export default function Header({ isMobile: isMobileProp }) {
                 { icon: User, labelKey: 'header.myProfile', action: () => { navigate('/my-profile'); setShowAvatar(false); } },
                 authUser.role === 'general_manager' && { icon: Settings, labelKey: 'nav.settings', action: () => { navigate('/settings'); setShowAvatar(false); } },
               ].filter(Boolean).map(({ icon: Icon, labelKey, action }) => (
-                <div
+                <button
+                  type="button"
                   key={labelKey}
                   onClick={action}
                   style={{
+                    border: 'none', width: '100%', textAlign: 'left', boxSizing: 'border-box', lineHeight: 'inherit', background: 'none', borderBottom: '1px solid var(--border-subtle)',
                     display: 'flex', alignItems: 'center', gap: 10,
                     padding: '11px 16px', cursor: 'pointer',
                     color: 'var(--text-secondary)', fontSize: 13, fontFamily: 'DM Sans',
                     transition: 'background 0.12s, color 0.12s',
-                    borderBottom: '1px solid var(--border-subtle)',
                   }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
                 >
                   <Icon size={14} strokeWidth={1.8} />
                   {t(labelKey)}
-                </div>
+                </button>
               ))}
 
               {/* Sign out */}
-              <div
+              <button
+                type="button"
                 onClick={() => { clearAuth(); navigate('/login'); setShowAvatar(false); }}
                 style={{
+                  border: 'none', width: '100%', textAlign: 'left', boxSizing: 'border-box', lineHeight: 'inherit', background: 'none',
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '11px 16px', cursor: 'pointer',
                   color: 'var(--accent-red)', fontSize: 13, fontFamily: 'DM Sans',
@@ -470,7 +480,7 @@ export default function Header({ isMobile: isMobileProp }) {
               >
                 <LogOut size={14} strokeWidth={1.8} />
                 {t('header.signOut')}
-              </div>
+              </button>
             </div>
           )}
         </div>

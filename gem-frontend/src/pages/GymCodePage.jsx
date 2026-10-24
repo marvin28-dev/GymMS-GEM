@@ -90,7 +90,7 @@ export default function GymCodePage() {
             />
           </div>
 
-          {error && <div style={{ fontSize: 13, color: 'var(--accent-red)', marginBottom: 12 }}>&#9888; {error}</div>}
+          {error && <div role="alert" style={{ fontSize: 13, color: 'var(--accent-red)', marginBottom: 12 }}>&#9888; {error}</div>}
 
           <button onClick={handleSubmit} disabled={loading} style={{ width: '100%', background: loading ? 'var(--bg-elevated)' : 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', color: loading ? 'var(--text-muted)' : '#0a0a0f', borderRadius: 12, padding: '15px', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: loading ? 'none' : '0 4px 16px rgba(201,169,110,0.3)' }}>
             {loading ? t('auth.codeChecking') : <><ArrowRight size={16} strokeWidth={2.5} /> {t('auth.codeContinue')}</>}
@@ -98,7 +98,7 @@ export default function GymCodePage() {
 
           <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
             {t('auth.codeNoAccount')}{' '}
-            <span onClick={() => nav('/signup')} style={{ color: '#c9a96e', fontWeight: 600, cursor: 'pointer' }}>{t('auth.codeStartTrial')}</span>
+            <button type="button" onClick={() => nav('/signup')} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#c9a96e', fontWeight: 600, cursor: 'pointer' }}>{t('auth.codeStartTrial')}</button>
             {t('auth.code7daysFree')}
           </p>
         </div>
@@ -296,12 +296,13 @@ export default function GymCodePage() {
 
           <p style={{ marginTop: 20, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6, textAlign: 'center' }}>
             {t('auth.codeDontHave')}{' '}
-            <span
-              style={{ color: 'var(--accent-gold)', cursor: 'pointer', fontWeight: 600 }}
+            <button
+              type="button"
+              style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'var(--accent-gold)', cursor: 'pointer', fontWeight: 600 }}
               onClick={() => nav('/signup')}
             >
               {t('auth.codeStartTrial')}
-            </span>
+            </button>
             {'. '}{t('auth.codeDays')}
           </p>
 

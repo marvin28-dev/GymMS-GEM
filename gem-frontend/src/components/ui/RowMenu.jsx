@@ -27,22 +27,51 @@ export default function RowMenu({ items = [], title = 'Actions', buttonContent =
       if (!b || b.bottom < 0 || b.top > window.innerHeight || b.right < 0 || b.left > window.innerWidth) setRect(null);
       else setRect(b);
     };
-    const onKey = (e) => { if (e.key === 'Escape') setRect(null); };
+    // Escape closes the menu, and only the menu: a dialog behind it stays open.
+    // Caught on the way down, before the dialog's own Escape hears it.
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      setRect(null);
+      btnRef.current?.focus();
+    };
     document.addEventListener('mousedown', outside);
     document.addEventListener('touchstart', outside);
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey, true);
     window.addEventListener('resize', follow);
     window.addEventListener('scroll', follow, true);
     return () => {
       document.removeEventListener('mousedown', outside);
       document.removeEventListener('touchstart', outside);
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKey, true);
       window.removeEventListener('resize', follow);
       window.removeEventListener('scroll', follow, true);
     };
   }, [rect]);
 
+  // The menu is drawn at the end of the page, out of the Tab order, so its
+  // first item takes focus when it opens (F-096)
+  const isOpen = !!rect;
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const frame = requestAnimationFrame(() => menuRef.current?.querySelector('[role="menuitem"]')?.focus({ preventScroll: true }));
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen]);
+
   if (!visible.length) return null;
+
+  // Arrow keys, Home and End move between the items; Tab closes the menu and
+  // goes back to its button
+  const onMenuKey = (e) => {
+    const items = [...(menuRef.current?.querySelectorAll('[role="menuitem"]') || [])];
+    const at = items.indexOf(document.activeElement);
+    const go = (i) => { e.preventDefault(); items[(i + items.length) % items.length]?.focus(); };
+    if (e.key === 'ArrowDown') go(at + 1);
+    else if (e.key === 'ArrowUp') go(at - 1);
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(items.length - 1);
+    else if (e.key === 'Tab') { e.preventDefault(); setRect(null); btnRef.current?.focus(); }
+  };
 
   const toggle = (e) => {
     e.stopPropagation();
@@ -81,6 +110,8 @@ export default function RowMenu({ items = [], title = 'Actions', buttonContent =
         <div
           ref={menuRef}
           role="menu"
+          aria-label={title}
+          onKeyDown={onMenuKey}
           onClick={e => e.stopPropagation()}
           style={{
             position: 'fixed',
@@ -97,6 +128,7 @@ export default function RowMenu({ items = [], title = 'Actions', buttonContent =
               key={item.label || i}
               type="button"
               role="menuitem"
+              tabIndex={-1}
               onClick={(e) => { e.stopPropagation(); setRect(null); item.onClick?.(e); }}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}

@@ -5,10 +5,12 @@ import "./index.css";
 import App from "./App";
 import { LanguageProvider } from "./contexts/LanguageProvider";
 import { installNumberGuard } from "./utils/numberGuard";
+import { installLabelLinker } from "./utils/labelLinker";
 import translations from "./i18n/translations";
 import { readStored } from "./utils/storage";
 
 installNumberGuard();
+installLabelLinker();
 
 // Apply saved theme before first render to avoid flash. There are two themes;
 // a browser still holding one of the ones we dropped falls back to dark rather

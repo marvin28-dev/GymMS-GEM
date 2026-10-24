@@ -235,7 +235,7 @@ export default function PackagesPage() {
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.packageName')} *</label>
               <input style={{ ...inputStyle, borderColor: errors.name ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={t('common.eg', { x: 'Premium 12M' })} />
-              {errors.name && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.name}</div>}
+              {errors.name && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.name}</div>}
             </div>
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.code')}</label>
@@ -250,12 +250,12 @@ export default function PackagesPage() {
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.price')} *</label>
               <input type="number" min="0" style={{ ...inputStyle, borderColor: errors.price ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0" />
-              {errors.price && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.price}</div>}
+              {errors.price && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.price}</div>}
             </div>
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.dayPassPrice')} *</label>
               <input type="number" min="0" style={{ ...inputStyle, borderColor: errors.dayPassPrice ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.dayPassPrice} onChange={e => setForm(f => ({ ...f, dayPassPrice: e.target.value }))} placeholder="0" />
-              {errors.dayPassPrice && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.dayPassPrice}</div>}
+              {errors.dayPassPrice && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.dayPassPrice}</div>}
             </div>
           </div>
           <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

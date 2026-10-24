@@ -1700,7 +1700,7 @@ export default function StaffProfilePage() {
         {/* Top bar */}
         <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', gap: 10 }}>
           {(String(getAuth()?.user?.id) !== String(id) || fromFrontDesk) && (
-            <button onClick={() => backToList()} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}>
+            <button aria-label={t('common.back')} onClick={() => backToList()} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}>
               <ChevronLeft size={22} color="var(--text-primary)" strokeWidth={2} />
             </button>
           )}
@@ -1814,7 +1814,7 @@ export default function StaffProfilePage() {
                   {revealedCode && showCode ? (
                     <>
                       <span style={{ fontSize: 16, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', letterSpacing: 6, color: 'var(--accent-gold)' }}>{revealedCode}</span>
-                      <button onClick={() => { setShowCode(false); setRevealedCode(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}><EyeOff size={13} color="var(--text-muted)" /></button>
+                      <button aria-label={t('staff.hideCode')} onClick={() => { setShowCode(false); setRevealedCode(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}><EyeOff size={13} color="var(--text-muted)" /></button>
                       {canIssueCodes && (
                         <button onClick={() => { setNewCodeNotice(''); setShowNewCodeAuth(true); }} disabled={codeLoading}
                           title={t('staff.newCodeAction')}
@@ -1933,7 +1933,7 @@ export default function StaffProfilePage() {
                 {scheduleMode === 'week' && (
                   <>
                     <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 10 }}>
-                      <button onClick={() => stepWeek(-1)} disabled={!canStepWeek(-1)}
+                      <button aria-label={t('common.previousWeek')} onClick={() => stepWeek(-1)} disabled={!canStepWeek(-1)}
                         style={{ background: 'none', border: 'none', padding: '10px 12px', cursor: canStepWeek(-1) ? 'pointer' : 'default', color: canStepWeek(-1) ? 'var(--text-secondary)' : 'var(--border)', display: 'flex' }}>
                         <ChevronLeft size={16} />
                       </button>
@@ -1941,7 +1941,7 @@ export default function StaffProfilePage() {
                         {currentWeek?.label}
                         {scheduleOverrides[selectedWeek] && <span style={{ color: 'var(--accent-gold)', marginLeft: 5 }}>•</span>}
                       </span>
-                      <button onClick={() => stepWeek(1)} disabled={!canStepWeek(1)}
+                      <button aria-label={t('common.nextWeek')} onClick={() => stepWeek(1)} disabled={!canStepWeek(1)}
                         style={{ background: 'none', border: 'none', padding: '10px 12px', cursor: canStepWeek(1) ? 'pointer' : 'default', color: canStepWeek(1) ? 'var(--text-secondary)' : 'var(--border)', display: 'flex' }}>
                         <ChevronRight size={16} />
                       </button>
@@ -2838,7 +2838,7 @@ export default function StaffProfilePage() {
 
                   {/* Week stepper */}
                   <div style={{ display: 'inline-flex', alignItems: 'center', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10 }}>
-                    <button onClick={() => stepWeek(-1)} disabled={!canStepWeek(-1)} title={t('staff.prevWeek')}
+                    <button aria-label={t('common.previousWeek')} onClick={() => stepWeek(-1)} disabled={!canStepWeek(-1)} title={t('staff.prevWeek')}
                       style={{ background: 'none', border: 'none', padding: '7px 9px', cursor: canStepWeek(-1) ? 'pointer' : 'default', color: canStepWeek(-1) ? 'var(--text-secondary)' : 'var(--border)', display: 'flex' }}>
                       <ChevronLeft size={15} />
                     </button>
@@ -2846,7 +2846,7 @@ export default function StaffProfilePage() {
                       {currentWeek?.label}
                       {scheduleOverrides[selectedWeek] && <span style={{ color: 'var(--accent-gold)', marginLeft: 5 }}>•</span>}
                     </span>
-                    <button onClick={() => stepWeek(1)} disabled={!canStepWeek(1)} title={t('staff.nextWeek')}
+                    <button aria-label={t('common.nextWeek')} onClick={() => stepWeek(1)} disabled={!canStepWeek(1)} title={t('staff.nextWeek')}
                       style={{ background: 'none', border: 'none', padding: '7px 9px', cursor: canStepWeek(1) ? 'pointer' : 'default', color: canStepWeek(1) ? 'var(--text-secondary)' : 'var(--border)', display: 'flex' }}>
                       <ChevronRight size={15} />
                     </button>

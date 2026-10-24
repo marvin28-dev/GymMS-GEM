@@ -114,7 +114,7 @@ function ModalField({ label, required, error, children, span }) {
         {label}{required && <span style={{ color: 'var(--accent-red)', marginLeft: 2 }}>*</span>}
       </label>
       {children}
-      {error && <span style={errorStyle}>{error}</span>}
+      {error && <span role="alert" data-field-error style={errorStyle}>{error}</span>}
     </div>
   );
 }
@@ -458,7 +458,7 @@ function MemberPaymentModal({ open, onClose, member }) {
               </div>
             )}
 
-            {error && <div style={{ fontSize: 12, color: 'var(--accent-red)', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 8, padding: '8px 12px' }}>⚠ {error}</div>}
+            {error && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 8, padding: '8px 12px' }}>⚠ {error}</div>}
           </>
         )}
 
@@ -824,7 +824,7 @@ export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gy
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>
               {t('members.photoHint')}
             </div>
-            {errors.photo && <div style={errorStyle}>{errors.photo}</div>}
+            {errors.photo && <div role="alert" data-field-error style={errorStyle}>{errors.photo}</div>}
           </div>
         </div>
 
@@ -2102,7 +2102,7 @@ export default function MembersPage() {
             {t('common.showing')} {Math.min((currentPage - 1) * PAGE_SIZE + 1, filtered.length)}-{Math.min(currentPage * PAGE_SIZE, filtered.length)} {t('common.of')} {filtered.length} {t('members.membersCount')}
           </span>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <PageBtn onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+            <PageBtn label={t('common.previousPage')} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
               <ChevronLeft size={14} strokeWidth={2} />
             </PageBtn>
             {pageNumbers(totalPages, currentPage).map((n, i) => (n === '…'
@@ -2112,7 +2112,7 @@ export default function MembersPage() {
                   {n}
                 </PageBtn>
               )))}
-            <PageBtn onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
+            <PageBtn label={t('common.nextPage')} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
               <ChevronRight size={14} strokeWidth={2} />
             </PageBtn>
           </div>
@@ -2194,6 +2194,7 @@ export default function MembersPage() {
 
           {/* Dismiss */}
           <button
+            aria-label={t('common.close')}
             onClick={exitSelectionMode}
             style={{
               width: 30, height: 30, borderRadius: 8,
@@ -2231,9 +2232,11 @@ export default function MembersPage() {
 
 // ─── Page Button ──────────────────────────────────────────────────────────────
 
-function PageBtn({ children, active, onClick, disabled }) {
+function PageBtn({ children, active, onClick, disabled, label }) {
   return (
     <button
+      aria-label={label}
+      aria-current={active ? 'page' : undefined}
       onClick={onClick}
       disabled={disabled}
       style={{

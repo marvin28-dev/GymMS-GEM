@@ -4,6 +4,7 @@ import { verifyManager, verifyManagerPassword } from '../../services/auth.servic
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getAuth } from '../../utils/auth';
 import CodeInput from './CodeInput';
+import { useDialogFocus, isTopDialog } from '../../hooks/useDialogFocus';
 
 /**
  * ManagerAuthModal
@@ -31,6 +32,17 @@ export default function ManagerAuthModal({ open, onClose, onConfirm, onVerified,
   const [shake, setShake] = useState(false);
   const [checking, setChecking] = useState(false);
   const inputRef = useRef(null);
+  const dialogRef = useRef(null);
+  useDialogFocus(open, dialogRef);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+  // Escape backs out, as from any dialog, when this one is on top
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape' && isTopDialog(dialogRef.current)) { setCode(''); setError(''); onCloseRef.current?.(); } };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
 
   useEffect(() => {
     if (open) {
@@ -98,8 +110,14 @@ export default function ManagerAuthModal({ open, onClose, onConfirm, onVerified,
       onClick={handleClose}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="manager-auth-title"
+        tabIndex={-1}
         onClick={e => e.stopPropagation()}
         style={{
+          outline: 'none',
           background: 'var(--bg-card)',
           border: `1px solid ${danger ? 'var(--accent-red)' : 'var(--border)'}`,
           borderRadius: 16,
@@ -123,7 +141,7 @@ export default function ManagerAuthModal({ open, onClose, onConfirm, onVerified,
         </div>
 
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+          <div id="manager-auth-title" style={{ fontFamily: 'Manrope, sans-serif', fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
             {t('managerAuth.title')}
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, fontFamily: 'DM Sans' }}>
@@ -193,6 +211,7 @@ export default function ManagerAuthModal({ open, onClose, onConfirm, onVerified,
             )}
             <button
               type="button"
+              aria-label={showCode ? t(usePassword ? 'common.hidePassword' : 'common.hideCode') : t(usePassword ? 'common.showPassword' : 'common.showCode')}
               onClick={() => setShowCode(v => !v)}
               style={{
                 position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',

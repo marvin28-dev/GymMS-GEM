@@ -91,9 +91,12 @@ function NavItem({ item, isActive, onClick, hasWarning }) {
   const { label, icon: Icon, badge } = item;
 
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
+      aria-current={isActive ? 'page' : undefined}
       style={{
+        border: 'none', width: 'calc(100% - 16px)', textAlign: 'left', boxSizing: 'border-box', lineHeight: 'inherit',
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
@@ -171,7 +174,7 @@ function NavItem({ item, isActive, onClick, hasWarning }) {
           }}
         />
       )}
-    </div>
+    </button>
   );
 }
 
@@ -296,6 +299,7 @@ export default function Sidebar({ open, onClose, isMobile }) {
         {isMobile && (
           <button
             type="button"
+            aria-label={t('common.close')}
             onClick={(e) => { e.stopPropagation(); onClose?.(); }}
             style={{
               display: 'flex',

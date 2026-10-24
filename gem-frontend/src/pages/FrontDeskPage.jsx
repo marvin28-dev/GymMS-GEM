@@ -55,6 +55,7 @@ import { TASK_CATEGORIES } from '../utils/taskCategories';
 import { gymCache } from '../utils/gymCache';
 import { fieldErrorStyle, serverFieldError } from '../utils/formErrors';
 import TimeInput from '../components/ui/TimeInput';
+import DialogBox from '../components/ui/DialogBox';
 
 const formatDate = (d) => fmtDate(d);
 const staffFullName = (s) => s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim();
@@ -158,9 +159,9 @@ function SchedulePanel({ events = [] }) {
       {view === 'day' && (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <button onClick={() => setSel(addDays(sel,-1))} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ChevronLeft size={13}/></button>
+            <button aria-label={t('frontDesk.prevDay')} onClick={() => setSel(addDays(sel,-1))} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ChevronLeft size={13}/></button>
             <span style={{ fontSize: 11, fontWeight: 600, color: sel === todayStr ? 'var(--accent-gold)' : 'var(--text-primary)', fontFamily: 'DM Sans' }}>{fmtDayLabel(sel)}</span>
-            <button onClick={() => setSel(addDays(sel, 1))} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ChevronRight size={13}/></button>
+            <button aria-label={t('frontDesk.nextDay')} onClick={() => setSel(addDays(sel, 1))} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ChevronRight size={13}/></button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 260, overflowY: 'auto' }}>
             {dayEvents.length === 0 ? (
@@ -185,11 +186,11 @@ function SchedulePanel({ events = [] }) {
       {view === 'week' && (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <button onClick={() => setSel(addDays(weekDays[0],-1))} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ChevronLeft size={13}/></button>
+            <button aria-label={t('common.previousWeek')} onClick={() => setSel(addDays(weekDays[0],-1))} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ChevronLeft size={13}/></button>
             <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>
               {new Date(weekDays[0]+'T00:00:00').toLocaleDateString(locale,{month:'short',day:'numeric'})} - {new Date(weekDays[6]+'T00:00:00').toLocaleDateString(locale,{month:'short',day:'numeric'})}
             </span>
-            <button onClick={() => setSel(addDays(weekDays[6], 1))} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ChevronRight size={13}/></button>
+            <button aria-label={t('common.nextWeek')} onClick={() => setSel(addDays(weekDays[6], 1))} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ChevronRight size={13}/></button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
             {['M','T','W','T','F','S','S'].map((l,i) => (
@@ -217,9 +218,9 @@ function SchedulePanel({ events = [] }) {
       {view === 'month' && (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <button onClick={() => setMoCursor(c => { const d = new Date(c.year, c.month-1); return {year:d.getFullYear(),month:d.getMonth()}; })} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ChevronLeft size={13}/></button>
+            <button aria-label={t('common.previousMonth')} onClick={() => setMoCursor(c => { const d = new Date(c.year, c.month-1); return {year:d.getFullYear(),month:d.getMonth()}; })} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ChevronLeft size={13}/></button>
             <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Manrope' }}>{moName}</span>
-            <button onClick={() => setMoCursor(c => { const d = new Date(c.year, c.month+1); return {year:d.getFullYear(),month:d.getMonth()}; })} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ChevronRight size={13}/></button>
+            <button aria-label={t('common.nextMonth')} onClick={() => setMoCursor(c => { const d = new Date(c.year, c.month+1); return {year:d.getFullYear(),month:d.getMonth()}; })} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ChevronRight size={13}/></button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, textAlign: 'center' }}>
             {/* 2 January 2023 was a Monday */}
@@ -1194,7 +1195,7 @@ export default function FrontDeskPage() {
   // its sign-in screen: every way out of the kiosk goes through it (F-106).
   const exitGate = showExitAuth ? (
     <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.7)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
-      <div style={{ width:'100%', maxWidth:400, background:'var(--bg-card)', border:'1px solid var(--border-subtle)', borderRadius:18, boxShadow:'0 24px 80px rgba(0,0,0,0.5)', overflow:'hidden' }}>
+      <DialogBox label={t('frontDesk.enterYourPassword')} onClose={() => setShowExitAuth(false)} style={{ width:'100%', maxWidth:400, background:'var(--bg-card)', border:'1px solid var(--border-subtle)', borderRadius:18, boxShadow:'0 24px 80px rgba(0,0,0,0.5)', overflow:'hidden' }}>
         {/* Header */}
         <div style={{ padding:'20px 28px', borderBottom:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', gap:12 }}>
           <div>
@@ -1205,7 +1206,7 @@ export default function FrontDeskPage() {
               {`${t('frontDesk.authenticatingAs')} ${meUser ? `${meUser.firstName || ''} ${meUser.lastName || ''}`.trim() : ''}`}
             </div>
           </div>
-          <button onClick={() => setShowExitAuth(false)} style={{ marginLeft:'auto', background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', display:'flex', padding:4 }}>
+          <button aria-label={t('common.close')} onClick={() => setShowExitAuth(false)} style={{ marginLeft:'auto', background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', display:'flex', padding:4 }}>
             <X size={16}/>
           </button>
         </div>
@@ -1228,7 +1229,7 @@ export default function FrontDeskPage() {
               placeholder={t('auth.loginPasswordPh')}
               style={{ width:'100%', boxSizing:'border-box', background:'var(--bg-elevated)', border:`1px solid ${exitPinError ? 'var(--accent-red)' : 'var(--border-subtle)'}`, borderRadius:10, padding:'12px 44px 12px 14px', fontSize:15, color:'var(--text-primary)', fontFamily:'DM Sans', outline:'none' }}
             />
-            <button type="button" onClick={() => setShowExitPw(v => !v)} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', display:'flex', padding:2 }}>
+            <button type="button" aria-label={showExitPw ? t('common.hidePassword') : t('common.showPassword')} onClick={() => setShowExitPw(v => !v)} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', display:'flex', padding:2 }}>
               {showExitPw ? <EyeOff size={16}/> : <Eye size={16}/>}
             </button>
           </div>
@@ -1240,7 +1241,7 @@ export default function FrontDeskPage() {
             <LogOut size={15}/> {exitBusy ? t('frontDesk.verifying') : t('frontDesk.exitToApp')}
           </button>
         </div>
-      </div>
+      </DialogBox>
     </div>
   ) : null;
 
@@ -1266,7 +1267,7 @@ export default function FrontDeskPage() {
         <div style={{ width: '100%', maxWidth: loginStep === 'pin' ? 400 : 560, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 18, boxShadow: 'var(--shadow-card)', overflow: 'hidden' }}>
           <div style={{ padding: '20px 28px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 12 }}>
             {loginStep === 'pin' && (
-              <button onClick={() => { setLoginStep('select'); setLoginPin(''); setLoginError(''); }} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ArrowLeft size={16}/></button>
+              <button aria-label={t('common.back')} onClick={() => { setLoginStep('select'); setLoginPin(''); setLoginError(''); }} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ArrowLeft size={16}/></button>
             )}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily:'Manrope', fontSize:15, fontWeight:700, color:'var(--text-primary)' }}>
@@ -1333,7 +1334,7 @@ export default function FrontDeskPage() {
 
         <div style={{ marginTop:20, display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
           <span style={{ fontSize:11, color:'var(--text-muted)', fontFamily:'DM Sans' }}>{t('frontDesk.selectNameAndPin')}</span>
-          <span onClick={() => requestExit('/dashboard')} style={{ fontSize:12, color:'var(--text-muted)', fontFamily:'DM Sans', cursor:'pointer', transition:'color 0.15s' }} onMouseEnter={e=>e.currentTarget.style.color='var(--text-secondary)'} onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}>{t('frontDesk.backToDashboard')}</span>
+          <button type="button" onClick={() => requestExit('/dashboard')} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontSize:12, color:'var(--text-muted)', fontFamily:'DM Sans', cursor:'pointer', transition:'color 0.15s' }} onMouseEnter={e=>e.currentTarget.style.color='var(--text-secondary)'} onMouseLeave={e=>e.currentTarget.style.color='var(--text-muted)'}>{t('frontDesk.backToDashboard')}</button>
         </div>
         {exitGate}
       </div>
@@ -1451,7 +1452,7 @@ export default function FrontDeskPage() {
                 <Search size={16} style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)', pointerEvents:'none' }}/>
                 <input value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setPinInput(''); runSearch(e.target.value); }} onKeyDown={e => e.key==='Enter'&&handleCheckIn()} placeholder={t('frontDesk.searchPlaceholderCheckin')} style={{ width:'100%', height:48, background:'var(--bg-elevated)', border:'1px solid var(--border-subtle)', borderRadius:10, paddingLeft:42, paddingRight:80, fontSize:14, color:'var(--text-primary)', fontFamily:'DM Sans', outline:'none', boxSizing:'border-box', transition:'border-color 0.15s' }} onFocus={e=>e.target.style.borderColor='var(--accent-gold)'} onBlur={e=>e.target.style.borderColor='var(--border-subtle)'}/>
                 <div style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', display:'flex', alignItems:'center', gap:4 }}>
-                  {searchTerm && <button onClick={resetCheckin} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', display:'flex', padding:2 }}><X size={14}/></button>}
+                  {searchTerm && <button aria-label={t('common.clearSearch')} onClick={resetCheckin} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', display:'flex', padding:2 }}><X size={14}/></button>}
                   <button onClick={() => { setQrManualInput(''); setShowQrScanner(true); }} title={t('attendance.scanQrCode')} style={{ background:'var(--bg-card)', border:'1px solid var(--border-subtle)', borderRadius:6, cursor:'pointer', color:'var(--text-muted)', display:'flex', alignItems:'center', padding:'4px 6px', transition:'all 0.1s' }} onMouseEnter={e=>{e.currentTarget.style.color='var(--accent-gold)';e.currentTarget.style.borderColor='var(--accent-gold)';}} onMouseLeave={e=>{e.currentTarget.style.color='var(--text-muted)';e.currentTarget.style.borderColor='var(--border-subtle)';}}><Scan size={14}/></button>
                 </div>
               </div>
@@ -1699,7 +1700,7 @@ export default function FrontDeskPage() {
           <div data-fdtour="checkin-recent" style={{ ...(isMobile ? { borderTop:'1px solid var(--border-subtle)', maxHeight:'60vh' } : { borderLeft:'1px solid var(--border-subtle)' }), display:'flex', flexDirection:'column', overflowY:'auto' }}>
             <div style={{ padding:'16px 18px', borderBottom:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
               <span style={{ fontSize:10, fontWeight:700, letterSpacing:'1.5px', color:'var(--text-muted)', fontFamily:'DM Sans' }}>{t('frontDesk.recentCheckIns')}</span>
-              <select value={timeFilter} onChange={e=>setTimeFilter(e.target.value)} style={{ background:'var(--bg-elevated)', border:'1px solid var(--border-subtle)', borderRadius:6, padding:'3px 8px', fontSize:11, color:'var(--text-secondary)', fontFamily:'DM Sans', cursor:'pointer', outline:'none' }}>
+              <select aria-label={t('common.checkinsSince')} value={timeFilter} onChange={e=>setTimeFilter(e.target.value)} style={{ background:'var(--bg-elevated)', border:'1px solid var(--border-subtle)', borderRadius:6, padding:'3px 8px', fontSize:11, color:'var(--text-secondary)', fontFamily:'DM Sans', cursor:'pointer', outline:'none' }}>
                 {TIME_FILTER_KEYS.map(f=><option key={f.key} value={f.key}>{t(`frontDesk.${f.key}`)}</option>)}
               </select>
             </div>
@@ -1853,13 +1854,13 @@ export default function FrontDeskPage() {
                 <div key={item.id} style={{ padding:'10px 18px', borderBottom:'1px solid var(--border-subtle)' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
                     <span style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', fontFamily:'DM Sans', flex:1 }}>{item.name}</span>
-                    <button onClick={()=>changeQty(item.id,-item.qty)} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><Trash2 size={12}/></button>
+                    <button aria-label={t('common.removeFromCart')} onClick={()=>changeQty(item.id,-item.qty)} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><Trash2 size={12}/></button>
                   </div>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      <button onClick={()=>changeQty(item.id,-1)} style={{ width:22, height:22, borderRadius:6, background:'var(--bg-elevated)', border:'1px solid var(--border-subtle)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}><Minus size={10}/></button>
+                      <button aria-label={t('common.oneFewer')} onClick={()=>changeQty(item.id,-1)} style={{ width:22, height:22, borderRadius:6, background:'var(--bg-elevated)', border:'1px solid var(--border-subtle)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}><Minus size={10}/></button>
                       <span style={{ fontSize:13, fontWeight:700, color:'var(--text-primary)', fontFamily:'DM Sans', minWidth:16, textAlign:'center' }}>{item.qty}</span>
-                      <button onClick={()=>changeQty(item.id, 1)} style={{ width:22, height:22, borderRadius:6, background:'var(--bg-elevated)', border:'1px solid var(--border-subtle)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}><Plus size={10}/></button>
+                      <button aria-label={t('common.oneMore')} onClick={()=>changeQty(item.id, 1)} style={{ width:22, height:22, borderRadius:6, background:'var(--bg-elevated)', border:'1px solid var(--border-subtle)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}><Plus size={10}/></button>
                     </div>
                     <span style={{ fontSize:12, fontWeight:700, color:'var(--accent-gold)', fontFamily:'DM Sans' }}>{formatMoney(item.price * item.qty)}</span>
                   </div>
@@ -2119,7 +2120,7 @@ export default function FrontDeskPage() {
       {showQrScanner && (
         <div style={{ position:'fixed', inset:0, zIndex:1100, background:'rgba(0,0,0,0.92)', display:'flex', alignItems:'center', justifyContent:'center' }} onClick={() => setShowQrScanner(false)}>
           <style>{`@keyframes gemScanLine { 0%{top:8%} 50%{top:88%} 100%{top:8%} }`}</style>
-          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:20 }} onClick={e => e.stopPropagation()}>
+          <DialogBox label={t('frontDesk.pointCamera')} onClose={() => setShowQrScanner(false)} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:20 }} onClick={e => e.stopPropagation()}>
             {/* Viewfinder */}
             <div style={{ position:'relative', width:260, height:260, background:'#0a0a0f', borderRadius:16, overflow:'hidden' }}>
               {/* Corner brackets */}
@@ -2160,7 +2161,7 @@ export default function FrontDeskPage() {
             <button onClick={() => setShowQrScanner(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.4)', fontSize:13, fontFamily:'DM Sans', padding:'4px 12px' }}>
               {t('frontDesk.cancelBtn')}
             </button>
-          </div>
+          </DialogBox>
         </div>
       )}
 
@@ -2235,10 +2236,10 @@ export default function FrontDeskPage() {
 
       {/* ── Photo lightbox ── */}
       {photoLightbox && (
-        <div onClick={() => setPhotoLightbox(null)} style={{ position:'fixed', inset:0, zIndex:2000, background:'rgba(0,0,0,0.88)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'zoom-out' }}>
+        <DialogBox label={t('members.profilePhoto')} onClose={() => setPhotoLightbox(null)} onClick={() => setPhotoLightbox(null)} style={{ position:'fixed', inset:0, zIndex:2000, background:'rgba(0,0,0,0.88)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'zoom-out' }}>
           <img src={photoLightbox} alt={t('members.profilePhoto')} style={{ maxWidth:'80vw', maxHeight:'80vh', borderRadius:16, objectFit:'contain', boxShadow:'0 32px 80px rgba(0,0,0,0.6)', border:'2px solid rgba(255,255,255,0.1)' }}/>
           <div style={{ position:'absolute', top:24, right:24, color:'rgba(255,255,255,0.5)', fontSize:12, fontFamily:'DM Sans' }}>{t('common.clickToClose')}</div>
-        </div>
+        </DialogBox>
       )}
 
       {exitGate}

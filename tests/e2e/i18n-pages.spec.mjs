@@ -106,7 +106,7 @@ test('a logo that could not be saved is not left on screen, and says so in Frenc
 
 test('in French, the Dashboard counts a class\'s places in French', async ({ page }) => {
   const owner = await registerGym();
-  await call('POST', '/calendar', { token: owner.token, body: { title: 'Yoga du soir', date: localDay(), time: '23:00', duration: '23:45', location: 'Salle 2', spots: 12 } });
+  await call('POST', '/calendar', { token: owner.token, body: { title: 'Yoga du soir', date: localDay(), time: '23:58', duration: '23:59', location: 'Salle 2', spots: 12, tz: new Date().getTimezoneOffset() } });
   await inFrench(page);
   await signIn(page, owner);
   await page.goto('/dashboard');

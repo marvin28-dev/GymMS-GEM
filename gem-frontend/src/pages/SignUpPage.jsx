@@ -72,7 +72,7 @@ function Field({ label, icon: Icon, required, error, hint, children }) {
       </label>
       {children}
       {hint && !error && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, fontFamily: 'DM Sans', lineHeight: 1.5 }}>{hint}</div>}
-      {error && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4, fontFamily: 'DM Sans' }}>{error}</div>}
+      {error && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4, fontFamily: 'DM Sans' }}>{error}</div>}
     </div>
   );
 }
@@ -928,7 +928,7 @@ function AccountStep({ form, set, errors, showPw, setShowPw, showConfirm, setSho
               onChange={e => set('password', e.target.value)}
               placeholder={t('signup.passwordPh')}
             />
-            <button type="button" onClick={() => setShowPw(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 2 }}>
+            <button type="button" aria-label={showPw ? t('common.hidePassword') : t('common.showPassword')} onClick={() => setShowPw(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 2 }}>
               {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
           </div>
@@ -944,7 +944,7 @@ function AccountStep({ form, set, errors, showPw, setShowPw, showConfirm, setSho
               onChange={e => set('confirmPassword', e.target.value)}
               placeholder={t('signup.confirmPwPh')}
             />
-            <button type="button" onClick={() => setShowConfirm(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 2 }}>
+            <button type="button" aria-label={showConfirm ? t('common.hidePassword') : t('common.showPassword')} onClick={() => setShowConfirm(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 2 }}>
               {showConfirm ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
           </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 // A required field shows " *" after its label. Some labels already carry the
@@ -9,11 +9,16 @@ const withMark = (label, required) =>
 export default function GemSelect({ label, error, options = [], hint, required, ...rest }) {
   const [focused, setFocused] = useState(false);
   const disabled = !!rest.disabled;
+  // The label names the box; the error or hint describes it (F-092)
+  const autoId = useId();
+  const id = rest.id || autoId;
+  const noteId = `${id}-note`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {label && (
         <label
+          htmlFor={id}
           style={{
             fontSize: 12,
             color: disabled ? 'var(--text-muted)' : 'var(--text-secondary)',
@@ -29,6 +34,9 @@ export default function GemSelect({ label, error, options = [], hint, required, 
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
         <select
           {...rest}
+          id={id}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error || hint ? noteId : undefined}
           onFocus={e => {
             setFocused(true);
             rest.onFocus && rest.onFocus(e);
@@ -78,6 +86,7 @@ export default function GemSelect({ label, error, options = [], hint, required, 
       </div>
       {error && (
         <span
+          id={noteId}
           role="alert"
           data-field-error
           style={{
@@ -92,6 +101,7 @@ export default function GemSelect({ label, error, options = [], hint, required, 
       )}
       {!error && hint && (
         <span
+          id={noteId}
           style={{
             fontSize: 11,
             color: 'var(--text-muted)',

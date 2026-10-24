@@ -87,7 +87,7 @@ test('a refused task status change stays in the task dialog', async ({ page }) =
   const task = await call('POST', '/tasks', { token: owner.token, body: { title: 'Restock towels', assignedToId: staff.id, dueDate: due, priority: 'medium', category: 'Front Desk' } });
   await signIn(page, owner);
   await page.goto(`/staff/${staff.id}`);
-  await page.getByRole('button', { name: /^Tasks/ }).click();
+  await page.getByRole('main').getByRole('button', { name: /^Tasks/ }).click();
   await page.getByRole('cell', { name: /Restock towels/ }).click();
   await refusePatch(page, `/tasks/${task.id}`);
   await page.getByRole('dialog').getByRole('button', { name: 'In Progress', exact: true }).click();

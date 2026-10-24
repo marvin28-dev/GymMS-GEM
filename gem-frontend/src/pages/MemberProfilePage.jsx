@@ -45,6 +45,7 @@ import { uploadPhoto } from '../services/upload.service';
 import { fmtDate, fmtTime, todayStr, dayStr } from '../utils/date';
 import { getGymInfo, gymContactFooterHtml, printReceiptDocument, escapeHtml } from '../utils/receipt';
 import { packageAllowance } from '../utils/packages';
+import DialogBox from '../components/ui/DialogBox';
 
 const formatDate = (d) => fmtDate(d);
 
@@ -132,6 +133,7 @@ function DobRow({ dob }) {
         </span>
         {dob && (
           <button
+            aria-label={visible ? t('common.hideDateOfBirth') : t('common.showDateOfBirth')}
             onClick={() => setVisible(v => !v)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, display: 'flex', alignItems: 'center' }}
           >
@@ -377,7 +379,7 @@ function AddPaymentModal({ open, onClose, onSave, member }) {
           </div>
         )}
 
-        {error && <div style={{ fontSize: 12, color: 'var(--accent-red)', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 8, padding: '8px 12px' }}>⚠ {error}</div>}
+        {error && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 8, padding: '8px 12px' }}>⚠ {error}</div>}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4, borderTop: '1px solid var(--border-subtle)' }}>
           <button type="button" style={secondaryBtn} onClick={onClose}>{t('memberProfile.cancel')}</button>
@@ -751,7 +753,7 @@ function CheckInCodeModal({ open, onClose, member, onSuccess }) {
                   width: '100%', boxSizing: 'border-box', transition: 'border-color 0.15s',
                 }}
               />
-              {error && <span style={{ fontSize: 11, color: '#ef4444', fontFamily: 'DM Sans' }}>{error}</span>}
+              {error && <span role="alert" data-field-error style={{ fontSize: 11, color: '#ef4444', fontFamily: 'DM Sans' }}>{error}</span>}
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
               <button style={secondaryBtn} onClick={onClose}>{t('memberProfile.cancel')}</button>
@@ -843,7 +845,7 @@ function RenewRegFeeModal({ open, onClose, member, gymData, onSave }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={onClose}>
-      <div style={{ ...cardStyle, width: '100%', maxWidth: 420, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}
+      <DialogBox label={t('memberProfile.renewRegistrationTitle')} onClose={onClose} style={{ ...cardStyle, width: '100%', maxWidth: 420, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}
         onClick={e => e.stopPropagation()}>
 
         {/* Header */}
@@ -902,7 +904,7 @@ function RenewRegFeeModal({ open, onClose, member, gymData, onSave }) {
             <CreditCard size={13} /> {saving ? t('memberProfile.processing') : `Pay ${fmtMoney(feeAmount)} & Renew`}
           </button>
         </div>
-      </div>
+      </DialogBox>
     </div>
   );
 }
@@ -1618,7 +1620,7 @@ function ActionConfirm({ member, action, params, valid = true, confirmLabel, con
           <Lock size={12} /> {t('memberProfile.deskCodeHint')}
         </div>
       )}
-      {error && <div style={{ fontSize: 12.5, color: 'var(--accent-red)' }}>{error}</div>}
+      {error && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)' }}>{error}</div>}
       <ManagerAuthModal
         open={codeOpen}
         onClose={() => setCodeOpen(false)}
@@ -3455,7 +3457,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
 
       {/* Profile Photo Modal */}
       {showPhotoModal && (
-        <div
+        <DialogBox label={t('members.profilePhoto')} onClose={() => setShowPhotoModal(false)}
           onClick={() => setShowPhotoModal(false)}
           style={{
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)',
@@ -3491,7 +3493,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
             onClick={() => setShowPhotoModal(false)}
             style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: 40, height: 40, cursor: 'pointer', color: '#fff', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
           >×</button>
-        </div>
+        </DialogBox>
       )}
     </div>
   );

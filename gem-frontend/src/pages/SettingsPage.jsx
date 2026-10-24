@@ -79,11 +79,14 @@ function ThemeCard({ theme, selected, onSelect }) {
   const { t } = useLanguage();
   const [hovered, setHovered] = useState(false);
   return (
-    <div
+    <button
+      type="button"
+      aria-pressed={selected}
       onClick={onSelect}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
+        padding: 0, background: 'none', width: '100%', textAlign: 'left', font: 'inherit', color: 'inherit',
         cursor: 'pointer',
         borderRadius: 14,
         border: selected ? `2px solid ${theme.accent}` : '2px solid var(--border-subtle)',
@@ -132,15 +135,15 @@ function ThemeCard({ theme, selected, onSelect }) {
           </div>
         )}
       </div>
-    </div>
+    </button>
   );
 }
 
-function Toggle({ value, onChange }) {
+function Toggle({ value, onChange, label }) {
   return (
-    <div onClick={() => onChange(!value)} style={{ width: 40, height: 22, borderRadius: 11, background: value ? 'var(--accent-gold)' : 'var(--bg-elevated)', border: '1px solid var(--border)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
-      <div style={{ position: 'absolute', top: 2, left: value ? 19 : 2, width: 16, height: 16, borderRadius: '50%', background: value ? '#0a0a0f' : 'var(--text-muted)', transition: 'left 0.2s' }} />
-    </div>
+    <button type="button" role="switch" aria-checked={!!value} aria-label={label} onClick={() => onChange(!value)} style={{ padding: 0, width: 40, height: 22, borderRadius: 11, background: value ? 'var(--accent-gold)' : 'var(--bg-elevated)', border: '1px solid var(--border)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+      <span style={{ position: 'absolute', top: 2, left: value ? 19 : 2, width: 16, height: 16, borderRadius: '50%', background: value ? '#0a0a0f' : 'var(--text-muted)', transition: 'left 0.2s' }} />
+    </button>
   );
 }
 
@@ -1256,7 +1259,7 @@ export default function SettingsPage() {
                     <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{t('settings.autoRenew')}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.autoRenewDesc')}</div>
                   </div>
-                  <Toggle value={autoRenew} onChange={v => setAutoRenew(v)} />
+                  <Toggle label={t('settings.autoRenew')} value={autoRenew} onChange={v => setAutoRenew(v)} />
                 </div>
 
                 {/* ── Registration Fee ── */}
@@ -1266,7 +1269,7 @@ export default function SettingsPage() {
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.registrationFeeTitle')}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.registrationFeeDesc')}</div>
                     </div>
-                    <Toggle value={regFeeSettings.required} onChange={v => setRegFee('required', v)} />
+                    <Toggle label={t('settings.registrationFeeTitle')} value={regFeeSettings.required} onChange={v => setRegFee('required', v)} />
                   </div>
                   {regFeeSettings.required && (
                     <div className="gem-two-col" style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -1356,7 +1359,7 @@ export default function SettingsPage() {
                       <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{p.label}</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{p.desc}</div>
                     </div>
-                    <Toggle value={notifPrefs[p.key]} onChange={v => setNotifPrefs(n => ({ ...n, [p.key]: v }))} />
+                    <Toggle label={p.label} value={notifPrefs[p.key]} onChange={v => setNotifPrefs(n => ({ ...n, [p.key]: v }))} />
                   </div>
                 ))}
                 <div style={{ paddingTop: 16, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>

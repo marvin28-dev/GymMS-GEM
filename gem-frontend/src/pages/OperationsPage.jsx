@@ -143,7 +143,7 @@ function ReportIssueModal({ open, onClose }) {
           <div>
             <label style={lbl}>{t('operations.equipmentArea')}</label>
             <input style={{ ...inp, borderColor: errors.equipment ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.equipment} onChange={set('equipment')} placeholder={t('operations.equipmentPlaceholder')} />
-            {errors.equipment && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.equipment}</div>}
+            {errors.equipment && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.equipment}</div>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
@@ -160,7 +160,7 @@ function ReportIssueModal({ open, onClose }) {
           <div>
             <label style={lbl}>{t('tasks.descriptionLabel')} *</label>
             <textarea style={{ ...inp, minHeight: 80, resize: 'vertical', borderColor: errors.description ? 'var(--accent-red)' : 'var(--border-subtle)' }} value={form.description} onChange={set('description')} placeholder={t('operations.descriptionPlaceholder')} />
-            {errors.description && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.description}</div>}
+            {errors.description && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4 }}>{errors.description}</div>}
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
             <button style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 8, fontSize: 13, fontWeight: 600, padding: '9px 18px', cursor: 'pointer', fontFamily: 'DM Sans' }} onClick={handleClose}>{t('common.cancel')}</button>
@@ -220,7 +220,7 @@ function AddTaskModal({ open, onClose, onSave, staffList = [] }) {
             labelStyle={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6, display: 'block', fontFamily: 'DM Sans', fontWeight: 500 }}
             required
           />
-          {errors.assignedTo && <span style={{ fontSize: 11, color: 'var(--accent-red)' }}>{errors.assignedTo}</span>}
+          {errors.assignedTo && <span role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)' }}>{errors.assignedTo}</span>}
         </div>
         <GemInput label={t('tasks.dueDate')} required error={errors.dueDate} type="date" value={form.dueDate} onChange={e => set('dueDate', e.target.value)} />
         <GemSelect

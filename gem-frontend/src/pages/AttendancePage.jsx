@@ -22,6 +22,7 @@ import CheckinStats from '../components/CheckinStats';
 import { SkeletonCards, SkeletonTableRows } from '../components/Skeleton';
 import { softAll, failed } from '../utils/loadAll';
 import { gymCache } from '../utils/gymCache';
+import DialogBox from '../components/ui/DialogBox';
 
 const formatDate = (d) => fmtDate(d);
 
@@ -169,7 +170,7 @@ function CheckOutModal({ open, onClose, entry, person, onConfirm, error, busy, f
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <div style={{ ...cardStyle, padding: 24, width: 380, display: 'flex', flexDirection: 'column', gap: 16 }} onClick={e => e.stopPropagation()}>
+      <DialogBox label={`${t('attendance.checkOutAction')} : ${person.name}`} onClose={onClose} style={{ ...cardStyle, padding: 24, width: 380, display: 'flex', flexDirection: 'column', gap: 16 }} onClick={e => e.stopPropagation()}>
         <div style={{ fontFamily: 'Manrope', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
           {t('attendance.checkOutAction')} : {person.name}
         </div>
@@ -217,7 +218,7 @@ function CheckOutModal({ open, onClose, entry, person, onConfirm, error, busy, f
             </>
           )}
         </div>
-      </div>
+      </DialogBox>
     </div>
   );
 }
@@ -245,7 +246,7 @@ function CheckInModal({ open, onClose, person, onConfirm }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <div style={{ ...cardStyle, padding: 24, width: 380, display: 'flex', flexDirection: 'column', gap: 16 }} onClick={e => e.stopPropagation()}>
+      <DialogBox label={`${t('attendance.checkInBtn')} : ${person.name}`} onClose={onClose} style={{ ...cardStyle, padding: 24, width: 380, display: 'flex', flexDirection: 'column', gap: 16 }} onClick={e => e.stopPropagation()}>
         <div style={{ fontFamily: 'Manrope', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
           {t('attendance.checkInBtn')} : {person.name}
         </div>
@@ -274,7 +275,7 @@ function CheckInModal({ open, onClose, person, onConfirm }) {
             <UserCheck size={13} /> {t('attendance.checkInBtn')}
           </button>
         </div>
-      </div>
+      </DialogBox>
     </div>
   );
 }
@@ -310,7 +311,7 @@ function EditTimeModal({ open, onClose, entry, field, onConfirm, error }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <div style={{ ...cardStyle, padding: 24, width: 380, display: 'flex', flexDirection: 'column', gap: 16 }} onClick={e => e.stopPropagation()}>
+      <DialogBox label={label} onClose={onClose} style={{ ...cardStyle, padding: 24, width: 380, display: 'flex', flexDirection: 'column', gap: 16 }} onClick={e => e.stopPropagation()}>
         <div style={{ fontFamily: 'Manrope', fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
           {label}
         </div>
@@ -343,7 +344,7 @@ function EditTimeModal({ open, onClose, entry, field, onConfirm, error }) {
             {t('common.save')}
           </button>
         </div>
-      </div>
+      </DialogBox>
     </div>
   );
 }
@@ -816,7 +817,7 @@ export default function AttendancePage() {
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button onClick={goPrevDay} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 7, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}>
+            <button aria-label={t('frontDesk.prevDay')} onClick={goPrevDay} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 7, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}>
               <ChevronLeft size={15} strokeWidth={2.5} />
             </button>
             {!isViewingToday && (
@@ -824,7 +825,7 @@ export default function AttendancePage() {
                 {t('common.today')}
               </button>
             )}
-            <button onClick={goNextDay} disabled={isViewingToday} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 7, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isViewingToday ? 'default' : 'pointer', color: isViewingToday ? 'var(--border-subtle)' : 'var(--text-muted)' }}>
+            <button aria-label={t('frontDesk.nextDay')} onClick={goNextDay} disabled={isViewingToday} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 7, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isViewingToday ? 'default' : 'pointer', color: isViewingToday ? 'var(--border-subtle)' : 'var(--text-muted)' }}>
               <ChevronRight size={15} strokeWidth={2.5} />
             </button>
           </div>
@@ -852,7 +853,7 @@ export default function AttendancePage() {
                 }}
               />
               {searchTerm && (
-                <button onClick={clearSearch} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex' }}>
+                <button aria-label={t('common.clearSearch')} onClick={clearSearch} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex' }}>
                   <X size={15} />
                 </button>
               )}
@@ -978,6 +979,7 @@ export default function AttendancePage() {
         {/* Date navigator */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '5px 6px', boxShadow: 'var(--shadow-card)' }}>
           <button
+            aria-label={t('frontDesk.prevDay')}
             onClick={goPrevDay}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s, color 0.15s' }}
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-elevated)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
@@ -997,13 +999,14 @@ export default function AttendancePage() {
               </span>
               <Calendar size={12} color={isViewingToday ? 'var(--accent-gold)' : 'var(--text-muted)'} strokeWidth={2} />
             </button>
-            <input ref={attDateRef} type="date" value={viewDate} max={todayISO}
+            <input ref={attDateRef} aria-label={t('frontDesk.pickDay')} type="date" value={viewDate} max={todayISO}
               onChange={e => e.target.value && setViewDate(e.target.value)}
               style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none', top: 0, left: '50%' }}
             />
           </div>
 
           <button
+            aria-label={t('frontDesk.nextDay')}
             onClick={goNextDay}
             disabled={isViewingToday}
             style={{ background: 'none', border: 'none', cursor: isViewingToday ? 'default' : 'pointer', color: isViewingToday ? 'var(--border-subtle)' : 'var(--text-muted)', width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s, color 0.15s' }}
@@ -1048,7 +1051,7 @@ export default function AttendancePage() {
             onBlur={e => e.target.style.borderColor = 'var(--border-subtle)'}
           />
           {searchTerm ? (
-            <button onClick={clearSearch} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
+            <button aria-label={t('common.clearSearch')} onClick={clearSearch} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
               <X size={16} />
             </button>
           ) : (
@@ -1183,7 +1186,7 @@ export default function AttendancePage() {
                 onBlur={e => { e.target.style.borderColor = 'var(--border-subtle)'; e.target.style.width = '190px'; }}
               />
               {tableSearch
-                ? <button onClick={() => setTableSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 0 }}><X size={12} /></button>
+                ? <button aria-label={t('common.clearSearch')} onClick={() => setTableSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 0 }}><X size={12} /></button>
                 : null
               }
             </div>
@@ -1304,7 +1307,7 @@ export default function AttendancePage() {
       {showQrScanner && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowQrScanner(false)}>
           <style>{`@keyframes gemScanLine { 0%{top:8%} 50%{top:88%} 100%{top:8%} }`}</style>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }} onClick={e => e.stopPropagation()}>
+          <DialogBox label={t('attendance.qrHoldBarcode')} onClose={() => setShowQrScanner(false)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }} onClick={e => e.stopPropagation()}>
             {/* Viewfinder */}
             <div style={{ position: 'relative', width: 260, height: 260, background: '#0a0a0f', borderRadius: 16, overflow: 'hidden' }}>
               {/* Corners */}
@@ -1353,15 +1356,15 @@ export default function AttendancePage() {
             <button onClick={() => setShowQrScanner(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: 13, fontFamily: 'DM Sans', padding: '4px 12px' }}>
               {t('common.cancel')}
             </button>
-          </div>
+          </DialogBox>
         </div>
       )}
 
       {photoLightbox && (
-        <div onClick={() => setPhotoLightbox(null)} style={{ position:'fixed', inset:0, zIndex:2000, background:'rgba(0,0,0,0.88)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'zoom-out' }}>
+        <DialogBox label={t('members.profilePhoto')} onClose={() => setPhotoLightbox(null)} onClick={() => setPhotoLightbox(null)} style={{ position:'fixed', inset:0, zIndex:2000, background:'rgba(0,0,0,0.88)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'zoom-out' }}>
           <img src={photoLightbox} alt={t('members.profilePhoto')} style={{ maxWidth:'80vw', maxHeight:'80vh', borderRadius:16, objectFit:'contain', boxShadow:'0 32px 80px rgba(0,0,0,0.6)', border:'2px solid rgba(255,255,255,0.1)' }}/>
           <div style={{ position:'absolute', top:24, right:24, color:'rgba(255,255,255,0.5)', fontSize:12, fontFamily:'DM Sans' }}>{t('common.clickToClose')}</div>
-        </div>
+        </DialogBox>
       )}
     </div>
   );

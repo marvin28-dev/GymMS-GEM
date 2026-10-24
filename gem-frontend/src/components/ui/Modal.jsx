@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useDialogFocus, isTopDialog } from '../../hooks/useDialogFocus';
 
 export default function Modal({ open, onClose, title, children, maxWidth = 560, hideClose = false }) {
   const { t } = useLanguage();
@@ -8,13 +9,16 @@ export default function Modal({ open, onClose, title, children, maxWidth = 560, 
   useEffect(() => { onCloseRef.current = onClose; });
   const hideCloseRef = useRef(hideClose);
   useEffect(() => { hideCloseRef.current = hideClose; });
+  const dialogRef = useRef(null);
+  useDialogFocus(open, dialogRef);
 
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e) => {
       // When close is hidden (money has been collected and must be refunded to
       // back out), Escape must not be a silent escape hatch either.
-      if (e.key === 'Escape' && !hideCloseRef.current) onCloseRef.current();
+      // Only the dialog on top closes: one opened over another used to close both
+      if (e.key === 'Escape' && !hideCloseRef.current && isTopDialog(dialogRef.current)) onCloseRef.current();
     };
     document.addEventListener('keydown', handleKeyDown);
     document.body.style.overflow = 'hidden';
@@ -44,6 +48,8 @@ export default function Modal({ open, onClose, title, children, maxWidth = 560, 
       onMouseDown={(e) => { if (e.target === e.currentTarget && !hideCloseRef.current) onCloseRef.current(); }}
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         className="modal-content-enter"
         role="dialog"
         aria-modal="true"
@@ -59,6 +65,7 @@ export default function Modal({ open, onClose, title, children, maxWidth = 560, 
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
+          outline: 'none',
         }}
       >
         {/* Header */}

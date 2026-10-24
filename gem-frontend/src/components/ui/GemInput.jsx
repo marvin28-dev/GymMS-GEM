@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import TimeInput from './TimeInput';
 
 // A required field shows " *" after its label. Some labels already carry the
@@ -8,11 +8,17 @@ const withMark = (label, required) =>
 
 export default function GemInput({ label, error, required, ...rest }) {
   const [focused, setFocused] = useState(false);
+  // The label names the box and the error is tied to it, for screen readers
+  // and for a click on the label (F-092)
+  const autoId = useId();
+  const id = rest.id || autoId;
+  const errorId = `${id}-error`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {label && (
         <label
+          htmlFor={id}
           style={{
             fontSize: 12,
             color: 'var(--text-secondary)',
@@ -26,12 +32,15 @@ export default function GemInput({ label, error, required, ...rest }) {
         </label>
       )}
       {rest.type === 'time' ? (
-        <TimeInput value={rest.value} onChange={rest.onChange} disabled={rest.disabled} id={rest.id} name={rest.name}
+        <TimeInput value={rest.value} onChange={rest.onChange} disabled={rest.disabled} id={id} name={rest.name}
           aria-label={typeof label === 'string' ? label.replace(/\s*\*\s*$/, '') : undefined}
           style={{ ...(error ? { borderColor: 'var(--accent-red)' } : {}), ...rest.style }} />
       ) : (
       <input
         {...rest}
+        id={id}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : rest['aria-describedby']}
         onFocus={e => {
           setFocused(true);
           rest.onFocus && rest.onFocus(e);
@@ -58,6 +67,7 @@ export default function GemInput({ label, error, required, ...rest }) {
       )}
       {error && (
         <span
+          id={errorId}
           role="alert"
           data-field-error
           style={{

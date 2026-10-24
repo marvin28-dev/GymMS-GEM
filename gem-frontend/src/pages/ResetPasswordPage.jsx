@@ -26,12 +26,13 @@ function Field({ label, icon: Icon, children, error }) {
         {label}
       </label>
       {children}
-      {error && <div style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4, fontFamily: 'DM Sans' }}>{error}</div>}
+      {error && <div role="alert" data-field-error style={{ fontSize: 11, color: 'var(--accent-red)', marginTop: 4, fontFamily: 'DM Sans' }}>{error}</div>}
     </div>
   );
 }
 
 function PasswordInput({ value, onChange, placeholder, error, id }) {
+  const { t } = useLanguage();
   const [show, setShow] = useState(false);
   return (
     <div style={{ position: 'relative' }}>
@@ -46,6 +47,7 @@ function PasswordInput({ value, onChange, placeholder, error, id }) {
       />
       <button
         type="button"
+        aria-label={show ? t('common.hidePassword') : t('common.showPassword')}
         onClick={() => setShow(s => !s)}
         style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 0 }}
       >

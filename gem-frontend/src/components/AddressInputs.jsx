@@ -35,10 +35,12 @@ export default function AddressInputs({ value = {}, onChange, errors = {}, gymCo
 // The gym's country, read-only: everyone at a gym lives where the gym is
 export function CountryField({ country, labelStyle }) {
   const { t } = useLanguage();
+  // Read-only, but still a field with a name to assistive technology
+  const labelId = useId();
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <label style={labelStyle || { fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6, display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 500 }}>{t('common.country')}</label>
-      <div data-country-field aria-readonly="true" title={t('common.countryFromGym')}
+      <label id={labelId} style={labelStyle || { fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6, display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 500 }}>{t('common.country')}</label>
+      <div data-country-field role="textbox" aria-readonly="true" aria-labelledby={labelId} title={t('common.countryFromGym')}
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '9px 14px', fontSize: 13, color: country ? 'var(--text-secondary)' : 'var(--text-muted)', fontFamily: 'DM Sans', cursor: 'not-allowed', minHeight: 38, boxSizing: 'border-box' }}>
         <span>{country || t('common.countryNotSet')}</span>
         <Lock size={12} color="var(--text-muted)" />
