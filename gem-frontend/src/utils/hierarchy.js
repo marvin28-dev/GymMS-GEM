@@ -11,6 +11,8 @@ export const RANK = {
   manager: 2,
   front_desk: 1,
   trainer: 1,
+  other: 1,
+  // Older accounts, kept so their records still read
   instructor: 1,
   coach: 1,
 };

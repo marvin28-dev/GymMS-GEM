@@ -24,6 +24,7 @@ const { smsInfo, fillIn, hasFillIns } = await import('../../gem-frontend/src/uti
 const { formatMoney } = await import('../../gem-frontend/src/utils/currency.js');
 const { ordinalDay, addDaysStr, todayStr, dayStr } = await import('../../gem-frontend/src/utils/date.js');
 const { trackOf, followUpsOf } = await import('../../gem-frontend/src/utils/coaching.js');
+const ladder = await import('../../gem-frontend/src/utils/hierarchy.js');
 
 const backend = createRequire(new URL('../../gem-backend/src/app.js', import.meta.url));
 const server = {
@@ -31,6 +32,7 @@ const server = {
   phone: backend('./utils/phone.js'),
   sms: backend('./utils/sms.js'),
   method: backend('./utils/paymentMethod.js'),
+  ladder: backend('./utils/hierarchy.js'),
 };
 
 const today = todayStr();
@@ -231,5 +233,27 @@ describe('a coach\'s reading of a client', () => {
     expect(todo.map(x => x.type)).toEqual(['checkin', 'ending', 'away', 'birthday']);
     expect(followUpsOf(client({ goalSetAt: null }), today)[0].type).toBe('goals');
     expect(followUpsOf(client({ status: 'cancelled' }), today)).toEqual([]);
+  });
+});
+
+// F-091: the screens offer only what the server allows, so both copies of
+// the ladder must give the same answer for every pair of roles
+describe('who may act on whom', () => {
+  const roles = Object.keys(server.ladder.RANK);
+
+  it('ranks every role the same in the browser and on the server', () => {
+    expect(ladder.RANK).toEqual(server.ladder.RANK);
+  });
+
+  it('agrees on private fields and on managing, for someone else and for oneself', () => {
+    for (const a of roles) {
+      for (const b of roles) {
+        const actor = { id: 'a', role: a };
+        for (const target of [{ id: 'b', role: b }, { id: 'a', role: a }]) {
+          expect(ladder.canSeePrivateFields(actor, target), `${a} -> ${target.role}`).toBe(server.ladder.canSeePrivateFields(actor, target));
+          expect(ladder.canManage(actor, target), `${a} -> ${target.role}`).toBe(server.ladder.canManage(actor, target));
+        }
+      }
+    }
   });
 });
