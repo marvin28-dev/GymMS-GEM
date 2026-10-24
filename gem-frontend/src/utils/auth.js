@@ -1,7 +1,7 @@
 import { countryByName } from './countries';
 import { pagesFor } from './rolePages';
 import { todayStr } from './date';
-import { readStoredJson, store, storeJson, storedKeys, unstore } from './storage';
+import { readStored, readStoredJson, store, storeJson, storedKeys, unstore } from './storage';
 
 const KEY          = 'gem_auth';
 const ACTIVITY_KEY = 'gem_last_activity';
@@ -22,9 +22,11 @@ export function getAuth() {
   }
 }
 
+// Says whether the session could be kept: a browser that blocks site storage
+// cannot hold one, and the sign-in pages say so (F-082)
 export function setAuth(payload) {
   // Stamp the login date so we can enforce daily re-login
-  localStorage.setItem(KEY, JSON.stringify({ ...payload, loginDate: today() }));
+  if (!storeJson(KEY, { ...payload, loginDate: today() })) return false;
   // Signing in is activity. Typing on the sign-in page is not counted (nobody is
   // signed in yet), so a page left open over 15 minutes before a first password
   // was chosen used to land the new account straight on "Are you still there?".
@@ -32,6 +34,7 @@ export function setAuth(payload) {
   // Signing in says where the gym is, which is what the forms suggest from
   const country = payload?.user?.gymCountry;
   if (country) store(COUNTRY_KEY, country);
+  return true;
 }
 
 export function clearAuth() {
@@ -50,19 +53,19 @@ export function clearAuth() {
   unstore('gem_fd_gym');
   // An old, unscoped copy of desk expenses that nothing writes any more
   unstore('gem_expenses');
-  localStorage.removeItem(KEY);
-  localStorage.removeItem('gem_gym_logo');
+  unstore(KEY);
+  unstore('gem_gym_logo');
   // Superseded by columns on the gym record - cleared so stale values from a
   // previous account can't surface in the gym profile
-  localStorage.removeItem('gem_gym_extra');
-  localStorage.removeItem('gem_demo_mode');
-  localStorage.removeItem(ACTIVITY_KEY);
+  unstore('gem_gym_extra');
+  unstore('gem_demo_mode');
+  unstore(ACTIVITY_KEY);
   // Anything about the gym itself belongs to the account that just left. Left
   // behind, it shows the next person to sign in here the last gym's country,
   // currency and settings.
   ['gem_gym_country', 'gem_currency_choice', 'gem_currency_symbol',
    'gem_payment_settings', 'gem_notif_prefs', 'gem_expense_limit',
-   'gem_settings_visited'].forEach(k => localStorage.removeItem(k));
+   'gem_settings_visited'].forEach(unstore);
 }
 
 // Returns true (and clears auth) when the stored loginDate is not today.
@@ -80,37 +83,37 @@ export function checkDailyExpiry() {
 // ── Setup / onboarding flag ───────────────────────────────────────────────────
 
 export function setSetupPending() {
-  localStorage.setItem('gem_setup_pending', '1');
-  localStorage.removeItem('gem_setup_confirmed');
+  store('gem_setup_pending', '1');
+  unstore('gem_setup_confirmed');
 }
 export function clearSetupPending() {
-  localStorage.removeItem('gem_setup_pending');
+  unstore('gem_setup_pending');
 }
 export function isSetupPending() {
-  return localStorage.getItem('gem_setup_pending') === '1';
+  return readStored('gem_setup_pending') === '1';
 }
 
 // ── Inactivity helpers ────────────────────────────────────────────────────────
 
 export function touchActivity() {
-  localStorage.setItem(ACTIVITY_KEY, String(Date.now()));
+  store(ACTIVITY_KEY, String(Date.now()));
 }
 
 // Returns true when the last recorded activity exceeds INACTIVITY_MS.
 // Returns false when no activity timestamp exists yet (fresh login).
 export function isInactive() {
-  const last = parseInt(localStorage.getItem(ACTIVITY_KEY) || '0', 10);
+  const last = parseInt(readStored(ACTIVITY_KEY, '0'), 10);
   if (!last) return false;
   return Date.now() - last > INACTIVITY_MS;
 }
 
 export function isDemoMode() {
-  return localStorage.getItem('gem_demo_mode') === '1';
+  return readStored('gem_demo_mode') === '1';
 }
 
 export function setDemoMode(val) {
-  if (val) localStorage.setItem('gem_demo_mode', '1');
-  else localStorage.removeItem('gem_demo_mode');
+  if (val) store('gem_demo_mode', '1');
+  else unstore('gem_demo_mode');
 }
 
 // A token is only good for 8 hours. Sign in at nine in the morning, come back
@@ -165,7 +168,7 @@ const COUNTRY_KEY = 'gem_gym_country';
 // session wins: the stored copy is only a leftover for sessions that predate it,
 // and reading it first would show one account the previous account's country.
 export function getGymCountry() {
-  try { return getAuth()?.user?.gymCountry || localStorage.getItem(COUNTRY_KEY) || ''; } catch { return ''; }
+  return getAuth()?.user?.gymCountry || readStored(COUNTRY_KEY, '');
 }
 
 // The gym's currency code (GHS, NGN, XAF...), straight off the gym record.

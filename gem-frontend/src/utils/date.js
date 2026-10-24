@@ -1,5 +1,7 @@
+import { readStored } from './storage';
+
 export const getDateLocale = () =>
-  (localStorage.getItem('gem-lang') || 'en') === 'fr' ? 'fr-FR' : 'en-GB';
+  readStored('gem-lang', 'en') === 'fr' ? 'fr-FR' : 'en-GB';
 
 export const capFirst = (str) =>
   str ? str.charAt(0).toUpperCase() + str.slice(1) : str;

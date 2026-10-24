@@ -7,6 +7,7 @@ import { useDialogFocus } from './hooks/useDialogFocus';
 import AppRoutes from './routes/AppRoutes';
 import { isAuthed, isDemoMode, clearAuth, touchActivity, isInactive, getHomeRoute, getAuth, updateSessionGym } from './utils/auth';
 import { setSessionPhoto } from './utils/sessionPhoto';
+import { readStored } from './utils/storage';
 import api from './services/api';
 
 /* Sign-in is kept per browser, not per tab. Signing in as someone else in one
@@ -21,10 +22,10 @@ const accountOf = (raw) => {
 };
 function useOneAccountPerBrowser() {
   useEffect(() => {
-    let shown = accountOf(localStorage.getItem('gem_auth'));
+    let shown = accountOf(readStored('gem_auth'));
     const onStorage = (e) => {
       if (e.key !== 'gem_auth' && e.key !== null) return;
-      const now = accountOf(localStorage.getItem('gem_auth'));
+      const now = accountOf(readStored('gem_auth'));
       if ((now?.key || null) === (shown?.key || null)) return;
       const signedOutOf = shown;
       shown = now;

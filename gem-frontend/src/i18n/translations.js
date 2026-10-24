@@ -2027,6 +2027,7 @@ const translations = {
       regenCode: 'Generate a new code',
     },
     auth: {
+      storageBlocked: 'This browser is blocking site storage, which GEM needs to keep you signed in. Allow cookies and site data for this site, then sign in again.',
       welcomeBack: 'Welcome back',
       pwTooShort: 'Use at least 6 characters.',
       pwMismatch: 'The two passwords do not match.',
@@ -4214,6 +4215,7 @@ const translations = {
       regenCode: 'Générer un nouveau code',
     },
     auth: {
+      storageBlocked: 'Ce navigateur bloque le stockage du site, dont GEM a besoin pour vous garder connecté. Autorisez les cookies et les données de ce site, puis reconnectez-vous.',
       welcomeBack: 'Bon retour',
       pwTooShort: 'Utilisez au moins 6 caractères.',
       pwMismatch: 'Les deux mots de passe ne correspondent pas.',

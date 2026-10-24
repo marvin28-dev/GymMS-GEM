@@ -109,7 +109,7 @@ export default function GymLoginPage() {
     setApiError('');
     try {
       const res = await setFirstPassword(gymCode, form.email.trim(), form.password, setupCode);
-      setAuth({ token: res.data.token, user: res.data.user });
+      if (!setAuth({ token: res.data.token, user: res.data.user })) { setApiError(t('auth.storageBlocked')); return; }
       nav(getHomeRoute());
     } catch (err) {
       setApiError(err.response?.data?.error || t('auth.loginErrorFailed'));
@@ -158,7 +158,7 @@ export default function GymLoginPage() {
     setApiError('');
     try {
       const res = await loginApi(gymCode, form.email, form.password);
-      setAuth({ token: res.data.token, user: res.data.user });
+      if (!setAuth({ token: res.data.token, user: res.data.user })) { setApiError(t('auth.storageBlocked')); return; }
       if (isDemo) setDemoMode(true);
       nav(getHomeRoute());
     } catch (err) {
