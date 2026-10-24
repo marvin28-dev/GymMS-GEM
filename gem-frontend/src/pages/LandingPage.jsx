@@ -36,7 +36,7 @@ export default function LandingPage() {
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontFamily: 'DM Sans, sans-serif', overflowX: 'hidden' }}>
 
       {/* ── Navbar ── */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, borderBottom: '1px solid var(--border-subtle)', background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(20px)' }}>
+      <nav style={{ position: 'sticky', top: 0, zIndex: 100, borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-header)', backdropFilter: 'blur(20px)' }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', padding: px, height: isMobile ? 56 : 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => nav('/')}>
             <div style={{ width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, borderRadius: 9, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 12px rgba(201,169,110,0.3)' }}>
@@ -118,11 +118,11 @@ export default function LandingPage() {
         </div>
         <div style={{ borderRadius: isMobile ? 12 : 16, overflow: 'hidden', border: '1.5px solid rgba(201,169,110,0.25)', boxShadow: '0 12px 48px rgba(0,0,0,0.35)' }}>
           {!isMobile && (
-            <div style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ display: 'flex', gap: 6 }}>
-                {[0,1,2].map(i => <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: 'rgba(255,255,255,0.12)' }} />)}
+                {[0,1,2].map(i => <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--border)' }} />)}
               </div>
-              <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 6, padding: '4px 12px', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
+              <div style={{ flex: 1, background: 'var(--bg-primary)', borderRadius: 6, padding: '4px 12px', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
                 GEM · Full Platform Walkthrough
               </div>
             </div>

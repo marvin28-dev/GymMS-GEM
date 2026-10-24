@@ -394,9 +394,9 @@ function WelcomeStep({ onStart, onDemo, onSignIn }) {
 
         {/* Video - mobile */}
         <div style={{ borderRadius: 12, overflow: 'hidden', border: '1.5px solid rgba(201,169,110,0.25)', boxShadow: '0 8px 28px rgba(0,0,0,0.28)', marginBottom: 20 }}>
-          <div style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ display: 'flex', gap: 4 }}>
-              {[0,1,2].map(i => <div key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: 'rgba(255,255,255,0.14)' }} />)}
+              {[0,1,2].map(i => <div key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--border)' }} />)}
             </div>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <PlayCircle size={10} color="#c9a96e" />
@@ -437,7 +437,7 @@ function WelcomeStep({ onStart, onDemo, onSignIn }) {
           <button onClick={onDemo} style={{ flex: 1, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 9, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <PlayCircle size={13} color="#c9a96e" strokeWidth={2} /> {t('signup.welcomeDemo')}
           </button>
-          <button onClick={onSignIn} style={{ flex: 1, background: 'transparent', border: '1px solid rgba(255,255,255,0.09)', color: 'var(--text-muted)', borderRadius: 9, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <button onClick={onSignIn} style={{ flex: 1, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', borderRadius: 9, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'DM Sans', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             {t('signup.welcomeSignIn')} <ArrowRight size={13} strokeWidth={2} />
           </button>
         </div>
@@ -514,8 +514,8 @@ function WelcomeStep({ onStart, onDemo, onSignIn }) {
             onMouseEnter={() => setSignInHov(true)}
             onMouseLeave={() => setSignInHov(false)}
             style={{
-              background: signInHov ? 'rgba(255,255,255,0.04)' : 'transparent',
-              border: `1px solid ${signInHov ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.09)'}`,
+              background: signInHov ? 'var(--bg-elevated)' : 'transparent',
+              border: `1px solid ${signInHov ? 'var(--border)' : 'var(--border-subtle)'}`,
               color: signInHov ? 'var(--text-secondary)' : 'var(--text-muted)',
               borderRadius: 9, padding: '9px 16px',
               fontSize: 13, fontWeight: 500, cursor: 'pointer',
@@ -531,9 +531,9 @@ function WelcomeStep({ onStart, onDemo, onSignIn }) {
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ borderRadius: 14, overflow: 'hidden', border: '1.5px solid rgba(201,169,110,0.25)', boxShadow: '0 24px 72px rgba(0,0,0,0.32)', marginBottom: 16 }}>
-          <div style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-              {[0,1,2].map(i => <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.14)' }} />)}
+              {[0,1,2].map(i => <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--border)' }} />)}
             </div>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
               <PlayCircle size={11} color="#c9a96e" />
@@ -665,8 +665,8 @@ function DialCodeSelect({ countries, value, onChange }) {
         top: dropPos.top,
         left: dropPos.left,
         width: 230,
-        background: '#16161f',
-        border: '1px solid #2a2a3a',
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
         borderRadius: 10,
         boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
         zIndex: 999999,
@@ -685,20 +685,20 @@ function DialCodeSelect({ countries, value, onChange }) {
               width: '100%',
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '10px 14px',
-              background: active ? 'rgba(201,169,110,0.12)' : 'transparent',
+              background: active ? 'var(--accent-gold-dim)' : 'transparent',
               border: 'none',
               cursor: 'pointer',
               fontFamily: 'DM Sans, sans-serif',
               fontSize: 13,
-              color: active ? '#c9a96e' : '#9a9aaa',
+              color: active ? 'var(--accent-gold)' : 'var(--text-secondary)',
               textAlign: 'left',
             }}
-            onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#1e1e2a'; }}
+            onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-elevated)'; }}
             onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
           >
             <MiniFlag country={c} size={14} />
             <span style={{ flex: 1 }}>{c.name}</span>
-            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: '#555568' }}>{c.dial}</span>
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'var(--text-muted)' }}>{c.dial}</span>
           </button>
         );
       })}
