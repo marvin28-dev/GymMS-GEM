@@ -264,8 +264,10 @@ test('J-08: with no answer the countdown signs you out', async ({ page }) => {
   await expect(page.getByText(`E2E Gym ${owner.gymCode}`).first()).toBeVisible();
   await page.clock.fastForward('15:30');
   await expect(page.getByText('Are you still there?')).toBeVisible();
-  // One second at a time, so the page can draw each step of the countdown
-  for (let i = 0; i < 32 && !/\/login$/.test(page.url()); i += 1) await page.clock.runFor(1000);
+  // One second at a time, so the page can draw each step of the countdown. A
+  // step can land before the last one was drawn (seen in WebKit), so there is
+  // room for more than the 30; it stops at the sign-in page.
+  for (let i = 0; i < 90 &&!/\/login$/.test(page.url()); i += 1) await page.clock.runFor(1000);
   await expect(page).toHaveURL(/\/login$/);
   expect(await page.evaluate(() => localStorage.getItem('gem_auth'))).toBeNull();
 });
