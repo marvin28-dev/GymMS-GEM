@@ -9,6 +9,7 @@ import FAB from '../components/FAB';
 import { useLanguage } from '../contexts/LanguageContext';
 import Modal from '../components/ui/Modal';
 import Avatar from '../components/ui/Avatar';
+import EmptyState from '../components/ui/EmptyState';
 import { getAll as getPayments, create as createPayment } from '../services/payments.service';
 import { getAll as getMembers } from '../services/members.service';
 import { getAll as getStaff } from '../services/staff.service';
@@ -523,7 +524,8 @@ export default function PaymentsPage() {
             const date = (p.createdAt || '').slice(0, 10);
             const pillStyle = methodStyle(p.method);
             return (
-              <div key={p.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              // Opens the same details and receipt as a desktop row (F-153)
+              <button type="button" key={p.id} onClick={() => setSelectedPayment(p)} style={{ width: '100%', textAlign: 'left', font: 'inherit', color: 'inherit', cursor: 'pointer', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'DM Sans', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2, display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -534,7 +536,7 @@ export default function PaymentsPage() {
                 <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent-gold)', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0 }}>
                   {formatMoney(p.amount)}
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -708,6 +710,9 @@ export default function PaymentsPage() {
                   </tr>
                 );
               })}
+              {!loading && paginatedPayments.length === 0 && (
+                <tr><td colSpan={7} style={{ padding: 0 }}><EmptyState icon={CreditCard} title={t('payments.noPaymentsYet')} /></td></tr>
+              )}
             </tbody>
           </table>
         </div>
