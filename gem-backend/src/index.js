@@ -7,6 +7,7 @@ const { startFreezeFees } = require('./jobs/freezeFees');
 const { startScheduledMessages } = require('./jobs/scheduledMessages');
 const prisma = require('./utils/prisma');
 const { closeGracefully } = require('./utils/shutdown');
+const { logFailure } = require('./utils/bestEffort');
 
 try {
   checkConfig().warnings.forEach(w => console.warn(`Warning: ${w}`));
@@ -31,7 +32,7 @@ async function stop(signal) {
   console.log(`${signal}: finishing the requests under way, then stopping`);
   jobs.forEach(clearInterval);
   await closeGracefully(server);
-  await prisma.$disconnect().catch(() => {});
+  await prisma.$disconnect().catch(logFailure('Closing the database connections'));
   process.exit(0);
 }
 process.on('SIGTERM', () => stop('SIGTERM'));
