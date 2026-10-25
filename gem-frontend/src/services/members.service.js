@@ -22,3 +22,11 @@ export const sendCode = (id) =>
 // change-package, day-pass, visitor-bundle, convert-to-visitor, registration-fee
 export const act = (id, action, data) =>
   api.post(`/members/${id}/${action}`, { ...data, tz: new Date().getTimezoneOffset() });
+
+// A member's notes, kept by the desk and management
+export const getNotes = (id) => api.get(`/members/${id}/notes`);
+
+export const addNote = (id, data) => api.post(`/members/${id}/notes`, data);
+
+// Notes this browser kept before they were saved on the server
+export const importNotes = (id, notes) => api.post(`/members/${id}/notes/import`, { notes });

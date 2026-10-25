@@ -1,8 +1,7 @@
 // Browser storage can refuse a read or a write: a private window, storage
 // switched off, a full quota. What the app keeps there is a copy of what the
 // server holds or a convenience for this browser, so a refusal means only that
-// the copy is missing. Writes say whether they worked, for the one caller whose
-// data has no other home (member notes, D-32).
+// the copy is missing. Writes say whether they worked.
 
 export function readStored(key, fallback = null) {
   try {

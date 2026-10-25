@@ -121,6 +121,7 @@ model Staff {
   payAdjustments    PayAdjustment[]
   coachClients      Member[]        @relation("CoachClients")
   progressLogs      ProgressLog[]
+  memberNotes       MemberNote[]
 
   @@unique([gymId, email])
   @@index([gymId])
@@ -231,6 +232,7 @@ model Member {
   coachId             String?
   coach               Staff?        @relation("CoachClients", fields: [coachId], references: [id])
   progressLogs        ProgressLog[]
+  memberNotes         MemberNote[]
   // What the member and their coach are working towards, set when the coach
   // takes them on. Whether they are on track is judged against these.
   goalType            String?
@@ -276,6 +278,26 @@ model ProgressLog {
 
   @@index([gymId, memberId])
   @@index([gymId, staffId, date])
+}
+
+// A note the desk or management keeps about a member. Notes were kept in the
+// browser that wrote them, signed "Staff", and seen nowhere else (D-32).
+model MemberNote {
+  id         String   @id @default(cuid())
+  gymId      String
+  memberId   String
+  authorId   String?
+  // The author's name as it was, so the note still reads after they leave
+  authorName String
+  // General | Health | Financial | Other
+  category   String   @default("General")
+  text       String
+  createdAt  DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  author Staff? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([gymId, memberId, createdAt])
 }
 
 model Package {

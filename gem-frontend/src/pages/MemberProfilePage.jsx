@@ -6,8 +6,7 @@ import useOnOpen from '../hooks/useOnOpen';
 import { useState, useEffect, useRef } from 'react';
 import { getCurrencySymbol, formatMoney } from '../utils/currency';
 import { durationText } from '../utils/packageText';
-import { roleName } from '../utils/roleNames';
-import { readStored, readStoredJson, store, storeJson } from '../utils/storage';
+import { readStored, readStoredJson, store, unstore } from '../utils/storage';
 import { digitsOnly } from '../utils/number';
 import { autoPaymentDescription } from '../utils/paymentDescription';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -30,7 +29,7 @@ import { isFitness } from '../utils/rolePages';
 import AddressInputs from '../components/AddressInputs';
 import { formatAddress } from '../utils/address';
 import { serverFieldError, revealFirstError } from '../utils/formErrors';
-import { getOne as getMemberById, update as updateMember, sendCode as sendMemberCode, act as memberAction } from '../services/members.service';
+import { getOne as getMemberById, update as updateMember, sendCode as sendMemberCode, act as memberAction, getNotes as getMemberNotes, addNote as addMemberNote, importNotes as importMemberNotes } from '../services/members.service';
 import { applyDirect as applyMemberAction, create as createApproval, listForMember as listApprovals, approve as approveRequest, reject as rejectRequest, cancel as cancelRequest } from '../services/approvals.service';
 import { getAll as getPackages } from '../services/packages.service';
 import { create as createPayment } from '../services/payments.service';
@@ -846,12 +845,22 @@ function RenewRegFeeModal({ open, onClose, member, gymData, onSave }) {
 function AddNoteModal({ open, onClose, onSave }) {
   const { t } = useLanguage();
   const [form, setForm] = useState({ note: '', category: 'General' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
-  const handleSave = () => {
-    if (!form.note.trim()) return;
-    onSave?.(form);
-    setForm({ note: '', category: 'General' });
-    onClose();
+  const handleSave = async () => {
+    if (!form.note.trim() || saving) return;
+    setSaving(true);
+    setError('');
+    try {
+      await onSave?.(form);
+      setForm({ note: '', category: 'General' });
+      onClose();
+    } catch (err) {
+      setError(err?.response?.data?.error || t('memberProfile.noteNotKept'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -892,9 +901,10 @@ function AddNoteModal({ open, onClose, onSave }) {
             { value: 'Other', label: t('memberProfile.categoryOther') },
           ]}
         />
+        {error && <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{error}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 8 }}>
           <button style={secondaryBtn} onClick={onClose}>{t('memberProfile.cancel')}</button>
-          <button style={primaryBtn} onClick={handleSave}>{t('memberProfile.saveNote')}</button>
+          <button style={{ ...primaryBtn, opacity: saving ? 0.6 : 1 }} disabled={saving} onClick={handleSave}>{t('memberProfile.saveNote')}</button>
         </div>
       </div>
     </Modal>
@@ -2327,8 +2337,8 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
     else if (initialAction === 'renew') setShowRenewModal(true);
   }, [member, initialAction]);
 
-  // Notes: localStorage keyed by member id (no DB model). Messages are every
-  // email and text this member was really sent.
+  // Notes are the desk's and management's, kept on the server (D-32). Messages
+  // are every email and text this member was really sent.
   const [memberNotes, setMemberNotes] = useState([]);
   const [notesError, setNotesError] = useState('');
   const [memberMessages, setMemberMessages] = useState([]);
@@ -2339,12 +2349,27 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
       .then(r => { setMemberMessages(r.data || []); setMessagesFailed(false); })
       .catch(() => setMessagesFailed(true));
   };
+  const loadNotes = () => {
+    if (!id || isFitness(getRole())) return;
+    getMemberNotes(id)
+      .then(r => { setMemberNotes(r.data || []); setNotesError(''); })
+      .catch(() => setNotesError(t('memberProfile.notesLoadFailed')));
+  };
   useEffect(() => {
     if (!id) return;
-    const stored = readStoredJson(`gem_member_notes_${id}`, []);
-    setMemberNotes(Array.isArray(stored) ? stored : []);
+    setMemberNotes([]);
     setNotesError('');
     loadMessages();
+    // Notes this browser kept before they were saved on the server go there
+    // once; anything that fails stays here and is tried on the next visit
+    const kept = isFitness(getRole()) ? null : readStoredJson(`gem_member_notes_${id}`, null);
+    if (Array.isArray(kept) && kept.length) {
+      importMemberNotes(id, kept)
+        .then(r => { unstore(`gem_member_notes_${id}`); setMemberNotes(r.data || []); })
+        .catch(err => { console.error('Moving notes kept in this browser failed:', err); loadNotes(); });
+    } else {
+      loadNotes();
+    }
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
   useLiveRefresh(loadMessages, ['communications']);
   const [showCode, setShowCode]                               = useState(false);
@@ -2384,7 +2409,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
   };
   const showsMoney = !isFitness(getRole());
   const TABS = TAB_KEYS
-    .filter(k => showsMoney || k !== 'Payments')
+    .filter(k => showsMoney || (k !== 'Payments' && k !== 'Notes'))
     .map(k => ({ key: k, label: t(`memberProfile.${TAB_LABEL_KEYS[k]}`) }));
 
   if (loading) {
@@ -3016,18 +3041,18 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {memberNotes.map((n, i) => {
+          {memberNotes.map((n) => {
             const cc = categoryColors[n.category] || categoryColors.Other;
             return (
-              <div key={i} style={cardStyle}>
+              <div key={n.id} style={cardStyle}>
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{n.date}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{fmtDate(n.createdAt)}</span>
                     <span style={{ background: cc.bg, color: cc.color, borderRadius: 20, padding: '2px 9px', fontSize: 11, fontWeight: 500 }}>{({ General: t('memberProfile.categoryGeneral'), Health: t('memberProfile.categoryHealth'), Financial: t('memberProfile.categoryFinancial'), Other: t('memberProfile.categoryOther') })[n.category] || n.category}</span>
                   </div>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('memberProfile.by')} {n.author}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('memberProfile.by')} {n.authorName}</span>
                 </div>
-                <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'DM Sans', lineHeight: 1.6 }}>{n.content}</div>
+                <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'DM Sans', lineHeight: 1.6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{n.text}</div>
               </div>
             );
           })}
@@ -3325,12 +3350,10 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
       <PaymentDetailModal open={!!viewPayment} onClose={() => setViewPayment(null)} payment={viewPayment} member={member} />
       <ConvertToVisitorModal open={showConvertToVisitorModal} onClose={() => setShowConvertToVisitorModal(false)} member={member} gymData={gymData} packagesList={packagesList} onApplied={applyMemberUpdate} onSettleBalance={() => { setShowConvertToVisitorModal(false); handleAddPayment(); }} />
       <AddNoteModal open={showNoteModal} onClose={() => setShowNoteModal(false)}
-        onSave={(form) => {
-          const note = { date: fmtDate(new Date()), content: form.note, category: form.category, author: [getAuth()?.user?.firstName, getAuth()?.user?.lastName].filter(Boolean).join(' ') || roleName(getRole(), t) };
-          const updated = [note, ...memberNotes];
+        onSave={async (form) => {
+          const res = await addMemberNote(id, { text: form.note, category: form.category });
+          setMemberNotes(prev => [res.data, ...prev.filter(n => n.id !== res.data.id)]);
           setNotesError('');
-          if (storeJson(`gem_member_notes_${id}`, updated)) setMemberNotes(updated);
-          else setNotesError(t('memberProfile.noteNotKept'));
         }} />
       <SendMessageModal open={showMessageModal} onClose={() => setShowMessageModal(false)} members={member ? [member] : []}
         onSent={() => setTimeout(loadMessages, 800)} />
