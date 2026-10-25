@@ -638,12 +638,10 @@ export default function SettingsPage() {
     fontWeight: active ? 600 : 400, textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   });
 
-  // Each section's panel, drawn by both layouts: on a phone they used to say
-  // "open it on a computer" (D-40). They stack to one column there.
   const emailLanguageCard = !sectionLoading && (
-    <div data-email-language style={{ ...cardStyle, marginTop: 16 }}>
+    <div data-email-language role="group" aria-labelledby="gem-email-language-title" style={{ ...cardStyle, marginTop: 16 }}>
       <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.emailLanguageTitle')}</div>
+        <div id="gem-email-language-title" style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.emailLanguageTitle')}</div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, lineHeight: 1.5 }}>{t('settings.emailLanguageDesc')}</div>
       </div>
       <div style={{ padding: 20, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -658,6 +656,8 @@ export default function SettingsPage() {
     </div>
   );
 
+  // Each section's panel, drawn by both layouts: on a phone they used to say
+  // "open it on a computer" (D-40). They stack to one column there.
   const sectionPanels = (
     <>
       {LOADS_FROM_GYM.includes(activeSection) && sectionLoading && (
@@ -1023,25 +1023,28 @@ export default function SettingsPage() {
               <Languages size={15} color="#818cf8" />
             </div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.chooseLanguage')}</div>
+              <div id="gem-interface-language-title" style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.chooseLanguage')}</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{t('settings.languageDesc')}</div>
             </div>
           </div>
-          <div className="gem-two-col" style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div data-interface-language role="group" aria-labelledby="gem-interface-language-title" className="gem-two-col" style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             {[
               { code: 'en', flag: '🇬🇧', name: t('settings.english'), desc: t('settings.englishDesc') },
               { code: 'fr', flag: '🇫🇷', name: t('settings.french'),  desc: t('settings.frenchDesc')  },
             ].map(option => {
               const selected = lang === option.code;
               return (
-                <div
+                <button
+                  type="button"
                   key={option.code}
+                  aria-pressed={selected}
                   onClick={() => switchLang(option.code)}
                   style={{
                     border: `2px solid ${selected ? '#818cf8' : 'var(--border-subtle)'}`,
                     borderRadius: 12, padding: '18px 20px', cursor: 'pointer',
                     background: selected ? 'rgba(129,140,248,0.06)' : 'var(--bg-elevated)',
                     transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 14,
+                    width: '100%', textAlign: 'left', fontFamily: 'inherit', color: 'inherit',
                   }}
                 >
                   <span style={{ fontSize: 28 }}>{option.flag}</span>
@@ -1054,7 +1057,7 @@ export default function SettingsPage() {
                       <Check size={12} color="#fff" strokeWidth={3} />
                     </div>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
@@ -1370,10 +1373,10 @@ export default function SettingsPage() {
                           );
                           if (sec === 'language') return (
                             <div>
-                              <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 14 }}>{t('settings.interfaceLanguage')}</p>
-                              <div style={{ display: 'flex', gap: 8 }}>
+                              <p id="gem-interface-language-title" style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 14 }}>{t('settings.interfaceLanguage')}</p>
+                              <div data-interface-language role="group" aria-labelledby="gem-interface-language-title" style={{ display: 'flex', gap: 8 }}>
                                 {[['en', 'English'], ['fr', 'Français']].map(([code, label]) => (
-                                  <button key={code} onClick={() => switchLang(code)} style={{ flex: 1, padding: '11px', borderRadius: 10, border: `2px solid ${lang === code ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, background: lang === code ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', cursor: 'pointer', fontSize: 13, fontWeight: lang === code ? 600 : 400, color: lang === code ? 'var(--accent-gold)' : 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
+                                  <button key={code} type="button" aria-pressed={lang === code} onClick={() => switchLang(code)} style={{ flex: 1, padding: '11px', borderRadius: 10, border: `2px solid ${lang === code ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, background: lang === code ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', cursor: 'pointer', fontSize: 13, fontWeight: lang === code ? 600 : 400, color: lang === code ? 'var(--accent-gold)' : 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
                                     {label}
                                   </button>
                                 ))}

@@ -45,7 +45,7 @@ test('J-27: French stays French, and the light theme stays light, after a reload
   const owner = await registerGym();
   await signIn(page, owner);
   await page.goto('/settings?section=language');
-  await page.getByText('Français', { exact: true }).click();
+  await page.locator('[data-interface-language]').getByText('Français', { exact: true }).click();
   await expect(page.getByRole('navigation').getByText('Membres', { exact: true })).toBeVisible();
 
   await page.goto('/settings?section=appearance');

@@ -41,3 +41,20 @@ test('the language of emails to members is chosen in Settings and kept on the gy
   await page.reload();
   await expect(page.locator('[data-email-language]').getByRole('button', { name: 'Français' })).toHaveAttribute('aria-pressed', 'true');
 });
+
+// The interface language was a clickable box a keyboard could not reach, and
+// since D-23 the page holds two choices of English / Français
+test('each language choice is a named group of buttons a keyboard can use', async ({ page, isMobile }) => {
+  const owner = await registerGym();
+  await signIn(page, owner);
+  await page.goto('/settings?section=language');
+  const ui = page.getByRole('group', { name: isMobile ? 'Interface language' : 'Choose Language' });
+  await expect(page.getByRole('group', { name: 'Emails to members' })).toBeVisible();
+  await expect(ui.getByRole('button', { name: /English/ })).toHaveAttribute('aria-pressed', 'true');
+  await ui.getByRole('button', { name: /Français/ }).focus();
+  await page.keyboard.press('Enter');
+  // The page is now in French, the group's name with it
+  const enFrancais = page.getByRole('group', { name: isMobile ? "Langue de l'interface" : 'Choisir la langue' });
+  await expect(enFrancais.getByRole('button', { name: /Français/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('group', { name: 'E-mails aux membres' }).getByRole('button', { name: 'English' })).toHaveAttribute('aria-pressed', 'true');
+});
