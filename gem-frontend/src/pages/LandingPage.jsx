@@ -4,7 +4,7 @@ import { SUPPORT, hasSupport } from '../utils/support';
 import { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import LangToggle from '../components/LangToggle';
-import { useIsMobile } from '../utils/useIsMobile';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 export default function LandingPage() {
   const nav = useNavigate();

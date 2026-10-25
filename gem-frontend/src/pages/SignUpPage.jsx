@@ -12,7 +12,7 @@ import { COUNTRIES } from '../utils/countries';
 import SupportLinks from '../components/SupportLinks';
 import { useLanguage } from '../contexts/LanguageContext';
 import LangToggle from '../components/LangToggle';
-import { useIsMobile } from '../utils/useIsMobile';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 // ─── Countries ────────────────────────────────────────────────────────────────
 

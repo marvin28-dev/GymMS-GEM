@@ -6,14 +6,14 @@ import { isAuthed } from '../utils/auth';
 import LangToggle from '../components/LangToggle';
 import SupportLinks from '../components/SupportLinks';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useIsMobile } from '../utils/useIsMobile';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 const PERK_ICONS = [Users, CreditCard, Monitor, BarChart3];
 
 export default function GymCodePage() {
   const nav = useNavigate();
   const { lang, switchLang, t } = useLanguage();
-  const isMobile = useIsMobile(800);
+  const isMobile = useIsMobile();
 
   const PERKS = [
     { icon: PERK_ICONS[0], text: t('auth.perk1') },

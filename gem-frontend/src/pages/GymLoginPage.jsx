@@ -10,7 +10,7 @@ import { getGymByCode } from '../services/gym.service';
 import LangToggle from '../components/LangToggle';
 import SupportLinks from '../components/SupportLinks';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useIsMobile } from '../utils/useIsMobile';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { gymAddress } from '../utils/gymAddress';
 
 const DEFAULT_GYM = { name: '', location: '', color: '#c9a96e', bg: 'rgba(201,169,110,0.07)', initials: '...', logo: null };
@@ -40,7 +40,7 @@ export default function GymLoginPage() {
   const { lang, switchLang, t } = useLanguage();
   const DEMO_ACCOUNTS = DEMO_ACCOUNTS_BASE.map(a => ({ ...a, label: t(a.labelKey), role: t(a.roleKey) }));
   const DEMO_FEATURES = DEMO_FEATURES_BASE.map(f => ({ ...f, label: t(f.labelKey), desc: t(f.descKey) }));
-  const isMobile = useIsMobile(800);
+  const isMobile = useIsMobile();
   const isDemo = gymCode === 'elite';
 
   useEffect(() => {

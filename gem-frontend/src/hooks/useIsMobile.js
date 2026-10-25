@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 
-const QUERY = '(max-width: 800px)';
+// The phone layout, at the same width as the stylesheet's phone rules
+// (index.css). The only such hook: utils/useIsMobile.js used 768 while this
+// one used 800, so pages changed layout at different widths (D-53).
+const QUERY = '(max-width: 768px)';
 
 export function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() => window.matchMedia(QUERY).matches);
