@@ -11,6 +11,11 @@
 const path = require('path');
 const { spawnSync } = require('child_process');
 
+// `npm run db:deploy` on a developer's machine: DATABASE_URL is in .env there,
+// as for the Prisma CLI (prisma.config.ts). Variables already set (Railway's)
+// are never replaced.
+require('dotenv').config({ quiet: true });
+
 const ROOT = path.resolve(__dirname, '..');
 const CLI = path.join(ROOT, 'node_modules/prisma/build/index.js');
 

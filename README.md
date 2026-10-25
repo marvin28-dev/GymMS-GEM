@@ -32,6 +32,14 @@ npm run db:seed           # optional: the demo gym "elite"
 npm run dev               # http://localhost:5000
 ```
 
+After pulling new code, run `npm run db:deploy` again: the dev server does not
+migrate, and a missing column stops sign-in with "The column ... does not exist
+in the current database". A database made earlier with `prisma db push` is
+recognised the same way as the live one (below); if it is told the database
+matches no known schema, compare the two with
+`npx prisma migrate diff --from-config-datasource --to-schema=prisma/schema.prisma --script`
+and add what is missing by hand.
+
 Web app, in a second terminal:
 
 ```sh

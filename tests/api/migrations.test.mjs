@@ -6,6 +6,9 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 const local = createRequire(import.meta.url);
 const { BACKEND, testDatabaseUrl, redact } = local('../support/testDb.cjs');
@@ -87,6 +90,29 @@ describe('migrating the database', () => {
     expect(r.status, r.out).toBe(0);
     expect(r.out).toMatch(/schema of 20261024000001_audit/);
     expect(sameAsSchema(url)).toBe(true);
+  }, 180_000);
+
+  // `npm run db:deploy` failed on a developer's machine ("client password must
+  // be a string"): the script never read .env. It is run here from a folder
+  // whose .env names a fresh test database, with DATABASE_URL unset.
+  it('reads the database from .env when DATABASE_URL is not set', async () => {
+    const url = await freshDatabase('gem_mig_envfile_test');
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'gem-migrate-'));
+    try {
+      fs.writeFileSync(path.join(folder, '.env'), `DATABASE_URL="${url}"\n`);
+      const withoutUrl = { ...process.env };
+      delete withoutUrl.DATABASE_URL;
+      const r = spawnSync(process.execPath, [`${BACKEND}/scripts/migrate.js`], {
+        cwd: folder,
+        env: { ...withoutUrl, PRISMA_HIDE_UPDATE_MESSAGE: '1', CHECKPOINT_DISABLE: '1' },
+        encoding: 'utf8',
+      });
+      const out = redact(`${r.stdout}\n${r.stderr}`);
+      expect(r.status, out).toBe(0);
+      expect(sameAsSchema(url)).toBe(true);
+    } finally {
+      fs.rmSync(folder, { recursive: true, force: true });
+    }
   }, 180_000);
 
   it('leaves a database it does not recognise exactly as it is, and fails the deploy', async () => {
