@@ -58,3 +58,19 @@ test('J-12: a freeze asked for at the desk is applied once a manager approves it
   await expect.poll(async () => (await call('GET', `/members/${member.id}`, { token: owner.token })).status).toBe('frozen');
   await office.close();
 });
+
+// D-17: days added to an end date weeks back gave fewer days of access, or none
+test('J-12: extending a membership that has ended counts the days from today', async ({ page }) => {
+  const owner = await registerGym();
+  const member = await memberOn(owner);
+  await call('PATCH', `/members/${member.id}`, { token: owner.token, body: { startDate: localDay(new Date(Date.now() - 50 * 864e5)), endDate: localDay(new Date(Date.now() - 20 * 864e5)), status: 'active' } });
+  await signIn(page, owner);
+  await page.goto(`/members/${member.id}`);
+  await page.getByRole('button', { name: 'Membership', exact: true }).click();
+  await page.getByRole('button', { name: 'Extend', exact: true }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Extend Membership' });
+  await dialog.getByRole('button', { name: '+7 Days' }).click();
+  await expect(dialog.getByText('This membership has ended, so the days count from today.')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Confirm Extension' }).click();
+  await expect.poll(async () => String((await call('GET', `/members/${member.id}`, { token: owner.token })).endDate).slice(0, 10)).toBe(localDay(new Date(Date.now() + 6 * 864e5)));
+});

@@ -36,6 +36,17 @@ describe('what each action does', () => {
     expect(res.body.member.status).toBe('active');
   });
 
+  // D-17: ten days added to an end date three weeks back left it in the past
+  it('extends a membership that has already ended by that many days from today', async () => {
+    const m = await addMember(api, gym.token, { startDate: daysFromNow(-50), endDate: daysFromNow(-20) });
+    const res = await apply(m.id, 'extend_membership', { days: 10 });
+    expect(res.status).toBe(200);
+    expect(day(res.body.member.endDate)).toBe(daysFromNow(9));
+    expect(res.body.member.status).toBe('active');
+    const lapsed = await addMember(api, gym.token, { startDate: daysFromNow(-50), endDate: daysFromNow(-20), status: 'expired' });
+    expect(day((await apply(lapsed.id, 'extend_membership', { days: 7 })).body.member.endDate)).toBe(daysFromNow(6));
+  });
+
   it('freezes, then unfreezes with the frozen days added back', async () => {
     const m = await addMember(api, gym.token, { endDate: daysFromNow(20) });
     const frozen = await apply(m.id, 'freeze_membership', { days: 7 });

@@ -1561,6 +1561,7 @@ const translations = {
       "notNow": "Not now",
     },
     memberProfile: {
+      extendFromToday: 'This membership has ended, so the days count from today.',
       paymentToTake: '{amount} by {method}, taken when you confirm.',
       paymentReady: 'Payment ready: it is taken when you confirm.',
       amountAdded: '(+{amount} added)',
@@ -3749,6 +3750,7 @@ const translations = {
       "notNow": "Pas maintenant",
     },
     memberProfile: {
+      extendFromToday: 'Cet abonnement est terminé : les jours comptent à partir d’aujourd’hui.',
       paymentToTake: '{amount} par {method}, encaissé à la confirmation.',
       paymentReady: 'Paiement prêt : il est encaissé à la confirmation.',
       amountAdded: '(+{amount} ajoutés)',

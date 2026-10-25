@@ -15,6 +15,16 @@ const addDays = (base, n) => {
   return d;
 };
 
+// An end date is the last day of access, kept as a date (midnight UTC). A
+// membership that ended before yesterday is extended from yesterday, so the
+// days added are days from today: added to an end date weeks back they gave
+// fewer days, or none (D-17).
+const extendFrom = (end) => {
+  const today = startOfToday();
+  const yesterday = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate() - 1));
+  return end && new Date(end) >= yesterday ? end : yesterday;
+};
+
 // A cancelled or deactivated membership is over until it is renewed
 const ENDED = ['cancelled', 'deactivated'];
 
@@ -31,7 +41,7 @@ const ACTIONS = {
     // A frozen membership stays frozen; the days are kept for when it resumes
     apply: (m, p) => (m.status === 'frozen'
       ? { endDate: addDays(m.endDate, p.days), ...(m.preFreezEndDate ? { preFreezEndDate: addDays(m.preFreezEndDate, p.days) } : {}) }
-      : { endDate: addDays(m.endDate, p.days), status: m.status === 'pending' ? 'pending' : 'active' }),
+      : { endDate: addDays(extendFrom(m.endDate), p.days), status: m.status === 'pending' ? 'pending' : 'active' }),
   },
   freeze_membership: {
     days: true,

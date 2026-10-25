@@ -1552,7 +1552,11 @@ function ExtendModal({ open, onClose, member, onApplied }) {
 
   const days = PRESETS[preset].days ?? parseInt(customDays || '0', 10);
   const currentEnd = member.endDate || todayStr();
-  const newEnd = days > 0 ? addDays(currentEnd, days) : currentEnd;
+  // An ended membership is extended from today, as the server does (D-17); a
+  // frozen one keeps its days for when it resumes
+  const yesterday = addDays(todayStr(), -1);
+  const fromToday = member.status !== 'frozen' && (!member.endDate || toDateStr(member.endDate) < yesterday);
+  const newEnd = days > 0 ? addDays(fromToday ? yesterday : currentEnd, days) : currentEnd;
 
   return (
     <Modal open={open} onClose={onClose} title={t('memberProfile.extendMembershipTitle')} maxWidth={420}>
@@ -1588,6 +1592,7 @@ function ExtendModal({ open, onClose, member, onApplied }) {
             borderRadius: 10, padding: '10px 14px', fontSize: 13, color: 'var(--accent-gold)',
           }}>
             {t('memberProfile.newEndDate')} <strong>{formatDate(newEnd)}</strong>
+            {fromToday && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>{t('memberProfile.extendFromToday')}</div>}
           </div>
         )}
         <ActionConfirm
