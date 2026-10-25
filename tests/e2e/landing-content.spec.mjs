@@ -21,3 +21,22 @@ test('the sign-up welcome has no placeholder video and no made-up contacts', asy
   await expect(page.locator('[data-support]')).toHaveCount(0);
   await expect(page.getByText('hello@gymgem.io')).toHaveCount(0);
 });
+
+// D-6: an address that leads nowhere landed silently on the home page; the
+// tab showed Vite's logo; D-49: phones could not zoom
+test('an address that leads nowhere says so, and the page carries its own icon and lets phones zoom', async ({ page }) => {
+  await page.goto('/no-such-page');
+  await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
+  await page.getByRole('button', { name: 'Go to GEM' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg');
+  expect(await page.locator('meta[name="viewport"]').getAttribute('content')).not.toMatch(/maximum-scale|user-scalable=no/);
+});
+
+test('on a phone, form text is at least 16px, so a touched box does not zoom the page by itself', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'a phone rule: desktop boxes keep their size');
+  await page.goto('/login');
+  const box = page.getByPlaceholder('e.g. elite-fitness');
+  await expect(box).toBeVisible();
+  expect(parseFloat(await box.evaluate(el => getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
+});

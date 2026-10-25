@@ -125,6 +125,11 @@ input:-webkit-autofill:focus {
 }
 
 @media (max-width: 768px) {
+  /* Pinch-zoom is allowed (D-49); an iPhone zooms in by itself on a box whose
+     text is under 16px, so form text is at least that on a phone. Boxes
+     already larger (a 4-digit code at 20px and up) keep their size. */
+  input:not([type="checkbox"]):not([type="radio"]):not([style*="font-size: 2"]):not([style*="font-size: 3"]),
+  select, textarea { font-size: 16px !important; }
   .gem-list-grid { grid-template-columns: minmax(0, 1fr) !important; }
   .gem-two-col { grid-template-columns: minmax(0, 1fr) !important; }
   .gem-eod-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }

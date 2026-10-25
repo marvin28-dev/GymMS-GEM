@@ -13,6 +13,7 @@ const GymLoginPage = lazy(() => import("../pages/GymLoginPage"));
 const ForgotPasswordPage = lazy(() => import("../pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("../pages/ResetPasswordPage"));
 const VerifyEmailPage = lazy(() => import("../pages/VerifyEmailPage"));
+const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
 const FrontDeskPage = lazy(() => import("../pages/FrontDeskPage"));
 const MemberProfilePage = lazy(() => import("../pages/MemberProfilePage"));
 const StaffProfilePage = lazy(() => import("../pages/StaffProfilePage"));
@@ -65,7 +66,7 @@ export default function AppRoutes() {
         </Route>
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
     </Suspense>
     </>
