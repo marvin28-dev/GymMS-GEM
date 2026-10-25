@@ -12,6 +12,17 @@ beforeAll(async () => {
 });
 afterAll(() => stop());
 
+// D-24: a trainer could read the gym's books, which none of their screens show
+describe('reading the books', () => {
+  it('is for management and the desk, not for trainers', async () => {
+    await spend({});
+    const trainer = await addStaff(api, gym, { role: 'trainer' });
+    expect((await api.get('/api/expenses', { token: trainer.token })).status).toBe(403);
+    expect((await api.get('/api/expenses', { token: desk.token })).status).toBe(200);
+    expect((await api.get('/api/expenses', { token: gym.token })).body.length).toBeGreaterThan(0);
+  });
+});
+
 // D-30: a receipt photo was kept only in the browser that attached it
 describe('the receipt of an expense', () => {
   const PHOTO = 'https://res.cloudinary.com/demo/image/upload/gem/receipts/r1.jpg';

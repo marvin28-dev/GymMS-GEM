@@ -4,7 +4,9 @@ const { authenticate } = require('../middleware/auth.middleware');
 const { only, DESK, OWNER, MANAGEMENT } = require('../middleware/access');
 
 router.use(authenticate);
-router.get('/', ctrl.getAll);
+// The books are read where they are shown: management's Accounting and the
+// desk's Operations and front desk. A trainer's screens show none of them (D-24).
+router.get('/', only(DESK), ctrl.getAll);
 router.post('/', only(DESK), ctrl.create);
 // A manager clears a waiting desk expense into the books.
 router.patch('/:id/approve', only(MANAGEMENT), ctrl.approve);

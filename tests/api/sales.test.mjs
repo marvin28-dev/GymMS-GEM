@@ -207,6 +207,15 @@ describe('a sale', () => {
   });
 });
 
+// D-24: a trainer could read every sale, which none of their screens show
+describe('reading the sales', () => {
+  it('is for management and the desk, not for trainers', async () => {
+    expect((await api.get('/api/sales', { token: trainer.token })).status).toBe(403);
+    expect((await api.get('/api/sales', { token: desk.token })).status).toBe(200);
+    expect((await api.get('/api/sales', { token: gym.token })).status).toBe(200);
+  });
+});
+
 // D-35: a discount on the whole sale, up to 100%, could be typed at any desk
 describe('a discount on a sale', () => {
   it('is given by management only, and a refused sale takes no stock', async () => {

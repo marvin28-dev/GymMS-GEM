@@ -4,7 +4,8 @@ const { logActivity, changesBetween, describeChanges, money } = require('../util
 
 const EXPENSE_FIELDS = { title: 'Title', category: 'Category', amount: 'Amount', date: 'Date', paidTo: 'Paid to', method: 'Method', note: 'Note' };
 
-// The books read the same for everyone, wages included. Who may change an
+// The books read the same for everyone who opens them (management and the
+// desk; the route keeps trainers out, D-24), wages included. Who may change an
 // entry is a separate question, settled on the write routes.
 //
 // Desk expenses over the gym's front-desk limit sit in `pending` until a
