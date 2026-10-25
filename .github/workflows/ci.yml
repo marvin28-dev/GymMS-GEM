@@ -1,0 +1,98 @@
+# Every push and pull request runs what was run by hand during the audit
+# (D-12): the backend's lint, the unit and API tests on a PostgreSQL service,
+# and the browser tests on a production build, one browser per job. Nothing
+# here reaches a real service: email, photos and texts are faked by the tests,
+# and the database is the job's own.
+name: CI
+
+on:
+  push:
+    branches: [main, production-audit]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+  TEST_DATABASE_URL: postgresql://gem:gem@localhost:5432/gem_test
+
+jobs:
+  checks:
+    name: Lint, unit and API tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: gem
+          POSTGRES_PASSWORD: gem
+          POSTGRES_DB: gem_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U gem" --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: '**/package-lock.json'
+      - run: npm ci
+      - run: npm ci
+        working-directory: gem-backend
+      - run: npm ci
+        working-directory: gem-frontend
+      - run: npx prisma generate
+        working-directory: gem-backend
+      - name: Backend lint
+        run: npx eslint src
+        working-directory: gem-backend
+      - name: Unit tests
+        run: npm run test:unit
+      - name: API tests
+        run: npm run test:api
+
+  browsers:
+    name: Browser tests (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: gem
+          POSTGRES_PASSWORD: gem
+          POSTGRES_DB: gem_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U gem" --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: '**/package-lock.json'
+      - run: npm ci
+      - run: npm ci
+        working-directory: gem-backend
+      - run: npm ci
+        working-directory: gem-frontend
+      - run: npx prisma generate
+        working-directory: gem-backend
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Browser tests
+        run: npx playwright test --project=${{ matrix.browser }}
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: playwright-report/
+          retention-days: 14
