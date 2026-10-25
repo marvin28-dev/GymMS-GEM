@@ -8,7 +8,7 @@ import {
   Search, X, UserCheck, ChevronLeft, ChevronRight, MessageSquare,
   AlertTriangle, CheckCircle, AlertCircle, Clock, LogOut, ArrowLeft, UserCircle,
   ShoppingCart, ShoppingBag, Plus, Minus, Trash2, Phone, Mail, Eye, EyeOff,
-  CreditCard, Wrench, FileText, Scan, Download, UserPlus, TrendingUp, Receipt, QrCode,
+  CreditCard, Wrench, FileText, Download, UserPlus, TrendingUp, Receipt,
   RefreshCw, Smartphone, LogIn,
 } from 'lucide-react';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -452,9 +452,6 @@ export default function FrontDeskPage() {
   const [showAddMember,  setShowAddMember]  = useState(false);
   const [showAddVisitor, setShowAddVisitor] = useState(false);
 
-  // ── QR scanner overlay ────────────────────────────────────────────────────
-  const [showQrScanner, setShowQrScanner] = useState(false);
-  const [qrManualInput, setQrManualInput] = useState('');
 
   // ── Operations modals ─────────────────────────────────────────────────────
   const [showIssueModal,    setShowIssueModal]    = useState(false);
@@ -1453,7 +1450,6 @@ export default function FrontDeskPage() {
                 <input value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setPinInput(''); runSearch(e.target.value); }} onKeyDown={e => e.key==='Enter'&&handleCheckIn()} placeholder={t('frontDesk.searchPlaceholderCheckin')} style={{ width:'100%', height:48, background:'var(--bg-elevated)', border:'1px solid var(--border-subtle)', borderRadius:10, paddingLeft:42, paddingRight:80, fontSize:14, color:'var(--text-primary)', fontFamily:'DM Sans', outline:'none', boxSizing:'border-box', transition:'border-color 0.15s' }} onFocus={e=>e.target.style.borderColor='var(--accent-gold)'} onBlur={e=>e.target.style.borderColor='var(--border-subtle)'}/>
                 <div style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', display:'flex', alignItems:'center', gap:4 }}>
                   {searchTerm && <button aria-label={t('common.clearSearch')} onClick={resetCheckin} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', display:'flex', padding:2 }}><X size={14}/></button>}
-                  <button onClick={() => { setQrManualInput(''); setShowQrScanner(true); }} title={t('attendance.scanQrCode')} style={{ background:'var(--bg-card)', border:'1px solid var(--border-subtle)', borderRadius:6, cursor:'pointer', color:'var(--text-muted)', display:'flex', alignItems:'center', padding:'4px 6px', transition:'all 0.1s' }} onMouseEnter={e=>{e.currentTarget.style.color='var(--accent-gold)';e.currentTarget.style.borderColor='var(--accent-gold)';}} onMouseLeave={e=>{e.currentTarget.style.color='var(--text-muted)';e.currentTarget.style.borderColor='var(--border-subtle)';}}><Scan size={14}/></button>
                 </div>
               </div>
               {searchTerm && !foundMember && fdMatches.length > 1 && (
@@ -2116,54 +2112,6 @@ export default function FrontDeskPage() {
         })()}
       </Modal>
 
-      {/* ── QR Scanner Overlay ── */}
-      {showQrScanner && (
-        <div style={{ position:'fixed', inset:0, zIndex:1100, background:'rgba(0,0,0,0.92)', display:'flex', alignItems:'center', justifyContent:'center' }} onClick={() => setShowQrScanner(false)}>
-          <style>{`@keyframes gemScanLine { 0%{top:8%} 50%{top:88%} 100%{top:8%} }`}</style>
-          <DialogBox label={t('frontDesk.pointCamera')} onClose={() => setShowQrScanner(false)} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:20 }} onClick={e => e.stopPropagation()}>
-            {/* Viewfinder */}
-            <div style={{ position:'relative', width:260, height:260, background:'#0a0a0f', borderRadius:16, overflow:'hidden' }}>
-              {/* Corner brackets */}
-              {[{top:10,left:10,borderTop:'3px solid #c9a96e',borderLeft:'3px solid #c9a96e'},{top:10,right:10,borderTop:'3px solid #c9a96e',borderRight:'3px solid #c9a96e'},{bottom:10,left:10,borderBottom:'3px solid #c9a96e',borderLeft:'3px solid #c9a96e'},{bottom:10,right:10,borderBottom:'3px solid #c9a96e',borderRight:'3px solid #c9a96e'}].map((s,i) => (
-                <div key={i} style={{ position:'absolute', width:24, height:24, borderRadius:2, ...s }} />
-              ))}
-              {/* Scan line */}
-              <div style={{ position:'absolute', left:12, right:12, height:2, background:'linear-gradient(90deg, transparent, #c9a96e, transparent)', animation:'gemScanLine 2s ease-in-out infinite' }} />
-              <QrCode size={64} color="rgba(201,169,110,0.15)" style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)' }} />
-            </div>
-            <p style={{ color:'#fff', fontSize:13, textAlign:'center', margin:0, fontFamily:'DM Sans', lineHeight:1.6 }}>
-              {t('frontDesk.pointCamera')}<br/>
-              <span style={{ color:'rgba(255,255,255,0.45)', fontSize:12 }}>{t('frontDesk.orEnterCode')}</span>
-            </p>
-            {/* Manual entry */}
-            <div style={{ display:'flex', gap:8, width:300 }}>
-              <input
-                autoFocus
-                value={qrManualInput}
-                onChange={e => setQrManualInput(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && qrManualInput.trim()) {
-                    setSearchTerm(qrManualInput.trim());
-                    runSearch(qrManualInput.trim());
-                    setShowQrScanner(false);
-                  }
-                }}
-                placeholder={t('frontDesk.typeOrPaste')}
-                style={{ flex:1, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:8, padding:'9px 14px', fontSize:13, color:'#fff', fontFamily:'DM Sans', outline:'none' }}
-              />
-              <button
-                style={{ ...primaryBtn, flexShrink:0 }}
-                onClick={() => { if (qrManualInput.trim()) { setSearchTerm(qrManualInput.trim()); runSearch(qrManualInput.trim()); setShowQrScanner(false); } }}
-              >
-                {t('frontDesk.searchBtn')}
-              </button>
-            </div>
-            <button onClick={() => setShowQrScanner(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.4)', fontSize:13, fontFamily:'DM Sans', padding:'4px 12px' }}>
-              {t('frontDesk.cancelBtn')}
-            </button>
-          </DialogBox>
-        </div>
-      )}
 
       {/* ── Add Member / Visitor Modals ── */}
       <AddMemberModal

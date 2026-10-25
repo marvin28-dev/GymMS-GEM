@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { formatMoney } from '../utils/currency';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Search, UserCheck, X, LogOut, Clock, ChevronLeft, ChevronRight, QrCode, Calendar } from 'lucide-react';
+import { Search, UserCheck, X, LogOut, Clock, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import Avatar from '../components/ui/Avatar';
 import MemberStatusTags from '../components/ui/MemberStatusTags';
@@ -400,8 +400,6 @@ export default function AttendancePage() {
   // Time cards in view that a manager has still to sign off
   const [checkInError, setCheckInError]   = useState('');
   const [flash, setFlash]                 = useState(null);
-  const [showQrScanner, setShowQrScanner] = useState(false);
-  const [qrManualInput, setQrManualInput] = useState('');
   const [tableSearch, setTableSearch] = useState('');
   const [codeInput, setCodeInput]   = useState('');
   const [codeError, setCodeError]   = useState('');
@@ -1050,19 +1048,9 @@ export default function AttendancePage() {
             onFocus={e => e.target.style.borderColor = 'var(--accent-gold)'}
             onBlur={e => e.target.style.borderColor = 'var(--border-subtle)'}
           />
-          {searchTerm ? (
+          {searchTerm && (
             <button aria-label={t('common.clearSearch')} onClick={clearSearch} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
               <X size={16} />
-            </button>
-          ) : (
-            <button
-              onClick={() => { setQrManualInput(''); setShowQrScanner(true); }}
-              title={t('attendance.scanQrCode')}
-              style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6, transition: 'color 0.15s' }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-gold)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-            >
-              <QrCode size={18} />
             </button>
           )}
         </div>
@@ -1303,62 +1291,6 @@ export default function AttendancePage() {
       <CheckOutModal open={!!checkoutModal} entry={checkoutModal?.entry} person={checkoutModal?.person} onClose={() => setCheckoutModal(null)} onConfirm={confirmCheckOut} {...checkoutResult} />
       <EditTimeModal open={!!editModal} entry={editModal?.entry} field={editModal?.field} onClose={() => { setEditModal(null); setEditError(''); }} onConfirm={confirmEdit} error={editError} />
 
-      {/* ── QR Scanner Overlay ───────────────────────────────────────────── */}
-      {showQrScanner && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowQrScanner(false)}>
-          <style>{`@keyframes gemScanLine { 0%{top:8%} 50%{top:88%} 100%{top:8%} }`}</style>
-          <DialogBox label={t('attendance.qrHoldBarcode')} onClose={() => setShowQrScanner(false)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }} onClick={e => e.stopPropagation()}>
-            {/* Viewfinder */}
-            <div style={{ position: 'relative', width: 260, height: 260, background: '#0a0a0f', borderRadius: 16, overflow: 'hidden' }}>
-              {/* Corners */}
-              {[['top','left'],['top','right'],['bottom','left'],['bottom','right']].map(([v, h]) => (
-                <div key={v+h} style={{ position: 'absolute', [v]: 8, [h]: 8, width: 28, height: 28,
-                  borderTop: v === 'top' ? '3px solid #c9a96e' : 'none',
-                  borderBottom: v === 'bottom' ? '3px solid #c9a96e' : 'none',
-                  borderLeft: h === 'left' ? '3px solid #c9a96e' : 'none',
-                  borderRight: h === 'right' ? '3px solid #c9a96e' : 'none',
-                  borderTopLeftRadius: v === 'top' && h === 'left' ? 6 : 0,
-                  borderTopRightRadius: v === 'top' && h === 'right' ? 6 : 0,
-                  borderBottomLeftRadius: v === 'bottom' && h === 'left' ? 6 : 0,
-                  borderBottomRightRadius: v === 'bottom' && h === 'right' ? 6 : 0,
-                }} />
-              ))}
-              {/* Scan line */}
-              <div style={{ position: 'absolute', left: 12, right: 12, height: 2, background: 'linear-gradient(90deg, transparent, #c9a96e, transparent)', animation: 'gemScanLine 2s ease-in-out infinite' }} />
-              <QrCode size={64} color="rgba(201,169,110,0.15)" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-            </div>
-            <p style={{ color: '#fff', fontSize: 13, textAlign: 'center', margin: 0, fontFamily: 'DM Sans', lineHeight: 1.6 }}>
-              {t('attendance.qrHoldBarcode')}
-              <br /><span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{t('attendance.qrOrManual')}</span>
-            </p>
-            {/* Manual entry */}
-            <div style={{ display: 'flex', gap: 8, width: 300 }}>
-              <input
-                autoFocus
-                value={qrManualInput}
-                onChange={e => setQrManualInput(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && qrManualInput.trim()) {
-                    handleSearch(qrManualInput.trim());
-                    setShowQrScanner(false);
-                  }
-                }}
-                placeholder={t('attendance.qrManualPlaceholder')}
-                style={{ ...inputStyle, flex: 1, background: 'rgba(255,255,255,0.08)', color: '#fff', borderColor: 'rgba(255,255,255,0.15)', fontFamily: 'DM Sans' }}
-              />
-              <button
-                style={{ ...primaryBtn, flexShrink: 0 }}
-                onClick={() => { if (qrManualInput.trim()) { handleSearch(qrManualInput.trim()); setShowQrScanner(false); } }}
-              >
-                {t('common.search')}
-              </button>
-            </div>
-            <button onClick={() => setShowQrScanner(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: 13, fontFamily: 'DM Sans', padding: '4px 12px' }}>
-              {t('common.cancel')}
-            </button>
-          </DialogBox>
-        </div>
-      )}
 
       {photoLightbox && (
         <DialogBox label={t('members.profilePhoto')} onClose={() => setPhotoLightbox(null)} onClick={() => setPhotoLightbox(null)} style={{ position:'fixed', inset:0, zIndex:2000, background:'rgba(0,0,0,0.88)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'zoom-out' }}>
