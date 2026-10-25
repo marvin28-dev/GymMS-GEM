@@ -18,6 +18,7 @@ import EodReport from '../components/EodReport';
 import RowMenu from '../components/ui/RowMenu';
 import Avatar from '../components/ui/Avatar';
 import Modal from '../components/ui/Modal';
+import ConfirmModal from '../components/ui/ConfirmModal';
 import { AddMemberModal, AddVisitorModal } from './MembersPage';
 import MemberProfilePage from './MemberProfilePage';
 import { getAll as getMembers, sendCode as sendMemberCode } from '../services/members.service';
@@ -580,6 +581,7 @@ export default function FrontDeskPage() {
       setMyCreatedTasks((res.data || []).filter(tk => String(tk.createdById) === String(myAccountId)));
     }).catch(() => {});
   };
+  const [taskToDelete, setTaskToDelete] = useState(null);
   const handleDeleteRaisedTask = async (taskId) => {
     setMyCreatedTasks(prev => prev.filter(tk => tk.id !== taskId));
     try { await removeTask(taskId); } catch (err) { console.error('Failed to delete task:', err); refreshMyTasks(); }
@@ -2112,6 +2114,8 @@ export default function FrontDeskPage() {
         })()}
       </Modal>
 
+
+      <ConfirmModal open={!!taskToDelete} onClose={() => setTaskToDelete(null)} onConfirm={() => handleDeleteRaisedTask(taskToDelete.id)} title={t('common.delete')} message={t('common.deleteNamedQ', { name: taskToDelete?.title || '' })} />
 
       {/* ── Add Member / Visitor Modals ── */}
       <AddMemberModal

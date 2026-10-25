@@ -21,6 +21,8 @@ test('a refused delete keeps the event open with the reason', async ({ page }) =
     ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Server is down for the test' }) })
     : route.fallback()));
   await dialog.getByRole('button', { name: 'Delete' }).click();
+  // D-25: a single event asks first
+  await page.getByRole('dialog', { name: 'Delete Event' }).getByRole('button', { name: 'Delete' }).click();
   await expect(dialog.getByText('Server is down for the test')).toBeVisible();
   expect((await call('GET', '/calendar', { token: owner.token })).some(e => e.title === 'Spin class refused')).toBe(true);
 });
@@ -29,6 +31,8 @@ test('a delete the server made closes the event', async ({ page }) => {
   const owner = await registerGym();
   const dialog = await openEvent(page, owner, 'Spin class deleted');
   await dialog.getByRole('button', { name: 'Delete' }).click();
+  // D-25: a single event asks first
+  await page.getByRole('dialog', { name: 'Delete Event' }).getByRole('button', { name: 'Delete' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect((await call('GET', '/calendar', { token: owner.token })).some(e => e.title === 'Spin class deleted')).toBe(false);
 });

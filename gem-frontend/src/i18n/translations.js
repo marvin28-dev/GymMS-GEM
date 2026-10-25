@@ -352,6 +352,11 @@ const translations = {
     },
     idle: { title: 'Are you still there?', body1: 'You’ve been inactive for a while.', body2: 'For your security, you’ll be logged out automatically.', secondsLeft: 'seconds remaining', logOut: 'Log out', stay: 'Yes, I’m still here' },
     common: {
+      notFoundTitle: 'Page not found',
+      notFoundText: 'The address may be mistyped, or the page has moved.',
+      notFoundHome: 'Go to GEM',
+      deleteNamedQ: 'Delete "{name}"? This cannot be undone.',
+      deleteEntryQ: 'Delete this entry? This cannot be undone.',
       period: 'Period',
       filterByCategory: 'Category to show',
       checkinsSince: 'Check-ins to show',
@@ -2555,6 +2560,11 @@ const translations = {
     },
     idle: { title: 'Êtes-vous toujours là ?', body1: 'Vous êtes inactif depuis un moment.', body2: 'Pour votre sécurité, vous serez déconnecté automatiquement.', secondsLeft: 'secondes restantes', logOut: 'Se déconnecter', stay: 'Oui, je suis là' },
     common: {
+      notFoundTitle: 'Page introuvable',
+      notFoundText: 'L\'adresse est peut-être mal saisie, ou la page a été déplacée.',
+      notFoundHome: 'Aller sur GEM',
+      deleteNamedQ: 'Supprimer « {name} » ? Cette action est irréversible.',
+      deleteEntryQ: 'Supprimer cette entrée ? Cette action est irréversible.',
       period: 'Période',
       filterByCategory: 'Catégorie à afficher',
       checkinsSince: 'Entrées à afficher',

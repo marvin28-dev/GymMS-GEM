@@ -6,6 +6,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import FAB from '../components/FAB';
 import { useLanguage } from '../contexts/LanguageContext';
 import Modal from '../components/ui/Modal';
+import ConfirmModal from '../components/ui/ConfirmModal';
 import Avatar from '../components/ui/Avatar';
 import BusyWarning from '../components/BusyWarning';
 import { getAll as getCalendar, create as createEvent, update as updateEvent, remove as removeEvent } from '../services/calendar.service';
@@ -273,7 +274,9 @@ export default function CalendarPage() {
     }
   };
 
-  const requestDelete = (evt) => { if (evt.seriesId) setDeleteTarget(evt); else handleDeleteEvent(evt, false); };
+  // A series asks which ones; a single event asks first too (D-25)
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const requestDelete = (evt) => { if (evt.seriesId) setDeleteTarget(evt); else setConfirmDelete(evt); };
   // A refused delete or invite answer keeps the event open with the reason
   // (F-120); it used to close as if done and leave the reload to contradict it.
   const handleDeleteEvent = async (evt, series = false) => {
@@ -790,6 +793,8 @@ export default function CalendarPage() {
           </div>
         </Modal>
       )}
+
+      <ConfirmModal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} onConfirm={() => handleDeleteEvent(confirmDelete, false)} title={t('calendar.deleteEvent')} message={t('common.deleteNamedQ', { name: confirmDelete?.title || '' })} />
 
       {/* Delete series choice */}
       <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title={t('calendar.deleteEvent')} maxWidth={400}>

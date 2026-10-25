@@ -5,6 +5,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import TrendChart from './ui/TrendChart';
 import WeekBars from './ui/WeekBars';
 import RowMenu from './ui/RowMenu';
+import ConfirmModal from './ui/ConfirmModal';
 import TrackPill from './ui/TrackPill';
 import LogProgressModal from './LogProgressModal';
 import GoalsModal from './GoalsModal';
@@ -164,6 +165,7 @@ export default function MemberProgressTab({ member, visits = [], onGoalsChanged 
   const kindLabel = (l) => (l.kind === 'note' && l.category && l.category !== 'general' ? t(`coach.noteCat_${l.category}`)
     : { session: t('coach.kindSession'), measure: t('coach.kindMeasure'), note: t('coach.kindNote'), followup: t('coach.kindFollowup') }[l.kind] || t('coach.kindNote'));
 
+  const [toDelete, setToDelete] = useState(null);
   const remove = async (id) => {
     setError('');
     setLogs(prev => prev.filter(l => l.id !== id));
@@ -433,7 +435,7 @@ export default function MemberProgressTab({ member, visits = [], onGoalsChanged 
                         <span style={{ fontSize: 11.5, color: 'var(--text-muted)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fmtDate(l.date, { weekday: 'short', day: 'numeric', month: 'short' })}{l.staff ? ` · ${l.staff.firstName} ${l.staff.lastName}` : ''}</span>
                         {canDelete && (
                           <span style={{ marginLeft: 'auto', flexShrink: 0 }}>
-                            <RowMenu title={t('common.actions')} items={[{ label: t('common.delete'), icon: <Trash2 size={15} />, onClick: () => remove(l.id), danger: true }]} />
+                            <RowMenu title={t('common.actions')} items={[{ label: t('common.delete'), icon: <Trash2 size={15} />, onClick: () => setToDelete(l.id), danger: true }]} />
                           </span>
                         )}
                       </div>
@@ -471,6 +473,8 @@ export default function MemberProgressTab({ member, visits = [], onGoalsChanged 
           </div>
         ))}
       </section>
+
+      <ConfirmModal open={!!toDelete} onClose={() => setToDelete(null)} onConfirm={() => remove(toDelete)} title={t('common.delete')} message={t('common.deleteEntryQ')} />
 
       <LogProgressModal
         open={!!logKind}
