@@ -25,6 +25,7 @@ All four were run in Phase 4 and pass: 1 in `journey-calendar.spec.mjs`, 2 and 3
 
 | Date | Phase | What happened |
 | :- | :- | :- |
+| 2026-10-25 | Decisions | Security, privacy and screens (section 8): D-3, D-45, D-24, D-36, D-41, D-34, D-33, D-46, D-12, D-51, D-8, D-37, D-43, D-42, D-39, D-38, D-25, D-6, D-49, D-53, D-48, c41eea1 to 2ff9f88. Three more additive migrations (revoked tokens, notification reads, email confirmation). A full browser run with the D-8 reminder in place found two problems of mine (the reminder's live region doubled a test's status message; a calendar test file edited mid-run) and Firefox timeouts under load; all fixed or passing on rerun. Unit 74/74, API 334/334 on the final code. |
 | 2026-10-24 | Decisions | Applying the section 7 decisions (see section 8): deployment (D-1, D-2, D-4, D-5, D-16, D-18, D-19, D-52) and money and data (D-17, D-20, D-21, D-22, D-26 to D-32, D-35, D-47, D-54) done, ee5155c to 5b053a9. Two additive migrations (payroll link and receipts, member notes). Prisma's AI guard refused `db push --force-reset` on gem_test for the unique index on PayRecord.expenseId; instead of a reset, that migration's own SQL (two added columns, an index, a foreign key) was applied to gem_test, which `migrate deploy` will do in production. A test of the old browser-kept member notes was replaced by its server-side form (5b053a9). |
 | 2026-10-24 | 8 | Final runs. Unit, API and the browser suite in all five profiles, twice in a row on one commit. Four earlier final runs each found one failure, fixed before starting again: an API race under full load (one of eight clock-ins at once answered 500; 99eaf9c, up to ten tries with growing random waits), and the light theme test on a phone three times (a click most likely lost to a late web font, 2a6d66b; then the dial-code button left partly below the screen, so the click's own scroll closed the list, bfa26e8). The two final runs on bfa26e8: 63 of 63 unit, 278 of 278 API, 798 of 798 browser, both times, in 15.5 and 15.1 minutes. AUDIT_REPORT.md written. |
 | 2026-10-24 | 8 | Second pass over the open findings. Fixed, each with a test that fails without the change: F-054 (6a853d3, two Sends or Retries at once mailed people twice), F-180 (fc97141), F-130 (c6c3ab5), F-153 and F-138 (c987473), F-082 (f5d2e41, a browser blocking site storage got the crash screen; it is now told what to allow), F-131 (983f298, the rest was done in step 10), F-173 (a) (5daf55a, the inactivity sign-out lands on the gym's own page), (b) and (g) (aaeb74a), (c) (29b3d3c), (e) (63ff34d, time card history is the person's or management's), F-091 in part (aeb7419), F-129 (4cea0be, checked on screenshots in light mode on desktop and phone), F-052 in part (afa39a4), F-013 in part (99d8947). Left for decisions: D-53 (the two phone-layout hooks), D-54 (an unknown payment method filed as cash), F-181 with D-28 (a refund that fails silently). A re-read of this session's server changes found one empty catch of my own in the shutdown (6613847). Seen once under load and not again in 6 runs alone: the J-12 renewal dialog not opening after a payment in Firefox; watch it in the final runs. Full browser run: 500 of 500 passed in 11.1 minutes, 250 in each browser, before 6613847. |
@@ -1064,3 +1065,28 @@ The owner asked for the recommended decisions to be made for them. Each is appli
 | D-47 | Reject on an earlier day's hand-set card stops its hours. | 8f606b0 |
 | D-31 | Pay history and bonuses for the owner and the person; "Paid this year". | 5877f7c (and ec4da1f earlier) |
 | D-32 | Member notes on the server (MemberNote), browser notes handed over once. | 5b053a9 |
+| D-3 | Signing out ends the token on the server (jti, RevokedToken, POST /api/auth/logout from clearAuth). The CSP half is D-45. | c41eea1 |
+| D-45 | Security headers in vercel.json (frame-ancestors, HSTS, nosniff, Referrer-Policy, Permissions-Policy); the content policy built into the page from VITE_API_URL and VITE_PHOTO_HOST. A full browser run found it blocked the ID Download (fixed in the same commit). | 2a0978c |
+| D-24 | GET /api/expenses and /api/sales for management and the desk only. | b1ee43b |
+| D-36, D-41, D-34, D-33 | 8-character passwords; a colleague's Pay, Notes and Clients off the desk; no placeholder video, figures, testimonials or "#1", 7-day trial everywhere; support contacts from VITE_SUPPORT_EMAIL / VITE_SUPPORT_WHATSAPP, hidden until set. | 3069e22 |
+| D-46 | Reading a gym-wide notice is per person (NotificationRead). | a43ffd3 |
+| D-12 | CI workflow (lint, unit, API on a PostgreSQL service; Chromium and Firefox jobs). Not run on GitHub from here. | c41cbc9 |
+| D-51 | scripts/move-logos.js lists, and with --apply moves, logos kept as data URLs. For the owner to run. | 0013c8c |
+| D-8 | New owners and changed addresses confirm by an emailed link; a reminder in the app; nothing locked. | ca815ca |
+| D-37, D-43 | Settings without behaviour removed; "task overdue" obeyed; the welcome email switch says it is the staff one. | 662008d |
+| D-42 | "Rest due by" removed from Add Visitor. | 2dcfb36 |
+| D-39 | The fake QR scanner removed. | 947ac56 |
+| D-38 | "Text from this device", and the dialog says the code shows in the message. | dce8d5f, 6dfca63 |
+| D-25 | A progress entry, a single event and a desk task ask before deleting. | 0e575f2, 6dfca63 |
+| D-6, D-49 | Zoom allowed, 16px form text on phones, GEM favicon, a not-found page. | f85c41b |
+| D-53 | One phone width, 768. | d7d6784 |
+| D-48 | Contrast tokens (light gold one step darker than decided, measured), --on-accent-gold, axe checks every rule in dark and light. | 2ff9f88 |
+| D-11 | Nothing to do: npm audit has been clean since Phase 3 with nodemon unchanged. | - |
+
+Not applied, and why:
+
+- D-50 (lint): the recommendation was to turn `react-hooks/set-state-in-effect` into a warning. That loosens a check, which the audit's rules forbid; the 47 problems stay as they are (none gives a wrong result, Phase 7), and CI lints the backend only until they are fixed properly.
+- D-13, D-15, D-44: deliberately not done (type-checking, money in minor units, ESLint 10), as recommended.
+- D-23 (emails in French) and D-40 (Settings on a phone): see the session log for where they stand.
+
+A slip in this stage, corrected: staging parts of a file by hunk with zero context put the D-38 hint between two buttons and left out D-25's desk row-menu line (6dfca63 corrects both). The browser tests had passed against the working copy. After that, partial files were staged from the committed version plus explicit edits, and the translations were compared key by key (6,450 keys, identical).
