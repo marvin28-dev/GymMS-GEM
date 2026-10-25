@@ -73,6 +73,23 @@ describe('task reminders', () => {
     const notes = await prisma.notification.findMany({ where: { gymId: gym.user.gymId, staffId: trainer.id, title: 'Task Overdue' } });
     expect(notes.some(n => /Fix the mirror/.test(n.body))).toBe(true);
   });
+
+  // D-37: the "task overdue" switch in Settings was never read
+  it('sends no overdue notice when the gym has switched them off, and none later for that task', async () => {
+    const other = await registerGym(api);
+    const worker = await addStaff(api, other, { role: 'trainer' });
+    expect((await api.patch('/api/gyms/me', { settings: { notifications: { taskOverdue: false, welcomeEmail: true } } }, { token: other.token })).status).toBe(200);
+    const yesterday = new Date(Date.now() - 2 * 864e5);
+    const late = await prisma.task.create({ data: { gymId: other.user.gymId, title: 'Paint the wall', category: 'Operations', status: 'todo', dueDate: yesterday, assignedToId: worker.id } });
+    const overdue = () => prisma.notification.findMany({ where: { gymId: other.user.gymId, staffId: worker.id, title: 'Task Overdue' } });
+    await backend('./jobs/taskReminders.js').runTaskReminders();
+    expect(await overdue()).toEqual([]);
+
+    await api.patch('/api/gyms/me', { settings: { notifications: { taskOverdue: true, welcomeEmail: true } } }, { token: other.token });
+    await backend('./jobs/taskReminders.js').runTaskReminders();
+    expect(await overdue()).toEqual([]);
+    expect((await prisma.task.findUnique({ where: { id: late.id } })).overdueNotifiedAt).not.toBe(null);
+  });
 });
 
 describe('giving a member a coach', () => {

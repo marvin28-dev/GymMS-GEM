@@ -31,15 +31,17 @@ const revertBtn = { ...secondaryBtn, display: 'inline-flex', alignItems: 'center
 const snap = (o) => JSON.stringify(o);
 const inputStyle = { width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '9px 14px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none' };
 
-// What a gym starts out accepting, until the owner says otherwise
+// What a gym starts out accepting, until the owner says otherwise. Only what
+// something reads is offered (D-37): tax rate, late fee and payment due days
+// were saved and used nowhere.
 const DEFAULT_PAYMENT_SETTINGS = {
-  currency: getCurrencyCode(), taxRate: '0', lateFee: '5', paymentDueDays: '30',
+  currency: getCurrencyCode(),
   // Every method until the gym chooses, Mobile Money included
   methods: PAYMENT_METHODS.map(m => m.key),
 };
-const DEFAULT_NOTIF_PREFS = {
-  expiryReminders: true, lowStockAlerts: true, taskOverdue: true, eodSummary: false, welcomeEmail: true,
-};
+// The task reminder job reads taskOverdue; staff creation reads welcomeEmail.
+// The expiry, low-stock and end-of-day switches had nothing behind them.
+const DEFAULT_NOTIF_PREFS = { taskOverdue: true, welcomeEmail: true };
 
 const SECTIONS = [
   { id: 'gym-identity' },
@@ -336,7 +338,6 @@ export default function SettingsPage() {
   };
 
   const [notifPrefs, setNotifPrefs] = useState(DEFAULT_NOTIF_PREFS);
-  const [autoRenew, setAutoRenew] = useState(() => localStorage.getItem('gem_auto_renew') === 'true');
   const [regFeeSettings, setRegFeeSettings] = useState({
     required: false, amount: 0, frequency: 'yearly', gracePeriod: 7,
   });
@@ -358,7 +359,6 @@ export default function SettingsPage() {
         settings: { freeze: { fee: Number(freezeFee.fee) || 0, intervalDays: Number(freezeFee.intervalDays) || 0 } },
       });
       notifyDataChanged();
-      store('gem_auto_renew', String(autoRenew));
       markConfirmed('membership');
       snapshotRegFee();
       setRegFeeSaved(true);
@@ -387,12 +387,7 @@ export default function SettingsPage() {
       const res = await updateMyGym({
         currency: paymentSettings.currency,
         settings: {
-          payment: {
-            taxRate: paymentSettings.taxRate,
-            lateFee: paymentSettings.lateFee,
-            paymentDueDays: paymentSettings.paymentDueDays,
-            methods: paymentSettings.methods,
-          },
+          payment: { methods: paymentSettings.methods },
           expenseLimit: limitVal > 0 ? limitVal : undefined,
         },
       });
@@ -438,9 +433,9 @@ export default function SettingsPage() {
   // The membership-defaults section owns both the auto-renew toggle and the
   // registration-fee fields, so the dirty check must cover both or Save/Revert
   // never light up when only auto-renew changes.
-  const regFeeDirty    = pristineRegFee != null && snap({ fee: regFeeSettings, autoRenew, freeze: freezeFee }) !== pristineRegFee;
-  const revertRegFee   = () => { if (pristineRegFee) { const p = JSON.parse(pristineRegFee); setRegFeeSettings(p.fee); setAutoRenew(p.autoRenew); if (p.freeze) setFreezeFee(p.freeze); } };
-  const snapshotRegFee = () => setPristineRegFee(snap({ fee: regFeeSettings, autoRenew, freeze: freezeFee }));
+  const regFeeDirty    = pristineRegFee != null && snap({ fee: regFeeSettings, freeze: freezeFee }) !== pristineRegFee;
+  const revertRegFee   = () => { if (pristineRegFee) { const p = JSON.parse(pristineRegFee); setRegFeeSettings(p.fee); if (p.freeze) setFreezeFee(p.freeze); } };
+  const snapshotRegFee = () => setPristineRegFee(snap({ fee: regFeeSettings, freeze: freezeFee }));
 
   const notifDirty     = pristineNotif != null && snap(notifPrefs) !== pristineNotif;
   const revertNotif    = () => { if (pristineNotif) setNotifPrefs(JSON.parse(pristineNotif)); setNotifError(''); };
@@ -491,12 +486,10 @@ export default function SettingsPage() {
         // on every device reads the same ones
         const s = g.settings || {};
         const loadedPayment = {
-          ...DEFAULT_PAYMENT_SETTINGS,
-          ...(s.payment || {}),
           currency: g.currency || DEFAULT_PAYMENT_SETTINGS.currency,
           methods: (s.payment?.methods?.length ? s.payment.methods : DEFAULT_PAYMENT_SETTINGS.methods),
         };
-        const loadedNotif = { ...DEFAULT_NOTIF_PREFS, ...(s.notifications || {}) };
+        const loadedNotif = Object.fromEntries(Object.entries(DEFAULT_NOTIF_PREFS).map(([k, on]) => [k, s.notifications?.[k] ?? on]));
         const loadedExpenseLimit = s.expenseLimit > 0 ? String(s.expenseLimit) : '50000';
         const loadedRegFee = {
           required: g.registrationFeeRequired ?? false,
@@ -512,7 +505,7 @@ export default function SettingsPage() {
         setFreezeFee(loadedFreeze);
         setPristinePayment(snap({ settings: loadedPayment, expenseLimit: loadedExpenseLimit }));
         setPristineNotif(snap(loadedNotif));
-        setPristineRegFee(snap({ fee: loadedRegFee, autoRenew: localStorage.getItem('gem_auto_renew') === 'true', freeze: loadedFreeze }));
+        setPristineRegFee(snap({ fee: loadedRegFee, freeze: loadedFreeze }));
       })
       .catch(() => { if (alive) setGymLoadFailed(true); });
     return () => { alive = false; };
@@ -1200,18 +1193,6 @@ export default function SettingsPage() {
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <Label>{t('settings.taxRate')}</Label>
-                    <input type="number" data-decimal style={inputStyle} value={paymentSettings.taxRate} onChange={e => setPS('taxRate', e.target.value)} />
-                  </div>
-                  <div>
-                    <Label>{t('settings.lateFee')}</Label>
-                    <input type="number" style={inputStyle} value={paymentSettings.lateFee} onChange={e => setPS('lateFee', e.target.value)} />
-                  </div>
-                  <div>
-                    <Label>{t('settings.paymentDueDays')}</Label>
-                    <input type="number" style={inputStyle} value={paymentSettings.paymentDueDays} onChange={e => setPS('paymentDueDays', e.target.value)} />
-                  </div>
                 </div>
                 <div>
                   <Label>{t('settings.acceptedMethods')}</Label>
@@ -1261,18 +1242,6 @@ export default function SettingsPage() {
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.membershipDefaults')}</span>
               </div>
               <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div><Label>{t('settings.gracePeriodDays')}</Label><input type="number" style={inputStyle} defaultValue="3" /></div>
-                  <div><Label>{t('settings.maxFreezeDays')}</Label><input type="number" style={inputStyle} defaultValue="60" /></div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid var(--border-subtle)' }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{t('settings.autoRenew')}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.autoRenewDesc')}</div>
-                  </div>
-                  <Toggle label={t('settings.autoRenew')} value={autoRenew} onChange={v => setAutoRenew(v)} />
-                </div>
-
                 {/* ── Registration Fee ── */}
                 <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden', marginTop: 4 }}>
                   <div style={{ padding: '12px 16px', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1359,13 +1328,10 @@ export default function SettingsPage() {
               </div>
               <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 0 }}>
                 {[
-                  { key: 'expiryReminders', label: t('settings.notifExpiryLabel'), desc: t('settings.notifExpiryDesc') },
-                  { key: 'lowStockAlerts', label: t('settings.notifStockLabel'), desc: t('settings.notifStockDesc') },
                   { key: 'taskOverdue', label: t('settings.notifTaskLabel'), desc: t('settings.notifTaskDesc') },
-                  { key: 'eodSummary', label: t('settings.notifEodLabel'), desc: t('settings.notifEodDesc') },
                   { key: 'welcomeEmail', label: t('settings.notifWelcomeLabel'), desc: t('settings.notifWelcomeDesc') },
-                ].map((p, i) => (
-                  <div key={p.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: i < 4 ? '1px solid var(--border-subtle)' : 'none' }}>
+                ].map((p, i, all) => (
+                  <div key={p.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '16px 0', borderBottom: i < all.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{p.label}</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{p.desc}</div>

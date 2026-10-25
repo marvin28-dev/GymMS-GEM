@@ -36,6 +36,7 @@ async function runTaskReminders() {
       select: {
         id: true, gymId: true, title: true, dueDate: true,
         assignedToId: true, dueSoonNotifiedAt: true, overdueNotifiedAt: true,
+        gym: { select: { settings: true } },
       },
     });
 
@@ -46,6 +47,14 @@ async function runTaskReminders() {
 
       if (now >= dueAt) {
         if (task.overdueNotifiedAt) continue;
+        // The gym's "task overdue" switch (Settings, Notifications) was shown
+        // but never read, so the notices kept coming with it off (D-37). Off,
+        // the task is stamped as told, so turning it on again does not
+        // announce every old one at once.
+        if (task.gym?.settings?.notifications?.taskOverdue === false) {
+          await prisma.task.update({ where: { id: task.id }, data: { overdueNotifiedAt: now, dueSoonNotifiedAt: task.dueSoonNotifiedAt || now } });
+          continue;
+        }
         await prisma.notification.create({
           data: {
             gymId: task.gymId,
