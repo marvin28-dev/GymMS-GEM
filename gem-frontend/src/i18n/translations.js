@@ -777,6 +777,7 @@ const translations = {
       setupRequired: 'Setup required. Click to configure.',
     },
     staff: {
+      payOwnerOnly: 'Pay history, bonuses and deductions are seen by the gym owner and the employee only.',
       noteFailedAfterCreate: 'The note could not be saved. Add it again on their profile, in Notes.',
       adjBonuses: 'Bonuses',
       adjDeductions: 'Deductions',
@@ -813,7 +814,7 @@ const translations = {
       issuePayNotePh: 'e.g. Includes performance bonus, deducted 2 sick days...',
       confirmRecord: 'Confirm & Record',
       issuedOn: 'Issued On',
-      totalPaidYtd: 'Total paid (YTD)',
+      totalPaidYtd: 'Paid this year',
       noteBy: 'by {name}',
       earningsAmount: '{amount} earnings',
       deductionsAmount: '− {amount} deductions',
@@ -2967,6 +2968,7 @@ const translations = {
       setupRequired: 'Configuration requise. Cliquez pour configurer.',
     },
     staff: {
+      payOwnerOnly: 'L\'historique de paie, les primes et les retenues ne sont visibles que par le propriétaire de la salle et l\'employé.',
       noteFailedAfterCreate: 'La note n’a pas pu être enregistrée. Ajoutez-la de nouveau sur son profil, dans Notes.',
       adjBonuses: 'Primes',
       adjDeductions: 'Déductions',
@@ -3003,7 +3005,7 @@ const translations = {
       issuePayNotePh: 'ex. Inclut une prime de performance, 2 jours de maladie déduits...',
       confirmRecord: 'Confirmer et enregistrer',
       issuedOn: 'Émis le',
-      totalPaidYtd: 'Total payé (depuis janvier)',
+      totalPaidYtd: 'Payé cette année',
       noteBy: 'par {name}',
       earningsAmount: '{amount} de gains',
       deductionsAmount: '− {amount} de déductions',

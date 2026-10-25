@@ -285,6 +285,9 @@ export default function StaffProfilePage() {
   const canChangeStatus = role === 'general_manager' && managesTarget;
   // Pay is the owner's alone, on the server as well as here
   const canEditPayroll = role === 'general_manager';
+  // Pay history, bonuses and deductions are the owner's and the person's own;
+  // the server refuses them to anyone else, so a manager is told so (D-31)
+  const seesPayDetails = canEditPayroll || isSelf;
   const canEditSchedule = managesTarget;
 
   // Notes
@@ -1359,7 +1362,18 @@ export default function StaffProfilePage() {
     { key: 'extra', label: t('staff.bonusesExtras'), value: recurringBonusTotal ? `+${formatMoney(recurringBonusTotal)}` : formatMoney(0), icon: TrendingUp, color: 'var(--accent-green)', dim: 'var(--accent-green-dim)' },
     { key: 'deduct', label: t('staff.deductionsLabel'), value: recurringDeductionTotal ? `−${formatMoney(recurringDeductionTotal)}` : formatMoney(0), icon: TrendingDown, color: 'var(--accent-red)', dim: 'var(--accent-red-dim)' },
     { key: 'net', label: t('staff.estNetPay'), value: formatMoney(monthlyNetPay), icon: Banknote, color: 'var(--accent-gold)', dim: 'var(--accent-gold-dim)', total: true },
-  ];
+  ].filter(tile => seesPayDetails || tile.key === 'base' || (isPartTime && tile.key === 'extra'));
+  // Paid this year, by the day it was paid: issued pay not yet handed over and
+  // earlier years left out
+  const paidThisYear = payHistory
+    .filter(p => p.status === 'paid' && p.paidAt && new Date(p.paidAt).getFullYear() === new Date().getFullYear())
+    .reduce((s, p) => s + p.grossPay, 0);
+  const payOwnerOnly = (
+    <div role="note" style={{ ...cardStyle, borderRadius: isMobile ? 12 : 14, padding: isMobile ? 14 : '16px 18px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'DM Sans', lineHeight: 1.5 }}>
+      <Lock size={14} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+      {t('staff.payOwnerOnly')}
+    </div>
+  );
 
   const payFieldLabel = { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', fontFamily: 'DM Sans', minWidth: 0 };
   const paySummary = (
@@ -1400,7 +1414,7 @@ export default function StaffProfilePage() {
           )}
         </div>
       )}
-      <div className="gem-pay-tiles" style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : 4}, minmax(0, 1fr))`, gridAutoRows: '1fr', gap: isMobile ? 10 : 14 }}>
+      <div className="gem-pay-tiles" style={{ display: 'grid', gridTemplateColumns: `repeat(${payTiles.length < 4 ? payTiles.length : (isMobile ? 2 : 4)}, minmax(0, 1fr))`, gridAutoRows: '1fr', gap: isMobile ? 10 : 14 }}>
         {payTiles.map(c => (
           <div key={c.key} data-pay-tile={c.key} style={{
             ...cardStyle, borderRadius: isMobile ? 12 : 14, padding: isMobile ? '12px 14px' : '16px 18px', minWidth: 0,
@@ -2008,6 +2022,7 @@ export default function StaffProfilePage() {
           <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {sectionProblem('pay')}
             {paySummary}
+            {seesPayDetails ? (<>
             {/* Bonuses, deductions and the pay they add up to - one card */}
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden' }}>
               {ADJ_KINDS.map((g, gi) => {
@@ -2096,7 +2111,14 @@ export default function StaffProfilePage() {
                   {r.note && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: 2 }}>{r.note}</div>}
                 </div>
               ))}
+              {payRecords.length > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, paddingTop: 10, marginTop: 4, borderTop: '1px solid var(--border-subtle)', fontFamily: 'DM Sans' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('staff.totalPaidYtd')}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-gold)', fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(paidThisYear)}</span>
+                </div>
+              )}
             </div>
+            </>) : payOwnerOnly}
             {/* Only hourly staff are clocked, so only they have a time log */}
             {isPartTime && (
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px' }}>
@@ -2908,6 +2930,7 @@ export default function StaffProfilePage() {
           {sectionProblem('pay', { marginBottom: 12 })}
           <div style={{ marginBottom: 16 }}>{paySummary}</div>
 
+          {seesPayDetails ? (<>
           {/* One card: the two ledgers side by side, and the pay they add up to */}
           <div style={{ ...cardStyle, marginBottom: 16, overflow: 'hidden' }}>
             <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
@@ -3034,7 +3057,7 @@ export default function StaffProfilePage() {
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', gap: 10 }}>
                         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('staff.totalPaidYtd')}</span>
                         <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-gold)', fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>
-                          {formatMoney(payHistory.reduce((s, p) => s + p.grossPay, 0))}
+                          {formatMoney(paidThisYear)}
                         </span>
                       </div>
                     </td>
@@ -3043,6 +3066,7 @@ export default function StaffProfilePage() {
               )}
             </table></div>
           </div>
+          </>) : payOwnerOnly}
 
           {/* Only hourly staff are clocked, so only they have a time log */}
           {isPartTime && (
