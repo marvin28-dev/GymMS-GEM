@@ -55,7 +55,8 @@ export default defineConfig({
       command: webCommand,
       cwd: 'gem-frontend',
       url: WEB_ORIGIN,
-      env: { VITE_API_URL: API_URL },
+      // The fake photo store's address, so the page's content policy lets its photos in
+      env: { VITE_API_URL: API_URL, VITE_PHOTO_HOST: 'https://res.cloudinary.test' },
       timeout: 240_000,
       reuseExistingServer: false,
     },
