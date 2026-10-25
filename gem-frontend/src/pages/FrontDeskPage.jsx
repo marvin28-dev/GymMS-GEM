@@ -1896,7 +1896,7 @@ export default function FrontDeskPage() {
                   </div>
                   <StatusBadge status={tk.status.toLowerCase()} />
                   <RowMenu title={t('common.actions')} items={[
-                    { label: t('common.delete'), icon: <Trash2 size={15} />, onClick: () => handleDeleteRaisedTask(tk.id), danger: true },
+                    { label: t('common.delete'), icon: <Trash2 size={15} />, onClick: () => setTaskToDelete(tk), danger: true },
                   ]} />
                 </div>
               ))}
@@ -2172,11 +2172,11 @@ export default function FrontDeskPage() {
                 <button onClick={emailCodeToMember} disabled={sendingCode} style={{ ...secondaryBtn, flex:1, justifyContent:'center', padding:'7px 10px', fontSize:11.5, opacity:sendingCode?0.6:1, cursor:sendingCode?'default':'pointer' }}><Mail size={13}/> {t('frontDesk.sendByEmail')}</button>
                 <button onClick={textCodeToMember} style={{ ...secondaryBtn, flex:1, justifyContent:'center', padding:'7px 10px', fontSize:11.5 }}><MessageSquare size={13}/> {t('frontDesk.sendByText')}</button>
               </div>
+              <div style={{ marginTop:8, fontSize:11, color:'var(--text-muted)', fontFamily:'DM Sans', lineHeight:1.5 }}>{t('frontDesk.textCodeHint')}</div>
               {sendCodeMsg && <div style={{ marginTop:8, fontSize:11, fontFamily:'DM Sans', color: sendCodeSent ? '#34d399' : 'var(--accent-red)' }}>{sendCodeMsg}</div>}
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
               <button style={secondaryBtn} onClick={()=>{ setShowCodeEntry(false); setCodeEntered(''); setCodeError(''); setSendCodeSent(false); setSendCodeMsg(''); }}>{t('common.cancel')}</button>
-              <div style={{ marginTop:8, fontSize:11, color:'var(--text-muted)', fontFamily:'DM Sans', lineHeight:1.5 }}>{t('frontDesk.textCodeHint')}</div>
               <button style={{ ...primaryBtn, opacity:codeEntered.trim()?1:0.4, cursor:codeEntered.trim()?'pointer':'not-allowed' }} disabled={!codeEntered.trim()} onClick={handleCodeVerifyCheckIn}>
                 <UserCheck size={13}/> {t('frontDesk.checkIn')}
               </button>
