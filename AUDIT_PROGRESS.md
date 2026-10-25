@@ -25,6 +25,7 @@ All four were run in Phase 4 and pass: 1 in `journey-calendar.spec.mjs`, 2 and 3
 
 | Date | Phase | What happened |
 | :- | :- | :- |
+| 2026-10-25 | 8 | Final runs on 019525c, twice in a row: unit 74/74 and 74/74, API 338/338 and 338/338, the browser suite in all five profiles 936 passed and 6 skipped by design both times (21.7 and 22.4 minutes). Lint unchanged (backend clean, frontend 47 for D-50). AUDIT_REPORT.md rebuilt for the state after the decisions: the verdict, the owner's steps, every finding's outcome, the decisions applied and the pre-launch list. |
 | 2026-10-25 | 8 | Final runs after the decisions. The first browser run in all five profiles on 336f7c9 passed 928 of 937 (6 skipped by design) and found 3 failures: J-27 in Chromium and Firefox clicked the only "Français" on Settings, Language, and D-23 had added a second (7e59805: each choice is now a labelled group of buttons, which also gives the screen's language choice to the keyboard; it was a clickable box); and sign-up's light-theme test in Firefox lost a click, 1 in 30 when repeated alone, because a web font arriving after document.fonts.ready moved the button half its height between the press and the release (0f1904d: the tests wait for the fonts by name; 60 of 60 after). CLAUDE.md's stale lines corrected (open question 2), TESTING_CHECKLIST updated for the decisions (sections 1, 20 and 25). |
 | 2026-10-25 | Decisions | D-23 and D-40 (4b26885, d2b63ae): members' emails in English or French, and Settings on a phone as an accordion of the desk's panels (the first phone layout opened the desk's default section below the whole list, out of sight, so the first tap closed it; the browser test caught it). Findings whose decision was applied now carry that status in section 6. Unit 74/74, API 338/338. |
 | 2026-10-25 | Decisions | Security, privacy and screens (section 8): D-3, D-45, D-24, D-36, D-41, D-34, D-33, D-46, D-12, D-51, D-8, D-37, D-43, D-42, D-39, D-38, D-25, D-6, D-49, D-53, D-48, c41eea1 to 2ff9f88. Three more additive migrations (revoked tokens, notification reads, email confirmation). A full browser run with the D-8 reminder in place found two problems of mine (the reminder's live region doubled a test's status message; a calendar test file edited mid-run) and Firefox timeouts under load; all fixed or passing on rerun. Unit 74/74, API 334/334 on the final code. |
@@ -1047,7 +1048,7 @@ Severity: Critical, High, Medium, Low. Status: Open, Fixed, Needs decision, Won'
 
 ## 8. Decisions applied
 
-The owner asked for the recommended decisions to be made for them. Each is applied with a test that fails without it.
+The owner asked for the recommended decisions to be made for them. Each one that changes behaviour came with a test that fails without it; the two removals (delete-all.js, D-5; the QR scanner drawing, D-39), the CI workflow (D-12) and the wording of D-38 had none.
 
 | Decision | Done | Commit |
 | :- | :- | :- |
