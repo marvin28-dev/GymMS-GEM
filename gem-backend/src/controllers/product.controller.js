@@ -42,6 +42,20 @@ function invalid(data, creating) {
   return null;
 }
 
+// What a product sells for, what it costs, its offer and whether it is sold
+// are management's: the desk once could put an item at 99% off, or move its
+// cost and with it the profit that revenue is built on (D-35). The desk still
+// adds products, with their price and cost, edits their details and restocks.
+const PRICING = { price: 'selling price', costPrice: 'cost price', discountPercent: 'offer', isActive: 'whether it is sold' };
+const isManagement = (req) => ['general_manager', 'manager'].includes(req.user.role);
+function pricingRefusal(req, data, existing) {
+  if (isManagement(req)) return null;
+  const field = Object.keys(PRICING).find(k => k in data && (existing
+    ? (data[k] ?? null) !== (existing[k] ?? null)
+    : (k === 'discountPercent' && data[k] != null) || (k === 'isActive' && data[k] === false)));
+  return field ? { error: `Only a manager can change a product's ${PRICING[field]}.`, field } : null;
+}
+
 const codeTakenError = (code) => ({ error: `The code ${code} is already used by another product.`, field: 'code' });
 
 // Two products given one code at the same moment both pass codeTaken; the
@@ -66,6 +80,8 @@ async function create(req, res) {
   const data = extractKnownFields(req.body);
   const problem = invalid(data, true);
   if (problem) return res.status(400).json({ error: problem });
+  const refused = pricingRefusal(req, data, null);
+  if (refused) return res.status(403).json(refused);
   if (await codeTaken(req.user.gymId, data.code)) return res.status(409).json(codeTakenError(data.code));
   let product;
   try {
@@ -92,6 +108,8 @@ async function update(req, res) {
   delete data.stock;
   const problem = invalid(data, false);
   if (problem) return res.status(400).json({ error: problem });
+  const refused = pricingRefusal(req, data, existing);
+  if (refused) return res.status(403).json(refused);
   if (data.code && await codeTaken(req.user.gymId, data.code, existing.id)) return res.status(409).json(codeTakenError(data.code));
 
   let product;

@@ -1109,6 +1109,8 @@ const translations = {
 
     },
     sales: {
+      pricesManagers: 'Only a manager can change the prices, the offer or whether it is sold.',
+      offerManagers: 'A manager can put it on offer later.',
       authDeleteProduct: 'delete the product "{name}"',
       authRemoveCategory: 'remove the category "{name}"',
       lastCategory: 'The last category cannot be removed',
@@ -3295,6 +3297,8 @@ const translations = {
 
     },
     sales: {
+      pricesManagers: 'Seul un manager peut modifier les prix, l\'offre ou la mise en vente.',
+      offerManagers: 'Un manager pourra la mettre en promotion plus tard.',
       authDeleteProduct: 'supprimer le produit « {name} »',
       authRemoveCategory: 'retirer la catégorie « {name} »',
       lastCategory: 'La dernière catégorie ne peut pas être retirée',

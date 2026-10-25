@@ -63,6 +63,10 @@ async function create(req, res) {
   if (paidBy.error) return res.status(400).json(paidBy);
   const dbMethod = paidBy.method;
   const discountPct = Math.max(0, Math.min(100, Number(discount) || 0));
+  // A discount on a sale is management's, so the desk cannot give one away (D-35)
+  if (discountPct > 0 && !['general_manager', 'manager'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Only a manager can give a discount on a sale.', field: 'discount' });
+  }
 
   // Validate all products exist and have enough stock
   const productIds = items.map(i => i.productId);

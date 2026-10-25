@@ -81,3 +81,36 @@ test('J-17: the front desk sells from its cart, and the day\'s sales panel lists
   await expect(page.getByText(name).first()).toBeVisible();
   await expect(page.getByText(amount(3000)).first()).toBeVisible();
 });
+
+// D-35: the desk adds products, edits their details and restocks; prices,
+// offers and a discount on a sale are a manager's
+test("J-17: the desk renames a product but cannot change its prices or discount a sale", async ({ page }) => {
+  const owner = await registerGym();
+  const desk = await addStaff(owner, { role: 'front_desk' });
+  const name = `Desk Bar ${uniqueCode('d').slice(-4)}`;
+  const made = await call('POST', '/products', { token: owner.token, body: { name, code: uniqueCode('DB').toUpperCase(), category: 'Snacks', price: 10000, costPrice: 6000, stock: 5 } });
+  await signIn(page, desk);
+  await page.goto('/sales');
+  await expect(page.getByLabel(/^Quantity/).first()).toBeVisible();
+  await expect(page.getByLabel('Discount (%)')).toHaveCount(0);
+
+  await page.getByRole('row').filter({ hasText: name }).getByRole('button', { name: 'Actions' }).click();
+  await page.getByRole('menuitem', { name: 'Edit' }).click();
+  const form = page.getByRole('dialog');
+  await expect(form.getByLabel(/^Selling Price/)).toHaveAttribute('readonly', '');
+  await expect(form.getByLabel(/^Cost Price/)).toHaveAttribute('readonly', '');
+  await expect(form.getByText('Only a manager can change the prices')).toBeVisible();
+  await form.getByLabel(/^Product Name/).fill(`${name} XL`);
+  await form.getByRole('button', { name: 'Save Product' }).click();
+  await expect(form).toHaveCount(0);
+  const kept = (await call('GET', '/products', { token: owner.token })).find(p => p.id === made.id);
+  expect(kept).toMatchObject({ name: `${name} XL`, price: 10000, costPrice: 6000 });
+});
+
+test('J-17: a manager sees the discount on Quick Sale', async ({ page }) => {
+  const owner = await registerGym();
+  await call('POST', '/products', { token: owner.token, body: { name: 'Manager Bar', code: uniqueCode('MB').toUpperCase(), category: 'Snacks', price: 1000, costPrice: 600, stock: 5 } });
+  await signIn(page, owner);
+  await page.goto('/sales');
+  await expect(page.getByLabel('Discount (%)')).toHaveCount(1);
+});

@@ -103,6 +103,32 @@ describe('a product', () => {
     const { body: p } = await product();
     expect((await api.del(`/api/products/${p.id}`, { token: desk.token })).status).toBe(403);
   });
+
+  // D-35: the desk could put an item at 99% off, or move its cost and with it
+  // the profit that revenue is built on
+  it("has its prices, offer and sale status set by management; the desk adds, edits details and restocks", async () => {
+    const added = await product({ name: 'Desk Water' }, desk.token);
+    expect(added.status).toBe(201);
+    const p = added.body;
+    expect((await product({ discountPercent: 10 }, desk.token)).body.field).toBe('discountPercent');
+
+    const asDesk = (body) => api.patch(`/api/products/${p.id}`, body, { token: desk.token });
+    // The edit form sends every field back unchanged; only the name moves
+    const renamed = await asDesk({ name: 'Still Water', price: p.price, costPrice: p.costPrice, discountPercent: null, status: 'active' });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.name).toBe('Still Water');
+    for (const [body, field] of [[{ price: 1 }, 'price'], [{ costPrice: 1 }, 'costPrice'], [{ discountPercent: 50 }, 'discountPercent'], [{ status: 'inactive' }, 'isActive']]) {
+      const refused = await asDesk(body);
+      expect(refused.status, field).toBe(403);
+      expect(refused.body.field).toBe(field);
+    }
+    expect((await api.post(`/api/products/${p.id}/restock`, { quantity: 2 }, { token: desk.token })).status).toBe(200);
+    const kept = (await api.get('/api/products', { token: gym.token })).body.find(x => x.id === p.id);
+    expect(kept).toMatchObject({ name: 'Still Water', price: 10000, costPrice: 6000, discountPercent: null, isActive: true, stock: 12 });
+
+    const manager = await addStaff(api, gym, { role: 'manager' });
+    expect((await api.patch(`/api/products/${p.id}`, { price: 12000, discountPercent: 10 }, { token: manager.token })).body).toMatchObject({ price: 12000, discountPercent: 10 });
+  });
 });
 
 describe('a sale', () => {
@@ -178,6 +204,21 @@ describe('a sale', () => {
     expect(on.body.some(s => s.id === sale.id)).toBe(true);
     const next = await api.get(`/api/sales?date=${dayAfter}&tz=-60`, { token: gym.token });
     expect(next.body.some(s => s.id === sale.id)).toBe(false);
+  });
+});
+
+// D-35: a discount on the whole sale, up to 100%, could be typed at any desk
+describe('a discount on a sale', () => {
+  it('is given by management only, and a refused sale takes no stock', async () => {
+    const { body: p } = await product({ price: 10000, stock: 5 });
+    const refused = await sell([{ productId: p.id, quantity: 1 }], { discount: 50 });
+    expect(refused.status).toBe(403);
+    expect(refused.body.field).toBe('discount');
+    expect(await stockOf(p.id)).toBe(5);
+    const given = await sell([{ productId: p.id, quantity: 1 }], { discount: 10 }, gym.token);
+    expect(given.status).toBe(201);
+    expect(given.body.total).toBe(9000);
+    expect((await sell([{ productId: p.id, quantity: 1 }], { discount: 0 })).status).toBe(201);
   });
 });
 

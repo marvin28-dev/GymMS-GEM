@@ -36,6 +36,8 @@ import { setProductCategories as saveProductCategories } from '../services/gym.s
 import { enabledMethods, PAYMENT_METHODS, canonicalMethod } from '../utils/paymentMethods';
 import { suggestProductCode } from '../utils/productCode';
 import { digitsOnly } from '../utils/number';
+import { getAuth } from '../utils/auth';
+import { isManagement } from '../utils/hierarchy';
 
 const primaryBtn = {
   background: 'linear-gradient(135deg, #c9a96e, #b08d4a)',
@@ -171,9 +173,12 @@ function ProfitLine({ form, editing }) {
 
 // Adding or editing a product. The code is required; while the staff haven't
 // typed one, it follows the name as a suggestion they can keep or change.
-function AddProductModal({ open, onClose, onSave, initial, categories, takenCodes }) {
+function AddProductModal({ open, onClose, onSave, initial, categories, takenCodes, canPrice }) {
   const { t } = useLanguage();
   const editing = !!initial?.id;
+  // The desk adds a product with its price and cost; changing them later is management's (D-35)
+  const pricesLocked = editing && !canPrice;
+  const lockedLook = { opacity: 0.6, cursor: 'not-allowed' };
   const [form, setForm] = useState(() => ({ ...emptyProductForm, ...(initial || {}), code: initial?.code || '' }));
   const [codeTouched, setCodeTouched] = useState(editing);
   const [errors, setErrors] = useState({});
@@ -236,11 +241,13 @@ function AddProductModal({ open, onClose, onSave, initial, categories, takenCode
             style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '9px 14px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
           />
         </div>
-        <GemInput label={t('sales.costPrice')} required={!editing} error={errors.costPrice} type="text" inputMode="numeric" value={form.costPrice ?? ''} onChange={e => set('costPrice', digitsOnly(e.target.value))} placeholder="0" />
-        <GemInput label={t('sales.sellingPrice')} required error={errors.price} type="text" inputMode="numeric" value={form.price ?? ''} onChange={e => set('price', digitsOnly(e.target.value))} placeholder="0" />
+        <GemInput label={t('sales.costPrice')} required={!editing} error={errors.costPrice} type="text" inputMode="numeric" value={form.costPrice ?? ''} onChange={e => set('costPrice', digitsOnly(e.target.value))} placeholder="0" readOnly={pricesLocked} style={pricesLocked ? lockedLook : {}} />
+        <GemInput label={t('sales.sellingPrice')} required error={errors.price} type="text" inputMode="numeric" value={form.price ?? ''} onChange={e => set('price', digitsOnly(e.target.value))} placeholder="0" readOnly={pricesLocked} style={pricesLocked ? lockedLook : {}} />
+        {pricesLocked && <div style={{ gridColumn: '1 / -1', fontSize: 11.5, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginTop: -6 }}>{t('sales.pricesManagers')}</div>}
         <div style={{ gridColumn: '1 / -1' }}><ProfitLine form={form} editing={editing} /></div>
         <div>
-          <GemInput label={t('sales.productDiscount')} error={errors.discountPercent} type="text" inputMode="numeric" value={form.discountPercent ?? ''} onChange={e => set('discountPercent', digitsOnly(e.target.value).slice(0, 2))} placeholder="0" />
+          <GemInput label={t('sales.productDiscount')} error={errors.discountPercent} type="text" inputMode="numeric" value={form.discountPercent ?? ''} onChange={e => set('discountPercent', digitsOnly(e.target.value).slice(0, 2))} placeholder="0" readOnly={!canPrice} style={!canPrice ? lockedLook : {}} />
+          {!canPrice && !editing && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, fontFamily: 'DM Sans' }}>{t('sales.offerManagers')}</div>}
           {Number(form.discountPercent) > 0 && Number(form.price) > 0 && (
             <div style={{ fontSize: 11, color: 'var(--accent-green)', marginTop: 4, fontFamily: 'DM Sans' }}>{t('sales.sellsAt', { amount: formatMoney(saleUnitPrice({ price: form.price, discountPercent: form.discountPercent })) })}</div>
           )}
@@ -255,6 +262,7 @@ function AddProductModal({ open, onClose, onSave, initial, categories, takenCode
           value={form.status}
           onChange={e => set('status', e.target.value)}
           options={[{ value: 'active', label: t('common.active') }, { value: 'inactive', label: t('common.inactive') }]}
+          disabled={!canPrice}
         />
       </div>
       {apiError && <div style={{ marginTop: 14, fontSize: 12, color: 'var(--accent-red)', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 8, padding: '9px 12px' }}>{apiError}</div>}
@@ -350,6 +358,8 @@ export default function SalesPage() {
   const [selectedProduct, setSelectedProduct] = useState('');
   const [qty, setQty] = useState('1');
   const [discount, setDiscount] = useState('');
+  // Prices, offers and a discount on a sale are management's (D-35)
+  const canPrice = isManagement(getAuth()?.user?.role);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
 
   const [shopLoading, setShopLoading] = useState(() => !cache.has('products'));
@@ -569,6 +579,7 @@ export default function SalesPage() {
           initial={editProduct}
           categories={categories}
           takenCodes={takenCodes(editProduct?.id)}
+          canPrice={canPrice}
           key={editProduct?.id ?? 'new'}
         />
       )}
@@ -666,15 +677,17 @@ export default function SalesPage() {
                     </select>
                     {productInfo && <div style={{ marginTop: 8 }}>{productInfo}</div>}
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: canPrice ? '1fr 1fr' : '1fr', gap: 10, marginBottom: 12 }}>
                     <div>
                       <label style={lbl}>{t('sales.qty')} *</label>
                       <input type="text" inputMode="numeric" value={qty} onChange={e => setQty(digitsOnly(e.target.value))} style={box} />
                     </div>
+                    {canPrice && (
                     <div>
                       <label style={lbl}>{t('sales.discount')}</label>
                       <input type="text" inputMode="numeric" value={discount} onChange={e => setDiscount(digitsOnly(e.target.value).slice(0, 3))} placeholder="0" style={box} />
                     </div>
+                    )}
                   </div>
                   {qtyProblem && <div style={{ fontSize: 12, color: 'var(--accent-red)', marginBottom: 10, fontFamily: 'DM Sans' }}>{qtyProblem}</div>}
                   <div style={{ marginBottom: 14 }}>
@@ -768,10 +781,10 @@ export default function SalesPage() {
           <div style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('sales.nothingToSell')}</div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2.2fr) repeat(4, minmax(0, 1fr))', gap: 14, alignItems: 'end' }} className="gem-two-col">
+            <div style={{ display: 'grid', gridTemplateColumns: `minmax(0, 2.2fr) repeat(${canPrice ? 4 : 3}, minmax(0, 1fr))`, gap: 14, alignItems: 'end' }} className="gem-two-col">
               <GemSelect label={t('sales.product')} required value={selectedProduct} onChange={e => setSelectedProduct(e.target.value)} options={forSale.map(productOption)} />
               <GemInput label={t('sales.quantity')} required type="text" inputMode="numeric" value={qty} onChange={e => setQty(digitsOnly(e.target.value))} error={qtyProblem || undefined} />
-              <GemInput label={t('sales.discount')} type="text" inputMode="numeric" value={discount} onChange={e => setDiscount(digitsOnly(e.target.value).slice(0, 3))} placeholder="0" />
+              {canPrice && <GemInput label={t('sales.discount')} type="text" inputMode="numeric" value={discount} onChange={e => setDiscount(digitsOnly(e.target.value).slice(0, 3))} placeholder="0" />}
               <GemSelect label={t('sales.paymentMethod')} value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} options={methods.map(m => ({ value: m.key, label: t(m.labelKey) }))} />
               <div>
                 <label style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6, display: 'block', fontFamily: 'DM Sans', fontWeight: 500 }}>{t('sales.total')}</label>
