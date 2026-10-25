@@ -27,3 +27,15 @@ test('signing out removes the member list the page kept', async ({ page }) => {
   expect(await kept()).toEqual([]);
   expect(await page.evaluate(() => localStorage.getItem('gem_auth'))).toBeNull();
 });
+
+// D-3: the token went on working on the server for up to 8 hours after Sign Out
+test('signing out ends the session on the server too', async ({ page }) => {
+  const owner = await registerGym();
+  await signIn(page, owner);
+  await page.goto('/dashboard');
+  expect((await call('GET', '/auth/me', { token: owner.token })).id).toBe(owner.user.id);
+  await page.getByText('OO', { exact: true }).last().click();
+  await page.getByText('Sign Out', { exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect.poll(() => call('GET', '/auth/me', { token: owner.token }).then(() => 'still works', err => err.message)).toContain('SIGNED_OUT');
+});

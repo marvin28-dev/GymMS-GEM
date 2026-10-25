@@ -182,3 +182,27 @@ describe('what a new gym must have', () => {
     expect(res.body.user.gymCurrency).toBe('XAF');
   });
 });
+
+// D-3: signing out left the token working on the server for up to 8 hours,
+// so a copy of it (another tab, a session taken from the computer) went on
+describe('signing out', () => {
+  it('ends that token on the server, and only that one', async () => {
+    const own = await registerGym(api);
+    const signIn = async () => (await api.post('/api/auth/login', { gymCode: own.gymCode, email: own.email, password: OWNER_PASSWORD })).body.token;
+    const first = await signIn();
+    const second = await signIn();
+    expect((await api.get('/api/auth/me', { token: first })).status).toBe(200);
+
+    expect((await api.post('/api/auth/logout', {}, { token: first })).status).toBe(200);
+    const after = await api.get('/api/auth/me', { token: first });
+    expect(after.status).toBe(401);
+    expect(after.body.code).toBe('SIGNED_OUT');
+    expect((await api.get('/api/members', { token: first })).status).toBe(401);
+    expect((await api.get('/api/auth/me', { token: second })).status).toBe(200);
+    expect((await api.post('/api/auth/logout', {}, { token: first })).status).toBe(401);
+  });
+
+  it('needs a signed-in account', async () => {
+    expect((await api.post('/api/auth/logout', {})).status).toBe(401);
+  });
+});

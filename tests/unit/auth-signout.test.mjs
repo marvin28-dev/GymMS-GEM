@@ -18,7 +18,22 @@ const GYM = 'cmgym0001abc';
 const signedIn = () => localStorage.setItem('gem_auth', JSON.stringify({ token: 't', user: { id: 's1', gymId: GYM, role: 'general_manager' }, loginDate: '2026-10-19' }));
 
 describe('clearAuth', () => {
-  beforeEach(() => { localStorage.clear(); signedIn(); });
+  let calls;
+  beforeEach(() => {
+    localStorage.clear(); signedIn();
+    calls = [];
+    globalThis.fetch = (url, init) => { calls.push([url, init]); return Promise.resolve({ ok: true }); };
+  });
+
+  // D-3: signing out left the token working on the server for up to 8 hours
+  it('tells the server to end the token', () => {
+    clearAuth();
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0].endsWith('/auth/logout')).toBe(true);
+    expect(calls[0][1]).toMatchObject({ method: 'POST', keepalive: true, headers: { Authorization: 'Bearer t' } });
+    clearAuth();
+    expect(calls).toHaveLength(1);
+  });
 
   it('removes every page cache of the gym', () => {
     const cached = [

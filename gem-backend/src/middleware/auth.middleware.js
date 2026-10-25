@@ -26,6 +26,30 @@ async function currentAccount(id) {
   return account;
 }
 
+// A token signed out on the server (D-3). Revoked ones are remembered until
+// they expire; a token found not revoked is believed for a few seconds, like
+// the account, so one screen's burst of requests costs one lookup. Another
+// server instance learns of a sign-out within those seconds.
+const revoked = new Map();
+
+function rememberRevoked(jti, expiresAt) {
+  revoked.set(jti, { revoked: true, until: new Date(expiresAt).getTime() });
+}
+
+async function isRevoked(jti) {
+  const now = Date.now();
+  const hit = revoked.get(jti);
+  if (hit && hit.until > now) return hit.revoked;
+  if (revoked.size > 10000) {
+    for (const [key, entry] of revoked) if (entry.until <= now) revoked.delete(key);
+  }
+  const row = await prisma.revokedToken.findUnique({ where: { jti }, select: { expiresAt: true } });
+  revoked.set(jti, row ? { revoked: true, until: row.expiresAt.getTime() } : { revoked: false, until: now + CACHE_MS });
+  return !!row;
+}
+
+const SIGNED_OUT = { error: 'You signed out on this session. Sign in again.', code: 'SIGNED_OUT' };
+
 // Called whenever an account changes, so the next request sees it at once
 function forgetAccount(id) {
   accounts.delete(String(id));
@@ -45,6 +69,7 @@ async function authenticate(req, res, next) {
 
   let account;
   try {
+    if (payload.jti && await isRevoked(payload.jti)) return res.status(401).json(SIGNED_OUT);
     account = await currentAccount(payload.id);
   } catch (err) {
     console.error('Account check failed:', err.message);
@@ -81,4 +106,4 @@ function confineOther(req, res, next) {
 }
 
 module.exports = {
-  confineOther, authenticate, requireRole, forgetAccount, DEACTIVATED };
+  confineOther, authenticate, requireRole, forgetAccount, rememberRevoked, DEACTIVATED };

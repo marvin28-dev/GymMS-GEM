@@ -280,6 +280,16 @@ model ProgressLog {
   @@index([gymId, staffId, date])
 }
 
+// A token signed out before it expired, kept until it would have expired
+// anyway. Signing out used to leave the token working for up to 8 hours (D-3).
+model RevokedToken {
+  jti       String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
 // A note the desk or management keeps about a member. Notes were kept in the
 // browser that wrote them, signed "Staff", and seen nowhere else (D-32).
 model MemberNote {

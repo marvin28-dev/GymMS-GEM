@@ -44,7 +44,19 @@ export function signInPath() {
   return code ? `/${encodeURIComponent(code)}/login` : '/login';
 }
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+// Signing out ends the token on the server too, so a copy of it (another tab,
+// a session taken from this computer) stops working at once (D-3). keepalive
+// lets the request finish while the page moves on to the sign-in screen.
+function revokeOnServer(token) {
+  if (!token || typeof fetch !== 'function') return;
+  fetch(`${API_BASE}/auth/logout`, { method: 'POST', keepalive: true, headers: { Authorization: `Bearer ${token}` } })
+    .catch(err => console.warn('Sign-out could not reach the server; the session still ends in this browser.', err?.message));
+}
+
 export function clearAuth() {
+  revokeOnServer(getAuth()?.token);
   const gymId = getAuth()?.user?.gymId;
   // Every page's copy of the gym's lists (gem_<page>_<gymId>_...) goes with
   // the session: on a shared desk computer they hold members' phones,

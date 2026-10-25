@@ -6,7 +6,7 @@ const prisma = require('../utils/prisma');
 const { currencyForCountry } = require('../utils/money');
 const E = require('../utils/emailLayout');
 const { logActivity, fullName } = require('../utils/activityLog');
-const { DEACTIVATED } = require('../middleware/auth.middleware');
+const { DEACTIVATED, rememberRevoked } = require('../middleware/auth.middleware');
 const { attemptCounter, refuseTooMany } = require('../utils/attempts');
 const { bestEffort } = require('../utils/bestEffort');
 const { newResetToken, hashResetToken } = require('../utils/resetToken');
@@ -145,7 +145,7 @@ async function register(req, res) {
   const token = jwt.sign(
     { id: owner.id, gymId: gym.id, role: owner.role, email: owner.email },
     process.env.JWT_SECRET,
-    { expiresIn: '8h' }
+    { expiresIn: '8h', jwtid: crypto.randomUUID() }
   );
 
   res.status(201).json({
@@ -228,7 +228,7 @@ function openSession(staff, gym) {
   const token = jwt.sign(
     { id: staff.id, gymId: gym.id, role: staff.role, email: staff.email },
     process.env.JWT_SECRET,
-    { expiresIn: '8h' }
+    { expiresIn: '8h', jwtid: crypto.randomUUID() }
   );
   return {
     token,
@@ -549,4 +549,17 @@ async function changePassword(req, res) {
   res.json({ message: 'Password changed successfully' });
 }
 
-module.exports = { register, login, me, verifyManager, checkGymCode, forgotPassword, resetPassword, verifyResetToken, changePassword, loginStatus, setFirstPassword };
+// Signing out ends this token on the server as well as in the browser (D-3).
+// A token from before tokens had an id simply runs out within 8 hours.
+async function logout(req, res) {
+  const { jti, exp } = req.user;
+  if (jti && exp) {
+    const expiresAt = new Date(exp * 1000);
+    await prisma.revokedToken.upsert({ where: { jti }, create: { jti, expiresAt }, update: {} });
+    rememberRevoked(jti, expiresAt);
+  }
+  bestEffort(prisma.revokedToken.deleteMany({ where: { expiresAt: { lt: new Date() } } }), 'Clearing expired sign-outs');
+  res.json({ message: 'Signed out' });
+}
+
+module.exports = { logout, register, login, me, verifyManager, checkGymCode, forgotPassword, resetPassword, verifyResetToken, changePassword, loginStatus, setFirstPassword };
