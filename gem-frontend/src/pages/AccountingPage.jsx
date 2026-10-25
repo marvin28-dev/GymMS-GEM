@@ -1,6 +1,6 @@
 ﻿import RevenueSplit from '../components/ui/RevenueSplit';
 import { useLiveTick } from '../hooks/useLiveRefresh';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { formatMoney } from '../utils/currency';
 import { digitsOnly } from '../utils/number';
@@ -12,16 +12,17 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Modal from '../components/ui/Modal';
 import ManagerAuthModal from '../components/ui/ManagerAuthModal';
-import { getAll as getExpenses, create as createExpense, update as updateExpense, remove as removeExpense, getPending as getPendingExpenses, approve as approveExpenseApi } from '../services/expenses.service';
+import { getAll as getExpenses, create as createExpense, update as updateExpense, remove as removeExpense, getPending as getPendingExpenses, approve as approveExpenseApi, setReceipt as setExpenseReceipt } from '../services/expenses.service';
+import { uploadPhoto } from '../services/upload.service';
 import { getRole } from '../utils/auth';
 import { getAll as getStaff } from '../services/staff.service';
 import { getAll as getPayments } from '../services/payments.service';
 import { getAll as getMembers } from '../services/members.service';
-import { getAll as getPayRecords, setStatus as setPayStatus, create as createPayRecord } from '../services/payroll.service';
+import { getAll as getPayRecords, setStatus as setPayStatus, create as createPayRecord, update as updatePayRecord, linkExpense as linkPayExpense } from '../services/payroll.service';
 import { previewMonth as previewPay } from '../services/payAdjustments.service';
 import { fmtDate, dayStr, todayStr, payMonthText } from '../utils/date';
 import { expenseCategoryName } from '../utils/expenseCategories';
-import { readStored, store, storeJson, unstore } from '../utils/storage';
+import { readStored, readStoredJson, unstore } from '../utils/storage';
 import { revenueOf } from '../utils/revenue';
 import { getAll as getSales } from '../services/sales.service';
 import { useGymSettings } from '../hooks/useGymSettings';
@@ -158,15 +159,46 @@ function toPaystub(r) {
     issuedAt: r.issuedAt,
     paidAt: r.paidAt,
     status: r.status || 'issued',
+    expenseId: r.expenseId || null,
   };
 }
 
-const PAYSTUB_EXPENSE_MAP_KEY = 'gem_paystub_expense_map';
-function loadPaystubExpenseMap() {
-  try { return JSON.parse(localStorage.getItem(PAYSTUB_EXPENSE_MAP_KEY) || '{}'); } catch { return {}; }
+// The deductions of a paystub as lines to edit. A total that was never
+// itemised becomes one line, so saving does not drop it.
+function deductionLinesOf(p, totalLabel) {
+  const items = p.breakdown?.deductions || [];
+  if (items.length) return items.map((d, i) => ({ id: `${p.id}-${i}`, label: d.label, amount: Number(d.amount) || 0, note: d.note || '', recurring: !!d.recurring }));
+  return p.deductions > 0 ? [{ id: `${p.id}-0`, label: totalLabel, amount: p.deductions, note: '', recurring: false }] : [];
 }
-function savePaystubExpenseMap(map) {
-  storeJson(PAYSTUB_EXPENSE_MAP_KEY, map);
+const sameLines = (a, b) => JSON.stringify(a.map(d => [d.label, d.amount, d.note || ''])) === JSON.stringify(b.map(d => [d.label, d.amount, d.note || '']));
+
+// Before D-30 the link from a paid pay to its salary expense, and receipt
+// photos, were kept in the browser that made them. This browser hands what it
+// has to the server once; anything that fails is tried again on the next visit.
+const PAYSTUB_EXPENSE_MAP_KEY = 'gem_paystub_expense_map';
+const receiptKey = (id) => `gem_expense_receipt_${id}`;
+function dataUrlToFile(dataUrl) {
+  const [head, data] = String(dataUrl).split(',');
+  const type = /^data:([^;]+)/.exec(head)?.[1] || 'image/jpeg';
+  const bytes = Uint8Array.from(atob(data || ''), c => c.charCodeAt(0));
+  return new File([bytes], 'receipt', { type });
+}
+async function handOverBrowserRecords(expenses, isOwner) {
+  const map = isOwner ? readStoredJson(PAYSTUB_EXPENSE_MAP_KEY, null) : null;
+  if (map) {
+    await Promise.allSettled(Object.entries(map).map(([payId, expenseId]) => linkPayExpense(payId, expenseId)));
+    unstore(PAYSTUB_EXPENSE_MAP_KEY);
+  }
+  for (const e of expenses) {
+    const dataUrl = readStored(receiptKey(e.id));
+    if (!dataUrl) continue;
+    try {
+      if (!e.receipt) await setExpenseReceipt(e.id, await uploadPhoto(dataUrlToFile(dataUrl), 'gem/receipts'));
+      unstore(receiptKey(e.id));
+    } catch (err) {
+      console.error('Moving a receipt kept in this browser failed:', err);
+    }
+  }
 }
 
 // Front-desk expenses live on the gym record now, not in this browser. A desk
@@ -286,9 +318,15 @@ export default function AccountingPage() {
   const [pendingExpenseSave, setPendingExpenseSave] = useState(null);
   const [showDeleteAuthModal, setShowDeleteAuthModal] = useState(false);
 
-  const getReceiptKey = (id) => `gem_expense_receipt_${id}`;
-  const loadReceipt = (id) => readStored(getReceiptKey(id)) || null;
-  const saveReceipt = (id, dataUrl) => (dataUrl ? store(getReceiptKey(id), dataUrl) : unstore(getReceiptKey(id)));
+  // A receipt photo chosen in the form, uploaded when the expense is saved
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [payError, setPayError] = useState('');
+  const [paystubError, setPaystubError] = useState('');
+  const [paystubSaving, setPaystubSaving] = useState(false);
+  const [settleMethod, setSettleMethod] = useState('');
+  const [settling, setSettling] = useState(false);
+  const [settleError, setSettleError] = useState('');
+  const handedOver = useRef(false);
 
   useEffect(() => {
     const onVisible = () => {
@@ -318,7 +356,10 @@ export default function AccountingPage() {
     softAll([getExpenses(), getStaff(), getPayments(), getMembers(), getPayRecords(), getPendingExpenses(), getExpenses({ source: 'frontdesk', status: 'all' }), getSales({ from: dayStr(yearAgo), to: todayStr() })])
       .then(([eRes, sRes, pRes, mRes, payRes, pendRes, fdRes, salesRes]) => {
         // A request that failed leaves what is shown, and its saved copy, alone
-        if (!failed(eRes)) { const exp = eRes.data || []; setExpenses(exp); cache.write('expenses', exp); }
+        if (!failed(eRes)) {
+          const exp = eRes.data || []; setExpenses(exp); cache.write('expenses', exp);
+          if (!handedOver.current) { handedOver.current = true; handOverBrowserRecords(exp, role === 'general_manager'); }
+        }
         if (!failed(mRes)) { const mem = mRes.data || []; setMembersList(mem); cache.write('members', mem); }
         if (!failed(sRes)) { const stf = sRes.data || []; setStaffList(stf); cache.write('staff', stf); }
         if (!failed(pRes)) { const pay = pRes.data || []; setPaymentsList(pay); cache.write('payments', pay); }
@@ -428,7 +469,7 @@ export default function AccountingPage() {
       .map(([label, amount]) => ({ label, amount, pct: Math.round((amount / total) * 100) }));
   })();
 
-  const openAdd = () => { setForm(emptyForm); setEditingExpense(null); setErrors({}); setExpenseImagePreview(null); setShowModal(true); };
+  const openAdd = () => { setForm(emptyForm); setEditingExpense(null); setErrors({}); setExpenseImagePreview(null); setReceiptFile(null); setShowModal(true); };
   const openEdit = (exp) => {
     setForm({
       title: exp.title || '',
@@ -443,10 +484,11 @@ export default function AccountingPage() {
     });
     setEditingExpense(exp);
     setErrors({});
-    setExpenseImagePreview(loadReceipt(exp.id));
+    setExpenseImagePreview(exp.receipt || null);
+    setReceiptFile(null);
     setShowModal(true);
   };
-  const openView = (exp) => { setViewError(''); setViewingExpense({ ...exp, receipt: loadReceipt(exp.id) }); };
+  const openView = (exp) => { setViewError(''); setViewingExpense(exp); };
 
   const validate = () => {
     const e = {};
@@ -503,15 +545,19 @@ export default function AccountingPage() {
   const commitExpenseSave = async (another = false) => {
     if (!editingExpense && form.category === 'Salaries') return commitPayrollSave(another);
     try {
+      // A new photo is uploaded first; taking the photo off an old entry clears it
+      const receipt = receiptFile
+        ? await uploadPhoto(receiptFile, 'gem/receipts')
+        : (editingExpense?.receipt && !expenseImagePreview ? null : undefined);
+      const body = { ...form, method: expenseMethod, ...(receipt !== undefined ? { receipt } : {}) };
       if (editingExpense) {
-        const res = await updateExpense(editingExpense.id, { ...form, method: expenseMethod });
-        saveReceipt(editingExpense.id, expenseImagePreview);
+        const res = await updateExpense(editingExpense.id, body);
         setExpenses(prev => prev.map(ex => ex.id === editingExpense.id ? res.data : ex));
       } else {
-        const res = await createExpense({ ...form, method: expenseMethod });
-        saveReceipt(res.data.id, expenseImagePreview);
+        const res = await createExpense(body);
         setExpenses(prev => [res.data, ...prev]);
       }
+      setReceiptFile(null);
       if (another) { setForm(emptyForm); setErrors({}); setExpenseImagePreview(null); } else { setShowModal(false); }
     } catch (err) {
       setErrors({ _api: err.response?.data?.error || t('reports.failedToSave') });
@@ -595,98 +641,73 @@ export default function AccountingPage() {
   const openEditPaystub = (p) => {
     setEditingPaystub(p);
     setPayForm({ basicPay: p.basicPay, allowances: p.allowances });
+    setPaystubDeductionLines({ [p.id]: deductionLinesOf(p, t('reports.deductions')) });
+    setPaystubError('');
     setNewDedLine({ label: '', amount: '', note: '' });
     setShowAddDedLine(false);
     setShowPaystubModal(true);
   };
 
+  // The pay is worked out again on the server, which moves a paid pay's
+  // salary expense with it (D-30). The edit used to change only the screen.
   const commitSavePaystub = async () => {
     if (!editingPaystub) return;
     const lines = paystubDeductionLines[editingPaystub.id] || [];
-    const totalDed = lines.reduce((s, d) => s + d.amount, 0);
-    const allowances = Number(payForm.allowances) || 0;
-    const basicPay = editingPaystub.basicPay;
-    const newNet = basicPay + allowances - totalDed;
-    const newGross = basicPay + allowances;
-    setPaystubs(prev => prev.map(p =>
-      p.id === editingPaystub.id
-        ? { ...p, allowances, deductions: totalDed, netPay: newNet, grossPay: newGross }
-        : p
-    ));
-    if (editingPaystub.status === 'paid') {
-      const map = loadPaystubExpenseMap();
-      const expenseId = map[editingPaystub.id];
-      if (expenseId) {
-        try {
-          const res = await updateExpense(expenseId, {
-            title: t('reports.salaryExpenseTitle', { name: editingPaystub.staffName }),
-            category: 'Salaries',
-            amount: newGross,
-            date: todayStr(),
-            paidTo: editingPaystub.staffName,
-            method: 'cash',
-            note: t('reports.paystubNote', { month: payMonthText(editingPaystub.month) }),
-            recordedBy: '',
-          });
-          setExpenses(prev => prev.map(e => e.id === expenseId ? res.data : e));
-        } catch (err) {
-          console.error('Failed to update salary expense:', err);
-        }
-      }
+    setPaystubSaving(true);
+    setPaystubError('');
+    try {
+      const res = await updatePayRecord(editingPaystub.id, {
+        allowances: Number(payForm.allowances) || 0,
+        deductions: lines.map(({ label, amount, note, recurring }) => ({ label, amount, note, recurring })),
+      });
+      setPaystubs(prev => prev.map(p => (p.id === editingPaystub.id ? toPaystub(res.data) : p)));
+      if (res.data.expense) setExpenses(prev => prev.map(e => (e.id === res.data.expense.id ? res.data.expense : e)));
+      setShowPaystubModal(false);
+    } catch (err) {
+      setPaystubError(err?.response?.data?.error || t('reports.failedToSave'));
+    } finally {
+      setPaystubSaving(false);
     }
-    setShowPaystubModal(false);
   };
 
   const handleSavePaystub = () => {
     if (!editingPaystub) return;
     const lines = paystubDeductionLines[editingPaystub.id] || [];
-    const origLines = [];
     const allowancesChanged = Number(payForm.allowances) !== editingPaystub.allowances;
-    const deductionsChanged = lines.length !== origLines.length || lines.length > 0;
+    const deductionsChanged = !sameLines(lines, deductionLinesOf(editingPaystub, t('reports.deductions')));
     if (allowancesChanged || deductionsChanged) {
       setShowPaystubAuthModal(true);
     } else {
-      commitSavePaystub();
+      setShowPaystubModal(false);
     }
   };
 
-  // Settling a paystub is what records the money actually leaving: the pay
-  // record is flipped to paid and a matching expense is booked.
+  // Settling a paystub is what records the money actually leaving: the server
+  // marks the pay paid and books its salary expense in one step.
   const [confirmPaid, setConfirmPaid] = useState(null);
   const requestMarkPaid = (id) => {
     const stub = paystubs.find(p => p.id === id);
-    if (stub) setConfirmPaid(stub);
+    if (stub) { setSettleMethod(''); setSettleError(''); setConfirmPaid(stub); }
   };
 
-  const markPaid = async (id) => {
-    const stub = paystubs.find(p => p.id === id);
-    if (!stub) return;
+  const markPaid = async (stub) => {
+    setSettling(true);
+    setSettleError('');
     try {
-      const res = await setPayStatus(id, 'paid');
-      setPaystubs(prev => prev.map(p => (p.id === id ? toPaystub(res.data) : p)));
-    } catch (err) {
-      console.error('Failed to settle paystub:', err);
-      return;
-    }
-    try {
-      const expense = await createExpense({
-        title: t('reports.salaryExpenseTitle', { name: stub.staffName }),
-        category: 'Salaries',
-        amount: stub.grossPay,
-        date: todayStr(),
-        paidTo: stub.staffName,
-        method: 'cash',
-        note: stub.deductions > 0
+      const res = await setPayStatus(stub.id, 'paid', {
+        method: acceptedMethod(settleMethod, takenMethods),
+        expenseTitle: t('reports.salaryExpenseTitle', { name: stub.staffName }),
+        expenseNote: stub.deductions > 0
           ? t('reports.salaryExpenseNote', { month: payMonthText(stub.month), handOver: formatMoney(stub.netPay), withheld: formatMoney(stub.deductions) })
           : t('reports.payrollNote', { month: payMonthText(stub.month) }),
-        recordedBy: '',
       });
-      const map = loadPaystubExpenseMap();
-      map[id] = expense.data.id;
-      savePaystubExpenseMap(map);
-      setExpenses(prev => [expense.data, ...prev]);
+      setPaystubs(prev => prev.map(p => (p.id === stub.id ? toPaystub(res.data) : p)));
+      if (res.data.expense) setExpenses(prev => [res.data.expense, ...prev.filter(e => e.id !== res.data.expense.id)]);
+      setConfirmPaid(null);
     } catch (err) {
-      console.error('Failed to auto-create salary expense:', err);
+      setSettleError(err?.response?.data?.error || t('reports.failedToSave'));
+    } finally {
+      setSettling(false);
     }
   };
 
@@ -696,27 +717,21 @@ export default function AccountingPage() {
     setShowUnpaidAuth(true);
   };
 
+  // The server takes the salary expense out of the books with it
   const markUnpaid = async (id) => {
+    const stub = paystubs.find(p => p.id === id);
+    setPayError('');
     try {
       const res = await setPayStatus(id, 'issued');
       setPaystubs(prev => prev.map(p => (p.id === id ? toPaystub(res.data) : p)));
+      if (stub?.expenseId) setExpenses(prev => prev.filter(e => e.id !== stub.expenseId));
     } catch (err) {
-      console.error('Failed to reopen paystub:', err);
-      return;
-    }
-    const map = loadPaystubExpenseMap();
-    const expenseId = map[id];
-    if (expenseId) {
-      try {
-        await removeExpense(expenseId);
-        setExpenses(prev => prev.filter(e => e.id !== expenseId));
-      } catch (err) {
-        console.error('Failed to remove salary expense:', err);
-      }
-      delete map[id];
-      savePaystubExpenseMap(map);
+      setPayError(err?.response?.data?.error || t('reports.failedToSave'));
     }
   };
+  const payErrorBanner = payError && (
+    <div role="alert" style={{ fontSize: 12.5, color: 'var(--accent-red)', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '8px 12px', fontFamily: 'DM Sans' }}>{payError}</div>
+  );
 
   const expenseCategoryBreakdown = (() => {
     const cats = categoriesIn(periodFilteredExpenses);
@@ -948,6 +963,7 @@ export default function AccountingPage() {
             <input type="file" accept="image/*" onChange={e => {
               const file = e.target.files[0];
               if (file) {
+                setReceiptFile(file);
                 const reader = new FileReader();
                 reader.onload = ev => setExpenseImagePreview(ev.target.result);
                 reader.readAsDataURL(file);
@@ -956,7 +972,7 @@ export default function AccountingPage() {
             {expenseImagePreview && (
               <div style={{ marginTop: 8, position: 'relative', display: 'inline-block' }}>
                 <img src={expenseImagePreview} alt={t('reports.receiptPreview')} style={{ maxWidth: '100%', maxHeight: 130, borderRadius: 8, border: '1px solid var(--border-subtle)', display: 'block' }} />
-                <button onClick={() => setExpenseImagePreview(null)} style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: '50%', width: 20, height: 20, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                <button type="button" aria-label={t('common.remove')} onClick={() => { setExpenseImagePreview(null); setReceiptFile(null); }} style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: '50%', width: 20, height: 20, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
               </div>
             )}
           </div>
@@ -1172,7 +1188,7 @@ export default function AccountingPage() {
                   </div>
                   <div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{t('reports.allowances')}</div>
-                    <input type="number" value={payForm.allowances ?? editingPaystub.allowances} onChange={e => setPayForm(f => ({ ...f, allowances: e.target.value }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', fontSize: 14, fontWeight: 700 }} />
+                    <input type="text" inputMode="numeric" aria-label={t('reports.allowances')} value={payForm.allowances ?? editingPaystub.allowances} onChange={e => setPayForm(f => ({ ...f, allowances: digitsOnly(e.target.value) }))} style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', fontSize: 14, fontWeight: 700 }} />
                   </div>
                 </div>
               </div>
@@ -1193,7 +1209,7 @@ export default function AccountingPage() {
                     <div key={d.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{d.label}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('common.notePrefixColon')} {d.note}</div>
+                        {d.note && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('common.notePrefixColon')} {d.note}</div>}
                       </div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-red)' }}>-{formatMoney(d.amount)}</span>
@@ -1236,7 +1252,8 @@ export default function AccountingPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
+              {paystubError && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', marginBottom: 12 }}>{paystubError}</div>}
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
                 <div>
                   {editingPaystub.status === 'paid' && (
                     <button style={{ ...secondaryBtn, color: 'var(--accent-red)', borderColor: 'var(--accent-red)' }} onClick={() => { requestUnpaid(editingPaystub.id); setShowPaystubModal(false); }}>{t('reports.markUnpaid')}</button>
@@ -1244,7 +1261,7 @@ export default function AccountingPage() {
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button style={secondaryBtn} onClick={() => { setShowPaystubModal(false); setShowAddDedLine(false); }}>{t('common.cancel')}</button>
-                  <button style={primaryBtn} onClick={handleSavePaystub}>{t('common.saveChanges')}</button>
+                  <button style={{ ...primaryBtn, opacity: paystubSaving ? 0.6 : 1 }} disabled={paystubSaving} onClick={handleSavePaystub}>{t('common.saveChanges')}</button>
                 </div>
               </div>
             </div>
@@ -1278,9 +1295,16 @@ export default function AccountingPage() {
                 {t('staff.handOverExplain', { gross: formatMoney(confirmPaid.grossPay), withheld: formatMoney(confirmPaid.deductions), handOver: formatMoney(confirmPaid.netPay) })}
               </div>
             )}
+            <div>
+              <label htmlFor="settle-method" style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('reports.paidBy')}</label>
+              <select id="settle-method" style={inputStyle} value={acceptedMethod(settleMethod, takenMethods)} onChange={e => setSettleMethod(e.target.value)}>
+                {takenMethods.map(m => <option key={m.key} value={m.key}>{t(m.labelKey)}</option>)}
+              </select>
+            </div>
+            {settleError && <div role="alert" style={{ fontSize: 12, color: 'var(--accent-red)' }}>{settleError}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               <button style={secondaryBtn} onClick={() => setConfirmPaid(null)}>{t('common.cancel')}</button>
-              <button style={primaryBtn} onClick={() => { const id = confirmPaid.id; setConfirmPaid(null); markPaid(id); }}>
+              <button style={{ ...primaryBtn, opacity: settling ? 0.6 : 1 }} disabled={settling} onClick={() => markPaid(confirmPaid)}>
                 {t('reports.confirmHandedOver', { amount: formatMoney(confirmPaid.netPay) })}
               </button>
             </div>
@@ -1525,6 +1549,7 @@ export default function AccountingPage() {
             {/* Month picker */}
             <input type="month" value={paystubMonth} onChange={e => setPaystubMonth(e.target.value)} style={{ width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 14px', fontSize: 14, color: 'var(--text-primary)', fontFamily: 'DM Sans', outline: 'none', boxSizing: 'border-box' }} />
             {otherMonthsNotice}
+            {payErrorBanner}
 
             {/* KPI 2x2 */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -1896,6 +1921,7 @@ export default function AccountingPage() {
           </div>
 
           {otherMonthsNotice && <div style={{ marginBottom: 16 }}>{otherMonthsNotice}</div>}
+          {payErrorBanner && <div style={{ marginBottom: 16 }}>{payErrorBanner}</div>}
 
           {/* Paystubs table */}
           <div style={cardStyle}>

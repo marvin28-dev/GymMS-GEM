@@ -12,6 +12,35 @@ beforeAll(async () => {
 });
 afterAll(() => stop());
 
+// D-30: a receipt photo was kept only in the browser that attached it
+describe('the receipt of an expense', () => {
+  const PHOTO = 'https://res.cloudinary.com/demo/image/upload/gem/receipts/r1.jpg';
+
+  it('is kept with the expense, as the address of an uploaded photo', async () => {
+    const res = await spend({ receipt: PHOTO });
+    expect(res.status).toBe(201);
+    expect(res.body.receipt).toBe(PHOTO);
+    for (const receipt of ['data:image/png;base64,AAAA', 'javascript:alert(1)', 'http://example.com/r.jpg']) {
+      const refused = await spend({ receipt });
+      expect(refused.status, receipt).toBe(400);
+      expect(refused.body.field).toBe('receipt');
+    }
+    const removed = await api.patch(`/api/expenses/${res.body.id}`, { receipt: null }, { token: gym.token });
+    expect(removed.body.receipt).toBe(null);
+  });
+
+  it('may be attached later by management when there is none; replacing one is an edit', async () => {
+    const manager = await addStaff(api, gym, { role: 'manager' });
+    const { body: expense } = await spend({});
+    const attach = (token) => api.put(`/api/expenses/${expense.id}/receipt`, { receipt: PHOTO }, { token });
+    expect((await attach(desk.token)).status).toBe(403);
+    const res = await attach(manager.token);
+    expect(res.status).toBe(200);
+    expect(res.body.receipt).toBe(PHOTO);
+    expect((await attach(manager.token)).status).toBe(409);
+  });
+});
+
 describe('recording an expense', () => {
   it('books one entered by management straight into the books', async () => {
     const res = await spend({});

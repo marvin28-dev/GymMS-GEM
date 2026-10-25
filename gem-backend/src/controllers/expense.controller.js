@@ -64,8 +64,28 @@ function readExpense(body, creating) {
   }
   if (sent('notes') || sent('note')) data.note = String(body.notes ?? body.note ?? '').trim() || null;
   if (sent('recordedBy')) data.recordedBy = String(body.recordedBy ?? '').trim() || null;
+  if (sent('receipt')) {
+    const receipt = readReceipt(body.receipt);
+    if (receipt.error) return receipt;
+    data.receipt = receipt.url;
+  }
   return { data };
 }
+
+// A photo of the receipt is uploaded like any photo and its address kept here.
+// It was kept in the browser that attached it, so nobody else ever saw it (D-30).
+function readReceipt(value) {
+  if (value === null || value === '') return { url: null };
+  const url = String(value);
+  if (url.length > 500 || !/^https:\/\/[^\s"'<>]+$/.test(url)) return { error: 'Attach the receipt as a photo.', field: 'receipt' };
+  return { url };
+}
+
+// The salary a pay record booked, if this expense is one (D-30)
+const payRecordOf = (expenseId) => prisma.payRecord.findFirst({
+  where: { expenseId },
+  select: { month: true, staff: { select: { firstName: true, lastName: true } } },
+});
 
 // The signed-in account, for the "entered by" stamp. Taken from the record
 // rather than from the request body, so it cannot be claimed to be somebody else.
@@ -182,6 +202,10 @@ async function update(req, res) {
   if (!existing) return res.status(404).json({ error: 'Expense not found' });
   const read = readExpense(req.body, false);
   if (read.error) return res.status(400).json({ error: read.error, field: read.field });
+  // A salary's amount is the pay's; it changes with the paystub, never here
+  if (read.data.amount !== undefined && read.data.amount !== existing.amount && await payRecordOf(existing.id)) {
+    return res.status(409).json({ error: 'This is a salary payment. Change the pay in Paystubs and the books follow.', field: 'amount' });
+  }
 
   try {
     const expense = await prisma.expense.update({
@@ -215,6 +239,10 @@ async function remove(req, res) {
     where: { id: req.params.id, gymId: req.user.gymId },
   });
   if (!existing) return res.status(404).json({ error: 'Expense not found' });
+  const pay = await payRecordOf(existing.id);
+  if (pay) {
+    return res.status(409).json({ error: `This is ${pay.staff.firstName} ${pay.staff.lastName}'s pay for ${pay.month}. Mark the pay unpaid in Paystubs to take it out of the books.` });
+  }
 
   await prisma.expense.delete({ where: { id: req.params.id } });
   logActivity(req, {
@@ -225,4 +253,22 @@ async function remove(req, res) {
   res.json({ message: 'Expense deleted' });
 }
 
-module.exports = { getAll, create, approve, update, remove };
+// Attaches a receipt to an expense that has none. Management may do it (a
+// receipt found after the entry was made); replacing one is an edit, the
+// owner's alone.
+async function setReceipt(req, res) {
+  const existing = await prisma.expense.findFirst({ where: { id: req.params.id, gymId: req.user.gymId }, select: { id: true, title: true, receipt: true } });
+  if (!existing) return res.status(404).json({ error: 'Expense not found' });
+  const receipt = readReceipt(req.body.receipt);
+  if (receipt.error || !receipt.url) return res.status(400).json({ error: receipt.error || 'Attach the receipt as a photo.', field: 'receipt' });
+  if (existing.receipt) return res.status(409).json({ error: 'This expense already has a receipt. The owner can change it by editing the expense.' });
+  const expense = await prisma.expense.update({ where: { id: existing.id }, data: { receipt: receipt.url } });
+  logActivity(req, {
+    category: 'money', action: 'expense.receipt',
+    summary: `Attached a receipt to the expense ${existing.title}`,
+    target: { type: 'expense', id: existing.id },
+  });
+  res.json(expense);
+}
+
+module.exports = { getAll, create, approve, update, remove, setReceipt, actorName };

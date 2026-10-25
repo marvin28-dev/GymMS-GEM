@@ -8,6 +8,8 @@ router.get('/', ctrl.listAll);
 router.get('/staff/:staffId', ctrl.listForStaff);
 router.post('/', only(OWNER), ctrl.create);
 router.patch('/:id/status', only(OWNER), ctrl.setStatus);
+router.patch('/:id', only(OWNER), ctrl.update);
+router.post('/:id/expense', only(OWNER), ctrl.linkExpense);
 router.delete('/:id', only(OWNER), ctrl.remove);
 
 module.exports = router;

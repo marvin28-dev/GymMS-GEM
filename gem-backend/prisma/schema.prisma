@@ -146,10 +146,14 @@ model PayRecord {
   issuedAt   DateTime  @default(now())
   issuedById String?
   createdAt  DateTime  @default(now())
+  // The salary expense booked when the pay was marked paid. Marking it unpaid
+  // takes that expense out of the books again (D-30).
+  expenseId  String?   @unique
 
-  gym      Gym    @relation(fields: [gymId], references: [id])
-  staff    Staff  @relation("PayRecordStaff", fields: [staffId], references: [id])
-  issuedBy Staff? @relation("PayRecordIssuedBy", fields: [issuedById], references: [id])
+  gym      Gym      @relation(fields: [gymId], references: [id])
+  staff    Staff    @relation("PayRecordStaff", fields: [staffId], references: [id])
+  issuedBy Staff?   @relation("PayRecordIssuedBy", fields: [issuedById], references: [id])
+  expense  Expense? @relation(fields: [expenseId], references: [id], onDelete: SetNull)
 
   @@index([gymId])
   @@index([staffId])
@@ -479,9 +483,12 @@ model Expense {
   approvedById   String?
   approvedByName String?
   approvedAt     DateTime?
+  // A photo of the receipt, filed like staff and member photos (D-30)
+  receipt        String?
   createdAt      DateTime       @default(now())
 
-  gym Gym @relation(fields: [gymId], references: [id])
+  gym       Gym        @relation(fields: [gymId], references: [id])
+  payRecord PayRecord?
 
   @@index([gymId, date])
 }

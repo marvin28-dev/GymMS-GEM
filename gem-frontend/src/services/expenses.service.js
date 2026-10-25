@@ -18,3 +18,7 @@ export const update = (id, data) =>
 
 export const remove = (id) =>
   api.delete(`/expenses/${id}`);
+
+// Attaches a receipt photo to an expense that has none
+export const setReceipt = (id, receipt) =>
+  api.put(`/expenses/${id}/receipt`, { receipt });

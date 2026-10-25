@@ -619,6 +619,7 @@ const translations = {
       perDayAverage: '{n} a day on average', visitsTotal: '{n} check-ins in total', visits: '{n} check-ins',
     },
     reports: {
+      paidBy: 'Paid by',
       paystubNote: 'Paystub for {month}',
       payrollNote: 'Payroll for {month}',
       last3Months: 'Last 3 Months',
@@ -2803,6 +2804,7 @@ const translations = {
       perDayAverage: '{n} par jour en moyenne', visitsTotal: '{n} entrées au total', visits: '{n} entrées',
     },
     reports: {
+      paidBy: 'Payé par',
       paystubNote: 'Bulletin de paie de {month}',
       payrollNote: 'Paie de {month}',
       last3Months: '3 derniers mois',

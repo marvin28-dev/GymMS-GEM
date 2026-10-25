@@ -97,6 +97,9 @@ describe('another gym\'s records, by id', () => {
     ['reject time card', () => api.patch(`/api/timecards/${B.timecard.id}/reject`, {}, as())],
     ['DELETE time card', () => api.del(`/api/timecards/${B.timecard.id}`, as())],
     ['pay status', () => api.patch(`/api/payroll/${B.payroll.id}/status`, { status: 'paid' }, as())],
+    ['edit pay record', () => api.patch(`/api/payroll/${B.payroll.id}`, { allowances: 1, deductions: [] }, as())],
+    ['link pay to an expense', () => api.post(`/api/payroll/${B.payroll.id}/expense`, { expenseId: B.expense.id }, as())],
+    ['attach a receipt', () => api.put(`/api/expenses/${B.expense.id}/receipt`, { receipt: 'https://res.cloudinary.com/x/hacked.jpg' }, as())],
     ['DELETE pay record', () => api.del(`/api/payroll/${B.payroll.id}`, as())],
     ['PATCH pay adjustment', () => api.patch(`/api/pay-adjustments/${B.adjustment.id}`, { amount: 1 }, as())],
     ['DELETE pay adjustment', () => api.del(`/api/pay-adjustments/${B.adjustment.id}`, as())],
@@ -150,7 +153,7 @@ describe('another gym\'s records, by id', () => {
     expect((staff.staffNotes || []).some(n => n.content === 'Hacked')).toBe(false);
     expect((await api.get('/api/packages', t)).body.find(p => p.id === B.pkg.id)?.price).toBe(15000);
     expect((await api.get('/api/payments', t)).body.some(p => p.id === B.payment.id)).toBe(true);
-    expect((await api.get('/api/expenses', t)).body.find(e => e.id === B.expense.id)?.amount).toBe(25000);
+    expect((await api.get('/api/expenses', t)).body.find(e => e.id === B.expense.id)).toMatchObject({ amount: 25000, receipt: null });
     expect((await api.get('/api/tasks', t)).body.find(x => x.id === B.task.id)?.title).toBe('B task');
     expect((await api.get('/api/products', t)).body.find(p => p.id === B.product.id)).toMatchObject({ price: 500, stock: 10 });
     expect((await api.get(`/api/approvals/member/${B.member.id}`, t)).body.find(r => r.id === B.approval.id)?.status).toBe('pending');
