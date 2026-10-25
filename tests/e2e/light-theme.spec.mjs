@@ -2,6 +2,7 @@
 // button and its dial-code list were drawn in fixed dark colours (CLAUDE.md:
 // components read the theme tokens).
 import { test, expect } from '@playwright/test';
+import { fontsLoaded } from './support/session.mjs';
 
 const SHOTS = process.env.LIGHT_SHOTS;
 const inLight = (page) => page.addInitScript(() => { try { localStorage.setItem('gem-theme', 'light'); } catch { /* storage blocked */ } });
@@ -26,8 +27,8 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 800 }], ['pho
     await page.setViewportSize(viewport);
     await page.goto('/signup');
     // The fonts come from Google; one arriving mid-click moves the button, and
-    // Firefox then fires no click (seen once in a final run)
-    await page.evaluate(() => document.fonts.ready);
+    // Firefox then fires no click
+    await fontsLoaded(page);
     const signIn = page.getByRole('button', { name: 'Sign in', exact: true });
     await expect(signIn).toBeVisible();
     expect(await style(signIn, 'borderTopColor')).toBe(LIGHT.borderSubtle);

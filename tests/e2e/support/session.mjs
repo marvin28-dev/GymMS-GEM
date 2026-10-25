@@ -113,3 +113,15 @@ export async function signIn(page, session) {
     localStorage.setItem('gem_last_activity', String(Date.now()));
   }, { token: session.token, user: session.user });
 }
+
+// Wait for the web fonts the screens use. document.fonts.ready resolves at once
+// while the page has not asked for a font yet, and a font arriving after it
+// re-wraps the text: a button can move half its height between the press and
+// the release, and the click is lost (seen in Firefox on sign-up).
+export function fontsLoaded(page) {
+  return page.evaluate(async () => {
+    const faces = ['400 14px "DM Sans"', '500 14px "DM Sans"', '600 14px "DM Sans"', '700 14px "DM Sans"', '700 14px Manrope', '800 28px Manrope'];
+    await Promise.all(faces.map(face => document.fonts.load(face)));
+    await document.fonts.ready;
+  });
+}

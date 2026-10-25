@@ -1,7 +1,7 @@
 // Journeys J-01 to J-08 and J-28: the public pages and everything about
 // getting into an account and out of it, driven the way a person does.
 import { test, expect } from '@playwright/test';
-import { registerGym, addStaff, signIn, call, mailTo, uniqueCode, seedDemoGym } from './support/session.mjs';
+import { registerGym, addStaff, signIn, call, mailTo, uniqueCode, seedDemoGym, fontsLoaded } from './support/session.mjs';
 
 // The sign-up form picks the gym's country from the time zone
 test.use({ timezoneId: 'Africa/Douala' });
@@ -20,7 +20,7 @@ test('J-01: the landing page leads to sign-up and to sign-in', async ({ page }) 
   // The offer is made at the top of the page and again at the bottom
   await expect(page.getByRole('button', { name: 'Request Free Access' })).toHaveCount(2);
   // A web font arriving moves the buttons; a click at that moment lands nowhere
-  await page.evaluate(() => document.fonts.ready);
+  await fontsLoaded(page);
   await page.getByRole('button', { name: 'Request Free Access' }).first().click();
   await expect(page).toHaveURL(/\/signup$/);
   await page.goBack();
