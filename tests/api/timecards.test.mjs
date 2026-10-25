@@ -127,6 +127,28 @@ describe('a time set by hand', () => {
     expect(res.body).toMatchObject({ approvalStatus: 'approved', punchIn: card.punchIn });
   });
 
+  // D-47: Reject put the moment the time was typed onto an earlier day's
+  // card, so yesterday's forgotten clock-out became a shift running into today
+  it("rejected on an earlier day's card, is not paid instead of being moved to today", async () => {
+    const worker = await addStaff(api, gym, { employmentType: 'Part Time', salary: 1000 });
+    const { body: card } = await clockIn(worker.id, day(-1), '09:00');
+    expect(card.originalPunchIn).toBe(null);
+    const out = await api.patch(`/api/timecards/${card.id}/punchout`, { at: '17:00' }, { token: gym.token });
+    expect(out.body.originalPunchOut).toBe(null);
+    const res = await api.patch(`/api/timecards/${card.id}/reject`, { note: 'Not on the rota' }, { token: gym.token });
+    expect(res.body).toMatchObject({ approvalStatus: 'rejected', punchIn: card.punchIn, punchOut: out.body.punchOut });
+    expect(hoursMinutes(res.body.punchOut)).toEqual([17, 0]);
+  });
+
+  it("rejected on today's card, goes back to the moment the clock was used", async () => {
+    const worker = await addStaff(api, gym, { employmentType: 'Part Time', salary: 1000 });
+    const before = Date.now();
+    const { body: card } = await clockIn(worker.id, day(0), '00:01');
+    expect(new Date(card.originalPunchIn).getTime()).toBeGreaterThanOrEqual(before - 1000);
+    const res = await api.patch(`/api/timecards/${card.id}/reject`, {}, { token: gym.token });
+    expect(res.body).toMatchObject({ approvalStatus: 'approved', punchIn: card.originalPunchIn });
+  });
+
   it('is reviewed by someone senior: not the desk, and not a manager on their own card while another can', async () => {
     const desk = await addStaff(api, gym, { role: 'front_desk' });
     const worker = await addStaff(api, gym, { employmentType: 'Part Time', salary: 1000 });

@@ -162,6 +162,13 @@ async function createDayCard({ gymId, staffId, dayStart, dayEnd, data }) {
   }
 }
 
+// The moment a time was typed is kept as the card's "original" only on today's
+// card, where it is the real moment the clock was used. On an earlier day's
+// card it is not: Reject put today's moment onto yesterday's shift, which was
+// then paid into today. An earlier day's card is a hand entry, and Reject
+// marks it rejected so its hours are not paid (D-47).
+const isToday = (day) => { const start = new Date(); start.setHours(0, 0, 0, 0); return new Date(day).getTime() === start.getTime(); };
+
 async function punchIn(req, res) {
   const { staffId, date } = req.body;
   if (!staffId) return res.status(400).json({ error: 'staffId is required' });
@@ -200,7 +207,7 @@ async function punchIn(req, res) {
       ...(issues.length ? {
         approvalStatus: 'pending',
         issues,
-        ...(handSet ? { originalPunchIn: now } : {}),
+        ...(handSet && isToday(dayStart) ? { originalPunchIn: now } : {}),
         adjustmentNote: req.body.note || null,
       } : {}),
     },
@@ -252,7 +259,7 @@ async function punchOut(req, res) {
       ...(issues.length ? {
         approvalStatus: 'pending',
         issues,
-        ...(handSet && existing.originalPunchOut === null ? { originalPunchOut: now } : {}),
+        ...(handSet && isToday(existing.date) && existing.originalPunchOut === null ? { originalPunchOut: now } : {}),
         adjustmentNote: req.body?.note || existing.adjustmentNote,
       } : {}),
     },
