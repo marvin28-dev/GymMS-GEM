@@ -57,6 +57,36 @@ describe('who sees a notice', () => {
   });
 });
 
+// D-46: one person's Mark all read marked a gym-wide notice read for everyone
+describe('reading', () => {
+  const notice = async (who, name) => (await list(who)).find(n => n.title === 'New Member Joined' && n.body.includes(name));
+
+  it("a gym-wide notice read by one person stays unread for everyone else", async () => {
+    await addMember(api, gym.token, { firstName: 'Rhea', lastName: 'Readme' });
+    const before = await eventually(() => notice(desk, 'Rhea Readme'));
+    expect(before.isRead).toBe(false);
+
+    expect((await api.patch('/api/notifications/mark-read', {}, { token: desk.token })).status).toBe(200);
+    expect((await notice(desk, 'Rhea Readme')).isRead).toBe(true);
+    expect((await notice(gym, 'Rhea Readme')).isRead).toBe(false);
+    expect((await notice(manager, 'Rhea Readme')).isRead).toBe(false);
+
+    const opened = await api.patch(`/api/notifications/${before.id}/read`, {}, { token: manager.token });
+    expect(opened.body.isRead).toBe(true);
+    expect((await notice(manager, 'Rhea Readme')).isRead).toBe(true);
+    expect((await notice(gym, 'Rhea Readme')).isRead).toBe(false);
+    // Opened again (another tab) is still read once
+    expect((await api.patch(`/api/notifications/${before.id}/read`, {}, { token: manager.token })).status).toBe(200);
+  });
+
+  it('one addressed to me is read with its own flag', async () => {
+    const mine = await prisma.notification.create({ data: { gymId: gym.user.gymId, staffId: desk.id, title: 'For the desk', body: 'Only yours' } });
+    await api.patch(`/api/notifications/${mine.id}/read`, {}, { token: desk.token });
+    expect((await prisma.notification.findUnique({ where: { id: mine.id } })).isRead).toBe(true);
+    expect((await list(desk)).find(n => n.id === mine.id).isRead).toBe(true);
+  });
+});
+
 describe('clearing', () => {
   it('a gym-wide notice comes off my list only; one addressed to me is deleted', async () => {
     await addMember(api, gym.token, { firstName: 'Clara', lastName: 'Clear' });

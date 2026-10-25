@@ -676,6 +676,7 @@ model Notification {
   gym        Gym                     @relation(fields: [gymId], references: [id])
   staff      Staff?                  @relation(fields: [staffId], references: [id])
   dismissals NotificationDismissal[]
+  reads      NotificationRead[]
 
   @@index([gymId, createdAt])
   @@index([staffId])
@@ -685,6 +686,20 @@ model Notification {
 // stays for everyone else; only a notification addressed to one person is
 // deleted outright when they clear it.
 model NotificationDismissal {
+  id             String       @id @default(cuid())
+  notificationId String
+  staffId        String
+  createdAt      DateTime     @default(now())
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, staffId])
+  @@index([staffId])
+}
+
+// Who has read a gym-wide notification. Its own isRead column served everyone,
+// so one person opening it marked it read for the whole gym (D-46). A notice
+// addressed to one person keeps using isRead.
+model NotificationRead {
   id             String       @id @default(cuid())
   notificationId String
   staffId        String
