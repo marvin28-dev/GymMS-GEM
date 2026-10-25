@@ -746,6 +746,7 @@ function SendCodeModal({ open, onClose, member, gymName }) {
             <Smartphone size={13} /> {t('memberProfile.sendByText')}
           </button>
         </div>
+        <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontFamily: 'DM Sans', lineHeight: 1.5 }}>{t('memberProfile.textCodeHint')}</div>
         {msg && <div style={{ fontSize: 12, fontFamily: 'DM Sans', color: ok ? '#34d399' : 'var(--accent-red)' }}>{msg}</div>}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
           <button style={secondaryBtn} onClick={onClose}>{t('common.close')}</button>
