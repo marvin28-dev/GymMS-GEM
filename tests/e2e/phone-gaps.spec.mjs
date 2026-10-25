@@ -195,7 +195,7 @@ test('a payment can be added on a phone, for the member it was taken from', asyn
     await expect(form.getByText('Payne Phonepay')).toBeVisible({ timeout: 1000 });
   }).toPass();
   await form.getByText('Payne Phonepay').click();
-  await form.locator('input[type="date"]').first().fill(day);
+  // The payment date starts on today (D-27)
   await form.locator('input[inputmode="numeric"]').first().fill('5000');
   await form.getByRole('button', { name: 'Save Payment' }).click();
 
