@@ -57,7 +57,7 @@ Step-by-step instructions for every test. Do them in order — later tests depen
 
 ### TEST 1.9 — Step 2 validation
 1. Leave all fields empty and click "Launch GEM"
-2. **Verify:** Errors appear: "Required" under first name, last name; "Valid email is required" under email; "At least 6 characters" under password
+2. **Verify:** Errors appear: "Required" under first name, last name; "Valid email is required" under email; "At least 8 characters" under password
 
 ### TEST 1.10 — Password mismatch
 1. Fill first name: `John`, last name: `Manager`, email: `john@test.com`
@@ -832,15 +832,15 @@ Step-by-step instructions for every test. Do them in order — later tests depen
 6. Go back to Settings → Language, select "English"
 7. **Verify:** Everything reverts to English
 
-### TEST 20.6 — Payment Settings save
-1. Go to Settings → Payment Settings
-2. Change Tax Rate to `15`
-3. Change Late Fee to `10`
-4. Uncheck "Credit/Debit Card" from accepted methods
-5. Click "Save Changes"
-6. **Verify:** Green "✓ Saved" appears next to the button
-7. Navigate away, then come back to Payment Settings
-8. **Verify:** Tax Rate shows 15, Late Fee shows 10, Card is unchecked
+### TEST 20.6 - Payment Settings save
+1. Go to Settings, Payment Settings
+2. Uncheck "Credit/Debit Card" from accepted methods
+3. Change the Front Desk Expense Limit to `20000`
+4. Click "Save Changes"
+5. **Verify:** "Saved" appears next to the button
+6. Navigate away, then come back to Payment Settings
+7. **Verify:** Card is unchecked and the limit shows 20000
+8. Open Add Payment on a member. **Verify:** Card is not offered
 
 ### TEST 20.7 — Membership Defaults (Registration Fee)
 1. Go to Settings → Membership Defaults
@@ -859,13 +859,22 @@ Step-by-step instructions for every test. Do them in order — later tests depen
 5. Click the X on "VIP Lounge Access"
 6. **Verify:** It disappears from the list
 
-### TEST 20.9 — Staff Roles
-1. Go to Settings → Staff Roles
-2. **Verify:** Role profiles listed (General Manager, Manager, Accountant, etc.)
-3. Click on a role (e.g., "Accountant")
-4. **Verify:** Page access checkboxes shown (Dashboard, Payments, Reports, etc.)
-5. Toggle a page ON or OFF
-6. **Verify:** Checkbox updates
+### TEST 20.9 - Emails to members in French
+1. Go to Settings, Language. Under "Emails to members", choose "Français"
+2. Refresh the page. **Verify:** Français is still chosen
+3. Record a payment for a member with an email address (a Resend test address or your own, see 25.4)
+4. **Verify:** the receipt and its PDF are in French ("Reçu de paiement", "Espèces", the date as "25 octobre 2026")
+5. Choose "English" again. **Verify:** the next email is in English
+
+### TEST 20.10 - Settings on a phone
+1. On a phone, open Settings
+2. **Verify:** a list of sections, none open
+3. Tap Gym Profile. **Verify:** its form opens directly under it, at the top of the screen
+4. Tap Payment Settings, change a method and save. **Verify:** it saves as on a computer
+5. Tap the open section again. **Verify:** it closes
+6. **Verify:** no page is wider than the screen
+
+There is no Staff Roles section: a role decides which pages someone may open, in the code (`utils/rolePages.js`).
 
 ---
 
@@ -1066,7 +1075,7 @@ These checks need real devices, real inboxes or a real person.
 1. Repeat 25.1 on an Android phone.
 2. Type an amount in any money box.
 3. **Verify:** the number keyboard opens and only digits go in.
-4. Try to pinch-zoom a page. Today zoom is switched off (decision D-49); note whether that is a problem for anyone at the gym.
+4. Pinch-zoom a page. **Verify:** it zooms (D-49), and tapping a form box does not zoom in on its own.
 
 ### TEST 25.3 - Safari on a Mac
 1. Sign in, add a payment, open the end-of-day report and print it.
@@ -1078,6 +1087,8 @@ Only once a sending domain is verified in Resend and `EMAIL_FROM_ADDRESS` is set
 2. **Verify:** the receipt arrives within a minute, not in spam, with the PDF attached and readable.
 3. Open it on a phone's mail app. **Verify:** the layout fits, accents (é, è) and the currency read correctly.
 4. Send a password reset to yourself. **Verify:** the link opens the reset page and works once.
+5. Register a new gym with your own address. **Verify:** the "Confirm your email address" link arrives, opens GEM and the reminder in the app goes away (D-8).
+6. In Settings, Language, choose Français for "Emails to members" and record a payment. **Verify:** the receipt and its PDF arrive in French, accents intact (D-23).
 
 ### TEST 25.5 - Text messages
 Texting is paused. When it is switched on:
@@ -1107,12 +1118,26 @@ Texting is paused. When it is switched on:
 2. In the old tab, open a page you had not opened before.
 3. **Verify:** either the page opens, or the "Something went wrong" screen offers Reload and Reload works.
 
-### TEST 25.11 - After the start-command decision (D-1)
-1. Deploy to Railway.
-2. **Verify:** the demo gym "elite" was not created or reset, and existing data is untouched.
+### TEST 25.11 - The first deploy with migrations (D-1, D-4)
+1. Back up the production database first (Railway, the Postgres service, Backups; or `pg_dump`).
+2. In Railway, check the backend service uses `gem-backend/railway.json` (its root directory is `gem-backend`, or the config path points to the file).
+3. Deploy.
+4. **Verify:** the pre-deploy log shows `node scripts/migrate.js` recognising the database and applying the new migrations (or saying there is nothing to apply), and the server starts.
+5. **Verify:** the demo gym "elite" was not created or reset, and existing gyms, members and payments are untouched.
+6. If the pre-deploy step refuses the database (it matches no known state), nothing was changed: keep the backup and send the log.
 
 ### TEST 25.12 - A deploy while a desk is working (F-180)
 1. Open the front desk, and the member list on a second computer.
 2. Deploy a new version of the backend on Railway.
 3. **Verify:** the old server's log says "SIGTERM: finishing the requests under way, then stopping"; both screens carry on without a reload, and a payment taken on one shows on the other within a few seconds of the new server starting.
 4. On Railway, open the service's health check (`/api/health`). **Verify:** it answers `{"status":"ok"}`.
+
+### TEST 25.13 - The web app's security headers (D-45)
+1. Open a Vercel preview of the web app in Chrome, with the developer tools on the Network tab, and reload.
+2. Click the first request (the page). **Verify:** its response headers include `Content-Security-Policy` (with `frame-ancestors 'none'`), `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `Referrer-Policy` and `Permissions-Policy`.
+3. Use the app: sign in, open a member with a photo, upload a photo, open a staff ID and click Download, open the front desk.
+4. **Verify:** the Console shows no "Content Security Policy" errors, and the photos and the ID download work. If photos are not on Cloudinary, set `VITE_PHOTO_HOST` to their host and build again.
+
+### TEST 25.14 - The tests on GitHub (D-12)
+1. After the first push of this branch, open the repository's Actions tab.
+2. **Verify:** the workflow runs lint, unit and API tests on its own PostgreSQL, and the Chromium and Firefox browser jobs, and all pass.
