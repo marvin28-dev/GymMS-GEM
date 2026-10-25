@@ -28,13 +28,18 @@ const sender = (gymName) => {
   return clean ? `"${clean} via GEM" <${FROM_ADDRESS}>` : `GEM <${FROM_ADDRESS}>`;
 };
 
-const longDate = (d) => (d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
+// A date written out in full, in the email's language (16 October 2026 / 16 octobre 2026)
+const longDate = (d, lang = 'en') => (d ? new Date(d).toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
 
 // ── Blocks ──
 const p = (text) => `<p style="margin:0 0 16px;font-family:${FONT};font-size:15px;line-height:1.6;color:${C.body};">${esc(text)}</p>`;
 const pHtml = (html) => `<p style="margin:0 0 16px;font-family:${FONT};font-size:15px;line-height:1.6;color:${C.body};">${html}</p>`;
 const strong = (text) => `<strong style="color:${C.ink};font-weight:700;">${esc(text)}</strong>`;
-const greeting = (name) => p(`Hi ${String(name || '').trim() || 'there'},`);
+const greeting = (name, lang = 'en') => {
+  const who = String(name || '').trim();
+  if (lang === 'fr') return p(who ? `Bonjour ${who},` : 'Bonjour,');
+  return p(`Hi ${who || 'there'},`);
+};
 const link = (href, text) => `<a href="${esc(href)}" style="color:${C.goldDeep};font-weight:600;text-decoration:underline;">${esc(text || href)}</a>`;
 
 // The one figure the email is about: an amount, a code
@@ -137,7 +142,7 @@ function bandHtml(brand) {
   <tr><td style="height:3px;line-height:3px;font-size:0;background:${C.gold};background-image:linear-gradient(90deg,#c9a96e,#b08d4a);">&nbsp;</td></tr>`;
 }
 
-function footerHtml(gym) {
+function footerHtml(gym, lang = 'en') {
   const lines = [];
   if (gym) {
     const place = [gym.location, gym.city, gym.country].filter(Boolean).join(', ');
@@ -152,15 +157,15 @@ function footerHtml(gym) {
     if (contact.length) lines.push(`<div>${contact.join(' &nbsp;·&nbsp; ')}</div>`);
     if (socials.length) lines.push(`<div>${socials.map(esc).join(' &nbsp;·&nbsp; ')}</div>`);
   }
-  lines.push(`<div style="margin-top:10px;color:#a3a3ad;">Sent with GEM · GymElite Manager</div>`);
+  lines.push(`<div style="margin-top:10px;color:#a3a3ad;">${lang === 'fr' ? 'Envoyé avec GEM' : 'Sent with GEM'} · GymElite Manager</div>`);
   return `
   <tr><td align="center" class="gem-px" style="padding:22px 32px 8px;font-family:${FONT};font-size:12px;line-height:1.7;color:${C.muted};">${lines.join('')}</td></tr>`;
 }
 
 // brand: { name, logo?, sub? }; gym: the gym's record for the footer (or null)
-function layout({ brand, gym = null, preheader = '', eyebrow, title, body }) {
+function layout({ brand, gym = null, preheader = '', eyebrow, title, body, lang = 'en' }) {
   return `<!doctype html>
-<html lang="en"><head>
+<html lang="${lang === 'fr' ? 'fr' : 'en'}"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
 <title>${esc(title)}</title>
@@ -187,7 +192,7 @@ function layout({ brand, gym = null, preheader = '', eyebrow, title, body }) {
           </td></tr>
         </table>
       </td></tr>
-      ${footerHtml(gym)}
+      ${footerHtml(gym, lang)}
     </table>
   </td></tr>
 </table>

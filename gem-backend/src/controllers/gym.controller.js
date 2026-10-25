@@ -2,6 +2,7 @@ const prisma = require('../utils/prisma');
 const { REQUIRED_SECTIONS, setupStatus } = require('../utils/gymSetup');
 const { logActivity, changesBetween, describeChanges, money } = require('../utils/activityLog');
 const { currencyForCountry, SYMBOLS } = require('../utils/money');
+const { EMAIL_LANGUAGES } = require('../utils/memberEmailText');
 
 const GYM_FIELDS = {
   name: 'Gym name', location: 'Address', phone: 'Phone', email: 'Email', currency: 'Currency', logo: 'Logo',
@@ -133,6 +134,10 @@ async function updateMyGym(req, res) {
     if ('accessTypes' in next) {
       next.accessTypes = cleanList(next.accessTypes);
       if (!next.accessTypes) return res.status(400).json({ error: 'Send the access types as a list.', field: 'accessTypes' });
+    }
+    // The language of the emails and receipts members are sent (D-23)
+    if ('emailLanguage' in next && !EMAIL_LANGUAGES.includes(next.emailLanguage)) {
+      return res.status(400).json({ error: 'Emails to members are sent in English or French.', field: 'emailLanguage' });
     }
     data.settings = { ...(previous?.settings || {}), ...next };
   }

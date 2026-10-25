@@ -1,7 +1,6 @@
 const PDFDocument = require('pdfkit');
 const { formatMoney, SYMBOLS, currencyOf } = require('./money');
-
-const METHOD_NAMES = { cash: 'Cash', card: 'Card', bank_transfer: 'Bank transfer', mobile_money: 'Mobile money' };
+const { TEXT } = require('./memberEmailText');
 
 const GOLD = '#b08d4a';
 const GOLD_SOFT = '#f3ead9';
@@ -23,7 +22,8 @@ function pdfCurrency(symbol, code) {
 
 // Renders a payment receipt and resolves with the finished PDF as a Buffer,
 // ready to attach to an email.
-function buildReceiptPdf({ gym, member, payment, currencyCode }) {
+function buildReceiptPdf({ gym, member, payment, currencyCode, lang = 'en' }) {
+  const T = TEXT[lang] || TEXT.en;
   const code = currencyOf({ currency: currencyCode, country: gym?.country });
   const sign = pdfCurrency(SYMBOLS[code] || code, code);
   return new Promise((resolve, reject) => {
@@ -54,9 +54,9 @@ function buildReceiptPdf({ gym, member, payment, currencyCode }) {
 
     // "RECEIPT" sits opposite the gym name
     doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(11)
-      .text('RECEIPT', M + W * 0.6, 60, { width: W * 0.4, align: 'right', characterSpacing: 3 });
+      .text(T.pdf.receipt, M + W * 0.6, 60, { width: W * 0.4, align: 'right', characterSpacing: 3 });
     doc.fillColor(MUTED).font('Helvetica').fontSize(9)
-      .text(new Date(payment.createdAt || Date.now()).toLocaleDateString('en-GB'),
+      .text(new Date(payment.createdAt || Date.now()).toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-GB'),
         M + W * 0.6, doc.y + 3, { width: W * 0.4, align: 'right' });
 
     y = Math.max(doc.y, 112) + 18;
@@ -67,19 +67,19 @@ function buildReceiptPdf({ gym, member, payment, currencyCode }) {
     const panelH = 78;
     doc.roundedRect(M, y, W, panelH, 10).fill(GOLD_SOFT);
     doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(8)
-      .text('AMOUNT PAID', M, y + 18, { width: W, align: 'center', characterSpacing: 2 });
+      .text(T.pdf.amountPaid, M, y + 18, { width: W, align: 'center', characterSpacing: 2 });
     doc.fillColor(INK).font('Helvetica-Bold').fontSize(27)
       .text(money(payment.amount), M, y + 34, { width: W, align: 'center' });
     y += panelH + 30;
 
     // ── Detail rows ───────────────────────────────────────────────────────────
     const rows = [
-      ['Receipt reference', payment.reference],
-      ['Paid by', `${member.firstName || ''} ${member.lastName || ''}`.trim()],
-      ['Member ID', member.memberCode],
-      ['Payment method', METHOD_NAMES[payment.method] || String(payment.method || '').replace(/_/g, ' ')],
-      ['Description', payment.note],
-      payment.balanceAfter != null ? ['Balance after payment', money(payment.balanceAfter)] : null,
+      [T.pdf.reference, payment.reference],
+      [T.pdf.paidBy, `${member.firstName || ''} ${member.lastName || ''}`.trim()],
+      [T.pdf.memberId, member.memberCode],
+      [T.pdf.method, T.methods[payment.method] || String(payment.method || '').replace(/_/g, ' ')],
+      [T.pdf.description, payment.note],
+      payment.balanceAfter != null ? [T.pdf.balanceAfter, money(payment.balanceAfter)] : null,
     ].filter(r => r && r[1] !== null && r[1] !== undefined && String(r[1]).trim() !== '');
 
     doc.fontSize(10.5);
@@ -94,7 +94,7 @@ function buildReceiptPdf({ gym, member, payment, currencyCode }) {
 
     y += 12;
     doc.fillColor(BODY).font('Helvetica').fontSize(10.5)
-      .text('Thank you for your payment. Please keep this receipt for your records.', M, y, { width: W });
+      .text(T.pdf.thanks, M, y, { width: W });
 
     // ── Footer pinned to the bottom of the page ───────────────────────────────
     const contact = [gym.phone, gym.email, gym.website].filter(Boolean);
@@ -124,7 +124,7 @@ function buildReceiptPdf({ gym, member, payment, currencyCode }) {
     }
 
     doc.fillColor(MUTED).font('Helvetica').fontSize(7.5)
-      .text('Powered by GEM', M, fy, { width: W, align: 'center' });
+      .text(T.pdf.poweredBy, M, fy, { width: W, align: 'center' });
 
     doc.rect(0, doc.page.height - 6, PAGE_W, 6).fill(GOLD);
 

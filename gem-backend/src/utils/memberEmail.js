@@ -4,16 +4,15 @@ const prisma = require('./prisma');
 const { buildReceiptPdf } = require('./receiptPdf');
 const { formatMoney, currencyOf } = require('./money');
 const E = require('./emailLayout');
+const { textFor, languageOf } = require('./memberEmailText');
 
-const METHOD_NAMES = { cash: 'Cash', card: 'Card', bank_transfer: 'Bank transfer', mobile_money: 'Mobile money' };
-const STATUS_LOOK = {
-  active: ['Active', 'green'], visitor: ['Active', 'green'], registered: ['Registered', 'gold'], pending: ['Starts soon', 'amber'],
-  expiring: ['Ending soon', 'amber'], frozen: ['Frozen', 'grey'], suspended: ['Suspended', 'red'],
-  expired: ['Expired', 'red'], cancelled: ['Cancelled', 'red'], deactivated: ['Deactivated', 'red'],
+const TONE = {
+  active: 'green', visitor: 'green', registered: 'gold', pending: 'amber', expiring: 'amber', frozen: 'grey',
+  suspended: 'red', expired: 'red', cancelled: 'red', deactivated: 'red',
 };
-const statusBadge = (status) => {
-  const [label, tone] = STATUS_LOOK[status] || [String(status || '').replace(/_/g, ' '), 'grey'];
-  return label ? E.badge(label, tone) : '';
+const statusBadge = (status, T) => {
+  const label = T.statuses[status] || String(status || '').replace(/_/g, ' ');
+  return label ? E.badge(label, TONE[status] || 'grey') : '';
 };
 
 async function getGym(gymId) {
@@ -21,15 +20,15 @@ async function getGym(gymId) {
     where: { id: gymId },
     select: {
       name: true, code: true, logo: true, location: true, phone: true, email: true, currency: true,
-      city: true, country: true, website: true, facebook: true, instagram: true, twitter: true,
+      city: true, country: true, website: true, facebook: true, instagram: true, twitter: true, settings: true,
     },
   });
 }
 
 // Replies to the sending address go nowhere, so the member is pointed at the gym
-const callUs = (gym) => (gym.phone
-  ? E.pHtml(`If anything doesn't look right, call us on ${E.strong(gym.phone)} and we'll sort it out.`)
-  : E.p("If anything doesn't look right, speak to us at the front desk and we'll sort it out."));
+const callUs = (gym, T) => (gym.phone
+  ? E.pHtml(E.esc(T.callUsPhone('\u0000')).replace('\u0000', E.strong(gym.phone)))
+  : E.p(T.callUsDesk));
 
 async function send({ gym, to, subject, html, attachments }) {
   if (!process.env.RESEND_API_KEY || !to) return false;
@@ -49,26 +48,27 @@ async function sendMemberWelcome(member, gymId) {
   if (!member?.email) return false;
   const gym = await getGym(gymId);
   if (!gym) return false;
+  const lang = languageOf(gym), T = textFor(gym), W = T.welcome;
 
   const body = [
-    E.greeting(member.firstName),
-    E.p(`Your membership at ${gym.name} is set up. Here is what you need to check in.`),
+    E.greeting(member.firstName, lang),
+    E.p(W.line(gym.name)),
     E.tiles([
-      member.memberCode && { label: 'Member ID', value: member.memberCode, mono: true },
-      member.accessCode && { label: 'Check-in code', value: member.accessCode, mono: true },
+      member.memberCode && { label: T.memberId, value: member.memberCode, mono: true },
+      member.accessCode && { label: T.checkInCode, value: member.accessCode, mono: true },
     ]),
     E.details([
-      ['Package', member.package?.name],
-      ['Starts', E.longDate(member.startDate)],
-      ['Valid until', E.longDate(member.endDate)],
+      [W.package, member.package?.name],
+      [W.starts, E.longDate(member.startDate, lang)],
+      [W.validUntil, E.longDate(member.endDate, lang)],
     ]),
-    E.note('Keep your check-in code to yourself: it is how the front desk knows it is you.'),
-    E.p('See you at the gym.'),
+    E.note(E.esc(W.keepCode)),
+    E.p(W.seeYou),
   ].join('');
 
   return send({
-    gym, to: member.email, subject: `Welcome to ${gym.name}`,
-    html: E.layout({ brand: E.gymBrand(gym), gym, preheader: `Your membership is set up. Member ID ${member.memberCode || ''}`.trim(), eyebrow: 'Welcome', title: `Welcome to ${gym.name}`, body }),
+    gym, to: member.email, subject: W.subject(gym.name),
+    html: E.layout({ lang, brand: E.gymBrand(gym), gym, preheader: W.preheader(member.memberCode || ''), eyebrow: W.eyebrow, title: W.subject(gym.name), body }),
   });
 }
 
@@ -77,29 +77,30 @@ async function sendPaymentReceipt(payment, member, gymId) {
   if (!member?.email) return false;
   const gym = await getGym(gymId);
   if (!gym) return false;
+  const lang = languageOf(gym), T = textFor(gym), R = T.receipt;
 
   const currency = currencyOf(gym);
   const amount = formatMoney(payment.amount, currency);
-  const paidOn = E.longDate(payment.createdAt || Date.now());
+  const paidOn = E.longDate(payment.createdAt || Date.now(), lang);
 
   const body = [
-    E.greeting(member.firstName),
-    E.p('Thank you, we have received your payment.'),
-    E.highlight({ label: 'Amount paid', value: amount, sub: paidOn }),
+    E.greeting(member.firstName, lang),
+    E.p(R.thanks),
+    E.highlight({ label: R.amountPaid, value: amount, sub: paidOn }),
     E.details([
-      ['Reference', payment.reference],
-      ['Member ID', member.memberCode],
-      ['For', payment.note],
-      ['Paid by', METHOD_NAMES[payment.method] || String(payment.method || '').replace(/_/g, ' ')],
-      ['Balance left to pay', payment.balanceAfter != null ? formatMoney(payment.balanceAfter, currency) : null],
+      [R.reference, payment.reference],
+      [T.memberId, member.memberCode],
+      [R.for, payment.note],
+      [R.paidBy, T.methods[payment.method] || String(payment.method || '').replace(/_/g, ' ')],
+      [R.balanceLeft, payment.balanceAfter != null ? formatMoney(payment.balanceAfter, currency) : null],
     ]),
-    E.note('Your receipt is attached to this email as a PDF you can download and keep.'),
-    callUs(gym),
+    E.note(E.esc(R.attached)),
+    callUs(gym, T),
   ].join('');
 
   let attachments;
   try {
-    const pdf = await buildReceiptPdf({ gym, member, payment, currencyCode: currency });
+    const pdf = await buildReceiptPdf({ gym, member, payment, currencyCode: currency, lang });
     attachments = [{
       filename: `receipt-${payment.reference || 'payment'}.pdf`,
       content: pdf.toString('base64'),
@@ -110,8 +111,8 @@ async function sendPaymentReceipt(payment, member, gymId) {
   }
 
   return send({
-    gym, to: member.email, subject: `Payment receipt: ${amount}, ${gym.name}`, attachments,
-    html: E.layout({ brand: E.gymBrand(gym), gym, preheader: `We received ${amount}. Your receipt is attached.`, eyebrow: 'Payment received', title: 'Thank you for your payment', body }),
+    gym, to: member.email, subject: R.subject(amount, gym.name), attachments,
+    html: E.layout({ lang, brand: E.gymBrand(gym), gym, preheader: R.preheader(amount), eyebrow: R.eyebrow, title: R.title, body }),
   });
 }
 
@@ -120,51 +121,45 @@ async function sendAccessCode(member, gymId) {
   if (!member?.email) return false;
   const gym = await getGym(gymId);
   if (!gym) return false;
+  const lang = languageOf(gym), T = textFor(gym), C = T.code;
 
   const body = [
-    E.greeting(member.firstName),
-    E.p(`Here is your check-in code for ${gym.name}. Give it at the front desk when you come in.`),
-    E.highlight({ label: 'Check-in code', value: member.accessCode, mono: true }),
-    E.note('Keep it to yourself: it is how we know it is you.'),
+    E.greeting(member.firstName, lang),
+    E.p(C.line(gym.name)),
+    E.highlight({ label: T.checkInCode, value: member.accessCode, mono: true }),
+    E.note(E.esc(C.keep)),
   ].join('');
 
   return send({
-    gym, to: member.email, subject: `Your check-in code, ${gym.name}`,
-    html: E.layout({ brand: E.gymBrand(gym), gym, preheader: 'Your check-in code is inside.', eyebrow: 'Check-in code', title: 'Your check-in code', body }),
+    gym, to: member.email, subject: C.subject(gym.name),
+    html: E.layout({ lang, brand: E.gymBrand(gym), gym, preheader: C.preheader, eyebrow: C.eyebrow, title: C.title, body }),
   });
 }
 
 // ── A change to the member's membership (extend / freeze / renew / …) ─────────
-const MEMBERSHIP_CHANGES = {
-  extend_membership:   { subject: 'Your membership was extended',  eyebrow: 'Membership extended', line: 'Your membership has been extended.' },
-  freeze_membership:   { subject: 'Your membership was frozen',    eyebrow: 'Membership frozen',   line: 'Your membership has been frozen (paused). It will carry on once it is unfrozen.' },
-  unfreeze_membership: { subject: 'Your membership was unfrozen',  eyebrow: 'Membership resumed',  line: 'Your membership has been unfrozen and is active again.' },
-  cancel_membership:   { subject: 'Your membership was cancelled', eyebrow: 'Membership cancelled', line: 'Your membership has been cancelled.' },
-  convert_to_visitor:  { subject: 'You are now on a visitor pass', eyebrow: 'Visitor pass',         line: 'Your membership has been changed to a visitor pass.' },
-  renew_membership:    { subject: 'Your membership was renewed',   eyebrow: 'Membership renewed',  line: 'Your membership has been renewed.' },
-};
 async function sendMembershipUpdate(member, action, gymId) {
   if (!member?.email) return false;
   const gym = await getGym(gymId);
   if (!gym) return false;
-  const m = MEMBERSHIP_CHANGES[action];
+  const lang = languageOf(gym), T = textFor(gym);
+  const m = T.changes[action];
   if (!m) return false;
   const showUntil = action !== 'cancel_membership' && action !== 'convert_to_visitor';
 
   const body = [
-    E.greeting(member.firstName),
+    E.greeting(member.firstName, lang),
     E.p(m.line),
     E.details([
-      ['Member ID', member.memberCode],
-      ['Status', statusBadge(member.status)],
-      ['Valid until', showUntil ? E.longDate(member.endDate) : null],
+      [T.memberId, member.memberCode],
+      [T.status, statusBadge(member.status, T)],
+      [T.welcome.validUntil, showUntil ? E.longDate(member.endDate, lang) : null],
     ]),
-    callUs(gym),
+    callUs(gym, T),
   ].join('');
 
   return send({
     gym, to: member.email, subject: `${m.subject}, ${gym.name}`,
-    html: E.layout({ brand: E.gymBrand(gym), gym, preheader: m.line, eyebrow: m.eyebrow, title: m.subject, body }),
+    html: E.layout({ lang, brand: E.gymBrand(gym), gym, preheader: m.line, eyebrow: m.eyebrow, title: m.subject, body }),
   });
 }
 
@@ -173,22 +168,23 @@ async function sendCoachIntro(member, coach, gymId) {
   if (!member?.email || !coach) return false;
   const gym = await getGym(gymId);
   if (!gym) return false;
+  const lang = languageOf(gym), T = textFor(gym), K = T.coach;
   const name = `${coach.firstName || ''} ${coach.lastName || ''}`.trim();
 
   const body = [
-    E.greeting(member.firstName),
-    E.pHtml(`${E.strong(name)} is now your coach at ${E.esc(gym.name)}. They will set your goals with you, take your measurements each week and help you stay on track.`),
+    E.greeting(member.firstName, lang),
+    E.pHtml(E.esc(K.line('\u0000', gym.name)).replace('\u0000', E.strong(name))),
     E.details([
-      ['Coach', name],
-      ['Email', coach.email ? { html: E.link(`mailto:${coach.email}`, coach.email) } : null],
-      ['Phone', coach.phone ? { html: E.link(`tel:${String(coach.phone).replace(/[^\d+]/g, '')}`, coach.phone) } : null],
-    ], 'Your coach'),
-    E.p('Get in touch with them to plan your first session.'),
+      [K.coach, name],
+      [K.email, coach.email ? { html: E.link(`mailto:${coach.email}`, coach.email) } : null],
+      [K.phone, coach.phone ? { html: E.link(`tel:${String(coach.phone).replace(/[^\d+]/g, '')}`, coach.phone) } : null],
+    ], K.section),
+    E.p(K.next),
   ].join('');
 
   return send({
-    gym, to: member.email, subject: `Meet your coach, ${gym.name}`,
-    html: E.layout({ brand: E.gymBrand(gym), gym, preheader: `${name} is now your coach.`, eyebrow: 'Your coach', title: 'Meet your coach', body }),
+    gym, to: member.email, subject: K.subject(gym.name),
+    html: E.layout({ lang, brand: E.gymBrand(gym), gym, preheader: K.preheader(name), eyebrow: K.eyebrow, title: K.title, body }),
   });
 }
 
