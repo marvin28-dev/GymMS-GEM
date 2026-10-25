@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startServer, outbox } from './helpers/server.mjs';
-import { registerGym, uniqueCode, eventually, OWNER_PASSWORD } from './helpers/fixtures.mjs';
+import { registerGym, uniqueCode, eventually, OWNER_PASSWORD, addStaff } from './helpers/fixtures.mjs';
 
 let api, stop, gym;
 
@@ -208,5 +208,66 @@ describe('signing out', () => {
 
   it('needs a signed-in account', async () => {
     expect((await api.post('/api/auth/logout', {})).status).toBe(401);
+  });
+});
+
+// D-8: nothing confirmed that a new owner's address, or a changed one, was theirs
+describe('confirming an email address', () => {
+  const linkIn = (mail) => /verify-email\?token=([a-f0-9]{64})/.exec(mail?.html || '')?.[1];
+  const me = async (token) => (await api.get('/api/auth/me', { token })).body;
+
+  it("is asked of a new owner in the welcome email, and the link works once", async () => {
+    const own = await registerGym(api);
+    expect(own.user.emailUnconfirmed).toBe(true);
+    expect((await me(own.token)).emailUnconfirmed).toBe(true);
+    const token = linkIn(await eventually(() => outbox().find(m => m.to === own.email && /Welcome to GEM/.test(m.subject))));
+    expect(token).toBeTruthy();
+
+    const res = await api.post('/api/auth/verify-email', { token });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ confirmed: true, email: own.email });
+    expect((await me(own.token)).emailUnconfirmed).toBe(false);
+    expect((await me(own.token)).emailVerifyHash).toBeUndefined();
+    expect((await api.post('/api/auth/verify-email', { token })).status).toBe(400);
+    const again = await api.post('/api/auth/login', { gymCode: own.gymCode, email: own.email, password: OWNER_PASSWORD });
+    expect(again.body.user.emailUnconfirmed).toBe(false);
+  });
+
+  it('sends a new link on request, and the old one stops working', async () => {
+    const own = await registerGym(api);
+    const first = linkIn(await eventually(() => outbox().find(m => m.to === own.email && /Welcome to GEM/.test(m.subject))));
+    const res = await api.post('/api/auth/resend-confirmation', {}, { token: own.token });
+    expect(res.status).toBe(200);
+    const second = linkIn(await eventually(() => outbox().filter(m => m.to === own.email && /Confirm your email/.test(m.subject)).at(-1)));
+    expect(second).toBeTruthy();
+    expect(second).not.toBe(first);
+    expect((await api.post('/api/auth/verify-email', { token: first })).status).toBe(400);
+    expect((await api.post('/api/auth/verify-email', { token: second })).status).toBe(200);
+    expect((await api.post('/api/auth/resend-confirmation', {})).status).toBe(401);
+  });
+
+  it('is asked again of a new address, at that address', async () => {
+    const own = await registerGym(api);
+    const desk = await addStaff(api, own);
+    expect((await me(desk.token)).emailUnconfirmed).toBe(false);
+    const address = `moved.${uniqueCode('m')}@example.test`;
+    expect((await api.patch(`/api/staff/${desk.id}`, { email: address }, { token: own.token })).status).toBe(200);
+    const token = linkIn(await eventually(() => outbox().find(m => m.to === address && /Confirm your email/.test(m.subject))));
+    expect(token).toBeTruthy();
+    expect((await me(desk.token)).emailUnconfirmed).toBe(true);
+    expect((await api.post('/api/auth/verify-email', { token })).status).toBe(200);
+    expect((await me(desk.token)).emailUnconfirmed).toBe(false);
+
+    // The same address written in capitals is not a new one
+    const before = outbox().length;
+    await api.patch(`/api/staff/${desk.id}`, { email: address.toUpperCase() }, { token: own.token });
+    expect((await me(desk.token)).emailUnconfirmed).toBe(false);
+    expect(outbox().slice(before).some(m => /Confirm your email/.test(m.subject))).toBe(false);
+  });
+
+  it('refuses a link that is not one', async () => {
+    for (const token of [undefined, '', 'abc', 'f'.repeat(64)]) {
+      expect((await api.post('/api/auth/verify-email', { token })).status).toBe(400);
+    }
   });
 });

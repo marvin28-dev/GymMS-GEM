@@ -11,6 +11,7 @@ const { sendWelcomeEmail } = require('../utils/welcomeEmail');
 const { deliver } = require('../utils/sendEmail');
 const { bestEffort } = require('../utils/bestEffort');
 const { newResetToken } = require('../utils/resetToken');
+const { newConfirmation, sendConfirmation } = require('../utils/emailConfirm');
 
 const STAFF_FIELDS = {
   firstName: 'First name', lastName: 'Last name', email: 'Email', phone: 'Phone',
@@ -413,6 +414,11 @@ async function update(req, res) {
     data.accessCode = await uniqueStaffCode(req.user.gymId);
   }
 
+  // A new sign-in address is confirmed from that address (D-8)
+  const newAddress = typeof data.email === 'string' && data.email.trim() !== '' && data.email.trim().toLowerCase() !== String(existing.email || '').trim().toLowerCase();
+  const confirmation = newAddress ? newConfirmation() : null;
+  if (confirmation) Object.assign(data, confirmation.data, { emailVerifiedAt: null });
+
   let staff;
   try {
     staff = await prisma.staff.update({
@@ -431,6 +437,11 @@ async function update(req, res) {
     console.error('Staff update failed:', err.message);
     if (err.code === 'P2002') return res.status(409).json({ error: 'A staff member with this email already exists.', field: 'email' });
     return res.status(500).json({ error: 'Failed to update staff' });
+  }
+
+  if (confirmation) {
+    bestEffort(prisma.gym.findUnique({ where: { id: req.user.gymId } })
+      .then(gym => sendConfirmation({ staff, gym, token: confirmation.token })), 'Email confirmation');
   }
 
   if (isActive !== undefined && isActive !== existing.isActive) {

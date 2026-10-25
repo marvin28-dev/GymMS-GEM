@@ -14,6 +14,10 @@ export const login = (gymCode, email, password) =>
 export const register = (data) =>
   api.post('/auth/register', data);
 
+// Confirming an email address (D-8)
+export const verifyEmail = (token) => api.post('/auth/verify-email', { token });
+export const resendConfirmation = () => api.post('/auth/resend-confirmation');
+
 export const getMe = () =>
   api.get('/auth/me');
 

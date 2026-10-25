@@ -7,6 +7,7 @@ import NavDrawer from '../components/NavDrawer';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { hasNavigation } from '../utils/rolePages';
 import { getRole } from '../utils/auth';
+import EmailConfirmBanner from '../components/EmailConfirmBanner';
 
 export default function AppLayout() {
   const { pathname } = useLocation();
@@ -36,6 +37,7 @@ export default function AppLayout() {
             padding: navigable ? '0 0 88px' : '0 0 24px',
           }}
         >
+          <EmailConfirmBanner isMobile />
           {/* The sidebar and header stay while a page arrives */}
           <Suspense fallback={null}>
             <Outlet />
@@ -68,6 +70,7 @@ export default function AppLayout() {
           className="page-fade gem-page-main"
           style={{ padding: 28, flex: 1 }}
         >
+          <EmailConfirmBanner />
           {/* The sidebar and header stay while a page arrives */}
           <Suspense fallback={null}>
             <Outlet />

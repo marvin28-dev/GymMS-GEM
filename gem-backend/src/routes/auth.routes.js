@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { logout, register, login, me, verifyManager, checkGymCode, forgotPassword, resetPassword, verifyResetToken, changePassword, loginStatus, setFirstPassword } = require('../controllers/auth.controller');
+const { verifyEmail, resendConfirmation, logout, register, login, me, verifyManager, checkGymCode, forgotPassword, resetPassword, verifyResetToken, changePassword, loginStatus, setFirstPassword } = require('../controllers/auth.controller');
 const { authenticate } = require('../middleware/auth.middleware');
 
 router.post('/register', register);
@@ -9,6 +9,9 @@ router.post('/login-status', loginStatus);
 router.post('/set-password', setFirstPassword);
 router.get('/me', authenticate, me);
 router.post('/logout', authenticate, logout);
+// Confirming an email address (D-8)
+router.post('/verify-email', verifyEmail);
+router.post('/resend-confirmation', authenticate, resendConfirmation);
 router.post('/verify-manager', authenticate, verifyManager);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);

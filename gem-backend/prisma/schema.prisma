@@ -65,45 +65,50 @@ model Gym {
 }
 
 model Staff {
-  id                String    @id @default(cuid())
-  gymId             String
-  firstName         String
-  lastName          String
-  email             String
-  phone             String?
-  role              StaffRole
-  department        String?
-  joinDate          DateTime?
-  accessCode        String?
-  shiftStart        String?
-  schedule          Json?
-  scheduleOverrides Json?
-  staffNotes        Json?
-  passwordHash      String
-  avatarColor       String?
-  photo             String?
-  photoId           String?
-  emergencyContact  String?
-  emergencyPhone    String?
-  houseNumber       String?
-  street            String?
-  city              String?
-  region            String?
-  postalCode        String?
-  country           String?
+  id                 String    @id @default(cuid())
+  gymId              String
+  firstName          String
+  lastName           String
+  email              String
+  phone              String?
+  role               StaffRole
+  department         String?
+  joinDate           DateTime?
+  accessCode         String?
+  shiftStart         String?
+  schedule           Json?
+  scheduleOverrides  Json?
+  staffNotes         Json?
+  passwordHash       String
+  avatarColor        String?
+  photo              String?
+  photoId            String?
+  emergencyContact   String?
+  emergencyPhone     String?
+  houseNumber        String?
+  street             String?
+  city               String?
+  region             String?
+  postalCode         String?
+  country            String?
   // 'Full Time' pays a flat monthly salary; 'Part Time' pays the salary
   // field as an hourly rate against hours actually clocked.
-  employmentType    String?   @default("Full Time")
-  salary            Float?
-  payDay            Int?
-  isActive          Boolean   @default(true)
+  employmentType     String?   @default("Full Time")
+  salary             Float?
+  payDay             Int?
+  isActive           Boolean   @default(true)
   // A new account has no password until its owner picks one at their first
   // sign-in; nothing is emailed to set it up
-  mustSetPassword   Boolean   @default(false)
-  resetToken        String?
-  resetTokenExpiry  DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  mustSetPassword    Boolean   @default(false)
+  resetToken         String?
+  resetTokenExpiry   DateTime?
+  // Confirming the address someone signs in with (D-8). A hash waiting means
+  // a link was sent and not used yet: a new owner, or an address that changed.
+  emailVerifiedAt    DateTime?
+  emailVerifyHash    String?
+  emailVerifyExpires DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   gym               Gym             @relation(fields: [gymId], references: [id])
   tasksAssigned     Task[]          @relation("AssignedTo")

@@ -12,6 +12,7 @@ const GymCodePage = lazy(() => import("../pages/GymCodePage"));
 const GymLoginPage = lazy(() => import("../pages/GymLoginPage"));
 const ForgotPasswordPage = lazy(() => import("../pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("../pages/ResetPasswordPage"));
+const VerifyEmailPage = lazy(() => import("../pages/VerifyEmailPage"));
 const FrontDeskPage = lazy(() => import("../pages/FrontDeskPage"));
 const MemberProfilePage = lazy(() => import("../pages/MemberProfilePage"));
 const StaffProfilePage = lazy(() => import("../pages/StaffProfilePage"));
@@ -36,6 +37,7 @@ export default function AppRoutes() {
       <Route path="/:gymCode/login" element={<GymLoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
 
       {/* Fullscreen Front Desk (no app layout) */}
       <Route element={<ProtectedRoute />}>

@@ -11,6 +11,7 @@ const { attemptCounter, refuseTooMany } = require('../utils/attempts');
 const { bestEffort } = require('../utils/bestEffort');
 const { newResetToken, hashResetToken } = require('../utils/resetToken');
 const { isDemoGym, demoCode } = require('../utils/sendEmail');
+const { newConfirmation, confirmBlock, sendConfirmation, confirmByToken } = require('../utils/emailConfirm');
 
 const asActor = (s) => ({ id: s.id, name: fullName(s), role: s.role });
 const MINUTE = 60 * 1000;
@@ -76,6 +77,8 @@ async function register(req, res) {
   if (existing) return res.status(409).json({ error: 'Gym code already taken', field: 'gymCode' });
 
   const passwordHash = await bcrypt.hash(String(password), 10);
+  // The owner confirms their address from the welcome email (D-8)
+  const confirmation = newConfirmation();
 
   let gym;
   try {
@@ -103,6 +106,7 @@ async function register(req, res) {
             role: 'general_manager',
             avatarColor: '#c9a96e',
             accessCode: generateAccessCode(),
+            ...confirmation.data,
           },
         },
       },
@@ -131,6 +135,7 @@ async function register(req, res) {
         E.pHtml(`Your gym ${E.strong(gym.name)} is live on GEM. Keep these details somewhere safe.`),
         E.tiles([{ label: 'Gym code', value: gym.code, mono: true }, { label: 'Your role', value: 'General Manager' }]),
         E.details([['Sign-in email', owner.email]]),
+        confirmBlock(confirmation.token),
         E.button(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/${encodeURIComponent(gym.code)}/login`, 'Open your gym'),
         '<div style="font-family:Manrope,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:800;color:#16161d;margin:0 0 12px;">Next steps</div>',
         E.steps(['Add your packages and prices in Settings.', 'Choose the payment methods you accept.', 'Add your staff. Each one gets an email with how to sign in.']),
@@ -165,6 +170,7 @@ async function register(req, res) {
       gymCountry: gym.country || null,
       gymCity: gym.city || null,
       gymCurrency: gym.currency || null,
+      emailUnconfirmed: true,
     },
   });
 }
@@ -249,6 +255,7 @@ function openSession(staff, gym) {
       gymCountry: gym.country || null,
       gymCity: gym.city || null,
       gymCurrency: gym.currency || null,
+      emailUnconfirmed: !!staff.emailVerifyHash,
     },
   };
 }
@@ -357,15 +364,17 @@ async function me(req, res) {
     where: { id: req.user.id },
     select: {
       id: true, firstName: true, lastName: true,
-      email: true, role: true, department: true, gymId: true, avatarColor: true, photo: true,
+      email: true, role: true, department: true, gymId: true, avatarColor: true, photo: true, emailVerifyHash: true,
       gym: { select: { code: true, name: true, country: true, city: true, currency: true } },
     },
   });
   if (!staff) return res.status(404).json({ error: 'User not found' });
+  const { emailVerifyHash, ...account } = staff;
   // Flattened the same way a sign-in reports it, so a session that refreshes
   // itself here ends up with the same gym details it signed in with.
   res.json({
-    ...staff,
+    ...account,
+    emailUnconfirmed: !!emailVerifyHash,
     gymCode: staff.gym?.code || null,
     gymName: staff.gym?.name || null,
     gymCountry: staff.gym?.country || null,
@@ -564,4 +573,28 @@ async function logout(req, res) {
   res.json({ message: 'Signed out' });
 }
 
-module.exports = { logout, register, login, me, verifyManager, checkGymCode, forgotPassword, resetPassword, verifyResetToken, changePassword, loginStatus, setFirstPassword };
+// The link from a confirmation email. Public: it is opened from the inbox,
+// often on a phone that is not signed in.
+async function verifyEmail(req, res) {
+  const confirmed = await confirmByToken(req.body?.token);
+  if (!confirmed) return res.status(400).json({ error: 'This link has expired or was already used. Sign in and ask for a new one.' });
+  res.json({ confirmed: true, email: confirmed.email });
+}
+
+// A new link, for whoever is signed in. Limited, as each one is an email.
+const confirmationsByAccount = attemptCounter({ max: 5, windowMs: 60 * MINUTE });
+async function resendConfirmation(req, res) {
+  const key = String(req.user.id);
+  const wait = confirmationsByAccount.lockedFor(key);
+  if (wait) return refuseTooMany(res, wait);
+  const staff = await prisma.staff.findUnique({ where: { id: req.user.id }, include: { gym: true } });
+  if (!staff?.email) return res.status(400).json({ error: 'This account has no email address.' });
+  const { token, data } = newConfirmation();
+  await prisma.staff.update({ where: { id: staff.id }, data });
+  confirmationsByAccount.count(key);
+  const { sent } = await sendConfirmation({ staff, gym: staff.gym, token });
+  if (!sent) return res.status(502).json({ error: 'The email could not be sent. Try again in a few minutes.' });
+  res.json({ sent: true, email: staff.email });
+}
+
+module.exports = { verifyEmail, resendConfirmation, logout, register, login, me, verifyManager, checkGymCode, forgotPassword, resetPassword, verifyResetToken, changePassword, loginStatus, setFirstPassword };

@@ -200,6 +200,13 @@ export function getGymCurrency() {
 
 // Everything the gym record says about where it is and what it charges in.
 // Called after Settings saves so the change is felt without signing in again.
+// A change to the signed-in person's own details, kept with the session
+export function updateSessionUser(patch) {
+  const auth = getAuth();
+  if (!auth?.user || !patch) return;
+  storeJson(KEY, { ...auth, user: { ...auth.user, ...patch } });
+}
+
 export function updateSessionGym(gym) {
   const auth = getAuth();
   if (!auth?.user || !gym) return;
