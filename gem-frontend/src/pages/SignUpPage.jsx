@@ -7,8 +7,9 @@ import {
   ShieldCheck, Zap, RefreshCw, CreditCard, Monitor, BarChart3, ChevronDown, PlayCircle, Globe,
 } from 'lucide-react';
 import { register, checkGymCode as checkGymCodeApi } from '../services/auth.service';
-import { setAuth, setPhoneFormat } from '../utils/auth';
+import { setAuth, setPhoneFormat, MIN_PASSWORD } from '../utils/auth';
 import { COUNTRIES } from '../utils/countries';
+import SupportLinks from '../components/SupportLinks';
 import { useLanguage } from '../contexts/LanguageContext';
 import LangToggle from '../components/LangToggle';
 import { useIsMobile } from '../utils/useIsMobile';
@@ -203,7 +204,7 @@ export default function SignUpPage() {
     if (!form.lastName.trim()) e.lastName = t('signup.errRequired');
     if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) e.email = t('signup.errEmail');
     if (!form.managerPhone.trim()) e.managerPhone = t('signup.errPhone');
-    if (form.password.length < 6) e.password = t('signup.errPasswordMin');
+    if (form.password.length < MIN_PASSWORD) e.password = t('signup.errPasswordMin');
     if (form.password !== form.confirmPassword) e.confirmPassword = t('signup.errPasswordMatch');
     return e;
   }
@@ -392,32 +393,6 @@ function WelcomeStep({ onStart, onDemo, onSignIn }) {
           {t('signup.welcomeSub')}
         </p>
 
-        {/* Video - mobile */}
-        <div style={{ borderRadius: 12, overflow: 'hidden', border: '1.5px solid rgba(201,169,110,0.25)', boxShadow: '0 8px 28px rgba(0,0,0,0.28)', marginBottom: 20 }}>
-          <div style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {[0,1,2].map(i => <div key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--border)' }} />)}
-            </div>
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <PlayCircle size={10} color="#c9a96e" />
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{t('signup.welcomeVideoTitle')}</span>
-            </div>
-            <div style={{ background: 'rgba(201,169,110,0.12)', borderRadius: 20, padding: '2px 7px' }}>
-              <span style={{ fontSize: 10, color: '#c9a96e', fontWeight: 600 }}>2 min</span>
-            </div>
-          </div>
-          <div style={{ position: 'relative', paddingBottom: '56.25%', background: '#050508' }}>
-            <iframe
-              src="https://www.youtube.com/embed/dQw4w9WgXcQ"
-              title={t('signup.welcomeVideoTitle')}
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-            />
-          </div>
-        </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px', marginBottom: 28 }}>
           {features.map(({ icon: Icon, label }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -530,33 +505,6 @@ function WelcomeStep({ onStart, onDemo, onSignIn }) {
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ borderRadius: 14, overflow: 'hidden', border: '1.5px solid rgba(201,169,110,0.25)', boxShadow: '0 24px 72px rgba(0,0,0,0.32)', marginBottom: 16 }}>
-          <div style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-              {[0,1,2].map(i => <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--border)' }} />)}
-            </div>
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
-              <PlayCircle size={11} color="#c9a96e" />
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.2px' }}>
-                {t('signup.welcomeVideoTitle')}
-              </span>
-            </div>
-            <div style={{ background: 'rgba(201,169,110,0.12)', borderRadius: 20, padding: '2px 8px', flexShrink: 0 }}>
-              <span style={{ fontSize: 10, color: '#c9a96e', fontWeight: 600 }}>2 min</span>
-            </div>
-          </div>
-          <div style={{ position: 'relative', paddingBottom: '56.25%', background: '#050508' }}>
-            <iframe
-              src="https://www.youtube.com/embed/dQw4w9WgXcQ"
-              title={t('signup.welcomeVideoTitle')}
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-            />
-          </div>
-        </div>
-
         <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 20px' }}>
           {features.map(({ icon: Icon, label }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
@@ -568,15 +516,7 @@ function WelcomeStep({ onStart, onDemo, onSignIn }) {
           ))}
         </div>
 
-        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('signup.welcomeSupport')}</span>
-          <a href="mailto:hello@gymgem.io" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#c9a96e', fontWeight: 600, textDecoration: 'none', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.2)', borderRadius: 6, padding: '4px 10px' }}>
-            ✉ hello@gymgem.io
-          </a>
-          <a href="https://wa.me/237600000000" target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#22c55e', fontWeight: 600, textDecoration: 'none', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)', borderRadius: 6, padding: '4px 10px' }}>
-            💬 WhatsApp
-          </a>
-        </div>
+        <SupportLinks inline label={t('signup.welcomeSupport')} style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-subtle)' }} />
       </div>
     </div>
   );

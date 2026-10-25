@@ -56,10 +56,10 @@ test('in French, the new-password form explains a refusal in French', async ({ p
   await page.route('**/api/auth/verify-reset-token/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ valid: true }) }));
   await inFrench(page);
   await page.goto('/reset-password?token=test-token');
-  await page.getByPlaceholder('Au moins 6 caractères').fill('abc');
+  await page.getByPlaceholder('Au moins 8 caractères').fill('abc');
   await page.getByPlaceholder('Répétez votre mot de passe').fill('abd');
   await page.getByRole('button', { name: 'Définir le nouveau mot de passe' }).click();
-  await expect(page.getByText('Utilisez au moins 6 caractères.')).toBeVisible();
+  await expect(page.getByText('Utilisez au moins 8 caractères.')).toBeVisible();
   await expect(page.getByText('Les deux mots de passe ne correspondent pas.')).toBeVisible();
 });
 

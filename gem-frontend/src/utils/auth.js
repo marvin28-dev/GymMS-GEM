@@ -6,6 +6,9 @@ import { readStored, readStoredJson, store, storeJson, storedKeys, unstore } fro
 const KEY          = 'gem_auth';
 const ACTIVITY_KEY = 'gem_last_activity';
 
+// The shortest new password the server accepts (D-36)
+export const MIN_PASSWORD = 8;
+
 // Inactivity timeout - 15 minutes of no user interaction triggers the warning
 const INACTIVITY_MS = 15 * 60 * 1000;
 

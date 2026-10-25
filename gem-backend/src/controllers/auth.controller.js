@@ -14,7 +14,9 @@ const { isDemoGym, demoCode } = require('../utils/sendEmail');
 
 const asActor = (s) => ({ id: s.id, name: fullName(s), role: s.role });
 const MINUTE = 60 * 1000;
-const MIN_PASSWORD = 6;
+// For every new password (sign-up, first password, reset, change). Passwords
+// set before the minimum rose to 8 keep working: signing in never checks it (D-36).
+const MIN_PASSWORD = 8;
 
 function getResend() {
   if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is not set');

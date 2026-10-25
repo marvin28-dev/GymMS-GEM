@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Dumbbell, ArrowLeft, Lock, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
 import { resetPassword, verifyResetToken } from '../services/auth.service';
+import { MIN_PASSWORD } from '../utils/auth';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const inp = (err) => ({
@@ -81,7 +82,7 @@ export default function ResetPasswordPage() {
 
   function validate() {
     const e = {};
-    if (!password || password.length < 6) e.password = t('auth.pwTooShort');
+    if (!password || password.length < MIN_PASSWORD) e.password = t('auth.pwTooShort');
     if (password !== confirm) e.confirm = t('auth.pwMismatch');
     return e;
   }

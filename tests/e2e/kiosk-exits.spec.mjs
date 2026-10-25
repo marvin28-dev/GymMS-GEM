@@ -23,19 +23,23 @@ test("the desk's sign-in screen asks for the password before leaving", async ({ 
   await expect(page).toHaveURL(/\/front-desk$/);
 });
 
-test("a coach's client opened from the desk stays inside the desk", async ({ page }) => {
+// D-41: this test followed a coach's client from the coach's profile on the
+// desk into the desk's member page. The desk no longer shows a colleague's
+// clients, pay or notes (anyone standing at it sees the screen, whoever is
+// signed in); a manager reads them in the app, and the desk shows only your own.
+test("a colleague's clients, pay and notes are not shown on the desk, only in the app", async ({ page }) => {
   const owner = await registerGym();
   const coach = await addStaff(owner, { role: 'trainer', firstName: 'Cora', lastName: 'Coach' });
-  const today = new Date().toISOString().slice(0, 10);
-  const member = await call('POST', '/members', {
-    token: owner.token,
-    body: { firstName: 'Kiosk', lastName: 'Client', city: 'Douala', region: 'Littoral', regFeeMethod: 'cash', startDate: today, endDate: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10) },
-  });
-  await call('POST', '/coach/assign', { token: owner.token, body: { memberId: member.id, coachId: coach.id } });
+  const tab = (name) => page.getByRole('button', { name, exact: true });
 
   await signIn(page, owner);
   await page.goto(`/front-desk/staff/${coach.id}`);
-  await page.getByRole('button', { name: 'Clients' }).click();
-  await page.getByText('Kiosk Client').first().click();
-  await expect(page).toHaveURL(new RegExp(`/front-desk/member/${member.id}$`));
+  await expect(tab('Schedule').first()).toBeVisible();
+  for (const name of ['Clients', 'Pay & Earnings', 'Notes']) await expect(tab(name), name).toHaveCount(0);
+
+  await page.goto(`/staff/${coach.id}`);
+  for (const name of ['Clients', 'Pay & Earnings', 'Notes']) await expect(tab(name).first(), name).toBeVisible();
+
+  await page.goto('/front-desk/my-profile');
+  await expect(tab('Pay & Earnings').first()).toBeVisible();
 });

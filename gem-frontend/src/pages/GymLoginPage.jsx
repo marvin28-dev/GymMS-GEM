@@ -4,10 +4,11 @@ import {
   Eye, EyeOff, ArrowLeft, Dumbbell, MapPin, Lock, Mail, LogIn, KeyRound,
   Users, Monitor, CreditCard, BarChart3, Users2, Sparkles, ChevronRight,
 } from 'lucide-react';
-import { setAuth, isAuthed, setDemoMode, getHomeRoute } from '../utils/auth';
+import { setAuth, isAuthed, setDemoMode, getHomeRoute, MIN_PASSWORD } from '../utils/auth';
 import { login as loginApi, loginStatus, setFirstPassword } from '../services/auth.service';
 import { getGymByCode } from '../services/gym.service';
 import LangToggle from '../components/LangToggle';
+import SupportLinks from '../components/SupportLinks';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useIsMobile } from '../utils/useIsMobile';
 import { gymAddress } from '../utils/gymAddress';
@@ -102,7 +103,7 @@ export default function GymLoginPage() {
     const e = {};
     if (!form.email.trim()) e.email = t('auth.loginErrorEmail');
     if (!/^\d{4}$/.test(setupCode)) e.setupCode = t('auth.codeFourDigits');
-    if ((form.password || '').length < 6) e.password = t('auth.pwTooShort');
+    if ((form.password || '').length < MIN_PASSWORD) e.password = t('auth.pwTooShort');
     else if (form.password !== password2) e.password2 = t('auth.pwMismatch');
     if (Object.keys(e).length) { setErrors(e); return; }
     setLoading(true);
@@ -690,19 +691,7 @@ export default function GymLoginPage() {
           </p>
 
           {/* Contact */}
-          <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--border-subtle)', textAlign: 'center' }}>
-            <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '0 0 12px', letterSpacing: '0.2px' }}>
-              {t('auth.loginSupport')}
-            </p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <a href="mailto:hello@gymgem.io" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#c9a96e', fontWeight: 600, textDecoration: 'none', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.2)', borderRadius: 8, padding: '6px 12px' }}>
-                ✉ hello@gymgem.io
-              </a>
-              <a href="https://wa.me/237600000000" target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#22c55e', fontWeight: 600, textDecoration: 'none', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)', borderRadius: 8, padding: '6px 12px' }}>
-                💬 WhatsApp
-              </a>
-            </div>
-          </div>
+          <SupportLinks label={t('auth.loginSupport')} style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--border-subtle)', textAlign: 'center' }} />
         </div>
       </div>
 

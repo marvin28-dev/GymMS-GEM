@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { Dumbbell, Users, BarChart2, Calendar, ChevronRight, CheckCircle2, ArrowRight, Zap, Shield, Star, Mail, MessageCircle } from 'lucide-react';
+import { Dumbbell, Users, BarChart2, Calendar, ChevronRight, CheckCircle2, ArrowRight, Zap, Shield, Mail, MessageCircle } from 'lucide-react';
+import { SUPPORT, hasSupport } from '../utils/support';
 import { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import LangToggle from '../components/LangToggle';
@@ -17,19 +18,6 @@ export default function LandingPage() {
     { icon: BarChart2,title: t('landing.feat2Title'), desc: t('landing.feat2Desc'), color: 'var(--accent-gold)',   dim: 'var(--accent-gold-dim)'   },
     { icon: Calendar, title: t('landing.feat3Title'), desc: t('landing.feat3Desc'), color: 'var(--accent-green)',  dim: 'var(--accent-green-dim)'  },
     { icon: Shield,   title: t('landing.feat4Title'), desc: t('landing.feat4Desc'), color: 'var(--accent-purple)', dim: 'var(--accent-purple-dim)' },
-  ];
-
-  const STATS = [
-    { value: '500+',  label: t('landing.stat1') },
-    { value: '120k+', label: t('landing.stat2') },
-    { value: '99.9%', label: t('landing.stat3') },
-    { value: '24/7',  label: t('landing.stat4') },
-  ];
-
-  const TESTIMONIALS = [
-    { text: t('landing.t1'), name: 'Marvin Ekokobe', role: t('landing.t1role'), initials: 'ME', color: '#c9a96e' },
-    { text: t('landing.t2'), name: 'Sophie Ngono',   role: t('landing.t2role'), initials: 'SN', color: '#60a5fa' },
-    { text: t('landing.t3'), name: 'Marcel Fonkoua', role: t('landing.t3role'), initials: 'MF', color: '#4ade80' },
   ];
 
   return (
@@ -103,62 +91,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Product Video ── */}
-      <section style={{ maxWidth: 900, margin: '0 auto', padding: isMobile ? '0 16px 56px' : '0 24px 88px' }}>
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? 20 : 32 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-gold)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: 10 }}>{t('landing.videoLabel')}</div>
-          <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: isMobile ? 20 : 'clamp(22px, 3.5vw, 34px)', fontWeight: 800, letterSpacing: '-0.4px', margin: '0 0 10px' }}>
-            {t('landing.videoTitle')}
-          </h2>
-          {!isMobile && (
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)', maxWidth: 460, margin: '0 auto', lineHeight: 1.7 }}>
-              {t('landing.videoSub')}
-            </p>
-          )}
-        </div>
-        <div style={{ borderRadius: isMobile ? 12 : 16, overflow: 'hidden', border: '1.5px solid rgba(201,169,110,0.25)', boxShadow: '0 12px 48px rgba(0,0,0,0.35)' }}>
-          {!isMobile && (
-            <div style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {[0,1,2].map(i => <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--border)' }} />)}
-              </div>
-              <div style={{ flex: 1, background: 'var(--bg-primary)', borderRadius: 6, padding: '4px 12px', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
-                GEM · Full Platform Walkthrough
-              </div>
-            </div>
-          )}
-          <div style={{ position: 'relative', paddingBottom: '56.25%', background: '#050508' }}>
-            <iframe
-              src="https://www.youtube.com/embed/dQw4w9WgXcQ"
-              title={t('landing.platformOverview')}
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ── Stats bar ── */}
-      <div style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border-subtle)', borderBottom: '1px solid var(--border-subtle)' }}>
-        <div style={{ maxWidth: 1160, margin: '0 auto', padding: px, display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)' }}>
-          {STATS.map((s, i) => (
-            <div key={s.label} style={{
-              padding: isMobile ? '20px 0' : '26px 0',
-              textAlign: 'center',
-              borderRight: isMobile
-                ? (i % 2 === 0 ? '1px solid var(--border-subtle)' : 'none')
-                : (i < 3 ? '1px solid var(--border-subtle)' : 'none'),
-              borderBottom: isMobile && i < 2 ? '1px solid var(--border-subtle)' : 'none',
-            }}>
-              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: isMobile ? 24 : 30, fontWeight: 800, background: 'linear-gradient(135deg, #c9a96e, #e8c87a)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>{s.value}</div>
-              <div style={{ fontSize: isMobile ? 11 : 12, color: 'var(--text-muted)', marginTop: 3, fontWeight: 500 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* ── Features ── */}
       <section style={{ maxWidth: 1160, margin: '0 auto', padding: isMobile ? '48px 20px' : '88px 24px' }}>
         <div style={{ textAlign: 'center', marginBottom: isMobile ? 32 : 56 }}>
@@ -174,37 +106,6 @@ export default function LandingPage() {
           {FEATURES.map(f => <FeatureCard key={f.title} feature={f} isMobile={isMobile} />)}
         </div>
       </section>
-
-      {/* ── Testimonials ── */}
-      <div style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border-subtle)', borderBottom: '1px solid var(--border-subtle)', padding: isMobile ? '48px 0' : '80px 0' }}>
-        <div style={{ maxWidth: 1160, margin: '0 auto', padding: px }}>
-          <div style={{ textAlign: 'center', marginBottom: isMobile ? 28 : 48 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-gold)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: 12 }}>{t('landing.testimonialsLabel')}</div>
-            <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: isMobile ? 22 : 'clamp(22px, 3.5vw, 36px)', fontWeight: 800, letterSpacing: '-0.5px' }}>
-              {t('landing.testimonialsTitle')}
-            </h2>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))', gap: isMobile ? 12 : 16 }}>
-            {TESTIMONIALS.map(tm => (
-              <div key={tm.name} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: isMobile ? 12 : 16, padding: isMobile ? 16 : 24 }}>
-                <div style={{ display: 'flex', gap: 2, marginBottom: 12 }}>
-                  {[...Array(5)].map((_, i) => <Star key={i} size={12} color="var(--accent-gold)" fill="var(--accent-gold)" />)}
-                </div>
-                <p style={{ fontSize: isMobile ? 13 : 14, color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 14, fontStyle: 'italic' }}>
-                  "{tm.text}"
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: `${tm.color}22`, border: `1px solid ${tm.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: tm.color, flexShrink: 0 }}>{tm.initials}</div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{tm.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{tm.role}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {/* ── CTA Banner ── */}
       <section style={{ maxWidth: 1160, margin: '0 auto', padding: isMobile ? '40px 20px' : '88px 24px' }}>
@@ -230,7 +131,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Contact ── */}
+      {/* ── Contact: GEM's own, once they are set (D-33) ── */}
+      {hasSupport && (
       <section style={{ borderTop: '1px solid var(--border-subtle)', padding: isMobile ? '40px 20px' : '72px 24px' }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: isMobile ? 24 : 40 }}>
           <div>
@@ -244,32 +146,37 @@ export default function LandingPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 14, width: isMobile ? '100%' : 'auto' }}>
-            <a href="mailto:hello@gymgem.io" style={{ textDecoration: 'none', width: isMobile ? '100%' : 'auto' }}>
+            {SUPPORT.email && (
+            <a href={`mailto:${SUPPORT.email}`} style={{ textDecoration: 'none', width: isMobile ? '100%' : 'auto' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, padding: isMobile ? '14px 20px' : '18px 24px', cursor: 'pointer', width: isMobile ? '100%' : 'auto', boxSizing: 'border-box' }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(201,169,110,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Mail size={17} color="#c9a96e" />
                 </div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 2 }}>Email</div>
-                  <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 600 }}>hello@gymgem.io</div>
+                  <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 600 }}>{SUPPORT.email}</div>
                 </div>
               </div>
             </a>
+            )}
 
-            <a href="https://wa.me/237600000000" target="_blank" rel="noreferrer" style={{ textDecoration: 'none', width: isMobile ? '100%' : 'auto' }}>
+            {SUPPORT.whatsapp && (
+            <a href={SUPPORT.whatsappUrl} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', width: isMobile ? '100%' : 'auto' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, padding: isMobile ? '14px 20px' : '18px 24px', cursor: 'pointer', width: isMobile ? '100%' : 'auto', boxSizing: 'border-box' }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(34,197,94,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <MessageCircle size={17} color="#22c55e" />
                 </div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 2 }}>WhatsApp</div>
-                  <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 600 }}>+237 6XX XXX XXX</div>
+                  <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 600 }}>{SUPPORT.whatsappLabel}</div>
                 </div>
               </div>
             </a>
+            )}
           </div>
         </div>
       </section>
+      )}
 
       {/* ── Footer ── */}
       <footer style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-subtle)', padding: isMobile ? '20px' : '28px 24px' }}>

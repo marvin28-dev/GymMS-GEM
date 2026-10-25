@@ -4,6 +4,7 @@ import { Dumbbell, ArrowRight, Search, Users, CreditCard, Monitor, BarChart3 } f
 import { getGymByCode } from '../services/gym.service';
 import { isAuthed } from '../utils/auth';
 import LangToggle from '../components/LangToggle';
+import SupportLinks from '../components/SupportLinks';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useIsMobile } from '../utils/useIsMobile';
 
@@ -307,19 +308,7 @@ export default function GymCodePage() {
           </p>
 
           {/* Contact */}
-          <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--border-subtle)', textAlign: 'center' }}>
-            <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '0 0 12px', letterSpacing: '0.2px' }}>
-              {t('auth.codeSupport')}
-            </p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <a href="mailto:hello@gymgem.io" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#c9a96e', fontWeight: 600, textDecoration: 'none', background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.2)', borderRadius: 8, padding: '6px 12px' }}>
-                ✉ hello@gymgem.io
-              </a>
-              <a href="https://wa.me/237600000000" target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#22c55e', fontWeight: 600, textDecoration: 'none', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)', borderRadius: 8, padding: '6px 12px' }}>
-                💬 WhatsApp
-              </a>
-            </div>
-          </div>
+          <SupportLinks label={t('auth.codeSupport')} style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--border-subtle)', textAlign: 'center' }} />
 
         </div>
       </div>

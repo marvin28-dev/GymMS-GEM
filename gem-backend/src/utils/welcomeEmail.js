@@ -25,7 +25,7 @@ function welcomeHtml({ staff, gym, loginUrl }) {
     E.steps([
       'Open the button above. It already knows your gym.',
       `Type your email and press <strong style="color:#16161d;">Continue</strong>.`,
-      `As it is your first time, you are asked to <strong style="color:#16161d;">choose a password</strong> (at least 6 characters).`,
+      `As it is your first time, you are asked to <strong style="color:#16161d;">choose a password</strong> (at least 8 characters).`,
       `Enter the <strong style="color:#16161d;">4-digit code</strong> your manager reads out to you. It proves the account is yours.`,
       'From then on, the same screen asks for your password.',
     ]),

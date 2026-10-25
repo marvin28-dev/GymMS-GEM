@@ -16,7 +16,7 @@ import GemInput from '../components/ui/GemInput';
 import GemSelect from '../components/ui/GemSelect';
 import { getOne as getStaffMember, getCode as getStaffCode, regenerateCode as regenerateStaffCode, update as updateStaff, addNote as addStaffNote, resendInvite as resendStaffInvite } from '../services/staff.service';
 import { uploadPhoto } from '../services/upload.service';
-import { getAuth, getRole } from '../utils/auth';
+import { getAuth, getRole, MIN_PASSWORD } from '../utils/auth';
 import { jobOf, departmentOfRole, assigneeName } from '../utils/departments';
 import { getAll as getTasks, update as updateTask } from '../services/tasks.service';
 import { getAll as getCalendar } from '../services/calendar.service';
@@ -266,10 +266,14 @@ export default function StaffProfilePage() {
   // Pay and private notes are for the person themself, or someone who
   // outranks them - a colleague viewing a peer's profile never sees these,
   // so the tabs that would only show blank or stale state stay off the list.
-  const seesPrivate = canSeePrivateFields(me, memberData ? { id: memberData.id ?? paramId, role: memberData.role } : null);
+  // At the desk the screen is seen by whoever stands there, so a colleague's
+  // pay, notes and clients stay in the app, where a manager reads them signed
+  // in as themself; on the desk only your own show (D-41)
+  const kioskHidesPrivate = fromFrontDesk && !isSelf;
+  const seesPrivate = !kioskHidesPrivate && canSeePrivateFields(me, memberData ? { id: memberData.id ?? paramId, role: memberData.role } : null);
   const PRIVATE_TABS = ['Pay & Earnings', 'Notes'];
   // A coach's clients: for management, and for the coach on their own profile
-  const showsClients = isFitness(memberData?.role) && (['general_manager', 'manager'].includes(role) || isSelf);
+  const showsClients = !kioskHidesPrivate && isFitness(memberData?.role) && (['general_manager', 'manager'].includes(role) || isSelf);
   const tabShown = (tab) => (seesPrivate || !PRIVATE_TABS.includes(tab)) && (tab !== 'Clients' || showsClients);
   const shownTabs = TABS.filter(tabShown);
   const shownTabKeys = TAB_KEYS.filter((_, i) => tabShown(TABS[i]));
@@ -1143,7 +1147,7 @@ export default function StaffProfilePage() {
   const handleChangePassword = async () => {
     setPwError('');
     if (!pwForm.current || !pwForm.next) { setPwError(t('staff.pwAllRequired')); return; }
-    if (pwForm.next.length < 6) { setPwError(t('staff.pwTooShort')); return; }
+    if (pwForm.next.length < MIN_PASSWORD) { setPwError(t('staff.pwTooShort')); return; }
     if (pwForm.next !== pwForm.confirm) { setPwError(t('staff.pwMismatch')); return; }
     setPwSaving(true);
     try {

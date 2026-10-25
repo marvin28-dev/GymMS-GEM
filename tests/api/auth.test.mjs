@@ -117,7 +117,7 @@ describe('resetting a forgotten password', () => {
 
     const login = await api.post('/api/auth/login', { gymCode: gym.gymCode, email: gym.email, password: 'Brand-new-2' });
     expect(login.status).toBe(200);
-    expect((await api.post('/api/auth/reset-password', { token, password: 'Again-3' })).status).toBe(400);
+    expect((await api.post('/api/auth/reset-password', { token, password: 'Again-333' })).status).toBe(400);
 
     await api.post('/api/auth/change-password', { currentPassword: 'Brand-new-2', newPassword: OWNER_PASSWORD }, { token: login.body.token });
   });
@@ -158,10 +158,14 @@ describe('gym codes typed another way', () => {
 describe('what a new gym must have', () => {
   const body = (over) => ({ ...gym.body, gymCode: uniqueCode('rule'), email: `${uniqueCode('r')}@example.test`, ...over });
 
-  it('refuses a password shorter than 6, as every other password box does', async () => {
-    const res = await api.post('/api/auth/register', body({ password: '12345' }));
-    expect(res.status).toBe(400);
-    expect(res.body.field).toBe('password');
+  // D-36: the minimum rose from 6 to 8
+  it('refuses a password shorter than 8, as every other password box does', async () => {
+    for (const password of ['12345', 'Seven-7']) {
+      const res = await api.post('/api/auth/register', body({ password }));
+      expect(res.status, password).toBe(400);
+      expect(res.body.field).toBe('password');
+    }
+    expect((await api.post('/api/auth/register', body({ password: 'Eight-88' }))).status).toBe(201);
   });
 
   it('refuses a gym code with spaces or symbols, which would break the sign-in address', async () => {

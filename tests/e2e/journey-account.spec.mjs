@@ -9,8 +9,8 @@ test.use({ timezoneId: 'Africa/Douala' });
 // server, which can take 10 seconds or more in Firefox when every test runs at once
 test.describe.configure({ timeout: 120_000 });
 
-// The landing and sign-up pages embed a YouTube video (F-141), and the page
-// only finishes loading once YouTube has; the tests do not wait on YouTube
+// The landing and sign-up pages embedded a YouTube video until D-34 (F-141);
+// the block stays so no test ever waits on one
 test.beforeEach(async ({ page }) => {
   await page.route(/^https:\/\/([a-z0-9-]+\.)*(youtube\.com|ytimg\.com|googlevideo\.com)\//, route => route.abort());
 });
@@ -19,6 +19,8 @@ test('J-01: the landing page leads to sign-up and to sign-in', async ({ page }) 
   await page.goto('/');
   // The offer is made at the top of the page and again at the bottom
   await expect(page.getByRole('button', { name: 'Request Free Access' })).toHaveCount(2);
+  // A web font arriving moves the buttons; a click at that moment lands nowhere
+  await page.evaluate(() => document.fonts.ready);
   await page.getByRole('button', { name: 'Request Free Access' }).first().click();
   await expect(page).toHaveURL(/\/signup$/);
   await page.goBack();
@@ -55,7 +57,7 @@ test('J-02: a new gym signs up, sees its gym code and 4-digit code, and opens it
   await page.getByPlaceholder('Last name').fill('Founder');
   await page.getByPlaceholder('you@yourgym.com').fill(email);
   await page.locator('input[inputmode="tel"]').fill('670 333 444');
-  await page.getByPlaceholder('At least 6 characters').fill('Founder-pass-1');
+  await page.getByPlaceholder('At least 8 characters').fill('Founder-pass-1');
   await page.getByPlaceholder('Repeat your password').fill('Founder-pass-2');
   await page.getByRole('button', { name: 'Launch GEM' }).click();
   await expect(page.getByText('Passwords do not match')).toBeVisible();
@@ -215,7 +217,7 @@ test('J-06: a forgotten password is reset through the emailed link, once', async
 
   await page.goto(link);
   await expect(page.getByText('Set a new password')).toBeVisible();
-  await page.getByPlaceholder('At least 6 characters').fill('Brand-new-1');
+  await page.getByPlaceholder('At least 8 characters').fill('Brand-new-1');
   await page.getByPlaceholder('Re-enter your password').fill('Brand-new-1');
   await page.getByRole('button', { name: 'Set new password' }).click();
   await expect(page.getByText('Password updated')).toBeVisible();
