@@ -702,6 +702,8 @@ const translations = {
       actionDeleteExpense: 'delete expense "{title}"',
     },
     settings: {
+      emailLanguageTitle: 'Emails to members',
+      emailLanguageDesc: 'The language of the welcome email, payment receipts and membership emails your members receive.',
       themeDark: 'Obsidian',
       themeDarkDesc: 'Sleek dark, easy on the eyes',
       themeLight: 'Ivory',
@@ -2913,6 +2915,8 @@ const translations = {
       actionDeleteExpense: 'supprimer la dépense « {title} »',
     },
     settings: {
+      emailLanguageTitle: 'E-mails aux membres',
+      emailLanguageDesc: 'La langue de l\'e-mail de bienvenue, des reçus de paiement et des e-mails d\'abonnement que reçoivent vos membres.',
       themeDark: 'Obsidienne',
       themeDarkDesc: 'Sombre et élégant, reposant pour les yeux',
       themeLight: 'Ivoire',

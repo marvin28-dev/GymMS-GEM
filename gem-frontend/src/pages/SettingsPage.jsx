@@ -159,7 +159,8 @@ export default function SettingsPage() {
   const isMobile = useIsMobile();
   const [activeSection, setActiveSection] = useState(() => {
     const asked = new URLSearchParams(window.location.search).get('section');
-    return SECTIONS.some(s => s.id === asked) ? asked : 'gym-profile';
+    // A phone lists the sections and opens one when tapped
+    return SECTIONS.some(s => s.id === asked) ? asked : (isMobile ? '' : 'gym-profile');
   });
   // Only the two themes remain. A browser still holding one of the old ones
   // falls back rather than rendering with no palette at all.
@@ -338,6 +339,20 @@ export default function SettingsPage() {
   };
 
   const [notifPrefs, setNotifPrefs] = useState(DEFAULT_NOTIF_PREFS);
+  // The language members are written to in (D-23), saved on the gym when chosen
+  const [emailLanguage, setEmailLanguage] = useState('en');
+  const [emailLanguageError, setEmailLanguageError] = useState('');
+  const chooseEmailLanguage = async (code) => {
+    const before = emailLanguage;
+    setEmailLanguage(code);
+    setEmailLanguageError('');
+    try {
+      await updateMyGym({ settings: { emailLanguage: code } });
+    } catch (err) {
+      setEmailLanguage(before);
+      setEmailLanguageError(err?.response?.data?.error || t('settings.saveFailed'));
+    }
+  };
   const [regFeeSettings, setRegFeeSettings] = useState({
     required: false, amount: 0, frequency: 'yearly', gracePeriod: 7,
   });
@@ -485,6 +500,7 @@ export default function SettingsPage() {
         // Payment and notification settings live on the gym, so every employee
         // on every device reads the same ones
         const s = g.settings || {};
+        setEmailLanguage(s.emailLanguage === 'fr' ? 'fr' : 'en');
         const loadedPayment = {
           currency: g.currency || DEFAULT_PAYMENT_SETTINGS.currency,
           methods: (s.payment?.methods?.length ? s.payment.methods : DEFAULT_PAYMENT_SETTINGS.methods),
@@ -622,6 +638,667 @@ export default function SettingsPage() {
     fontWeight: active ? 600 : 400, textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   });
 
+  // Each section's panel, drawn by both layouts: on a phone they used to say
+  // "open it on a computer" (D-40). They stack to one column there.
+  const emailLanguageCard = !sectionLoading && (
+    <div data-email-language style={{ ...cardStyle, marginTop: 16 }}>
+      <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.emailLanguageTitle')}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, lineHeight: 1.5 }}>{t('settings.emailLanguageDesc')}</div>
+      </div>
+      <div style={{ padding: 20, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {[['en', 'English'], ['fr', 'Français']].map(([code, label]) => (
+          <button key={code} type="button" aria-pressed={emailLanguage === code} onClick={() => chooseEmailLanguage(code)}
+            style={{ flex: '1 1 120px', padding: '11px', borderRadius: 10, border: `2px solid ${emailLanguage === code ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, background: emailLanguage === code ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', cursor: 'pointer', fontSize: 13, fontWeight: emailLanguage === code ? 600 : 400, color: emailLanguage === code ? 'var(--accent-gold)' : 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {emailLanguageError && <div role="alert" style={{ padding: '0 20px 16px', fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{emailLanguageError}</div>}
+    </div>
+  );
+
+  const sectionPanels = (
+    <>
+      {LOADS_FROM_GYM.includes(activeSection) && sectionLoading && (
+        <div data-settings-loading style={{ ...cardStyle, padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {['40%', '70%', '55%', '65%', '35%'].map((w, i) => <SkeletonLine key={i} width={w} height={14} style={{ animationDelay: `${i * 60}ms` }} />)}
+        </div>
+      )}
+
+      {/* ── Gym Identity ──────────────────────────────────────────────── */}
+      {activeSection === 'gym-identity' && (() => {
+        const authUser = getAuth()?.user || {};
+        const displayCode = gymCode || authUser.gymCode || '-';
+        const displayName = gymProfile.name || authUser.gymName || '-';
+        return (
+          <div style={cardStyle}>
+            <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.gymIdentity')}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.gymIdentityDesc')}</div>
+            </div>
+            <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 28 }}>
+
+              {/* Gym Name */}
+              <div>
+                <Label>{t('settings.gymNameLabel')}</Label>
+                <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '12px 16px', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Manrope, sans-serif', letterSpacing: '-0.2px' }}>
+                  {displayName}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5, fontFamily: 'DM Sans' }}>{t('settings.gymNameHint')}</div>
+              </div>
+
+              {/* Gym Code */}
+              <div>
+                <Label>{t('settings.gymCodeLabel')}</Label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ background: 'var(--bg-elevated)', border: `1px solid ${showGymCode ? 'rgba(201,169,110,0.4)' : 'var(--border-subtle)'}`, borderRadius: 10, padding: '12px 16px', flex: 1, fontFamily: 'JetBrains Mono, monospace', fontSize: 18, fontWeight: 700, letterSpacing: '0.12em', color: showGymCode ? 'var(--accent-gold)' : 'var(--text-muted)', transition: 'all 0.2s' }}>
+                    {showGymCode ? displayCode : '•'.repeat(displayCode.length || 8)}
+                  </div>
+                  {showGymCode && (
+                    <button
+                      onClick={async () => {
+                        // "Copied" only when it was: a refused or missing clipboard says so
+                        let copied = false;
+                        try { if (navigator.clipboard) { await navigator.clipboard.writeText(displayCode); copied = true; } } catch { copied = false; }
+                        setCodeCopied(copied ? true : 'failed');
+                        setTimeout(() => setCodeCopied(false), 1600);
+                      }}
+                      style={{
+                        ...secondaryBtn, flexShrink: 0, padding: '0 16px',
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        minWidth: 96, transition: 'all 0.18s',
+                        color: codeCopied === 'failed' ? 'var(--accent-red)' : codeCopied ? '#22c55e' : 'var(--text-primary)',
+                        borderColor: codeCopied === 'failed' ? 'rgba(248,113,113,0.45)' : codeCopied ? 'rgba(34,197,94,0.45)' : 'var(--border)',
+                        background: codeCopied === 'failed' ? 'var(--accent-red-dim)' : codeCopied ? 'rgba(34,197,94,0.1)' : 'var(--bg-card)',
+                      }}
+                    >
+                      {codeCopied === 'failed'
+                        ? t('settings.copyFailed')
+                        : codeCopied
+                          ? <><Check size={14} strokeWidth={3} /> {t('settings.copied')}</>
+                          : t('settings.copy')}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { if (showGymCode) { setShowGymCode(false); return; } setShowAccountAuth(true); }}
+                    style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '0 16px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontFamily: 'DM Sans', fontWeight: 600, flexShrink: 0 }}
+                  >
+                    {showGymCode ? <><EyeOff size={14} /> {t('settings.hide')}</> : <><Eye size={14} /> {t('settings.reveal')}</>}
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5, fontFamily: 'DM Sans' }}>
+                  {showGymCode ? t('settings.gymCodeHintVisible') : t('settings.gymCodeHintHidden')}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Gym Profile ────────────────────────────────────────────────── */}
+      {activeSection === 'gym-profile' && !sectionLoading && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {!confirmedSections.has('gym-profile') && setupOpen && (
+            <div style={{ background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>🏢</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'Manrope, sans-serif', marginBottom: 3 }}>{t('settings.completeProfileTitle')}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                  {t('settings.completeProfileDesc')}
+                </div>
+              </div>
+            </div>
+          )}
+        <div style={cardStyle}>
+          <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.gymProfile')}</span>
+          </div>
+          <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              {[
+                { label: t('settings.fieldGymName'), key: 'name' }, { label: t('settings.fieldEmail'), key: 'email' },
+                { label: t('settings.fieldPhone'), key: 'phone' }, { label: t('settings.fieldAltPhone'), key: 'altPhone' },
+                { label: t('settings.fieldAddress'), key: 'address' },
+                { label: t('settings.fieldProvince'), key: 'province' },
+                { label: t('settings.fieldPostal'), key: 'postal' }, { label: t('settings.fieldWebsite'), key: 'website' },
+              ].map(f => (
+                <div key={f.key}>
+                  <Label>{f.label}</Label>
+                  <input
+                    type={f.key === 'email' ? 'email' : 'text'}
+                    inputMode={['phone', 'altPhone'].includes(f.key) ? 'tel' : undefined}
+                    style={inputStyle}
+                    value={gymProfile[f.key]}
+                    onChange={e => setGymProfile(g => ({
+                      ...g,
+                      [f.key]: ['phone', 'altPhone'].includes(f.key)
+                        ? e.target.value.replace(/[^\d\s+\-()]/g, '')
+                        : e.target.value,
+                    }))}
+                  />
+                </div>
+              ))}
+              {/* The country decides the currency, the phone format and the
+                  address the forms suggest, so it is picked, never typed. */}
+              <div>
+                <Label>{t('settings.fieldCountry')}</Label>
+                <select
+                  style={inputStyle}
+                  value={gymProfile.country}
+                  onChange={e => setGymProfile(g => ({ ...g, country: e.target.value, city: '' }))}
+                >
+                  <option value="">{t('settings.choose')}</option>
+                  {COUNTRIES.map(c => <option key={c.code} value={c.name}>{c.flag} {c.name}</option>)}
+                </select>
+                {gymProfile.country !== savedCountry && countryByName(gymProfile.country) && (
+                  <div style={{ fontSize: 11, color: 'var(--accent-gold)', marginTop: 5 }}>
+                    {t('settings.countryChangeHint', { currency: countryByName(gymProfile.country).currency })}
+                  </div>
+                )}
+              </div>
+              <div>
+                <Label>{t('settings.fieldCity')}</Label>
+                <select
+                  style={inputStyle}
+                  value={gymProfile.city}
+                  onChange={e => setGymProfile(g => ({ ...g, city: e.target.value }))}
+                  disabled={!countryByName(gymProfile.country)}
+                >
+                  <option value="">{countryByName(gymProfile.country) ? t('settings.choose') : t('settings.chooseCountryFirst')}</option>
+                  {(countryByName(gymProfile.country)?.cities || []).map(c => <option key={c} value={c}>{c}</option>)}
+                  {/* a city already on the record that is not in the list stays selectable */}
+                  {gymProfile.city && !(countryByName(gymProfile.country)?.cities || []).includes(gymProfile.city) && (
+                    <option value={gymProfile.city}>{gymProfile.city}</option>
+                  )}
+                </select>
+              </div>
+            </div>
+            <div>
+              <Label>{t('settings.openingHours')}</Label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                {DAYS.map(day => {
+                  const dayData = gymSchedule[day];
+                  const updateSlot = (i, field, val) => setGymSchedule(s => ({
+                    ...s,
+                    [day]: { ...s[day], slots: s[day].slots.map((sl, idx) => idx === i ? { ...sl, [field]: val } : sl) },
+                  }));
+                  const addSlot = () => setGymSchedule(s => ({
+                    ...s,
+                    [day]: { ...s[day], slots: [...s[day].slots, { from: '12:00', to: '18:00' }] },
+                  }));
+                  const removeSlot = (i) => setGymSchedule(s => ({
+                    ...s,
+                    [day]: { ...s[day], slots: s[day].slots.filter((_, idx) => idx !== i) },
+                  }));
+                  return (
+                    <div key={day} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, width: 52, cursor: 'pointer', flexShrink: 0, paddingTop: 7 }}>
+                        <input
+                          type="checkbox"
+                          checked={dayData.open}
+                          onChange={e => setGymSchedule(s => ({ ...s, [day]: { ...s[day], open: e.target.checked } }))}
+                          style={{ width: 14, height: 14, accentColor: 'var(--accent-gold)', cursor: 'pointer' }}
+                        />
+                        <span style={{ fontSize: 12, fontWeight: 600, color: dayData.open ? 'var(--text-primary)' : 'var(--text-muted)', fontFamily: 'DM Sans' }}>{capFirst(new Date(2024, 0, 1 + DAYS.indexOf(day)).toLocaleDateString(getDateLocale(), { weekday: 'short' }))}</span>
+                      </label>
+                      {dayData.open ? (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          {dayData.slots.map((slot, i) => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <TimeInput value={slot.from} onChange={e => updateSlot(i, 'from', e.target.value)} style={{ ...inputStyle, width: 112, padding: '5px 8px', fontSize: 12 }} />
+                              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('settings.timeTo')}</span>
+                              <TimeInput value={slot.to} onChange={e => updateSlot(i, 'to', e.target.value)} style={{ ...inputStyle, width: 112, padding: '5px 8px', fontSize: 12 }} />
+                              {dayData.slots.length > 1 && (
+                                <button onClick={() => removeSlot(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px 4px', borderRadius: 4, fontSize: 16, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                                  onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-red)'}
+                                  onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>×</button>
+                              )}
+                              {i === dayData.slots.length - 1 && dayData.slots.length < 3 && (
+                                <button onClick={addSlot} title={t('settings.addTimeSlot')} style={{ background: 'var(--accent-gold-dim)', border: '1px solid var(--accent-gold)', color: 'var(--accent-gold)', borderRadius: 6, width: 22, height: 22, cursor: 'pointer', fontSize: 16, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flexShrink: 0 }}>+</button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', fontFamily: 'DM Sans', paddingTop: 7 }}>{t('settings.closed')}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <Label>{t('settings.logoLabel')}</Label>
+              <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={e => {
+                const file = e.target.files?.[0];
+                // Clear the value so picking the same file again still fires onChange
+                e.target.value = '';
+                if (file) handleLogoFile(file);
+              }} />
+              <div style={{ position: 'relative', border: '2px dashed var(--border)', borderRadius: 10, padding: '24px 20px', textAlign: 'center', cursor: 'pointer' }}
+                onClick={() => logoInputRef.current?.click()}
+                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-gold)'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                {logoPreview ? (
+                  <>
+                    <button type="button" title={t('settings.removeLogo')} aria-label={t('settings.removeLogo')}
+                      onClick={e => { e.stopPropagation(); removeLogo(); }}
+                      style={{ position: 'absolute', top: 8, right: 8, width: 24, height: 24, padding: 0, borderRadius: '50%', border: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 0 }}
+                      onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent-red)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}>
+                      <X size={13} />
+                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                      <img src={logoPreview} alt={t('settings.gymLogo')} style={{ maxHeight: 80, maxWidth: 200, objectFit: 'contain', borderRadius: 8 }} />
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('settings.clickToChangeLogo')}</div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <CloudUpload size={24} color="var(--text-muted)" style={{ marginBottom: 8 }} />
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{t('settings.clickToUploadLogo')}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{t('settings.logoHint')}</div>
+                  </>
+                )}
+              </div>
+              {logoError && (
+                <div style={{ fontSize: 12, color: 'var(--accent-red)', marginTop: 8 }}>{logoError}</div>
+              )}
+            </div>
+            <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+              {[{ label: 'Facebook', key: 'facebook' }, { label: 'Instagram', key: 'instagram' }, { label: 'Twitter', key: 'twitter' }].map(f => (
+                <div key={f.key}>
+                  <Label>{f.label}</Label>
+                  <input style={inputStyle} value={gymProfile[f.key]} onChange={e => setGymProfile(g => ({ ...g, [f.key]: e.target.value }))} placeholder={`@handle`} />
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', paddingTop: 8 }}>
+              {gymSaveError && <span role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', marginRight: 'auto', fontFamily: 'DM Sans' }}>{gymSaveError}</span>}
+              {gymSaved && (
+                <span style={{ fontSize: 12, color: 'var(--accent-green)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  ✓ {t('settings.savedSuccessfully')}
+                </span>
+              )}
+              {gymDirty && <button style={revertBtn} onClick={revertGym}><RotateCcw size={13} /> {t('settings.revertChanges')}</button>}
+              <button style={primaryBtn} onClick={saveGymProfile} disabled={gymSaving || !gymDirty}><Save size={13} />{gymSaving ? t('common.saving') : t('common.saveChanges')}</button>
+            </div>
+          </div>
+        </div>
+        </div>
+      )}
+
+      {activeSection === 'appearance' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Theme picker card */}
+          <div style={cardStyle}>
+            <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--accent-gold-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Palette size={15} color="var(--accent-gold)" />
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.colorTheme')}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{t('settings.colorThemeDesc')}</div>
+              </div>
+            </div>
+            <div style={{ padding: 24 }}>
+              <div className="gem-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                {THEMES.map(t => (
+                  <ThemeCard key={t.id} theme={t} selected={currentTheme === t.id} onSelect={() => applyTheme(t.id)} />
+                ))}
+              </div>
+              <div style={{ marginTop: 16, padding: '12px 16px', borderRadius: 10, background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-gold)', flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  {t('settings.currentlyUsing', { name: THEMES.find(th => th.id === currentTheme)?.name })}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick dark/light toggle card */}
+          <div style={cardStyle}>
+            <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.quickToggle')}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{t('settings.quickToggleDesc')}</div>
+            </div>
+            <div style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: currentTheme === 'light' ? 'rgba(251,191,36,0.15)' : 'rgba(96,165,250,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.3s' }}>
+                  {currentTheme === 'light'
+                    ? <Sun size={18} color="#d97706" />
+                    : <Moon size={18} color="var(--accent-blue)" />
+                  }
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
+                    {currentTheme === 'light' ? t('settings.lightModeActive') : t('settings.darkModeActive')}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                    {currentTheme === 'light' ? t('settings.switchToDark') : t('settings.switchToLight')}
+                  </div>
+                </div>
+              </div>
+              {/* Animated sun/moon pill toggle */}
+              <div
+                onClick={() => applyTheme(currentTheme === 'light' ? 'dark' : 'light')}
+                style={{
+                  width: 68, height: 34, borderRadius: 17, cursor: 'pointer', position: 'relative',
+                  background: currentTheme === 'light'
+                    ? 'linear-gradient(135deg, #fbbf24, #f59e0b)'
+                    : 'linear-gradient(135deg, #1e2a50, #3b4a6b)',
+                  transition: 'background 0.35s',
+                  boxShadow: currentTheme === 'light' ? '0 0 12px rgba(251,191,36,0.4)' : '0 0 12px rgba(60,80,150,0.4)',
+                  flexShrink: 0,
+                }}
+              >
+                <div style={{
+                  width: 26, height: 26, borderRadius: '50%',
+                  background: '#ffffff',
+                  position: 'absolute',
+                  top: 4,
+                  left: currentTheme === 'light' ? 38 : 4,
+                  transition: 'left 0.3s cubic-bezier(0.34,1.56,0.64,1)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                }}>
+                  {currentTheme === 'light'
+                    ? <Sun size={13} color="#f59e0b" strokeWidth={2.5} />
+                    : <Moon size={13} color="#6278a8" strokeWidth={2.5} />
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeSection === 'language' && (<>
+        <div style={cardStyle}>
+          <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(129,140,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Languages size={15} color="#818cf8" />
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.chooseLanguage')}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{t('settings.languageDesc')}</div>
+            </div>
+          </div>
+          <div className="gem-two-col" style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            {[
+              { code: 'en', flag: '🇬🇧', name: t('settings.english'), desc: t('settings.englishDesc') },
+              { code: 'fr', flag: '🇫🇷', name: t('settings.french'),  desc: t('settings.frenchDesc')  },
+            ].map(option => {
+              const selected = lang === option.code;
+              return (
+                <div
+                  key={option.code}
+                  onClick={() => switchLang(option.code)}
+                  style={{
+                    border: `2px solid ${selected ? '#818cf8' : 'var(--border-subtle)'}`,
+                    borderRadius: 12, padding: '18px 20px', cursor: 'pointer',
+                    background: selected ? 'rgba(129,140,248,0.06)' : 'var(--bg-elevated)',
+                    transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 14,
+                  }}
+                >
+                  <span style={{ fontSize: 28 }}>{option.flag}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: selected ? '#818cf8' : 'var(--text-primary)' }}>{option.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{option.desc}</div>
+                  </div>
+                  {selected && (
+                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Check size={12} color="#fff" strokeWidth={3} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ padding: '0 24px 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#818cf8', flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              {t('settings.currentLangHint')}
+            </span>
+          </div>
+        </div>
+        {emailLanguageCard}
+      </>)}
+
+      {activeSection === 'payment' && !sectionLoading && (
+        <div style={cardStyle}>
+          <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.paymentSettings')}</span>
+          </div>
+          <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div>
+                <Label>{t('settings.currency')}</Label>
+                <select style={inputStyle} value={paymentSettings.currency} onChange={e => setPS('currency', e.target.value)}>
+                  {Object.entries(CURRENCY_SYMBOLS).map(([code, symbol]) => (
+                    <option key={code} value={code}>{code} - {symbol}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <Label>{t('settings.acceptedMethods')}</Label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {[
+                  ['Cash', t('settings.methodCash')],
+                  ['Credit/Debit Card', t('settings.methodCard')],
+                  ['Bank Transfer', t('settings.methodTransfer')],
+                  ['Mobile Money', t('settings.methodMobile')],
+                ].map(([val, label]) => (
+                  <label key={val} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={paymentSettings.methods.includes(val)} onChange={() => toggleMethod(val)} style={{ width: 16, height: 16, accentColor: 'var(--accent-gold)' }} />
+                    <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label>{t('settings.expenseLimit', { currency: getCurrencySymbol() })}</Label>
+              <input
+                type="number"
+                min="0"
+                style={inputStyle}
+                value={expenseLimitInput}
+                onChange={e => setExpenseLimitInput(e.target.value)}
+                placeholder={t('common.eg', { x: 50000 })}
+              />
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>
+                {t('settings.expenseLimitHint')}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+              {paymentSaved && <span style={{ fontSize: 12, color: '#22c55e', fontFamily: 'DM Sans' }}>✓ {t('settings.saved')}</span>}
+              {paymentError && <span style={{ fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{paymentError}</span>}
+              {paymentDirty && <button style={revertBtn} onClick={revertPayment}><RotateCcw size={13} /> {t('settings.revertChanges')}</button>}
+              <button style={{ ...primaryBtn, opacity: (paymentSaving || (!paymentDirty && !setupOpen)) ? 0.6 : 1 }} onClick={savePaymentSettings} disabled={paymentSaving || (!paymentDirty && !setupOpen)}>
+                <Save size={13} />{paymentSaving ? t('common.saving') : t('common.saveChanges')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeSection === 'membership' && !sectionLoading && (
+        <div style={cardStyle}>
+          <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.membershipDefaults')}</span>
+          </div>
+          <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* ── Registration Fee ── */}
+            <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden', marginTop: 4 }}>
+              <div style={{ padding: '12px 16px', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.registrationFeeTitle')}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.registrationFeeDesc')}</div>
+                </div>
+                <Toggle label={t('settings.registrationFeeTitle')} value={regFeeSettings.required} onChange={v => setRegFee('required', v)} />
+              </div>
+              {regFeeSettings.required && (
+                <div className="gem-two-col" style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <Label>{t('common.amount')} ({getCurrencySymbol()})</Label>
+                    <input type="number" style={inputStyle} value={regFeeSettings.amount} onChange={e => setRegFee('amount', e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t('settings.frequencyLabel')}</Label>
+                    <select style={inputStyle} value={regFeeSettings.frequency} onChange={e => setRegFee('frequency', e.target.value)}>
+                      <option value="yearly">{t('settings.frequencyYearly')}</option>
+                      <option value="one-time">{t('settings.frequencyOneTime')}</option>
+                    </select>
+                  </div>
+                  {regFeeSettings.frequency === 'yearly' && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <Label>{t('settings.gracePeriodSuspension')}</Label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <input type="number" style={{ ...inputStyle, width: 100 }} value={regFeeSettings.gracePeriod} onChange={e => setRegFee('gracePeriod', e.target.value)} min={0} max={90} />
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                          {t('settings.gracePeriodMemberHint', { days: regFeeSettings.gracePeriod })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Freeze fee */}
+            <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden', marginTop: 4 }}>
+              <div style={{ padding: '12px 16px', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.freezeFeeTitle')}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.freezeFeeDesc')}</div>
+              </div>
+              <div className="gem-two-col" style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <Label>{t('settings.freezeFeeAmount')} ({getCurrencySymbol()})</Label>
+                  <input type="text" inputMode="numeric" style={inputStyle} value={freezeFee.fee} onChange={e => setFF('fee', e.target.value.replace(/[^\d]/g, ''))} placeholder="0" />
+                </div>
+                <div>
+                  <Label>{t('settings.freezeFeeInterval')}</Label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input type="text" inputMode="numeric" style={{ ...inputStyle, width: 100 }} value={freezeFee.intervalDays} onChange={e => setFF('intervalDays', e.target.value.replace(/[^\d]/g, ''))} placeholder="30" />
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('settings.freezeFeeIntervalHint')}</span>
+                  </div>
+                </div>
+                <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--text-muted)' }}>
+                  {Number(freezeFee.fee) > 0
+                    ? t('settings.freezeFeeSummary', { amount: formatMoney(Number(freezeFee.fee)), days: freezeFee.intervalDays || 0 })
+                    : t('settings.freezeFeeOff')}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+              {regFeeSaveError && <span role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', marginRight: 'auto', fontFamily: 'DM Sans' }}>{regFeeSaveError}</span>}
+              {regFeeSaved && (
+                <span style={{ fontSize: 12, color: 'var(--accent-green)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  ✓ {t('settings.savedSuccessfully')}
+                </span>
+              )}
+              {regFeeDirty && <button style={revertBtn} onClick={revertRegFee}><RotateCcw size={13} /> {t('settings.revertChanges')}</button>}
+              <button style={{ ...primaryBtn, opacity: (regFeeSaving || (!regFeeDirty && !setupOpen)) ? 0.6 : 1 }} onClick={saveRegFee} disabled={regFeeSaving || (!regFeeDirty && !setupOpen)}>
+                <Save size={13} />{regFeeSaving ? t('common.saving') : t('common.saveChanges')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeSection === 'notifications' && !sectionLoading && (
+        <div style={cardStyle}>
+          <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.notificationPreferences')}</span>
+          </div>
+          <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {[
+              { key: 'taskOverdue', label: t('settings.notifTaskLabel'), desc: t('settings.notifTaskDesc') },
+              { key: 'welcomeEmail', label: t('settings.notifWelcomeLabel'), desc: t('settings.notifWelcomeDesc') },
+            ].map((p, i, all) => (
+              <div key={p.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '16px 0', borderBottom: i < all.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{p.label}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{p.desc}</div>
+                </div>
+                <Toggle label={p.label} value={notifPrefs[p.key]} onChange={v => setNotifPrefs(n => ({ ...n, [p.key]: v }))} />
+              </div>
+            ))}
+            <div style={{ paddingTop: 16, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
+              {notifSaved && <span style={{ fontSize: 12, color: '#34d399', display: 'flex', alignItems: 'center', gap: 4 }}><Check size={12} /> {t('settings.saved')}</span>}
+              {notifError && <span style={{ fontSize: 12, color: 'var(--accent-red)' }}>{notifError}</span>}
+              {setupOpen && confirmedSections.has('notifications') && !notifSaved && <span style={{ fontSize: 12, color: '#34d399' }}>✓ {t('settings.saved')}</span>}
+              {notifDirty && <button style={revertBtn} onClick={revertNotif}><RotateCcw size={13} /> {t('settings.revertChanges')}</button>}
+              <button style={{ ...primaryBtn, opacity: (notifSaving || (!notifDirty && !setupOpen)) ? 0.6 : 1 }} onClick={saveNotifPrefs} disabled={notifSaving || (!notifDirty && !setupOpen)}>
+                <Save size={13} />{notifSaving ? t('common.saving') : t('common.saveChanges')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeSection === 'packages' && (
+        <>
+        <div style={cardStyle}>
+          <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.packageSettings')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.packageSettingsDesc')}</div>
+          </div>
+          <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div>
+              <Label>{t('settings.accessTypes')}</Label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                {accessTypes.map(type => (
+                  <div key={type} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-elevated)', borderRadius: 10, padding: '10px 14px', border: '1px solid var(--border-subtle)' }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{type}</span>
+                    <RowMenu title={t('common.actions')} items={[
+                      { label: t('common.delete'), icon: <Trash2 size={15} />, onClick: () => removeAccessType(type), danger: true },
+                    ]} />
+                  </div>
+                ))}
+                {accessTypes.length === 0 && (
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans', padding: '12px 0', textAlign: 'center' }}>
+                    {t('settings.noAccessTypes')}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  style={{ ...inputStyle, flex: 1 }}
+                  value={newAccessType}
+                  onChange={e => setNewAccessType(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addAccessType()}
+                  placeholder={t('settings.accessTypePlaceholder')}
+                />
+                <button style={primaryBtn} onClick={addAccessType}><Plus size={13} />{t('common.add')}</button>
+              </div>
+              {accessTypesError && <div role="alert" style={{ marginTop: 8, fontSize: 12.5, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{accessTypesError}</div>}
+              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>
+                {t('settings.accessTypesHint')}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
+          {justConfirmed === 'packages'
+            ? <span style={{ fontSize: 12, color: '#34d399', display: 'flex', alignItems: 'center', gap: 5 }}><Check size={12} /> {t('common.saved')}</span>
+            : setupOpen && confirmedSections.has('packages') && <span style={{ fontSize: 12, color: '#34d399', display: 'flex', alignItems: 'center', gap: 5 }}><Check size={12} /> {t('settings.packageSettingsConfirmed')}</span>}
+          <button style={{ ...primaryBtn, opacity: confirmingSection === 'packages' ? 0.6 : 1 }} disabled={confirmingSection === 'packages'} onClick={() => markConfirmed('packages')}>
+            <Save size={13} /> {confirmingSection === 'packages' ? t('common.saving') : !setupOpen ? t('common.saveChanges') : confirmedSections.has('packages') ? t('settings.reconfirm') : t('settings.confirmPackageSettings')}
+          </button>
+        </div>
+        </>
+      )}
+
+      {activeSection === 'logs' && <ActivityLog />}
+    </>
+  );
+
   // The log is long, so on a phone it opens on a screen of its own with a way
   // back, rather than underneath the whole list of sections
   if (isMobile && activeSection === 'logs') {
@@ -650,64 +1327,72 @@ export default function SettingsPage() {
           {SECTIONS.map(sec => {
             const isOpen = activeSection === sec.id;
             return (
-              <button
-                key={sec.id}
-                onClick={() => { handleSectionClick(sec.id); if (isOpen) setActiveSection(''); }}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: isOpen ? 'var(--accent-gold-dim)' : 'var(--bg-card)', border: `1px solid ${isOpen ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, borderRadius: 12, cursor: 'pointer', color: isOpen ? 'var(--accent-gold)' : 'var(--text-primary)', fontFamily: 'DM Sans', fontSize: 14, fontWeight: isOpen ? 600 : 400, textAlign: 'left', width: '100%' }}
-              >
-                {sectionLabels[sec.id]}
-                <ChevronRight size={16} strokeWidth={2} color={isOpen ? 'var(--accent-gold)' : 'var(--text-muted)'} />
-              </button>
+              <div key={sec.id}>
+                <button
+                  onClick={(e) => {
+                    handleSectionClick(sec.id);
+                    if (isOpen) { setActiveSection(''); return; }
+                    // The opened section starts at the top of the screen, under the header
+                    const item = e.currentTarget;
+                    requestAnimationFrame(() => {
+                      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+                      window.scrollTo({ top: item.getBoundingClientRect().top + window.scrollY - 72, behavior: reduce ? 'auto' : 'smooth' });
+                    });
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: isOpen ? 'var(--accent-gold-dim)' : 'var(--bg-card)', border: `1px solid ${isOpen ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, borderRadius: 12, cursor: 'pointer', color: isOpen ? 'var(--accent-gold)' : 'var(--text-primary)', fontFamily: 'DM Sans', fontSize: 14, fontWeight: isOpen ? 600 : 400, textAlign: 'left', width: '100%' }}
+                >
+                  {sectionLabels[sec.id]}
+                  <ChevronRight size={16} strokeWidth={2} color={isOpen ? 'var(--accent-gold)' : 'var(--text-muted)'} style={{ transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                </button>
+                {isOpen && (
+                  <div data-settings-panel style={{ margin: '8px 0 14px' }}>
+                    {['appearance', 'language'].includes(activeSection) ? (
+                    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14 }}>
+                      <div style={{ padding: 16 }}>
+                        {(() => {
+                          const sec = activeSection;
+                          if (sec === 'appearance') return (
+                            <div>
+                              <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 14 }}>{t('settings.chooseThemeMobile')}</p>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {THEMES.map(th => (
+                                  <button key={th.id} onClick={() => applyTheme(th.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, border: `2px solid ${currentTheme === th.id ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, background: currentTheme === th.id ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                                    <div style={{ width: 32, height: 32, borderRadius: 8, background: th.bg, border: '2px solid rgba(255,255,255,0.1)', flexShrink: 0 }} />
+                                    <div>
+                                      <div style={{ fontSize: 13, fontWeight: 600, color: currentTheme === th.id ? 'var(--accent-gold)' : 'var(--text-primary)', fontFamily: 'DM Sans' }}>{t(th.nameKey)}</div>
+                                      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t(th.descKey)}</div>
+                                    </div>
+                                    {currentTheme === th.id && <Check size={14} color="var(--accent-gold)" strokeWidth={2.5} style={{ marginLeft: 'auto' }} />}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                          if (sec === 'language') return (
+                            <div>
+                              <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 14 }}>{t('settings.interfaceLanguage')}</p>
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                {[['en', 'English'], ['fr', 'Français']].map(([code, label]) => (
+                                  <button key={code} onClick={() => switchLang(code)} style={{ flex: 1, padding: '11px', borderRadius: 10, border: `2px solid ${lang === code ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, background: lang === code ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', cursor: 'pointer', fontSize: 13, fontWeight: lang === code ? 600 : 400, color: lang === code ? 'var(--accent-gold)' : 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
+                                    {label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                          return null;
+                        })()}
+                      </div>
+                    </div>
+                    ) : sectionPanels}
+                    {activeSection === 'language' && emailLanguageCard}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
 
-        {/* Active section content rendered below the list */}
-        {activeSection && (
-          <div style={{ marginTop: 16, marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--accent-gold)', marginBottom: 10, fontFamily: 'DM Sans' }}>
-              {sectionLabels[activeSection]}
-            </div>
-            {/* Render the same content panels as desktop */}
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14 }}>
-              <div style={{ padding: 16 }}>
-                {(() => {
-                  const sec = activeSection;
-                  if (sec === 'appearance') return (
-                    <div>
-                      <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 14 }}>{t('settings.chooseThemeMobile')}</p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {THEMES.map(th => (
-                          <button key={th.id} onClick={() => applyTheme(th.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, border: `2px solid ${currentTheme === th.id ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, background: currentTheme === th.id ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
-                            <div style={{ width: 32, height: 32, borderRadius: 8, background: th.bg, border: '2px solid rgba(255,255,255,0.1)', flexShrink: 0 }} />
-                            <div>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: currentTheme === th.id ? 'var(--accent-gold)' : 'var(--text-primary)', fontFamily: 'DM Sans' }}>{t(th.nameKey)}</div>
-                              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t(th.descKey)}</div>
-                            </div>
-                            {currentTheme === th.id && <Check size={14} color="var(--accent-gold)" strokeWidth={2.5} style={{ marginLeft: 'auto' }} />}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                  if (sec === 'language') return (
-                    <div>
-                      <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 14 }}>{t('settings.interfaceLanguage')}</p>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        {[['en', 'English'], ['fr', 'Français']].map(([code, label]) => (
-                          <button key={code} onClick={() => switchLang(code)} style={{ flex: 1, padding: '11px', borderRadius: 10, border: `2px solid ${lang === code ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, background: lang === code ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', cursor: 'pointer', fontSize: 13, fontWeight: lang === code ? 600 : 400, color: lang === code ? 'var(--accent-gold)' : 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                  return <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('settings.openOnDesktop', { section: sectionLabels[sec] || sec })}</p>;
-                })()}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -771,641 +1456,7 @@ export default function SettingsPage() {
         {/* Content */}
         <div style={{ flex: 1 }}>
 
-          {LOADS_FROM_GYM.includes(activeSection) && sectionLoading && (
-            <div data-settings-loading style={{ ...cardStyle, padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {['40%', '70%', '55%', '65%', '35%'].map((w, i) => <SkeletonLine key={i} width={w} height={14} style={{ animationDelay: `${i * 60}ms` }} />)}
-            </div>
-          )}
-
-          {/* ── Gym Identity ──────────────────────────────────────────────── */}
-          {activeSection === 'gym-identity' && (() => {
-            const authUser = getAuth()?.user || {};
-            const displayCode = gymCode || authUser.gymCode || '-';
-            const displayName = gymProfile.name || authUser.gymName || '-';
-            return (
-              <div style={cardStyle}>
-                <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.gymIdentity')}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.gymIdentityDesc')}</div>
-                </div>
-                <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 28 }}>
-
-                  {/* Gym Name */}
-                  <div>
-                    <Label>{t('settings.gymNameLabel')}</Label>
-                    <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '12px 16px', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Manrope, sans-serif', letterSpacing: '-0.2px' }}>
-                      {displayName}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5, fontFamily: 'DM Sans' }}>{t('settings.gymNameHint')}</div>
-                  </div>
-
-                  {/* Gym Code */}
-                  <div>
-                    <Label>{t('settings.gymCodeLabel')}</Label>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <div style={{ background: 'var(--bg-elevated)', border: `1px solid ${showGymCode ? 'rgba(201,169,110,0.4)' : 'var(--border-subtle)'}`, borderRadius: 10, padding: '12px 16px', flex: 1, fontFamily: 'JetBrains Mono, monospace', fontSize: 18, fontWeight: 700, letterSpacing: '0.12em', color: showGymCode ? 'var(--accent-gold)' : 'var(--text-muted)', transition: 'all 0.2s' }}>
-                        {showGymCode ? displayCode : '•'.repeat(displayCode.length || 8)}
-                      </div>
-                      {showGymCode && (
-                        <button
-                          onClick={async () => {
-                            // "Copied" only when it was: a refused or missing clipboard says so
-                            let copied = false;
-                            try { if (navigator.clipboard) { await navigator.clipboard.writeText(displayCode); copied = true; } } catch { copied = false; }
-                            setCodeCopied(copied ? true : 'failed');
-                            setTimeout(() => setCodeCopied(false), 1600);
-                          }}
-                          style={{
-                            ...secondaryBtn, flexShrink: 0, padding: '0 16px',
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                            minWidth: 96, transition: 'all 0.18s',
-                            color: codeCopied === 'failed' ? 'var(--accent-red)' : codeCopied ? '#22c55e' : 'var(--text-primary)',
-                            borderColor: codeCopied === 'failed' ? 'rgba(248,113,113,0.45)' : codeCopied ? 'rgba(34,197,94,0.45)' : 'var(--border)',
-                            background: codeCopied === 'failed' ? 'var(--accent-red-dim)' : codeCopied ? 'rgba(34,197,94,0.1)' : 'var(--bg-card)',
-                          }}
-                        >
-                          {codeCopied === 'failed'
-                            ? t('settings.copyFailed')
-                            : codeCopied
-                              ? <><Check size={14} strokeWidth={3} /> {t('settings.copied')}</>
-                              : t('settings.copy')}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => { if (showGymCode) { setShowGymCode(false); return; } setShowAccountAuth(true); }}
-                        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '0 16px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontFamily: 'DM Sans', fontWeight: 600, flexShrink: 0 }}
-                      >
-                        {showGymCode ? <><EyeOff size={14} /> {t('settings.hide')}</> : <><Eye size={14} /> {t('settings.reveal')}</>}
-                      </button>
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5, fontFamily: 'DM Sans' }}>
-                      {showGymCode ? t('settings.gymCodeHintVisible') : t('settings.gymCodeHintHidden')}
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* ── Gym Profile ────────────────────────────────────────────────── */}
-          {activeSection === 'gym-profile' && !sectionLoading && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {!confirmedSections.has('gym-profile') && setupOpen && (
-                <div style={{ background: 'rgba(201,169,110,0.08)', border: '1px solid rgba(201,169,110,0.3)', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                  <span style={{ fontSize: 18, flexShrink: 0 }}>🏢</span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'Manrope, sans-serif', marginBottom: 3 }}>{t('settings.completeProfileTitle')}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                      {t('settings.completeProfileDesc')}
-                    </div>
-                  </div>
-                </div>
-              )}
-            <div style={cardStyle}>
-              <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.gymProfile')}</span>
-              </div>
-              <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  {[
-                    { label: t('settings.fieldGymName'), key: 'name' }, { label: t('settings.fieldEmail'), key: 'email' },
-                    { label: t('settings.fieldPhone'), key: 'phone' }, { label: t('settings.fieldAltPhone'), key: 'altPhone' },
-                    { label: t('settings.fieldAddress'), key: 'address' },
-                    { label: t('settings.fieldProvince'), key: 'province' },
-                    { label: t('settings.fieldPostal'), key: 'postal' }, { label: t('settings.fieldWebsite'), key: 'website' },
-                  ].map(f => (
-                    <div key={f.key}>
-                      <Label>{f.label}</Label>
-                      <input
-                        type={f.key === 'email' ? 'email' : 'text'}
-                        inputMode={['phone', 'altPhone'].includes(f.key) ? 'tel' : undefined}
-                        style={inputStyle}
-                        value={gymProfile[f.key]}
-                        onChange={e => setGymProfile(g => ({
-                          ...g,
-                          [f.key]: ['phone', 'altPhone'].includes(f.key)
-                            ? e.target.value.replace(/[^\d\s+\-()]/g, '')
-                            : e.target.value,
-                        }))}
-                      />
-                    </div>
-                  ))}
-                  {/* The country decides the currency, the phone format and the
-                      address the forms suggest, so it is picked, never typed. */}
-                  <div>
-                    <Label>{t('settings.fieldCountry')}</Label>
-                    <select
-                      style={inputStyle}
-                      value={gymProfile.country}
-                      onChange={e => setGymProfile(g => ({ ...g, country: e.target.value, city: '' }))}
-                    >
-                      <option value="">{t('settings.choose')}</option>
-                      {COUNTRIES.map(c => <option key={c.code} value={c.name}>{c.flag} {c.name}</option>)}
-                    </select>
-                    {gymProfile.country !== savedCountry && countryByName(gymProfile.country) && (
-                      <div style={{ fontSize: 11, color: 'var(--accent-gold)', marginTop: 5 }}>
-                        {t('settings.countryChangeHint', { currency: countryByName(gymProfile.country).currency })}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <Label>{t('settings.fieldCity')}</Label>
-                    <select
-                      style={inputStyle}
-                      value={gymProfile.city}
-                      onChange={e => setGymProfile(g => ({ ...g, city: e.target.value }))}
-                      disabled={!countryByName(gymProfile.country)}
-                    >
-                      <option value="">{countryByName(gymProfile.country) ? t('settings.choose') : t('settings.chooseCountryFirst')}</option>
-                      {(countryByName(gymProfile.country)?.cities || []).map(c => <option key={c} value={c}>{c}</option>)}
-                      {/* a city already on the record that is not in the list stays selectable */}
-                      {gymProfile.city && !(countryByName(gymProfile.country)?.cities || []).includes(gymProfile.city) && (
-                        <option value={gymProfile.city}>{gymProfile.city}</option>
-                      )}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <Label>{t('settings.openingHours')}</Label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-                    {DAYS.map(day => {
-                      const dayData = gymSchedule[day];
-                      const updateSlot = (i, field, val) => setGymSchedule(s => ({
-                        ...s,
-                        [day]: { ...s[day], slots: s[day].slots.map((sl, idx) => idx === i ? { ...sl, [field]: val } : sl) },
-                      }));
-                      const addSlot = () => setGymSchedule(s => ({
-                        ...s,
-                        [day]: { ...s[day], slots: [...s[day].slots, { from: '12:00', to: '18:00' }] },
-                      }));
-                      const removeSlot = (i) => setGymSchedule(s => ({
-                        ...s,
-                        [day]: { ...s[day], slots: s[day].slots.filter((_, idx) => idx !== i) },
-                      }));
-                      return (
-                        <div key={day} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, width: 52, cursor: 'pointer', flexShrink: 0, paddingTop: 7 }}>
-                            <input
-                              type="checkbox"
-                              checked={dayData.open}
-                              onChange={e => setGymSchedule(s => ({ ...s, [day]: { ...s[day], open: e.target.checked } }))}
-                              style={{ width: 14, height: 14, accentColor: 'var(--accent-gold)', cursor: 'pointer' }}
-                            />
-                            <span style={{ fontSize: 12, fontWeight: 600, color: dayData.open ? 'var(--text-primary)' : 'var(--text-muted)', fontFamily: 'DM Sans' }}>{capFirst(new Date(2024, 0, 1 + DAYS.indexOf(day)).toLocaleDateString(getDateLocale(), { weekday: 'short' }))}</span>
-                          </label>
-                          {dayData.open ? (
-                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                              {dayData.slots.map((slot, i) => (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <TimeInput value={slot.from} onChange={e => updateSlot(i, 'from', e.target.value)} style={{ ...inputStyle, width: 112, padding: '5px 8px', fontSize: 12 }} />
-                                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('settings.timeTo')}</span>
-                                  <TimeInput value={slot.to} onChange={e => updateSlot(i, 'to', e.target.value)} style={{ ...inputStyle, width: 112, padding: '5px 8px', fontSize: 12 }} />
-                                  {dayData.slots.length > 1 && (
-                                    <button onClick={() => removeSlot(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px 4px', borderRadius: 4, fontSize: 16, lineHeight: 1, display: 'flex', alignItems: 'center' }}
-                                      onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-red)'}
-                                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>×</button>
-                                  )}
-                                  {i === dayData.slots.length - 1 && dayData.slots.length < 3 && (
-                                    <button onClick={addSlot} title={t('settings.addTimeSlot')} style={{ background: 'var(--accent-gold-dim)', border: '1px solid var(--accent-gold)', color: 'var(--accent-gold)', borderRadius: 6, width: 22, height: 22, cursor: 'pointer', fontSize: 16, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flexShrink: 0 }}>+</button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', fontFamily: 'DM Sans', paddingTop: 7 }}>{t('settings.closed')}</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <Label>{t('settings.logoLabel')}</Label>
-                  <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={e => {
-                    const file = e.target.files?.[0];
-                    // Clear the value so picking the same file again still fires onChange
-                    e.target.value = '';
-                    if (file) handleLogoFile(file);
-                  }} />
-                  <div style={{ position: 'relative', border: '2px dashed var(--border)', borderRadius: 10, padding: '24px 20px', textAlign: 'center', cursor: 'pointer' }}
-                    onClick={() => logoInputRef.current?.click()}
-                    onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-gold)'}
-                    onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
-                    {logoPreview ? (
-                      <>
-                        <button type="button" title={t('settings.removeLogo')} aria-label={t('settings.removeLogo')}
-                          onClick={e => { e.stopPropagation(); removeLogo(); }}
-                          style={{ position: 'absolute', top: 8, right: 8, width: 24, height: 24, padding: 0, borderRadius: '50%', border: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 0 }}
-                          onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent-red)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)'; }}
-                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}>
-                          <X size={13} />
-                        </button>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                          <img src={logoPreview} alt={t('settings.gymLogo')} style={{ maxHeight: 80, maxWidth: 200, objectFit: 'contain', borderRadius: 8 }} />
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('settings.clickToChangeLogo')}</div>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <CloudUpload size={24} color="var(--text-muted)" style={{ marginBottom: 8 }} />
-                        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{t('settings.clickToUploadLogo')}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{t('settings.logoHint')}</div>
-                      </>
-                    )}
-                  </div>
-                  {logoError && (
-                    <div style={{ fontSize: 12, color: 'var(--accent-red)', marginTop: 8 }}>{logoError}</div>
-                  )}
-                </div>
-                <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-                  {[{ label: 'Facebook', key: 'facebook' }, { label: 'Instagram', key: 'instagram' }, { label: 'Twitter', key: 'twitter' }].map(f => (
-                    <div key={f.key}>
-                      <Label>{f.label}</Label>
-                      <input style={inputStyle} value={gymProfile[f.key]} onChange={e => setGymProfile(g => ({ ...g, [f.key]: e.target.value }))} placeholder={`@handle`} />
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', paddingTop: 8 }}>
-                  {gymSaveError && <span role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', marginRight: 'auto', fontFamily: 'DM Sans' }}>{gymSaveError}</span>}
-                  {gymSaved && (
-                    <span style={{ fontSize: 12, color: 'var(--accent-green)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      ✓ {t('settings.savedSuccessfully')}
-                    </span>
-                  )}
-                  {gymDirty && <button style={revertBtn} onClick={revertGym}><RotateCcw size={13} /> {t('settings.revertChanges')}</button>}
-                  <button style={primaryBtn} onClick={saveGymProfile} disabled={gymSaving || !gymDirty}><Save size={13} />{gymSaving ? t('common.saving') : t('common.saveChanges')}</button>
-                </div>
-              </div>
-            </div>
-            </div>
-          )}
-
-          {activeSection === 'appearance' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Theme picker card */}
-              <div style={cardStyle}>
-                <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--accent-gold-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Palette size={15} color="var(--accent-gold)" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.colorTheme')}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{t('settings.colorThemeDesc')}</div>
-                  </div>
-                </div>
-                <div style={{ padding: 24 }}>
-                  <div className="gem-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-                    {THEMES.map(t => (
-                      <ThemeCard key={t.id} theme={t} selected={currentTheme === t.id} onSelect={() => applyTheme(t.id)} />
-                    ))}
-                  </div>
-                  <div style={{ marginTop: 16, padding: '12px 16px', borderRadius: 10, background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-gold)', flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                      {t('settings.currentlyUsing', { name: THEMES.find(th => th.id === currentTheme)?.name })}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick dark/light toggle card */}
-              <div style={cardStyle}>
-                <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.quickToggle')}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{t('settings.quickToggleDesc')}</div>
-                </div>
-                <div style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: currentTheme === 'light' ? 'rgba(251,191,36,0.15)' : 'rgba(96,165,250,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.3s' }}>
-                      {currentTheme === 'light'
-                        ? <Sun size={18} color="#d97706" />
-                        : <Moon size={18} color="var(--accent-blue)" />
-                      }
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
-                        {currentTheme === 'light' ? t('settings.lightModeActive') : t('settings.darkModeActive')}
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                        {currentTheme === 'light' ? t('settings.switchToDark') : t('settings.switchToLight')}
-                      </div>
-                    </div>
-                  </div>
-                  {/* Animated sun/moon pill toggle */}
-                  <div
-                    onClick={() => applyTheme(currentTheme === 'light' ? 'dark' : 'light')}
-                    style={{
-                      width: 68, height: 34, borderRadius: 17, cursor: 'pointer', position: 'relative',
-                      background: currentTheme === 'light'
-                        ? 'linear-gradient(135deg, #fbbf24, #f59e0b)'
-                        : 'linear-gradient(135deg, #1e2a50, #3b4a6b)',
-                      transition: 'background 0.35s',
-                      boxShadow: currentTheme === 'light' ? '0 0 12px rgba(251,191,36,0.4)' : '0 0 12px rgba(60,80,150,0.4)',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <div style={{
-                      width: 26, height: 26, borderRadius: '50%',
-                      background: '#ffffff',
-                      position: 'absolute',
-                      top: 4,
-                      left: currentTheme === 'light' ? 38 : 4,
-                      transition: 'left 0.3s cubic-bezier(0.34,1.56,0.64,1)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
-                    }}>
-                      {currentTheme === 'light'
-                        ? <Sun size={13} color="#f59e0b" strokeWidth={2.5} />
-                        : <Moon size={13} color="#6278a8" strokeWidth={2.5} />
-                      }
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeSection === 'language' && (
-            <div style={cardStyle}>
-              <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(129,140,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Languages size={15} color="#818cf8" />
-                </div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.chooseLanguage')}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{t('settings.languageDesc')}</div>
-                </div>
-              </div>
-              <div className="gem-two-col" style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                {[
-                  { code: 'en', flag: '🇬🇧', name: t('settings.english'), desc: t('settings.englishDesc') },
-                  { code: 'fr', flag: '🇫🇷', name: t('settings.french'),  desc: t('settings.frenchDesc')  },
-                ].map(option => {
-                  const selected = lang === option.code;
-                  return (
-                    <div
-                      key={option.code}
-                      onClick={() => switchLang(option.code)}
-                      style={{
-                        border: `2px solid ${selected ? '#818cf8' : 'var(--border-subtle)'}`,
-                        borderRadius: 12, padding: '18px 20px', cursor: 'pointer',
-                        background: selected ? 'rgba(129,140,248,0.06)' : 'var(--bg-elevated)',
-                        transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 14,
-                      }}
-                    >
-                      <span style={{ fontSize: 28 }}>{option.flag}</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: selected ? '#818cf8' : 'var(--text-primary)' }}>{option.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{option.desc}</div>
-                      </div>
-                      {selected && (
-                        <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Check size={12} color="#fff" strokeWidth={3} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ padding: '0 24px 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#818cf8', flexShrink: 0 }} />
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                  {t('settings.currentLangHint')}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {activeSection === 'payment' && !sectionLoading && (
-            <div style={cardStyle}>
-              <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.paymentSettings')}</span>
-              </div>
-              <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div>
-                    <Label>{t('settings.currency')}</Label>
-                    <select style={inputStyle} value={paymentSettings.currency} onChange={e => setPS('currency', e.target.value)}>
-                      {Object.entries(CURRENCY_SYMBOLS).map(([code, symbol]) => (
-                        <option key={code} value={code}>{code} - {symbol}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <Label>{t('settings.acceptedMethods')}</Label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {[
-                      ['Cash', t('settings.methodCash')],
-                      ['Credit/Debit Card', t('settings.methodCard')],
-                      ['Bank Transfer', t('settings.methodTransfer')],
-                      ['Mobile Money', t('settings.methodMobile')],
-                    ].map(([val, label]) => (
-                      <label key={val} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                        <input type="checkbox" checked={paymentSettings.methods.includes(val)} onChange={() => toggleMethod(val)} style={{ width: 16, height: 16, accentColor: 'var(--accent-gold)' }} />
-                        <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <Label>{t('settings.expenseLimit', { currency: getCurrencySymbol() })}</Label>
-                  <input
-                    type="number"
-                    min="0"
-                    style={inputStyle}
-                    value={expenseLimitInput}
-                    onChange={e => setExpenseLimitInput(e.target.value)}
-                    placeholder={t('common.eg', { x: 50000 })}
-                  />
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>
-                    {t('settings.expenseLimitHint')}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
-                  {paymentSaved && <span style={{ fontSize: 12, color: '#22c55e', fontFamily: 'DM Sans' }}>✓ {t('settings.saved')}</span>}
-                  {paymentError && <span style={{ fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{paymentError}</span>}
-                  {paymentDirty && <button style={revertBtn} onClick={revertPayment}><RotateCcw size={13} /> {t('settings.revertChanges')}</button>}
-                  <button style={{ ...primaryBtn, opacity: (paymentSaving || (!paymentDirty && !setupOpen)) ? 0.6 : 1 }} onClick={savePaymentSettings} disabled={paymentSaving || (!paymentDirty && !setupOpen)}>
-                    <Save size={13} />{paymentSaving ? t('common.saving') : t('common.saveChanges')}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeSection === 'membership' && !sectionLoading && (
-            <div style={cardStyle}>
-              <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.membershipDefaults')}</span>
-              </div>
-              <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {/* ── Registration Fee ── */}
-                <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden', marginTop: 4 }}>
-                  <div style={{ padding: '12px 16px', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.registrationFeeTitle')}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.registrationFeeDesc')}</div>
-                    </div>
-                    <Toggle label={t('settings.registrationFeeTitle')} value={regFeeSettings.required} onChange={v => setRegFee('required', v)} />
-                  </div>
-                  {regFeeSettings.required && (
-                    <div className="gem-two-col" style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                      <div>
-                        <Label>{t('common.amount')} ({getCurrencySymbol()})</Label>
-                        <input type="number" style={inputStyle} value={regFeeSettings.amount} onChange={e => setRegFee('amount', e.target.value)} />
-                      </div>
-                      <div>
-                        <Label>{t('settings.frequencyLabel')}</Label>
-                        <select style={inputStyle} value={regFeeSettings.frequency} onChange={e => setRegFee('frequency', e.target.value)}>
-                          <option value="yearly">{t('settings.frequencyYearly')}</option>
-                          <option value="one-time">{t('settings.frequencyOneTime')}</option>
-                        </select>
-                      </div>
-                      {regFeeSettings.frequency === 'yearly' && (
-                        <div style={{ gridColumn: '1 / -1' }}>
-                          <Label>{t('settings.gracePeriodSuspension')}</Label>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <input type="number" style={{ ...inputStyle, width: 100 }} value={regFeeSettings.gracePeriod} onChange={e => setRegFee('gracePeriod', e.target.value)} min={0} max={90} />
-                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                              {t('settings.gracePeriodMemberHint', { days: regFeeSettings.gracePeriod })}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Freeze fee */}
-                <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden', marginTop: 4 }}>
-                  <div style={{ padding: '12px 16px', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.freezeFeeTitle')}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.freezeFeeDesc')}</div>
-                  </div>
-                  <div className="gem-two-col" style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                    <div>
-                      <Label>{t('settings.freezeFeeAmount')} ({getCurrencySymbol()})</Label>
-                      <input type="text" inputMode="numeric" style={inputStyle} value={freezeFee.fee} onChange={e => setFF('fee', e.target.value.replace(/[^\d]/g, ''))} placeholder="0" />
-                    </div>
-                    <div>
-                      <Label>{t('settings.freezeFeeInterval')}</Label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <input type="text" inputMode="numeric" style={{ ...inputStyle, width: 100 }} value={freezeFee.intervalDays} onChange={e => setFF('intervalDays', e.target.value.replace(/[^\d]/g, ''))} placeholder="30" />
-                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('settings.freezeFeeIntervalHint')}</span>
-                      </div>
-                    </div>
-                    <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--text-muted)' }}>
-                      {Number(freezeFee.fee) > 0
-                        ? t('settings.freezeFeeSummary', { amount: formatMoney(Number(freezeFee.fee)), days: freezeFee.intervalDays || 0 })
-                        : t('settings.freezeFeeOff')}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
-                  {regFeeSaveError && <span role="alert" style={{ fontSize: 12, color: 'var(--accent-red)', marginRight: 'auto', fontFamily: 'DM Sans' }}>{regFeeSaveError}</span>}
-                  {regFeeSaved && (
-                    <span style={{ fontSize: 12, color: 'var(--accent-green)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      ✓ {t('settings.savedSuccessfully')}
-                    </span>
-                  )}
-                  {regFeeDirty && <button style={revertBtn} onClick={revertRegFee}><RotateCcw size={13} /> {t('settings.revertChanges')}</button>}
-                  <button style={{ ...primaryBtn, opacity: (regFeeSaving || (!regFeeDirty && !setupOpen)) ? 0.6 : 1 }} onClick={saveRegFee} disabled={regFeeSaving || (!regFeeDirty && !setupOpen)}>
-                    <Save size={13} />{regFeeSaving ? t('common.saving') : t('common.saveChanges')}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeSection === 'notifications' && !sectionLoading && (
-            <div style={cardStyle}>
-              <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.notificationPreferences')}</span>
-              </div>
-              <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 0 }}>
-                {[
-                  { key: 'taskOverdue', label: t('settings.notifTaskLabel'), desc: t('settings.notifTaskDesc') },
-                  { key: 'welcomeEmail', label: t('settings.notifWelcomeLabel'), desc: t('settings.notifWelcomeDesc') },
-                ].map((p, i, all) => (
-                  <div key={p.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '16px 0', borderBottom: i < all.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{p.label}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{p.desc}</div>
-                    </div>
-                    <Toggle label={p.label} value={notifPrefs[p.key]} onChange={v => setNotifPrefs(n => ({ ...n, [p.key]: v }))} />
-                  </div>
-                ))}
-                <div style={{ paddingTop: 16, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
-                  {notifSaved && <span style={{ fontSize: 12, color: '#34d399', display: 'flex', alignItems: 'center', gap: 4 }}><Check size={12} /> {t('settings.saved')}</span>}
-                  {notifError && <span style={{ fontSize: 12, color: 'var(--accent-red)' }}>{notifError}</span>}
-                  {setupOpen && confirmedSections.has('notifications') && !notifSaved && <span style={{ fontSize: 12, color: '#34d399' }}>✓ {t('settings.saved')}</span>}
-                  {notifDirty && <button style={revertBtn} onClick={revertNotif}><RotateCcw size={13} /> {t('settings.revertChanges')}</button>}
-                  <button style={{ ...primaryBtn, opacity: (notifSaving || (!notifDirty && !setupOpen)) ? 0.6 : 1 }} onClick={saveNotifPrefs} disabled={notifSaving || (!notifDirty && !setupOpen)}>
-                    <Save size={13} />{notifSaving ? t('common.saving') : t('common.saveChanges')}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeSection === 'packages' && (
-            <>
-            <div style={cardStyle}>
-              <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t('settings.packageSettings')}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{t('settings.packageSettingsDesc')}</div>
-              </div>
-              <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div>
-                  <Label>{t('settings.accessTypes')}</Label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-                    {accessTypes.map(type => (
-                      <div key={type} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-elevated)', borderRadius: 10, padding: '10px 14px', border: '1px solid var(--border-subtle)' }}>
-                        <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{type}</span>
-                        <RowMenu title={t('common.actions')} items={[
-                          { label: t('common.delete'), icon: <Trash2 size={15} />, onClick: () => removeAccessType(type), danger: true },
-                        ]} />
-                      </div>
-                    ))}
-                    {accessTypes.length === 0 && (
-                      <div style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans', padding: '12px 0', textAlign: 'center' }}>
-                        {t('settings.noAccessTypes')}
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input
-                      style={{ ...inputStyle, flex: 1 }}
-                      value={newAccessType}
-                      onChange={e => setNewAccessType(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && addAccessType()}
-                      placeholder={t('settings.accessTypePlaceholder')}
-                    />
-                    <button style={primaryBtn} onClick={addAccessType}><Plus size={13} />{t('common.add')}</button>
-                  </div>
-                  {accessTypesError && <div role="alert" style={{ marginTop: 8, fontSize: 12.5, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{accessTypesError}</div>}
-                  <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>
-                    {t('settings.accessTypesHint')}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
-              {justConfirmed === 'packages'
-                ? <span style={{ fontSize: 12, color: '#34d399', display: 'flex', alignItems: 'center', gap: 5 }}><Check size={12} /> {t('common.saved')}</span>
-                : setupOpen && confirmedSections.has('packages') && <span style={{ fontSize: 12, color: '#34d399', display: 'flex', alignItems: 'center', gap: 5 }}><Check size={12} /> {t('settings.packageSettingsConfirmed')}</span>}
-              <button style={{ ...primaryBtn, opacity: confirmingSection === 'packages' ? 0.6 : 1 }} disabled={confirmingSection === 'packages'} onClick={() => markConfirmed('packages')}>
-                <Save size={13} /> {confirmingSection === 'packages' ? t('common.saving') : !setupOpen ? t('common.saveChanges') : confirmedSections.has('packages') ? t('settings.reconfirm') : t('settings.confirmPackageSettings')}
-              </button>
-            </div>
-            </>
-          )}
-
-          {activeSection === 'logs' && <ActivityLog />}
+          {sectionPanels}
 
         </div>
       </div>
