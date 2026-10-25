@@ -567,6 +567,7 @@ const translations = {
       "photoFailed": "The photo could not be uploaded, so nothing was saved yet. Try again, or remove the photo.",
     },
     packages: {
+      inUse: '{count} member(s) are on this package, so it cannot be deleted. Set it to Inactive instead: it is no longer offered, and they keep it.',
       authEdit: 'edit the package "{name}"',
       authDelete: 'delete the package "{name}"',
       authDeleteBundle: 'delete the bundle "{name}"',
@@ -2754,6 +2755,7 @@ const translations = {
       "photoFailed": "La photo n’a pas pu être envoyée, rien n’a encore été enregistré. Réessayez, ou retirez la photo.",
     },
     packages: {
+      inUse: '{count} membre(s) ont ce forfait, il ne peut donc pas être supprimé. Passez-le en Inactif : il n\'est plus proposé, et ils le gardent.',
       authEdit: 'modifier le forfait « {name} »',
       authDelete: 'supprimer le forfait « {name} »',
       authDeleteBundle: 'supprimer le pack « {name} »',

@@ -114,6 +114,15 @@ async function remove(req, res) {
     where: { id: req.params.id, gymId: req.user.gymId },
   });
   if (!existing) return res.status(404).json({ error: 'Package not found' });
+  // Deleting it took the package off every member on it, past ones included,
+  // so their membership no longer said what they had bought (D-22)
+  const members = await prisma.member.count({ where: { packageId: existing.id } });
+  if (members > 0) {
+    return res.status(409).json({
+      error: `${members} member${members === 1 ? ' is' : 's are'} on ${existing.name}, so it cannot be deleted. Set it to Inactive instead: it is no longer offered, and they keep it.`,
+      members,
+    });
+  }
 
   await prisma.package.delete({ where: { id: req.params.id } });
   logActivity(req, {

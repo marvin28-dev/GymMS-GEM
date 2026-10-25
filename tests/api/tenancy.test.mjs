@@ -114,4 +114,19 @@ describe('packages', () => {
     const res = await create({ isVisitor: true, dayPassPrice: undefined, sessions: '10', price: 20000 });
     expect(res.status).toBe(201);
   });
+
+  // D-22: deleting a package took it off every member on it
+  it('is not deleted while members are on it, and they keep it; set Inactive it stays theirs', async () => {
+    const pkg = (await create()).body;
+    const member = await addMember(api, gymA.token, { packageId: pkg.id });
+    const refused = await api.del(`/api/packages/${pkg.id}`, { token: gymA.token });
+    expect(refused.status).toBe(409);
+    expect(refused.body.members).toBe(1);
+    expect((await api.get(`/api/members/${member.id}`, { token: gymA.token })).body.packageId).toBe(pkg.id);
+    expect((await api.patch(`/api/packages/${pkg.id}`, { status: 'inactive' }, { token: gymA.token })).status).toBe(200);
+    expect((await api.get(`/api/members/${member.id}`, { token: gymA.token })).body.packageId).toBe(pkg.id);
+
+    const unused = (await create()).body;
+    expect((await api.del(`/api/packages/${unused.id}`, { token: gymA.token })).status).toBe(200);
+  });
 });

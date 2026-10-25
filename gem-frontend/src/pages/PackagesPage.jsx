@@ -63,6 +63,7 @@ export default function PackagesPage() {
   const [errors, setErrors] = useState({});
   // A refused delete, shown at the top of the page (the dialogs close at once)
   const [deleteError, setDeleteError] = useState('');
+  const deleteRefusal = (err) => (err?.response?.data?.members ? t('packages.inUse', { count: err.response.data.members }) : err?.response?.data?.error || t('memberProfile.actionFailed'));
   const [profilePkg, setProfilePkg] = useState(null);
   const [showDeleteAuth, setShowDeleteAuth] = useState(false);
 
@@ -399,7 +400,7 @@ export default function PackagesPage() {
             setPackages(prev => prev.filter(p => p.id !== profilePkg.id));
             setProfilePkg(null);
             setShowDeleteAuth(false);
-          } catch (err) { setShowDeleteAuth(false); setDeleteError(err?.response?.data?.error || t('memberProfile.actionFailed')); }
+          } catch (err) { setShowDeleteAuth(false); setDeleteError(deleteRefusal(err)); }
         }}
       />
 
@@ -410,7 +411,7 @@ export default function PackagesPage() {
             await removePackage(deletePkg.id);
             setPackages(prev => prev.filter(p => p.id !== deletePkg.id));
             setDeletePkg(null);
-          } catch (err) { setDeleteError(err?.response?.data?.error || t('memberProfile.actionFailed')); }
+          } catch (err) { setDeletePkg(null); setDeleteError(deleteRefusal(err)); }
         }}
         title={t('packages.deletePackage')} message={deletePkg ? t('packages.deletePackageConfirm', { name: deletePkg.name }) : ''} confirmLabel={t('common.delete')} />
 
@@ -481,7 +482,7 @@ export default function PackagesPage() {
             await removePackage(deleteVPkg.id);
             setPackages(prev => prev.filter(p => p.id !== deleteVPkg.id));
             setDeleteVPkg(null);
-          } catch (err) { setDeleteVPkg(null); setDeleteError(err?.response?.data?.error || t('memberProfile.actionFailed')); }
+          } catch (err) { setDeleteVPkg(null); setDeleteError(deleteRefusal(err)); }
         }}
       />
     </>

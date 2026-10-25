@@ -35,3 +35,22 @@ test('a refused package delete keeps the package and says why', async ({ page })
   await expect(page.getByText('Server is down for the test')).toBeVisible();
   await expect(page.getByRole('row').filter({ hasText: 'Silver Monthly' })).toBeVisible();
 });
+
+// D-22: deleting a package took it off every member on it
+test('a package members are on is not deleted, and the page says to set it Inactive', async ({ page }) => {
+  const owner = await registerGym();
+  const pkg = await call('POST', '/packages', { token: owner.token, body: { name: 'Bronze Monthly', price: 12000, dayPassPrice: 1200, duration: '1 Months', durationDays: 30, status: 'active' } });
+  const today = new Date();
+  const day = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const member = await call('POST', '/members', { token: owner.token, body: { firstName: 'Ada', lastName: 'Bronze', city: 'Douala', region: 'Littoral', regFeeMethod: 'cash', packageId: pkg.id, startDate: day(today), endDate: day(new Date(Date.now() + 30 * 864e5)) } });
+  await signIn(page, owner);
+  await page.goto('/packages');
+  const row = page.getByRole('row').filter({ hasText: 'Bronze Monthly' });
+  await row.getByRole('button', { name: 'Actions' }).click();
+  await page.getByRole('menuitem', { name: /delete/i }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+
+  await expect(page.getByRole('alert').filter({ hasText: '1 member(s) are on this package' })).toContainText('Set it to Inactive');
+  await expect(row).toBeVisible();
+  expect((await call('GET', `/members/${member.id}`, { token: owner.token })).packageId).toBe(pkg.id);
+});
