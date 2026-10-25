@@ -30,7 +30,7 @@ import { getMyGym } from '../services/gym.service';
 import { create as createPayment } from '../services/payments.service';
 import { checkIn as checkInApi } from '../services/attendance.service';
 import { uploadPhoto } from '../services/upload.service';
-import { fmtDate, todayStr, addDaysStr, dayStr } from '../utils/date';
+import { fmtDate, todayStr, addDaysStr } from '../utils/date';
 import { useGymSettings } from '../hooks/useGymSettings';
 import { enabledMethods, acceptedMethod } from '../utils/paymentMethods';
 import { memberNeedsAttention, membershipEndsThisWeek, isActiveMember } from '../utils/attention';
@@ -960,7 +960,6 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
   const navigate = useNavigate();
   const { t } = useLanguage();
   const minPct   = gymData.minUpfrontPercent   || 50;
-  const deadDays = gymData.paymentDeadlineDays || 30;
 
   const vPkgs = packagesList
     .filter(p => p.isVisitor && p.status === 'active')
@@ -995,7 +994,7 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
     emergencyContact: '', emergencyPhone: '',
     bundleId: '',
     amountPaid: '', paymentMethod: 'Cash',
-    remainderDeadline: '', howHeard: '', notes: '',
+    howHeard: '', notes: '',
     photo: null, photoPreview: null,
   };
   const [form, setForm]     = useState(emptyForm);
@@ -1023,16 +1022,9 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
   const meetsMinimum   = amountPaidN >= minRequired;
 
   const handleBundleChange = (id) => {
-    const pkg = allOptions.find(p => p.id === id);
     // A different bundle is a different price, so anything collected is redone
     setVisitorPaid(null);
-    const dl = new Date();
-    dl.setDate(dl.getDate() + deadDays);
-    setForm(f => ({
-      ...f,
-      bundleId: id,
-      remainderDeadline: pkg ? dayStr(dl) : '',
-    }));
+    setForm(f => ({ ...f, bundleId: id }));
   };
 
   const validate = () => {
@@ -1322,12 +1314,6 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
             error={errors.amountPaid}
           />
         )}
-        {visitorPaid && remainder > 0 && (
-          <ModalField label={t('members.remainderDueBy')}>
-            <input autoComplete="off" style={inp(false)} type="date" value={form.remainderDeadline}
-              onChange={e => set('remainderDeadline', e.target.value)} />
-          </ModalField>
-        )}
 
         {/* Payment summary bar */}
         {totalPrice > 0 && visitorPaid && (
@@ -1358,7 +1344,7 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
             )}
             {meetsMinimum && remainder > 0 && (
               <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 4, fontFamily: 'DM Sans' }}>
-                ⏳ {t('members.visitorActiveRemainder', { deadline: form.remainderDeadline || t('members.nDays', { n: deadDays }) })}
+                ⏳ {t('members.visitorActiveOwes', { amount: formatMoney(remainder) })}
               </div>
             )}
           </div>
