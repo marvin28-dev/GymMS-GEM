@@ -1,6 +1,6 @@
 # GEM production-readiness audit: report
 
-Branch `production-audit`, made from `main` at `69cefa8`: 214 commits up to `019525c`, the commit the final test runs used (only documents came after it: this report, the progress log, CLAUDE.md and the testing checklist). Nothing has been pushed and `main` was not touched. The audit ran from 19 to 24 October 2026; on 24 and 25 October the recommended decisions were applied, as the owner asked. `AUDIT_PROGRESS.md` holds the working log (file inventory, journeys, every session and every decision); this report is the summary.
+Branch `production-audit`, made from `main` at `69cefa8`: 214 commits up to `019525c`, the commit the final test runs used. After it came this report and one fix: `npm run db:deploy` did not read `.env` on a developer's machine (`9e0456d`, with a test; the API suite passed again, 339 of 339). Nothing has been pushed and `main` was not touched. The audit ran from 19 to 24 October 2026; on 24 and 25 October the recommended decisions were applied, as the owner asked. `AUDIT_PROGRESS.md` holds the working log (file inventory, journeys, every session and every decision); this report is the summary.
 
 ## 1. Verdict
 
