@@ -1194,7 +1194,7 @@ export default function AttendancePage() {
                   onMouseEnter={e => { if (typeFilter !== f.key) { e.currentTarget.style.background = 'var(--bg-elevated)'; e.currentTarget.style.color = 'var(--text-primary)'; } }}
                   onMouseLeave={e => { if (typeFilter !== f.key) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; } }}
                 >
-                  {f.label} <span style={{ fontSize: 11, opacity: 0.75 }}>({displayCheckins.filter(c => (f.key === 'All' ? c.personType !== 'Staff' : c.personType === typeMap[f.key])).length})</span>
+                  {f.label} <span style={{ fontSize: 11 }}>({displayCheckins.filter(c => (f.key === 'All' ? c.personType !== 'Staff' : c.personType === typeMap[f.key])).length})</span>
                 </button>
               ))}
             </div>

@@ -149,7 +149,7 @@ function SchedulePanel({ events = [] }) {
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('frontDesk.program')}</span>
         <div style={{ display: 'flex', gap: 2 }}>
           {[['day','frontDesk.viewDayShort'],['week','frontDesk.viewWeekShort'],['month','frontDesk.viewMonthShort']].map(([v, key]) => (
-            <button key={v} onClick={() => setView(v)} style={{ background: view === v ? 'var(--accent-gold)' : 'var(--bg-elevated)', color: view === v ? '#0a0a0f' : 'var(--text-muted)', border: 'none', borderRadius: 4, padding: '2px 7px', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'DM Sans', transition: 'all 0.1s' }}>
+            <button key={v} onClick={() => setView(v)} style={{ background: view === v ? 'var(--accent-gold)' : 'var(--bg-elevated)', color: view === v ? 'var(--on-accent-gold)' : 'var(--text-muted)', border: 'none', borderRadius: 4, padding: '2px 7px', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'DM Sans', transition: 'all 0.1s' }}>
               {t(key)}
             </button>
           ))}
@@ -1598,7 +1598,7 @@ export default function FrontDeskPage() {
             {/* Category filter */}
             <div style={{ display:'flex', gap:6, marginBottom:18, flexWrap:'wrap' }}>
               {displayCats.map(c => (
-                <button key={c} onClick={()=>setProdCat(c)} style={{ padding:'5px 12px', background: prodCat===c?'var(--accent-gold)':'var(--bg-elevated)', color: prodCat===c?'#0a0a0f':'var(--text-secondary)', border:`1px solid ${prodCat===c?'transparent':'var(--border-subtle)'}`, borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'DM Sans', transition:'all 0.1s' }}>{tProdCat(c)}</button>
+                <button key={c} onClick={()=>setProdCat(c)} style={{ padding:'5px 12px', background: prodCat===c?'var(--accent-gold)':'var(--bg-elevated)', color: prodCat===c?'var(--on-accent-gold)':'var(--text-secondary)', border:`1px solid ${prodCat===c?'transparent':'var(--border-subtle)'}`, borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'DM Sans', transition:'all 0.1s' }}>{tProdCat(c)}</button>
               ))}
             </div>
             {/* Product grid */}

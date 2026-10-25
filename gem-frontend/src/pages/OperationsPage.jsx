@@ -593,7 +593,7 @@ export default function OperationsPage() {
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     {[['All', t('common.all')], ['Open', t('operations.issueOpen')], ['In Progress', t('tasks.statusInProgress')], ['Resolved', t('operations.issueResolved')]].map(([key, label]) => (
-                      <button key={key} onClick={() => setIssueFilter(key)} style={{ background: issueFilter === key ? 'var(--accent-gold)' : 'var(--bg-elevated)', color: issueFilter === key ? '#0a0a0f' : 'var(--text-secondary)', border: '1px solid var(--border-subtle)', borderRadius: 6, fontSize: 11, fontWeight: 600, padding: '4px 10px', cursor: 'pointer', fontFamily: 'DM Sans' }}>{label}</button>
+                      <button key={key} onClick={() => setIssueFilter(key)} style={{ background: issueFilter === key ? 'var(--accent-gold)' : 'var(--bg-elevated)', color: issueFilter === key ? 'var(--on-accent-gold)' : 'var(--text-secondary)', border: '1px solid var(--border-subtle)', borderRadius: 6, fontSize: 11, fontWeight: 600, padding: '4px 10px', cursor: 'pointer', fontFamily: 'DM Sans' }}>{label}</button>
                     ))}
                   </div>
                 </div>

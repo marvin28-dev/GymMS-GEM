@@ -369,7 +369,7 @@ export default function CalendarPage() {
                   <button key={ds} type="button" data-cal-day={ds} onClick={() => setFocus(ds)}
                     style={{ aspectRatio: '1', borderRadius: 10, border: sel ? '1px solid var(--accent-gold)' : '1px solid transparent', background: isToday ? 'var(--accent-gold)' : sel ? 'var(--accent-gold-dim)' : 'transparent', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, cursor: 'pointer', opacity: inMonth(ds) ? (ds < today ? 0.55 : 1) : 0.3, fontFamily: 'DM Sans' }}>
                     <span style={{ fontSize: 13, fontWeight: isToday || sel ? 700 : 500, color: isToday ? '#0a0a0f' : 'var(--text-primary)' }}>{Number(ds.slice(8))}</span>
-                    <span style={{ display: 'flex', gap: 2, height: 4 }}>{Array.from({ length: Math.min(n, 3) }, (_, i) => <span key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: isToday ? '#0a0a0f' : 'var(--accent-gold)' }} />)}</span>
+                    <span style={{ display: 'flex', gap: 2, height: 4 }}>{Array.from({ length: Math.min(n, 3) }, (_, i) => <span key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: isToday ? 'var(--on-accent-gold)' : 'var(--accent-gold)' }} />)}</span>
                   </button>
                 );
               })}
@@ -396,11 +396,11 @@ export default function CalendarPage() {
               return (
                 <div key={ds} data-cal-day={ds} onClick={() => openAdd(ds)}
                   title={addable ? t('calendar.clickToAdd') : undefined}
-                  style={{ minHeight: 96, padding: 6, borderRight: '1px solid var(--border-subtle)', borderBottom: '1px solid var(--border-subtle)', cursor: addable ? 'pointer' : 'default', background: ds < today ? 'rgba(0,0,0,0.06)' : 'transparent', opacity: inMonth(ds) ? 1 : 0.45, transition: 'background 0.15s' }}
+                  style={{ minHeight: 96, padding: 6, borderRight: '1px solid var(--border-subtle)', borderBottom: '1px solid var(--border-subtle)', cursor: addable ? 'pointer' : 'default', background: ds < today ? 'rgba(0,0,0,0.06)' : 'transparent', transition: 'background 0.15s' }}
                   onMouseEnter={e => { if (addable) e.currentTarget.style.background = 'var(--bg-card-hover)'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = ds < today ? 'rgba(0,0,0,0.06)' : 'transparent'; }}>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
-                    <span style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: 13, fontWeight: isToday ? 700 : 400, background: isToday ? 'var(--accent-gold)' : 'transparent', color: isToday ? '#0a0a0f' : ds < today ? 'var(--text-muted)' : 'var(--text-primary)' }}>{Number(ds.slice(8))}</span>
+                    <span style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: 13, fontWeight: isToday ? 700 : 400, background: isToday ? 'var(--accent-gold)' : 'transparent', color: isToday ? 'var(--on-accent-gold)' : ds < today || !inMonth(ds) ? 'var(--text-muted)' : 'var(--text-primary)' }}>{Number(ds.slice(8))}</span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {list.slice(0, 1).map(it => chipFor(it, true))}
@@ -547,7 +547,7 @@ export default function CalendarPage() {
         <div role="radiogroup" aria-label={t('calendar.entryType')} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: 4 }}>
           {[['training', t('calendar.typeTraining'), Dumbbell], ['event', t('calendar.typePersonal'), StickyNote]].map(([k, label, Icon]) => (
             <button key={k} type="button" role="radio" aria-checked={form.type === k} onClick={() => setF({ type: k })}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 6px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'DM Sans', fontSize: 12.5, fontWeight: form.type === k ? 700 : 500, background: form.type === k ? 'var(--accent-gold)' : 'transparent', color: form.type === k ? '#0a0a0f' : 'var(--text-secondary)' }}>
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 6px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'DM Sans', fontSize: 12.5, fontWeight: form.type === k ? 700 : 500, background: form.type === k ? 'var(--accent-gold)' : 'transparent', color: form.type === k ? 'var(--on-accent-gold)' : 'var(--text-secondary)' }}>
               <Icon size={13} /> {label}
             </button>
           ))}

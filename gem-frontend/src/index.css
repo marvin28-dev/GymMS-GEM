@@ -11,9 +11,12 @@
   --border: #2a2a3a;
   --border-subtle: #1e1e2e;
   --text-primary: #f0ede6;
-  --text-secondary: #8a8a9a;
-  --text-muted: #5a5a6a;
+  /* At least 4.5:1 on every dark surface (D-48): secondary 7 to 8.4, muted 5 to 6 */
+  --text-secondary: #a8a8b6;
+  --text-muted: #8c8c9c;
   --accent-gold: #c9a96e;
+  /* Text on a gold fill */
+  --on-accent-gold: #0a0a0f;
   --accent-gold-dim: rgba(201,169,110,0.15);
   --accent-gold-glow: rgba(201,169,110,0.08);
   --accent-green: #4ade80;
@@ -51,11 +54,13 @@
   --border-subtle: #ded8cb;
   --text-primary: #1f1b14;
   --text-secondary: #564f43;
-  --text-muted: #857d6e;
-  --accent-gold: #8a6a24;
+  /* At least 4.5:1 on every light surface and on the pale chips (D-48) */
+  --text-muted: #675f52;
+  --accent-gold: #6a5118;
+  --on-accent-gold: #fbfaf7;
   --accent-gold-dim: rgba(138,106,36,0.11);
   --accent-gold-glow: rgba(138,106,36,0.06);
-  --accent-green: #15803d;
+  --accent-green: #166534;
   --accent-green-dim: rgba(21,128,61,0.1);
   --accent-red: #b91c1c;
   --accent-red-dim: rgba(185,28,28,0.09);
@@ -63,7 +68,7 @@
   --accent-blue-dim: rgba(29,78,216,0.09);
   --accent-purple: #6d28d9;
   --accent-purple-dim: rgba(109,40,217,0.09);
-  --accent-yellow: #b45309;
+  --accent-yellow: #92400e;
   --accent-yellow-dim: rgba(180,83,9,0.1);
   --bg-header: rgba(251,250,247,0.88);
   --shadow-card: 0 1px 3px rgba(60,48,26,0.06), 0 0 0 1px rgba(60,48,26,0.04);

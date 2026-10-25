@@ -8,9 +8,8 @@ import { localDay } from './support/forms.mjs';
 
 test.describe.configure({ timeout: 180_000 });
 
-// Left out until the owner decides: the text colours fall short of 4.5:1 on
-// the dark surfaces (D-48), and zoom is switched off for phones (D-49)
-const WAITING_ON_A_DECISION = ['color-contrast', 'meta-viewport'];
+// Every rule is checked: text colours reach 4.5:1 (D-48) and phones may zoom (D-49)
+const WAITING_ON_A_DECISION = [];
 
 async function problems(page) {
   const r = await new AxeBuilder({ page })
@@ -45,6 +44,21 @@ test.describe('the app\'s screens pass', () => {
       await expect(page.locator('main')).toBeVisible();
       await page.waitForTimeout(700);
       expect(await problems(page), path).toEqual([]);
+    });
+  }
+});
+
+// D-48 set the light theme's colours too
+test.describe('the screens pass in the light theme', () => {
+  for (const screen of ['/', '/dashboard', '/members', '/calendar', '/attendance', '/sales', '/settings?section=gym-profile']) {
+    test(screen, async ({ page }) => {
+      await page.addInitScript(() => { try { localStorage.setItem('gem-theme', 'light'); } catch { /* the test fails below if the theme did not apply */ } });
+      const owner = await registerGym();
+      await signIn(page, owner);
+      await page.goto(screen);
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+      await page.waitForTimeout(800);
+      expect(await problems(page), screen).toEqual([]);
     });
   }
 });

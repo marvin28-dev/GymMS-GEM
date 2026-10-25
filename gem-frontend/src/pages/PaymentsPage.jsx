@@ -726,7 +726,7 @@ export default function PaymentsPage() {
                 return acc;
               }, []).map((p, i) => (
                 <button key={i} onClick={() => typeof p === 'number' && setCurrentPage(p)} disabled={p === '…'}
-                  style={{ width: 32, height: 32, borderRadius: 6, border: '1px solid var(--border-subtle)', background: p === safePage ? 'var(--accent-gold)' : 'var(--bg-card)', color: p === safePage ? '#0a0a0f' : 'var(--text-secondary)', fontSize: 12, fontWeight: 600, cursor: p === '…' ? 'default' : 'pointer' }}>{p}</button>
+                  style={{ width: 32, height: 32, borderRadius: 6, border: '1px solid var(--border-subtle)', background: p === safePage ? 'var(--accent-gold)' : 'var(--bg-card)', color: p === safePage ? 'var(--on-accent-gold)' : 'var(--text-secondary)', fontSize: 12, fontWeight: 600, cursor: p === '…' ? 'default' : 'pointer' }}>{p}</button>
               ))}
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
                 style={{ width: 32, height: 32, borderRadius: 6, border: '1px solid var(--border-subtle)', background: 'var(--bg-card)', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600, cursor: safePage === totalPages ? 'not-allowed' : 'pointer', opacity: safePage === totalPages ? 0.4 : 1 }}>›</button>

@@ -381,7 +381,7 @@ export default function Header({ isMobile: isMobileProp }) {
               height: 34,
               borderRadius: '50%',
               background: showAvatar ? 'var(--accent-gold)' : 'var(--accent-gold-dim)',
-              color: showAvatar ? '#0a0a0f' : 'var(--accent-gold)',
+              color: showAvatar ? 'var(--on-accent-gold)' : 'var(--accent-gold)',
               fontWeight: 700,
               fontSize: 12,
               display: 'flex',
