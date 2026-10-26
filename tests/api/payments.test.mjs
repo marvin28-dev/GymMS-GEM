@@ -30,6 +30,18 @@ describe('recording a payment', () => {
     expect((await getMember(api, gym.token, m.id)).balance).toBe(15000);
   });
 
+  // The Payments page adds the reply to its list at once; without the member
+  // its row read "-" until the list was next loaded
+  it('comes back with who paid and who took it, as the list shows it', async () => {
+    const m = await addMember(api, gym.token, { firstName: 'Nadia', lastName: 'Named', balance: 10000 });
+    const res = await pay(m.id);
+    expect(res.status).toBe(201);
+    expect(res.body.member).toMatchObject({ id: m.id, firstName: 'Nadia', lastName: 'Named' });
+    expect(res.body.staff).toMatchObject({ id: gym.user.id });
+    const listed = (await api.get('/api/payments', { token: gym.token })).body.find(p => p.id === res.body.id);
+    expect(Object.keys(res.body.member).sort()).toEqual(Object.keys(listed.member).sort());
+  });
+
   it('loses no payment when several are taken for one member at the same moment', async () => {
     const m = await addMember(api, gym.token, { balance: 20000 });
     const results = await Promise.all([1, 2, 3, 4, 5].map(() => pay(m.id, { amount: 1000 })));

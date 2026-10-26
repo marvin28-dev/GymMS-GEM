@@ -17,6 +17,14 @@ const TYPE_MAP = {
   Other: 'other', other: 'other',
 };
 
+// A payment as the screens list it, with who paid and who took it. The reply to
+// a new payment has the same shape: without the member, the row a screen adds
+// at once read "-" until the list was next loaded.
+const PAYMENT_WITH = {
+  member: { select: { id: true, firstName: true, lastName: true, avatarColor: true, photo: true } },
+  staff:  { select: { id: true, firstName: true, lastName: true, photo: true } },
+};
+
 // ?date=YYYY-MM-DD&tz= is that whole local day and ?limit=N the latest N, so a
 // screen showing today's takings or the last few payments is not sent every
 // payment the gym ever took (F-099). Without them, every payment as before.
@@ -25,10 +33,7 @@ async function getAll(req, res) {
   const limit = Math.min(500, Math.max(0, parseInt(req.query.limit, 10) || 0));
   const payments = await prisma.payment.findMany({
     where: { gymId: req.user.gymId, ...(day ? { createdAt: { gte: day, lt: new Date(day.getTime() + 86400000) } } : {}) },
-    include: {
-      member: { select: { id: true, firstName: true, lastName: true, avatarColor: true, photo: true } },
-      staff:  { select: { id: true, firstName: true, lastName: true, photo: true } },
-    },
+    include: PAYMENT_WITH,
     orderBy: { createdAt: 'desc' },
     ...(limit ? { take: limit } : {}),
   });
@@ -114,7 +119,7 @@ async function create(req, res) {
         balanceAfter: pendingCharge != null ? currentBalance + (pendingCharge - payAmount) : newBalance,
         ...(dated.at ? { createdAt: dated.at } : {}),
       },
-      include: { staff: { select: { id: true, firstName: true, lastName: true } } },
+      include: PAYMENT_WITH,
     });
     if (!skipBalance) await tx.member.update({ where: { id: member.id }, data: { balance: newBalance } });
     return { payment, member, newBalance };
