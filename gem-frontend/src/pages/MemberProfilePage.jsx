@@ -46,6 +46,7 @@ import { getGymInfo, gymContactFooterHtml, printReceiptDocument, escapeHtml } fr
 import { packageAllowance } from '../utils/packages';
 import DialogBox from '../components/ui/DialogBox';
 import Avatar from '../components/ui/Avatar';
+import PageLoader from '../components/ui/PageLoader';
 
 const formatDate = (d) => fmtDate(d);
 
@@ -2414,9 +2415,10 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
     .map(k => ({ key: k, label: t(`memberProfile.${TAB_LABEL_KEYS[k]}`) }));
 
   if (loading) {
+    // Where the profile will appear, in its shape
     return (
-      <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>
-        <div style={{ fontSize: 14 }}>{t('memberProfile.loading')}</div>
+      <div style={{ padding: 28, maxWidth: 1200, margin: '0 auto' }}>
+        <PageLoader variant="profile" />
       </div>
     );
   }

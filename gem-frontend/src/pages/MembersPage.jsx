@@ -40,6 +40,7 @@ import { serverFieldError, fieldErrorStyle, revealFirstError } from '../utils/fo
 import { digitsOnly } from '../utils/number';
 import { softAll, failed } from '../utils/loadAll';
 import { escapeHtml, openPrintWindow } from '../utils/receipt';
+import { SkeletonTableRows, SkeletonCards } from '../components/Skeleton';
 
 const formatDate = (d) => fmtDate(d);
 
@@ -1667,9 +1668,7 @@ export default function MembersPage() {
         {/* Member card list */}
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>
-              {t('members.loading')}
-            </div>
+            <SkeletonCards count={5} />
           ) : pagedFiltered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>
               {t('members.noMembers')}
@@ -2048,11 +2047,7 @@ export default function MembersPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={tableHeaders.length + (selectionMode ? 1 : 0)} style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', fontSize: 13 }}>
-                    {t('members.loading')}
-                  </td>
-                </tr>
+                <SkeletonTableRows rows={6} cols={tableHeaders.length + (selectionMode ? 1 : 0)} colClassName={{ [tableHeaders.indexOf(t('members.startDate')) + (selectionMode ? 1 : 0)]: 'gem-col-start' }} />
               ) : pagedFiltered.length === 0 ? (
                 <tr>
                   <td colSpan={tableHeaders.length + (selectionMode ? 1 : 0)} style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', fontSize: 13 }}>
@@ -2085,7 +2080,7 @@ export default function MembersPage() {
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            {t('common.showing')} {Math.min((currentPage - 1) * PAGE_SIZE + 1, filtered.length)}-{Math.min(currentPage * PAGE_SIZE, filtered.length)} {t('common.of')} {filtered.length} {t('members.membersCount')}
+            {loading ? t('common.loading') : <>{t('common.showing')} {Math.min((currentPage - 1) * PAGE_SIZE + 1, filtered.length)}-{Math.min(currentPage * PAGE_SIZE, filtered.length)} {t('common.of')} {filtered.length} {t('members.membersCount')}</>}
           </span>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <PageBtn label={t('common.previousPage')} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>

@@ -5,6 +5,7 @@ import ProtectedRoute, { RoleGuard } from "./ProtectedRoute";
 import { appRoutes } from "./routeConfig";
 import ScrollToTop from "../components/ScrollToTop";
 import { isAuthed, checkDailyExpiry, getHomeRoute } from "../utils/auth";
+import PageLoader from "../components/ui/PageLoader";
 
 const LandingPage = lazy(() => import("../pages/LandingPage"));
 const SignUpPage = lazy(() => import("../pages/SignUpPage"));
@@ -25,10 +26,10 @@ export default function AppRoutes() {
   return (
     <>
     <ScrollToTop />
-    {/* Pages arrive as they are first opened. Moving between pages keeps the
-        current one on screen until the next has arrived (the router navigates
-        in a transition), so only the very first page shows nothing meanwhile. */}
-    <Suspense fallback={null}>
+    {/* Pages arrive as they are first opened. A whole-screen page (the public
+        pages, the front desk) shows the loader until its code has arrived;
+        pages inside the app have their own, in AppLayout. */}
+    <Suspense fallback={<PageLoader variant="screen" />}>
     <Routes>
       {/* Public marketing & auth */}
       <Route path="/" element={isAuthed() ? <Navigate to={getHomeRoute()} replace /> : <LandingPage />} />

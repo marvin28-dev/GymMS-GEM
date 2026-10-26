@@ -15,21 +15,40 @@ export function SkeletonLine({ width = '100%', height = 12, style }) {
   return <div style={{ ...bar, width, height, ...style }} />;
 }
 
-// Rows for a table, matching its column count so nothing shifts sideways
-export function SkeletonTableRows({ rows = 6, cols = 4 }) {
+// Rows for a table, matching its column count so nothing shifts sideways.
+// colClassName gives a cell its column's class (by index), for a column that
+// hides itself on narrower screens.
+export function SkeletonTableRows({ rows = 6, cols = 4, colClassName = {} }) {
   const widths = ['62%', '45%', '38%', '52%', '33%', '44%', '50%'];
   return (
     <>
       {Array.from({ length: rows }, (_, r) => (
         <tr key={r}>
           {Array.from({ length: cols }, (_, c) => (
-            <td key={c} style={{ padding: '14px 20px' }}>
+            <td key={c} className={colClassName[c]} style={{ padding: '14px 20px' }}>
               <SkeletonLine width={widths[(r + c) % widths.length]} style={{ animationDelay: `${(r * cols + c) * 40}ms` }} />
             </td>
           ))}
         </tr>
       ))}
     </>
+  );
+}
+
+// Rows inside a card that is already drawn (no card of their own)
+export function SkeletonList({ rows = 4 }) {
+  return (
+    <div>
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px', borderBottom: i < rows - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
+          <div style={{ ...bar, width: 34, height: 34, borderRadius: 10, flexShrink: 0, animationDelay: `${i * 60}ms` }} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <SkeletonLine width={['48%', '62%', '40%', '55%'][i % 4]} style={{ animationDelay: `${i * 60}ms` }} />
+            <SkeletonLine width="28%" height={10} style={{ animationDelay: `${i * 60 + 30}ms` }} />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 

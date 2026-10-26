@@ -129,6 +129,19 @@ input:-webkit-autofill:focus {
   50%      { opacity: 0.85; }
 }
 
+/* The whole-screen loader (components/ui/PageLoader.jsx): the GEM mark breathes
+   and three dots follow it. */
+.gem-loader-mark { animation: gem-loader-breathe 1.8s ease-in-out infinite; }
+.gem-loader-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-gold); opacity: 0.3; animation: gem-loader-dot 1.2s ease-in-out infinite; }
+@keyframes gem-loader-breathe {
+  0%, 100% { transform: scale(0.95); opacity: 0.8; }
+  50%      { transform: scale(1);    opacity: 1; }
+}
+@keyframes gem-loader-dot {
+  0%, 80%, 100% { opacity: 0.3; }
+  40%           { opacity: 1; }
+}
+
 @media (max-width: 768px) {
   /* Pinch-zoom is allowed (D-49); an iPhone zooms in by itself on a box whose
      text is under 16px, so form text is at least that on a phone. Boxes
@@ -153,6 +166,8 @@ input:-webkit-autofill:focus {
 @media (prefers-reduced-motion: reduce) {
   .page-fade { animation: none; }
   [style*="gem-skeleton"] { animation: none !important; opacity: 0.6 !important; }
+  .gem-loader-mark, .gem-loader-dot { animation: none; }
+  .gem-loader-dot { opacity: 0.6; }
 }
 
 /* The amber dot on a Settings section, and on the sidebar's Settings link,

@@ -8,6 +8,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import { hasNavigation } from '../utils/rolePages';
 import { getRole } from '../utils/auth';
 import EmailConfirmBanner from '../components/EmailConfirmBanner';
+import PageLoader from '../components/ui/PageLoader';
 
 export default function AppLayout() {
   const { pathname } = useLocation();
@@ -38,8 +39,9 @@ export default function AppLayout() {
           }}
         >
           <EmailConfirmBanner isMobile />
-          {/* The sidebar and header stay while a page arrives */}
-          <Suspense fallback={null}>
+          {/* The header stays while a page arrives, and the page's shape stands in
+              for it. The phone's main area has no side padding of its own. */}
+          <Suspense fallback={<div style={{ padding: 16 }}><PageLoader /></div>}>
             <Outlet />
           </Suspense>
         </main>
@@ -71,8 +73,9 @@ export default function AppLayout() {
           style={{ padding: 28, flex: 1 }}
         >
           <EmailConfirmBanner />
-          {/* The sidebar and header stay while a page arrives */}
-          <Suspense fallback={null}>
+          {/* The sidebar and header stay while a page arrives, and the page's
+              shape stands in for it (it used to be an empty area) */}
+          <Suspense fallback={<PageLoader />}>
             <Outlet />
           </Suspense>
         </main>

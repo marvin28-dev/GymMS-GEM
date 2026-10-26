@@ -50,7 +50,7 @@ import { getRole } from '../utils/auth';
 import { pagesFor } from '../utils/rolePages';
 import { serverFieldError } from '../utils/formErrors';
 import TaskAssigneeField from '../components/TaskAssigneeField';
-import { SkeletonCards } from '../components/Skeleton';
+import { SkeletonCards, SkeletonLine } from '../components/Skeleton';
 import { softAll, failed } from '../utils/loadAll';
 import { gymCache } from '../utils/gymCache';
 
@@ -408,12 +408,17 @@ export default function OperationsPage() {
   };
 
   // ── Mobile layout ────────────────────────────────────────────────────────────
+  // Before anything has come back the day's figures are not yet known: a
+  // placeholder, not a row of zeros
+  const counting = loading && !eod;
+  const figure = (v, w = 56) => (counting ? <SkeletonLine width={w} height={18} /> : v);
+
   if (isMobile) {
     const kpis = [
-      { label: t('operations.checkInsToday'), value: todayCheckIns, icon: UserCheck, path: '/attendance', color: '#22c55e' },
-      { label: t('operations.newMembers'), value: todayMembers, icon: UserPlus, path: '/members', color: '#c9a96e' },
-      { label: t('operations.revenueToday'), value: fmtMoney(todayRevenue), sub: revenueSplit, icon: TrendingUp, path: '/accounting', color: '#60a5fa' },
-      { label: t('operations.expendituresToday'), value: fmtMoney(todayExpenses), icon: TrendingDown, path: '/accounting', color: '#f87171' },
+      { label: t('operations.checkInsToday'), value: figure(todayCheckIns), icon: UserCheck, path: '/attendance', color: '#22c55e' },
+      { label: t('operations.newMembers'), value: figure(todayMembers), icon: UserPlus, path: '/members', color: '#c9a96e' },
+      { label: t('operations.revenueToday'), value: figure(fmtMoney(todayRevenue), 100), sub: counting ? null : revenueSplit, icon: TrendingUp, path: '/accounting', color: '#60a5fa' },
+      { label: t('operations.expendituresToday'), value: figure(fmtMoney(todayExpenses), 100), icon: TrendingDown, path: '/accounting', color: '#f87171' },
     ];
     return (
       <div style={{ minHeight: '100%' }}>
@@ -444,6 +449,8 @@ export default function OperationsPage() {
             </div>
           ))}
         </div>
+
+        {counting && <div style={{ padding: '0 16px 14px' }}><SkeletonCards count={3} height={56} /></div>}
 
         {/* Pending tasks */}
         {pendingTasks.length > 0 && (
@@ -494,17 +501,17 @@ export default function OperationsPage() {
 
       {/* Row 1 : 4 cards */}
       <div className="gem-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 14 }}>
-        <SummaryCard label={t('operations.checkInsToday')} value={String(todayCheckIns)} icon={UserCheck} accent="var(--accent-green)" dim="var(--accent-green-dim)" onClick={linkTo('/attendance')} />
-        <SummaryCard label={t('operations.newMembers')} value={String(todayMembers)} icon={UserPlus} accent="var(--accent-gold)" dim="var(--accent-gold-dim)" onClick={linkTo('/members')} />
-        <SummaryCard label={t('operations.paymentsReceived')} value={String(todayPayments.length)} icon={CreditCard} accent="var(--accent-blue)" dim="var(--accent-blue-dim)" onClick={linkTo('/payments')} />
-        <SummaryCard label={t('operations.revenueToday')} value={fmtMoney(todayRevenue)} sub={revenueSplit} icon={TrendingUp} accent="var(--accent-purple)" dim="var(--accent-purple-dim)" onClick={linkTo('/accounting')} />
+        <SummaryCard label={t('operations.checkInsToday')} value={figure(String(todayCheckIns))} icon={UserCheck} accent="var(--accent-green)" dim="var(--accent-green-dim)" onClick={linkTo('/attendance')} />
+        <SummaryCard label={t('operations.newMembers')} value={figure(String(todayMembers))} icon={UserPlus} accent="var(--accent-gold)" dim="var(--accent-gold-dim)" onClick={linkTo('/members')} />
+        <SummaryCard label={t('operations.paymentsReceived')} value={figure(String(todayPayments.length))} icon={CreditCard} accent="var(--accent-blue)" dim="var(--accent-blue-dim)" onClick={linkTo('/payments')} />
+        <SummaryCard label={t('operations.revenueToday')} value={figure(fmtMoney(todayRevenue), 110)} sub={counting ? null : revenueSplit} icon={TrendingUp} accent="var(--accent-purple)" dim="var(--accent-purple-dim)" onClick={linkTo('/accounting')} />
       </div>
 
       {/* Row 2 : 3 cards */}
       <div className="gem-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
-        <SummaryCard label={t('operations.visitorsToday')} value={String(todayVisitors)} icon={Users} accent="var(--accent-blue)" dim="var(--accent-blue-dim)" onClick={linkTo('/attendance')} />
-        <SummaryCard label={t('operations.staffCount')} value={String(staffList.filter(s => s.isActive !== false && isWorkingToday(s)).length)} icon={ShoppingBag} accent="var(--accent-yellow)" dim="var(--accent-yellow-dim)" onClick={linkTo('/staff')} />
-        <SummaryCard label={t('operations.expendituresToday')} value={fmtMoney(todayExpenses)} icon={TrendingDown} accent="var(--accent-red)" dim="var(--accent-red-dim)" onClick={linkTo('/accounting')} />
+        <SummaryCard label={t('operations.visitorsToday')} value={figure(String(todayVisitors))} icon={Users} accent="var(--accent-blue)" dim="var(--accent-blue-dim)" onClick={linkTo('/attendance')} />
+        <SummaryCard label={t('operations.staffCount')} value={figure(String(staffList.filter(s => s.isActive !== false && isWorkingToday(s)).length))} icon={ShoppingBag} accent="var(--accent-yellow)" dim="var(--accent-yellow-dim)" onClick={linkTo('/staff')} />
+        <SummaryCard label={t('operations.expendituresToday')} value={figure(fmtMoney(todayExpenses), 110)} icon={TrendingDown} accent="var(--accent-red)" dim="var(--accent-red-dim)" onClick={linkTo('/accounting')} />
       </div>
 
       {/* Two-column grid */}

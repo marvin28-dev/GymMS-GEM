@@ -8,6 +8,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import { getRole } from '../utils/auth';
 import { TASKS_PATH } from '../utils/rolePages';
 import { useLanguage } from '../contexts/LanguageContext';
+import { SkeletonCards, SkeletonList } from '../components/Skeleton';
 
 const cardStyle = { background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, boxShadow: 'var(--shadow-card)' };
 const secondaryBtn = { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '8px 16px', cursor: 'pointer', fontFamily: 'DM Sans' };
@@ -72,6 +73,9 @@ export default function NotificationsPage() {
   // A list that could not be loaded says so, rather than "No notifications";
   // a refused change says so, rather than happening on screen only (F-102, F-107)
   const [loadError, setLoadError] = useState(false);
+  // Until the list has come back nothing is said about it: it used to read
+  // "No notifications, all caught up" while it was still on its way
+  const [loading, setLoading] = useState(true);
   const [actionError, setActionError] = useState('');
   const failed = (err) => setActionError(err?.response?.data?.error || t('memberProfile.actionFailed'));
   const liveTick = useLiveTick();
@@ -85,7 +89,8 @@ export default function NotificationsPage() {
           text: n.body,
         })));
       })
-      .catch(() => setLoadError(true));
+      .catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
   }, [liveTick]);
   const [activeCategory, setActiveCategory] = useState('All');
 
@@ -154,7 +159,7 @@ export default function NotificationsPage() {
               {t('notifications.title')}
             </h1>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3, fontFamily: 'DM Sans' }}>
-              {unreadCount > 0 ? t('notifications.unread', { count: unreadCount }) : t('notifications.allCaughtUp')}
+              {loading ? t('common.loading') : unreadCount > 0 ? t('notifications.unread', { count: unreadCount }) : t('notifications.allCaughtUp')}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -186,7 +191,7 @@ export default function NotificationsPage() {
 
         {/* Notification list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 16 }}>
-          {filtered.length === 0 ? (loadError ? null :
+          {filtered.length === 0 ? (loadError ? null : loading ? <SkeletonCards count={4} /> :
             <div style={{ textAlign: 'center', padding: '48px 16px' }}>
               <Bell size={36} color="var(--text-muted)" style={{ marginBottom: 10 }} />
               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'DM Sans', marginBottom: 6 }}>
@@ -238,7 +243,7 @@ export default function NotificationsPage() {
             {t('notifications.title')}
           </h1>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-            {unreadCount > 0 ? t('notifications.unreadPlural', { count: unreadCount }) : t('notifications.allCaughtUp')}
+            {loading ? t('common.loading') : unreadCount > 0 ? t('notifications.unreadPlural', { count: unreadCount }) : t('notifications.allCaughtUp')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -266,7 +271,7 @@ export default function NotificationsPage() {
       </div>
 
       <div style={cardStyle}>
-        {filtered.length === 0 ? (loadError ? null :
+        {filtered.length === 0 ? (loadError ? null : loading ? <SkeletonList rows={4} /> :
           <div style={{ padding: 60, textAlign: 'center' }}>
             <Bell size={40} color="var(--text-muted)" style={{ marginBottom: 12 }} />
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>

@@ -57,6 +57,7 @@ import { gymCache } from '../utils/gymCache';
 import { fieldErrorStyle, serverFieldError } from '../utils/formErrors';
 import TimeInput from '../components/ui/TimeInput';
 import DialogBox from '../components/ui/DialogBox';
+import { SkeletonLine, SkeletonCards } from '../components/Skeleton';
 
 const formatDate = (d) => fmtDate(d);
 const staffFullName = (s) => s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim();
@@ -109,7 +110,7 @@ const getWeekDays = (d) => {
 };
 
 // ─── Schedule panel (left column) ─────────────────────────────────────────────
-function SchedulePanel({ events = [] }) {
+function SchedulePanel({ events = [], loading = false }) {
   const { t, lang } = useLanguage();
   const locale = lang === 'fr' ? 'fr-FR' : 'en-US';
   const todayStr = getTodayStr();
@@ -165,7 +166,12 @@ function SchedulePanel({ events = [] }) {
             <button aria-label={t('frontDesk.nextDay')} onClick={() => setSel(addDays(sel, 1))} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex',padding:2 }}><ChevronRight size={13}/></button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 260, overflowY: 'auto' }}>
-            {dayEvents.length === 0 ? (
+            {loading && dayEvents.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '6px 0' }}>
+                <SkeletonLine width="85%" height={10} />
+                <SkeletonLine width="60%" height={10} style={{ animationDelay: '80ms' }} />
+              </div>
+            ) : dayEvents.length === 0 ? (
               <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', textAlign: 'center', padding: '20px 0' }}>{t('frontDesk.noClassesScheduled')}</div>
             ) : dayEvents.map(e => (
               <div key={e.id} onClick={() => setDetail(e)} title={t('frontDesk.viewAssignedStaff')}
@@ -486,6 +492,8 @@ export default function FrontDeskPage() {
   const cachedGym   = (() => { try { return JSON.parse(localStorage.getItem('gem_fd_gym')   || 'null'); } catch { return null; } })();
 
   const [staffList,      setStaffList]      = useState(cachedStaff);
+  // Whether the staff list has come back once; a saved copy counts
+  const [staffLoaded,    setStaffLoaded]    = useState(cachedStaff.length > 0);
 
   // The desk is signed in to one account but worked by whoever entered their
   // code. If that person is deactivated, their desk session ends as well.
@@ -517,6 +525,9 @@ export default function FrontDeskPage() {
   const [productsData,   setProductsData]   = useState(() => fdCache.read('products', []));
   const [scheduleEvents, setScheduleEvents] = useState(() => fdCache.read('schedule', []));
   const [todayCheckins,  setTodayCheckins]  = useState(() => fdCache.read('checkins', []));
+  // Whether the desk's lists have come back once; a saved copy counts. Until
+  // then the panels show placeholders, not "nothing scheduled" or "no check-ins"
+  const [deskLoaded,     setDeskLoaded]     = useState(() => fdCache.has('checkins'));
 
   // Tasks the person on shift raised themselves, so they can check whether
   // whoever it went to has picked it up - this is the only place that view
@@ -597,7 +608,7 @@ export default function FrontDeskPage() {
       const data = sRes.data || [];
       setStaffList(data);
       storeJson('gem_fd_staff', data);
-    }).catch(console.error);
+    }).catch(console.error).finally(() => setStaffLoaded(true));
     getMyGym().then(gymRes => {
       const data = gymRes.data || null;
       setGymData(data);
@@ -673,7 +684,7 @@ export default function FrontDeskPage() {
         })),
         ...issueEntries,
       ]);
-    }).catch(console.error);
+    }).catch(console.error).finally(() => setDeskLoaded(true));
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadDesk(); }, []);
@@ -1347,10 +1358,16 @@ export default function FrontDeskPage() {
   // Left sidebar (always visible)
   const leftPanel = (
     <div data-fdtour="left-panel" style={{ ...(isMobile ? { borderTop:'1px solid var(--border-subtle)' } : { borderRight:'1px solid var(--border-subtle)' }), padding:20, display:'flex', flexDirection:'column', gap:20, overflowY:'auto' }}>
-      <SchedulePanel events={scheduleEvents}/>
+      <SchedulePanel events={scheduleEvents} loading={!deskLoaded}/>
       <div style={{ borderTop:'1px solid var(--border-subtle)', paddingTop:16 }}>
         <div style={{ fontSize:10, fontWeight:700, letterSpacing:'1.5px', color:'var(--text-muted)', marginBottom:12, fontFamily:'DM Sans' }}>{t('frontDesk.staffOnDuty')}</div>
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {!staffLoaded && staffList.length === 0 && [0, 1].map(i => (
+            <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <SkeletonLine width={28} height={28} style={{ borderRadius:'50%', flexShrink:0, animationDelay:`${i * 80}ms` }} />
+              <SkeletonLine width="55%" height={10} style={{ animationDelay:`${i * 80}ms` }} />
+            </div>
+          ))}
           {staffList.filter(s=>s.isActive!==false && isWorkingToday(s)).slice(0,5).map(s => {
             const nm = staffFullName(s); const [fn,...r] = nm.split(' ');
             return (
@@ -1738,7 +1755,10 @@ export default function FrontDeskPage() {
                   </div>
                 );})}
               </>}
-              {memberCheckins.length===0 && staffCheckins.length===0 && (
+              {memberCheckins.length===0 && staffCheckins.length===0 && !deskLoaded && (
+                <div style={{ padding:14 }}><SkeletonCards count={3} height={52} /></div>
+              )}
+              {memberCheckins.length===0 && staffCheckins.length===0 && deskLoaded && (
                 <div style={{ padding:'32px 18px', textAlign:'center' }}>
                   <Clock size={28} color="var(--text-muted)" style={{ marginBottom:8 }}/>
                   <div style={{ fontSize:12, color:'var(--text-muted)', fontFamily:'DM Sans' }}>{t('frontDesk.noCheckInsThisPeriod')}</div>

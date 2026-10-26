@@ -40,6 +40,7 @@ import { addressErrors, formatAddress } from '../utils/address';
 import { serverFieldError, revealFirstError } from '../utils/formErrors';
 import { isFitness } from '../utils/rolePages';
 import TimeInput from '../components/ui/TimeInput';
+import PageLoader from '../components/ui/PageLoader';
 
 
 // Pay periods are stored as "Sep 2026". Generating the options the same way
@@ -633,9 +634,10 @@ export default function StaffProfilePage() {
   }, [memberData?.id, id, liveTick, retryTick]);
 
   if (loadingStaff) {
+    // Where the profile will appear, in its shape
     return (
-      <div className="page-fade" style={{ padding: 40, textAlign: 'center' }}>
-        <p style={{ color: 'var(--text-secondary)' }}>{t('staff.loadingProfile')}</p>
+      <div style={fromFrontDesk ? { padding: 28, maxWidth: 1200, margin: '0 auto' } : (isMobile ? { padding: 16 } : undefined)}>
+        <PageLoader variant="profile" />
       </div>
     );
   }

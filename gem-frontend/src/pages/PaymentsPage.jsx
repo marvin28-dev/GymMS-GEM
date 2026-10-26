@@ -21,6 +21,7 @@ import { gymCache } from '../utils/gymCache';
 import { getAuth } from '../utils/auth';
 import { isManagement } from '../utils/hierarchy';
 import { serverFieldError } from '../utils/formErrors';
+import { SkeletonLine, SkeletonTableRows, SkeletonCards } from '../components/Skeleton';
 
 const staffName = (s) => s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim();
 
@@ -474,15 +475,15 @@ export default function PaymentsPage() {
         <div style={{ padding: '16px 16px 10px' }}>
           <h1 style={{ fontFamily: 'Manrope', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{t('payments.title')}</h1>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '3px 0 0', fontFamily: 'DM Sans' }}>
-            {formatMoney(totalThisMonth)} {t('common.thisMonth').toLowerCase()}
+            {loading ? t('common.loading') : `${formatMoney(totalThisMonth)} ${t('common.thisMonth').toLowerCase()}`}
           </p>
         </div>
 
         {/* KPI strip */}
         <div style={{ padding: '0 16px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {[
-            { label: t('common.today'), value: formatMoney(totalToday) },
-            { label: t('common.thisMonth'), value: formatMoney(totalThisMonth) },
+            { label: t('common.today'), value: loading ? <SkeletonLine width={90} height={16} /> : formatMoney(totalToday) },
+            { label: t('common.thisMonth'), value: loading ? <SkeletonLine width={90} height={16} /> : formatMoney(totalThisMonth) },
           ].map(({ label, value }) => (
             <div key={label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '12px 14px' }}>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
@@ -512,7 +513,7 @@ export default function PaymentsPage() {
         {/* Payment list */}
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>{t('common.loading')}</div>
+            <SkeletonCards count={5} />
           ) : paginatedPayments.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>{t('payments.noPaymentsYet')}</div>
           ) : paginatedPayments.map(p => {
@@ -571,8 +572,8 @@ export default function PaymentsPage() {
       {/* Summary cards */}
       <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 24 }}>
         {[
-          { label: t('payments.totalThisMonth'), value: formatMoney(totalThisMonth), color: 'var(--accent-blue)', dimColor: 'var(--accent-blue-dim)' },
-          { label: dynamicLabel, value: formatMoney(dynamicValue), color: 'var(--accent-green)', dimColor: 'var(--accent-green-dim)' },
+          { label: t('payments.totalThisMonth'), value: loading ? <SkeletonLine width={150} height={30} /> : formatMoney(totalThisMonth), color: 'var(--accent-blue)', dimColor: 'var(--accent-blue-dim)' },
+          { label: dynamicLabel, value: loading ? <SkeletonLine width={150} height={30} /> : formatMoney(dynamicValue), color: 'var(--accent-green)', dimColor: 'var(--accent-green-dim)' },
         ].map(c => (
           <div key={c.label} style={{ ...cardStyle, padding: 20, position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: c.color, filter: 'blur(40px)', opacity: 0.12 }} />
@@ -706,6 +707,7 @@ export default function PaymentsPage() {
                   </tr>
                 );
               })}
+              {loading && paginatedPayments.length === 0 && <SkeletonTableRows rows={6} cols={7} />}
               {!loading && paginatedPayments.length === 0 && (
                 <tr><td colSpan={7} style={{ padding: 0 }}><EmptyState icon={CreditCard} title={t('payments.noPaymentsYet')} /></td></tr>
               )}
@@ -714,7 +716,7 @@ export default function PaymentsPage() {
         </div>
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            {t('common.showing')} {filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, filtered.length)} {t('common.of')} {filtered.length} {t('payments.paymentsLabel')}
+            {loading ? t('common.loading') : <>{t('common.showing')} {filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, filtered.length)} {t('common.of')} {filtered.length} {t('payments.paymentsLabel')}</>}
           </span>
           {totalPages > 1 && (
             <div style={{ display: 'flex', gap: 4 }}>

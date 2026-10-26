@@ -21,6 +21,7 @@ import { membershipEnded } from '../utils/coaching';
 import { TASKS_PATH } from '../utils/rolePages';
 import { serverFieldError, revealFirstError } from '../utils/formErrors';
 import TimeInput from '../components/ui/TimeInput';
+import { InlineLoader } from '../components/ui/PageLoader';
 
 const staffName = (s) => s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim();
 
@@ -114,6 +115,8 @@ export default function CalendarPage() {
   // Show the last calendar at once and refresh it quietly. See utils/gymCache.js.
   const cache = gymCache('calendar');
   const [events, setEvents] = useState(() => cache.read('events', []));
+  // An empty month while the events are on their way reads as a gym with none
+  const [eventsLoading, setEventsLoading] = useState(() => !cache.has('events'));
   const [myCalendarEvents, setMyCalendarEvents] = useState(() => cache.read('mine', []));
   const [myTasks, setMyTasks] = useState([]);
   const [respondingId, setRespondingId] = useState(null);
@@ -156,7 +159,8 @@ export default function CalendarPage() {
       if (!failed(calRes)) { const evs = (calRes.data || []).map(mapEvent); setEvents(evs); cache.write('events', evs); }
       if (!failed(staffRes)) { const stf = staffRes.data || []; setStaffList(stf); cache.write('staff', stf); }
     })
-    .catch(console.error), []); // eslint-disable-line react-hooks/exhaustive-deps
+    .catch(console.error)
+    .finally(() => setEventsLoading(false)), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const liveTick = useLiveTick();
   useEffect(() => { loadGym(); refreshMine(); }, [loadGym, refreshMine, liveTick]);
@@ -530,6 +534,7 @@ export default function CalendarPage() {
       <span data-cal-label style={{ fontFamily: 'Manrope, sans-serif', fontSize: isMobile ? 15 : 17, fontWeight: 700, color: 'var(--text-primary)', minWidth: isMobile ? 0 : 200, flex: isMobile ? 1 : 'none', textAlign: 'center' }}>{navLabel}</span>
       <button aria-label={t('calendar.next')} style={{ ...secondaryBtn, padding: '6px 10px' }} onClick={() => shift(1)}><ChevronRight size={16} /></button>
       <button style={{ ...secondaryBtn, padding: '6px 12px' }} onClick={() => setFocus(today)}>{t('common.today')}</button>
+      {eventsLoading && <InlineLoader compact={isMobile} />}
     </div>
   );
   const addLabel = ownDiaryOnly ? t('calendar.addOwnEntry') : t('calendar.addEvent');
