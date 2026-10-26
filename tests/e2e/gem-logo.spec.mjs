@@ -8,13 +8,15 @@ import { registerGym, signIn } from './support/session.mjs';
 const GEM = '21,17 43,17 53,27 32,50 11,27';
 
 async function showsTheMark(page) {
+  // The page itself, not the loader (which shows the mark too) while it arrives
+  await expect(page.locator('[data-page-loader]')).toHaveCount(0);
   const mark = page.locator('svg[data-gem-mark]:visible').first();
   await expect(mark).toBeVisible();
   await expect(mark.locator('polygon').first()).toHaveAttribute('points', GEM);
   // The gold tile points at a gradient in the same drawing: a reference to
-  // one elsewhere draws nothing when that one is hidden
-  const fill = await mark.locator('rect').getAttribute('fill');
-  const id = await mark.locator('linearGradient').getAttribute('id');
+  // one elsewhere draws nothing when that one is hidden. Read from one mark at
+  // once, as the page may swap marks between two reads.
+  const { fill, id } = await mark.evaluate(el => ({ fill: el.querySelector('rect').getAttribute('fill'), id: el.querySelector('linearGradient').id }));
   expect(fill).toBe(`url(#${id})`);
 }
 
