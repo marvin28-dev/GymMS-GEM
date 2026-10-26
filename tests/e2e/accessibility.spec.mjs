@@ -63,22 +63,31 @@ test.describe('the screens pass in the light theme', () => {
   }
 });
 
-test('the main dialogs pass', async ({ page }) => {
-  const owner = await registerGym();
-  const trainer = await addStaff(owner, { role: 'trainer' });
-  await call('POST', '/packages', { token: owner.token, body: { name: 'Axe Plan', price: 10000, dayPassPrice: 1000, duration: '1 Months', durationDays: 30, status: 'active' } });
-  await signIn(page, owner);
+// One test a dialog, like the screens: all ten in one test took 1.4 minutes
+// in Firefox alone and ran past three when tests ran side by side
+test.describe('the main dialogs pass', () => {
   for (const [path, button] of [['/members', 'Add Member'], ['/members', 'Add Visitor'], ['/payments', 'Add Payment'], ['/staff', 'Add Staff Member'], ['/tasks', 'Add Task'], ['/calendar', 'Add Event'], ['/sales', '+ Add Product'], ['/packages', 'Add Package'], ['/accounting', 'Add Expense']]) {
-    await page.goto(path);
-    await page.getByRole('button', { name: button }).first().click();
-    await expect(page.getByRole('dialog').first()).toBeVisible();
-    await page.waitForTimeout(400);
-    expect(await problems(page), `${path} ${button}`).toEqual([]);
+    test(`${path} ${button}`, async ({ page }) => {
+      const owner = await registerGym();
+      await call('POST', '/packages', { token: owner.token, body: { name: 'Axe Plan', price: 10000, dayPassPrice: 1000, duration: '1 Months', durationDays: 30, status: 'active' } });
+      await signIn(page, owner);
+      await page.goto(path);
+      await page.getByRole('button', { name: button }).first().click();
+      await expect(page.getByRole('dialog').first()).toBeVisible();
+      await page.waitForTimeout(400);
+      expect(await problems(page), `${path} ${button}`).toEqual([]);
+    });
   }
-  await page.goto(`/staff/${trainer.id}`);
-  await page.getByRole('button', { name: 'View Code' }).click();
-  await expect(page.getByRole('dialog', { name: 'Confirm it\'s you' })).toBeVisible();
-  expect(await problems(page), 'code dialog').toEqual([]);
+
+  test('the code dialog on a staff profile', async ({ page }) => {
+    const owner = await registerGym();
+    const trainer = await addStaff(owner, { role: 'trainer' });
+    await signIn(page, owner);
+    await page.goto(`/staff/${trainer.id}`);
+    await page.getByRole('button', { name: 'View Code' }).click();
+    await expect(page.getByRole('dialog', { name: 'Confirm it\'s you' })).toBeVisible();
+    expect(await problems(page), 'code dialog').toEqual([]);
+  });
 });
 
 test('the front desk passes', async ({ page }) => {
