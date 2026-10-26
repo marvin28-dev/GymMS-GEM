@@ -13,6 +13,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { gymAddress } from '../utils/gymAddress';
 import GemMark from '../components/ui/GemMark';
+import PoweredBy from '../components/ui/PoweredBy';
 
 const DEFAULT_GYM = { name: '', location: '', color: '#c9a96e', bg: 'rgba(201,169,110,0.07)', initials: '...', logo: null };
 
@@ -549,6 +550,7 @@ export default function GymLoginPage() {
             {t('auth.loginWrongGym')}{' '}
             <button type="button" style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: gym.color, cursor: 'pointer', fontWeight: 600 }} onClick={() => nav('/login')}>{t('auth.loginSearchGym')}</button>
           </p>
+          <PoweredBy style={{ textAlign: 'center', marginTop: 28 }} />
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
@@ -587,7 +589,10 @@ export default function GymLoginPage() {
 
         <div onClick={() => nav('/')} style={{ display: 'flex', alignItems: 'center', gap: 8, borderTop: '1px solid var(--border-subtle)', paddingTop: 20, cursor: 'pointer' }}>
           <GemMark size={24} />
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('auth.loginPowered')}</span>
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('auth.loginPowered')}</div>
+            <PoweredBy style={{ marginTop: 2 }} />
+          </div>
         </div>
       </div>
 

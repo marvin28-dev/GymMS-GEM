@@ -1,6 +1,8 @@
 // What members are sent, in the gym's language for them (D-23): its
 // settings.emailLanguage, English unless the gym chose French. Staff emails
 // stay in English for now; staff read GEM itself in the language they choose.
+const { MAKER } = require('./emailLayout');
+
 const TEXT = {
   en: {
     callUsPhone: (phone) => `If anything doesn't look right, call us on ${phone} and we'll sort it out.`,
@@ -55,7 +57,7 @@ const TEXT = {
     pdf: {
       receipt: 'RECEIPT', amountPaid: 'AMOUNT PAID', reference: 'Receipt reference', paidBy: 'Paid by', memberId: 'Member ID',
       method: 'Payment method', description: 'Description', balanceAfter: 'Balance after payment',
-      thanks: 'Thank you for your payment. Please keep this receipt for your records.', poweredBy: 'Powered by GEM',
+      thanks: 'Thank you for your payment. Please keep this receipt for your records.', poweredBy: `GEM · Powered by ${MAKER}`,
     },
   },
   fr: {
@@ -111,7 +113,7 @@ const TEXT = {
     pdf: {
       receipt: 'REÇU', amountPaid: 'MONTANT PAYÉ', reference: 'Référence du reçu', paidBy: 'Payé par', memberId: 'Numéro de membre',
       method: 'Moyen de paiement', description: 'Objet', balanceAfter: 'Reste après paiement',
-      thanks: 'Merci pour votre paiement. Veuillez conserver ce reçu.', poweredBy: 'Propulsé par GEM',
+      thanks: 'Merci pour votre paiement. Veuillez conserver ce reçu.', poweredBy: `GEM · Propulsé par ${MAKER}`,
     },
   },
 };

@@ -14,6 +14,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import LangToggle from '../components/LangToggle';
 import { useIsMobile } from '../hooks/useIsMobile';
 import GemMark from '../components/ui/GemMark';
+import PoweredBy from '../components/ui/PoweredBy';
 
 // ─── Countries ────────────────────────────────────────────────────────────────
 
@@ -353,6 +354,7 @@ export default function SignUpPage() {
 
         {step === 3 && <SuccessStep gymCode={form.gymCode} gymName={form.gymName} firstName={form.firstName} managerCode={managerCode} onGo={() => nav('/dashboard')} />}
       </div>
+      <PoweredBy style={{ textAlign: 'center', padding: '0 16px 28px' }} />
     </div>
   );
 }

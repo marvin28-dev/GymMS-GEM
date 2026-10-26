@@ -157,7 +157,7 @@ function footerHtml(gym, lang = 'en') {
     if (contact.length) lines.push(`<div>${contact.join(' &nbsp;·&nbsp; ')}</div>`);
     if (socials.length) lines.push(`<div>${socials.map(esc).join(' &nbsp;·&nbsp; ')}</div>`);
   }
-  lines.push(`<div style="margin-top:10px;color:#a3a3ad;">${lang === 'fr' ? 'Envoyé avec GEM' : 'Sent with GEM'} · GymElite Manager</div>`);
+  lines.push(`<div style="margin-top:10px;color:#a3a3ad;">${lang === 'fr' ? `Envoyé avec GEM · Propulsé par ${MAKER}` : `Sent with GEM · Powered by ${MAKER}`}</div>`);
   return `
   <tr><td align="center" class="gem-px" style="padding:22px 32px 8px;font-family:${FONT};font-size:12px;line-height:1.7;color:${C.muted};">${lines.join('')}</td></tr>`;
 }
@@ -199,10 +199,13 @@ function layout({ brand, gym = null, preheader = '', eyebrow, title, body, lang 
 </body></html>`;
 }
 
+// Who makes GEM, credited at the foot of every email and on the receipt PDF
+const MAKER = 'Ekoteksolutions';
+
 const gymBrand = (gym) => ({ name: gym?.name || 'GEM', logo: gym?.logo || null });
 const gemBrand = { name: 'GEM', sub: 'GymElite Manager' };
 
 module.exports = {
-  esc, sender, longDate, layout, gymBrand, gemBrand,
+  esc, sender, longDate, layout, gymBrand, gemBrand, MAKER,
   p, pHtml, strong, greeting, link, highlight, tiles, details, badge, button, note, steps, small,
 };

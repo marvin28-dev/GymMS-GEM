@@ -6,6 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import LangToggle from '../components/LangToggle';
 import { useIsMobile } from '../hooks/useIsMobile';
 import GemMark from '../components/ui/GemMark';
+import PoweredBy from '../components/ui/PoweredBy';
 
 export default function LandingPage() {
   const nav = useNavigate();
@@ -185,7 +186,10 @@ export default function LandingPage() {
             <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: 13 }}>GEM</span>
             {!isMobile && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· GymElite Manager</span>}
           </div>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('landing.footerRights')}</span>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: isMobile ? 4 : 16 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('landing.footerRights')}</span>
+            <PoweredBy style={{ fontSize: 12 }} />
+          </div>
         </div>
       </footer>
     </div>

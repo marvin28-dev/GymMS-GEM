@@ -26,6 +26,7 @@ import { countMembersNeedingAttention, countTasksNeedingAttention } from '../uti
 import { useLanguage } from '../contexts/LanguageContext';
 import { useSetupStatus } from '../hooks/useSetupStatus';
 import GemMark from './ui/GemMark';
+import PoweredBy from './ui/PoweredBy';
 
 const PATH_TO_NAV_KEY = {
   '/dashboard':    'dashboard',
@@ -401,6 +402,7 @@ export default function Sidebar({ open, onClose, isMobile }) {
           </div>
         </div>
       </div>
+      <PoweredBy style={{ padding: '0 16px 14px', fontSize: 10.5 }} />
     </div>
   );
 }

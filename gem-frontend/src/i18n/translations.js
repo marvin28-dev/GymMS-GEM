@@ -352,6 +352,7 @@ const translations = {
     },
     idle: { title: 'Are you still there?', body1: 'You’ve been inactive for a while.', body2: 'For your security, you’ll be logged out automatically.', secondsLeft: 'seconds remaining', logOut: 'Log out', stay: 'Yes, I’m still here' },
     common: {
+      poweredBy: 'Powered by',
       stillLoading: 'This is taking longer than usual. Check your connection, or reload the page.',
       notFoundTitle: 'Page not found',
       notFoundText: 'The address may be mistyped, or the page has moved.',
@@ -2118,7 +2119,7 @@ const translations = {
       loginWrongGym: 'Wrong gym?',
       loginSearchGym: 'Search for your gym',
       loginSupport: "Need a hand? 24/7 support, we're always here.",
-      loginPowered: 'Powered by GEM · GymElite Manager',
+      loginPowered: 'GEM · GymElite Manager',
       loginErrorEmail: 'Email is required',
       loginErrorPassword: 'Password is required',
       loginErrorFailed: 'Login failed. Please try again.',
@@ -2562,6 +2563,7 @@ const translations = {
     },
     idle: { title: 'Êtes-vous toujours là ?', body1: 'Vous êtes inactif depuis un moment.', body2: 'Pour votre sécurité, vous serez déconnecté automatiquement.', secondsLeft: 'secondes restantes', logOut: 'Se déconnecter', stay: 'Oui, je suis là' },
     common: {
+      poweredBy: 'Propulsé par',
       stillLoading: 'Le chargement prend plus de temps que d\'habitude. Vérifiez votre connexion ou rechargez la page.',
       notFoundTitle: 'Page introuvable',
       notFoundText: 'L\'adresse est peut-être mal saisie, ou la page a été déplacée.',
@@ -4340,7 +4342,7 @@ const translations = {
       loginWrongGym: 'Mauvaise salle ?',
       loginSearchGym: 'Chercher votre salle',
       loginSupport: "Besoin d'aide ? Support 24/7, toujours là.",
-      loginPowered: 'Propulsé par GEM · GymElite Manager',
+      loginPowered: 'GEM · GymElite Manager',
       loginErrorEmail: "L'e-mail est requis",
       loginErrorPassword: 'Le mot de passe est requis',
       loginErrorFailed: 'Échec de la connexion. Veuillez réessayer.',

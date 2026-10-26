@@ -8,6 +8,7 @@ import SupportLinks from '../components/SupportLinks';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useIsMobile } from '../hooks/useIsMobile';
 import GemMark from '../components/ui/GemMark';
+import PoweredBy from '../components/ui/PoweredBy';
 
 const PERK_ICONS = [Users, CreditCard, Monitor, BarChart3];
 
@@ -99,6 +100,7 @@ export default function GymCodePage() {
             <button type="button" onClick={() => nav('/signup')} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#c9a96e', fontWeight: 600, cursor: 'pointer' }}>{t('auth.codeStartTrial')}</button>
             {t('auth.code7daysFree')}
           </p>
+          <PoweredBy style={{ textAlign: 'center', marginTop: 24 }} />
         </div>
       </div>
     );
@@ -297,6 +299,7 @@ export default function GymCodePage() {
 
           {/* Contact */}
           <SupportLinks label={t('auth.codeSupport')} style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--border-subtle)', textAlign: 'center' }} />
+          <PoweredBy style={{ textAlign: 'center', marginTop: 20 }} />
 
         </div>
       </div>
