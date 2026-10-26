@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
-  Dumbbell, ArrowLeft, ArrowRight, Check, Building2, User,
+  ArrowLeft, ArrowRight, Check, Building2, User,
   Mail, Lock, MapPin, Eye, EyeOff, Phone, Sparkles, Users,
   ShieldCheck, Zap, RefreshCw, CreditCard, Monitor, BarChart3, ChevronDown, PlayCircle, Globe,
 } from 'lucide-react';
@@ -13,6 +13,7 @@ import SupportLinks from '../components/SupportLinks';
 import { useLanguage } from '../contexts/LanguageContext';
 import LangToggle from '../components/LangToggle';
 import { useIsMobile } from '../hooks/useIsMobile';
+import GemMark from '../components/ui/GemMark';
 
 // ─── Countries ────────────────────────────────────────────────────────────────
 
@@ -273,9 +274,7 @@ export default function SignUpPage() {
       <div style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)', padding: isMobile ? '0 20px' : '0 24px' }}>
         <div style={{ maxWidth: 600, margin: '0 auto', height: isMobile ? 52 : 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={() => nav('/')}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Dumbbell size={15} color="#0a0a0f" strokeWidth={2.5} />
-            </div>
+            <GemMark size={30} />
             <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 800, fontSize: 16, color: 'var(--text-primary)' }}>GEM</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

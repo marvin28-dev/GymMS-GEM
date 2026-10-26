@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Dumbbell, CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { verifyEmail } from '../services/auth.service';
 import { getAuth, isAuthed, getHomeRoute, updateSessionUser } from '../utils/auth';
 import { useLanguage } from '../contexts/LanguageContext';
+import GemMark from '../components/ui/GemMark';
 
 const card = { background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 18, padding: '40px 28px', textAlign: 'center', boxShadow: 'var(--shadow-card)' };
 const goldBtn = { background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', color: '#0a0a0f', borderRadius: 10, padding: '11px 28px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'DM Sans' };
@@ -41,9 +42,7 @@ export default function VerifyEmailPage() {
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', fontFamily: 'DM Sans, sans-serif' }}>
       <div style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)', padding: '0 24px' }}>
         <div style={{ maxWidth: 480, margin: '0 auto', height: 60, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => nav('/')}>
-          <div style={{ width: 30, height: 30, borderRadius: 7, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Dumbbell size={14} color="#0a0a0f" strokeWidth={2.5} />
-          </div>
+          <GemMark size={30} />
           <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 800, fontSize: 16, color: 'var(--text-primary)' }}>GEM</span>
         </div>
       </div>

@@ -1,10 +1,11 @@
 import { useNavigate } from 'react-router-dom';
-import { Dumbbell, Users, BarChart2, Calendar, ChevronRight, CheckCircle2, ArrowRight, Zap, Shield, Mail, MessageCircle } from 'lucide-react';
+import { Users, BarChart2, Calendar, ChevronRight, CheckCircle2, ArrowRight, Zap, Shield, Mail, MessageCircle } from 'lucide-react';
 import { SUPPORT, hasSupport } from '../utils/support';
 import { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import LangToggle from '../components/LangToggle';
 import { useIsMobile } from '../hooks/useIsMobile';
+import GemMark from '../components/ui/GemMark';
 
 export default function LandingPage() {
   const nav = useNavigate();
@@ -27,9 +28,7 @@ export default function LandingPage() {
       <nav style={{ position: 'sticky', top: 0, zIndex: 100, borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-header)', backdropFilter: 'blur(20px)' }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', padding: px, height: isMobile ? 56 : 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => nav('/')}>
-            <div style={{ width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, borderRadius: 9, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 12px rgba(201,169,110,0.3)' }}>
-              <Dumbbell size={isMobile ? 14 : 18} color="#0a0a0f" strokeWidth={2.5} />
-            </div>
+            <GemMark size={isMobile ? 30 : 36} style={{ boxShadow: '0 2px 12px rgba(201,169,110,0.3)' }} />
             <div>
               <div style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 800, fontSize: isMobile ? 15 : 17, color: 'var(--text-primary)', lineHeight: 1.1 }}>GEM</div>
               {!isMobile && <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.5px', lineHeight: 1 }}>GymElite Manager</div>}
@@ -182,9 +181,7 @@ export default function LandingPage() {
       <footer style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-subtle)', padding: isMobile ? '20px' : '28px 24px' }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, textAlign: isMobile ? 'center' : 'left' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={() => nav('/')}>
-            <div style={{ width: 24, height: 24, borderRadius: 6, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Dumbbell size={11} color="#0a0a0f" strokeWidth={2.5} />
-            </div>
+            <GemMark size={24} />
             <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: 13 }}>GEM</span>
             {!isMobile && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· GymElite Manager</span>}
           </div>

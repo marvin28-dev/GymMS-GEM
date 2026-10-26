@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  Gem,
   LayoutGrid,
   Users,
   CheckSquare,
@@ -26,6 +25,7 @@ import { getAll as getTasks } from '../services/tasks.service';
 import { countMembersNeedingAttention, countTasksNeedingAttention } from '../utils/attention';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useSetupStatus } from '../hooks/useSetupStatus';
+import GemMark from './ui/GemMark';
 
 const PATH_TO_NAV_KEY = {
   '/dashboard':    'dashboard',
@@ -267,7 +267,7 @@ export default function Sidebar({ open, onClose, isMobile }) {
           background: 'var(--bg-secondary)',
         }}
       >
-        <Gem size={29} color="var(--accent-gold)" strokeWidth={1.9} style={{ flexShrink: 0 }} />
+        <GemMark size={32} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{

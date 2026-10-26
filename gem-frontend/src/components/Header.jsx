@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Settings, LogOut, User, Trash2, Menu, Gem } from 'lucide-react';
+import { Bell, Settings, LogOut, User, Trash2, Menu } from 'lucide-react';
 import { getAll as getNotifs, markAllRead as apiMarkAllRead, remove as removeNotif, removeAll as removeAllNotifs } from '../services/notifications.service';
 import { getAuth, clearAuth, getRole } from '../utils/auth';
 import { TASKS_PATH } from '../utils/rolePages';
@@ -10,6 +10,7 @@ import { useSessionPhoto } from '../utils/sessionPhoto';
 import GlobalSearch from './GlobalSearch';
 import { roleName } from '../utils/roleNames';
 import LoadFailed from './ui/LoadFailed';
+import GemMark from './ui/GemMark';
 
 const ROLE_KEYS = {
   general_manager: 'generalManager',
@@ -190,7 +191,7 @@ export default function Header({ isMobile: isMobileProp }) {
       {/* Logo - mobile only */}
       {isMobile && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <Gem size={18} color="var(--accent-gold)" strokeWidth={2} />
+          <GemMark size={24} />
           <span
             style={{
               fontFamily: 'Manrope, sans-serif',

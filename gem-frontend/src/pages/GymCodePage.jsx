@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { Dumbbell, ArrowRight, Search, Users, CreditCard, Monitor, BarChart3 } from 'lucide-react';
+import { ArrowRight, Search, Users, CreditCard, Monitor, BarChart3 } from 'lucide-react';
 import { getGymByCode } from '../services/gym.service';
 import { isAuthed } from '../utils/auth';
 import LangToggle from '../components/LangToggle';
 import SupportLinks from '../components/SupportLinks';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useIsMobile } from '../hooks/useIsMobile';
+import GemMark from '../components/ui/GemMark';
 
 const PERK_ICONS = [Users, CreditCard, Monitor, BarChart3];
 
@@ -53,9 +54,7 @@ export default function GymCodePage() {
       <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', fontFamily: 'DM Sans, sans-serif' }}>
         <div style={{ padding: '20px 20px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div onClick={() => nav('/')} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Dumbbell size={15} color="#0a0a0f" strokeWidth={2.5} />
-            </div>
+            <GemMark size={30} />
             <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 800, fontSize: 16, color: 'var(--text-primary)' }}>GEM</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -66,9 +65,7 @@ export default function GymCodePage() {
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 20px 60px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
-            <div style={{ width: 60, height: 60, borderRadius: 16, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(201,169,110,0.3)' }}>
-              <Dumbbell size={28} color="#0a0a0f" strokeWidth={2} />
-            </div>
+            <GemMark size={60} style={{ boxShadow: '0 8px 24px rgba(201,169,110,0.3)' }} />
           </div>
           <h1 style={{ fontFamily: 'Manrope, sans-serif', fontSize: 28, fontWeight: 800, color: 'var(--text-primary)', textAlign: 'center', marginBottom: 8, letterSpacing: '-0.4px' }}>
             {t('auth.codeTitle')}
@@ -136,9 +133,7 @@ export default function GymCodePage() {
 
         {/* Logo */}
         <div onClick={() => nav('/')} style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 'auto', position: 'relative', zIndex: 1, cursor: 'pointer' }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Dumbbell size={16} color="#0a0a0f" strokeWidth={2.5} />
-          </div>
+          <GemMark size={32} />
           <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 800, fontSize: 16, color: 'var(--text-primary)' }}>GEM</span>
         </div>
 
@@ -206,14 +201,7 @@ export default function GymCodePage() {
 
           {/* Icon */}
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
-            <div style={{
-              width: 52, height: 52, borderRadius: 14,
-              background: 'linear-gradient(135deg, #c9a96e, #b08d4a)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 6px 24px rgba(201,169,110,0.3)',
-            }}>
-              <Dumbbell size={24} color="#0a0a0f" strokeWidth={2} />
-            </div>
+            <GemMark size={52} style={{ boxShadow: '0 6px 24px rgba(201,169,110,0.3)' }} />
           </div>
 
           <h1 style={{

@@ -2,12 +2,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   X, LayoutGrid, Users, CheckSquare, Calendar, Monitor,
   ClipboardList, ShoppingBag, Activity, CreditCard, BarChart3,
-  Package, MessageSquare, Users2, Settings, Gem, LogOut,
+  Package, MessageSquare, Users2, Settings, LogOut,
 } from 'lucide-react';
 import { getAuth, clearAuth } from '../utils/auth';
 import { pagesFor } from '../utils/rolePages';
 import { useLanguage } from '../contexts/LanguageContext';
 import { roleName } from '../utils/roleNames';
+import GemMark from './ui/GemMark';
 
 const DRAWER_SECTIONS = [
   {
@@ -117,7 +118,7 @@ export default function NavDrawer({ open, onClose }) {
             gap: 10,
           }}
         >
-          <Gem size={20} color="var(--accent-gold)" strokeWidth={2} />
+          <GemMark size={26} />
           <span
             style={{
               fontFamily: 'Manrope, sans-serif',

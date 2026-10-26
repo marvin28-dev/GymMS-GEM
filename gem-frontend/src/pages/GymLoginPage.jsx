@@ -12,6 +12,7 @@ import SupportLinks from '../components/SupportLinks';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { gymAddress } from '../utils/gymAddress';
+import GemMark from '../components/ui/GemMark';
 
 const DEFAULT_GYM = { name: '', location: '', color: '#c9a96e', bg: 'rgba(201,169,110,0.07)', initials: '...', logo: null };
 
@@ -451,9 +452,7 @@ export default function GymLoginPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <LangToggle lang={lang} switchLang={switchLang} />
               <div onClick={() => nav('/')} style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer' }}>
-                <div style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Dumbbell size={12} color="#0a0a0f" strokeWidth={2.5} />
-                </div>
+                <GemMark size={26} />
                 <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 800, fontSize: 14, color: 'var(--text-primary)' }}>GEM</span>
               </div>
             </div>
@@ -587,9 +586,7 @@ export default function GymLoginPage() {
         </div>
 
         <div onClick={() => nav('/')} style={{ display: 'flex', alignItems: 'center', gap: 8, borderTop: '1px solid var(--border-subtle)', paddingTop: 20, cursor: 'pointer' }}>
-          <div style={{ width: 24, height: 24, borderRadius: 6, background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Dumbbell size={11} color="#0a0a0f" strokeWidth={2.5} />
-          </div>
+          <GemMark size={24} />
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('auth.loginPowered')}</span>
         </div>
       </div>
