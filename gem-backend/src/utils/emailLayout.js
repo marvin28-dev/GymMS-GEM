@@ -200,7 +200,7 @@ function layout({ brand, gym = null, preheader = '', eyebrow, title, body, lang 
 }
 
 // Who makes GEM, credited at the foot of every email and on the receipt PDF
-const MAKER = 'Ekoteksolutions';
+const MAKER = 'Ekoteksolutions Inc.';
 
 const gymBrand = (gym) => ({ name: gym?.name || 'GEM', logo: gym?.logo || null });
 const gemBrand = { name: 'GEM', sub: 'GymElite Manager' };

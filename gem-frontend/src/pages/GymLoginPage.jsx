@@ -550,8 +550,8 @@ export default function GymLoginPage() {
             {t('auth.loginWrongGym')}{' '}
             <button type="button" style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: gym.color, cursor: 'pointer', fontWeight: 600 }} onClick={() => nav('/login')}>{t('auth.loginSearchGym')}</button>
           </p>
-          <PoweredBy style={{ textAlign: 'center', marginTop: 28 }} />
         </div>
+        <PoweredBy style={{ textAlign: 'center', marginTop: 'auto', padding: '24px 16px 20px' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -589,15 +589,13 @@ export default function GymLoginPage() {
 
         <div onClick={() => nav('/')} style={{ display: 'flex', alignItems: 'center', gap: 8, borderTop: '1px solid var(--border-subtle)', paddingTop: 20, cursor: 'pointer' }}>
           <GemMark size={24} />
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('auth.loginPowered')}</div>
-            <PoweredBy style={{ marginTop: 2 }} />
-          </div>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('auth.loginPowered')}</span>
         </div>
       </div>
 
       {/* Right: Login form */}
       <div className="gem-login-form-panel" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px', position: 'relative' }}>
+        <PoweredBy style={{ position: 'absolute', bottom: 18, left: 0, right: 0, textAlign: 'center' }} />
         <div style={{ position: 'absolute', top: 20, right: 24 }}>
           <LangToggle lang={lang} switchLang={switchLang} />
         </div>

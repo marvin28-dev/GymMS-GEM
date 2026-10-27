@@ -14,6 +14,6 @@ export const SUPPORT = {
 
 export const hasSupport = !!(email || whatsapp);
 
-// Who makes GEM: "Powered by Ekoteksolutions" (components/ui/PoweredBy.jsx,
+// Who makes GEM: "Powered by Ekoteksolutions Inc." (components/ui/PoweredBy.jsx,
 // the payslip PDF). The server's emails and receipts name it in utils/emailLayout.js.
-export const MAKER = 'Ekoteksolutions';
+export const MAKER = 'Ekoteksolutions Inc.';

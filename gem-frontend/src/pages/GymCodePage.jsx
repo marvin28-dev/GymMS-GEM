@@ -100,8 +100,8 @@ export default function GymCodePage() {
             <button type="button" onClick={() => nav('/signup')} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#c9a96e', fontWeight: 600, cursor: 'pointer' }}>{t('auth.codeStartTrial')}</button>
             {t('auth.code7daysFree')}
           </p>
-          <PoweredBy style={{ textAlign: 'center', marginTop: 24 }} />
         </div>
+        <PoweredBy style={{ textAlign: 'center', padding: '0 16px 20px' }} />
       </div>
     );
   }
@@ -196,6 +196,7 @@ export default function GymCodePage() {
         padding: '40px 32px',
         position: 'relative',
       }}>
+        <PoweredBy style={{ position: 'absolute', bottom: 18, left: 0, right: 0, textAlign: 'center' }} />
         <div style={{ position: 'absolute', top: 20, right: 24 }}>
           <LangToggle lang={lang} switchLang={switchLang} />
         </div>
@@ -299,7 +300,6 @@ export default function GymCodePage() {
 
           {/* Contact */}
           <SupportLinks label={t('auth.codeSupport')} style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--border-subtle)', textAlign: 'center' }} />
-          <PoweredBy style={{ textAlign: 'center', marginTop: 20 }} />
 
         </div>
       </div>

@@ -50,21 +50,21 @@ describe("the language of members' emails", () => {
     expect(welcome.html).toContain('lang="en"');
   });
 
-  it('credits Ekoteksolutions at the foot of every email and on the receipt, in its language', async () => {
+  it('credits Ekoteksolutions Inc. at the foot of every email and on the receipt, in its language', async () => {
     const en = await registerGym(api);
     const enEmail = `credit.${uniqueCode('e')}@example.test`;
     await addMember(api, en.token, { firstName: 'Cleo', email: enEmail });
-    expect((await mailFor(enEmail, /Welcome to/)).html).toContain('Sent with GEM · Powered by Ekoteksolutions');
+    expect((await mailFor(enEmail, /Welcome to/)).html).toContain('Sent with GEM · Powered by Ekoteksolutions Inc.');
 
     const fr = await registerGym(api);
     await api.patch('/api/gyms/me', { settings: { emailLanguage: 'fr' } }, { token: fr.token });
     const frEmail = `credit.${uniqueCode('e')}@example.test`;
     await addMember(api, fr.token, { firstName: 'Cleo', email: frEmail });
-    expect((await mailFor(frEmail, /Bienvenue chez/)).html).toContain('Envoyé avec GEM · Propulsé par Ekoteksolutions');
+    expect((await mailFor(frEmail, /Bienvenue chez/)).html).toContain('Envoyé avec GEM · Propulsé par Ekoteksolutions Inc.');
 
     const { TEXT } = backend('./utils/memberEmailText.js');
-    expect(TEXT.en.pdf.poweredBy).toBe('GEM · Powered by Ekoteksolutions');
-    expect(TEXT.fr.pdf.poweredBy).toBe('GEM · Propulsé par Ekoteksolutions');
+    expect(TEXT.en.pdf.poweredBy).toBe('GEM · Powered by Ekoteksolutions Inc.');
+    expect(TEXT.fr.pdf.poweredBy).toBe('GEM · Propulsé par Ekoteksolutions Inc.');
   });
 
   it('prints the receipt PDF in either language', async () => {

@@ -9,7 +9,6 @@ import { pagesFor } from '../utils/rolePages';
 import { useLanguage } from '../contexts/LanguageContext';
 import { roleName } from '../utils/roleNames';
 import GemMark from './ui/GemMark';
-import PoweredBy from './ui/PoweredBy';
 
 const DRAWER_SECTIONS = [
   {
@@ -251,7 +250,6 @@ export default function NavDrawer({ open, onClose }) {
             <LogOut size={17} strokeWidth={1.8} />
             {t('common.signOut')}
           </button>
-          <PoweredBy style={{ padding: '4px 20px 6px', fontSize: 10.5 }} />
         </div>
       </div>
     </>
