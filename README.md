@@ -93,13 +93,23 @@ Lint: `npm run lint` in `gem-frontend` and in `gem-backend`.
 The web app builds with `npm run build` (set `VITE_API_URL` to the API's
 address) and is served by Vercel.
 
-The backend's settings for Railway are in `gem-backend/railway.json`: before
-each start it runs `node scripts/migrate.js`, which applies the migrations in
-`prisma/migrations`; then `node src/index.js`; `/api/health` is the health
-check (it answers 503 when the database cannot be reached), and the old server
-gets 15 seconds to finish its requests. If Railway's root directory for the
-service is the repository root, set the service's config file path to
-`gem-backend/railway.json`.
+The backend runs on Railway. `npm start` (what Railway runs unless the service
+has a start command of its own) first runs `node scripts/migrate.js`, which
+applies the migrations in `prisma/migrations`, then starts the server
+(`scripts/start.js`); a database it does not recognise stops the start.
+
+`gem-backend/railway.json` holds the same settings as code, but Railway reads it
+only when the service's config file path is set to `/gem-backend/railway.json`
+(it does not follow the root directory), and Railway is retiring config files:
+they work until 1 December 2026, and only for services already using one. Set
+these in the backend service's settings instead:
+
+- Pre-deploy command `node scripts/migrate.js`: an update that cannot be
+  applied then stops the deploy while the running version stays up.
+- Healthcheck path `/api/health` (it answers 503 when the database cannot be
+  reached), so a server that cannot work is never put in front of users.
+- Variable `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=15`: the old server gets 15
+  seconds to finish its requests.
 
 The first time, the live database has no migration history (it was kept by
 `prisma db push`). `migrate.js` then finds which known schema it has, marks

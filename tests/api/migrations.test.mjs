@@ -5,8 +5,9 @@
 // Each case gets its own empty database on the local test server.
 import { describe, it, expect, afterAll } from 'vitest';
 import { createRequire } from 'node:module';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -31,11 +32,14 @@ async function freshDatabase(name) {
   made.push(name);
   return urlOf(name);
 }
+// A server that starts when it should not never exits on its own: the time
+// limit ends it so that case fails instead of hanging
 function run(url, args) {
   const r = spawnSync(process.execPath, args, {
     cwd: BACKEND,
     env: { ...process.env, DATABASE_URL: url, PRISMA_HIDE_UPDATE_MESSAGE: '1', CHECKPOINT_DISABLE: '1' },
     encoding: 'utf8',
+    timeout: 150_000,
   });
   return { status: r.status, out: redact(`${r.stdout}\n${r.stderr}`) };
 }
@@ -44,6 +48,12 @@ const pushSchema = (url, schema) => {
   const r = run(url, [CLI, 'db', 'push', `--schema=${schema}`, `--url=${url}`]);
   if (r.status !== 0) throw new Error(r.out);
 };
+const freePort = () => new Promise((resolve, reject) => {
+  const probe = net.createServer().once('error', reject).listen(0, '127.0.0.1', () => {
+    const { port } = probe.address();
+    probe.close(() => resolve(port));
+  });
+});
 const sameAsSchema = (url) => run(url, [CLI, 'migrate', 'diff', '--from-config-datasource', '--to-schema=prisma/schema.prisma', '--exit-code']).status === 0;
 
 afterAll(async () => {
@@ -113,6 +123,46 @@ describe('migrating the database', () => {
     } finally {
       fs.rmSync(folder, { recursive: true, force: true });
     }
+  }, 180_000);
+
+  // Railway runs `npm start` unless the service has its own start command, and
+  // reads railway.json (with the pre-deploy migration) only when the service is
+  // pointed at it. So `npm start` migrates first, then serves.
+  it('npm start brings a database like the live one up to date, then serves', async () => {
+    expect(JSON.parse(fs.readFileSync(`${BACKEND}/package.json`, 'utf8')).scripts.start).toBe('node scripts/start.js');
+    const url = await freshDatabase('gem_mig_start_test');
+    pushSchema(url, 'prisma/snapshots/1_main.prisma');
+    const port = await freePort();
+    const server = spawn(process.execPath, ['scripts/start.js'], {
+      cwd: BACKEND,
+      env: { ...process.env, DATABASE_URL: url, PORT: String(port), PRISMA_HIDE_UPDATE_MESSAGE: '1', CHECKPOINT_DISABLE: '1' },
+    });
+    let out = '';
+    server.stdout.on('data', (d) => { out += d; });
+    server.stderr.on('data', (d) => { out += d; });
+    const exited = new Promise((resolve) => server.on('exit', resolve));
+    try {
+      for (const until = Date.now() + 150_000; !/GEM backend running/.test(out) && server.exitCode === null && Date.now() < until;) {
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      expect(redact(out)).toMatch(/schema of 20261024000000_baseline[\s\S]*GEM backend running/);
+      expect(sameAsSchema(url)).toBe(true);
+      const health = await fetch(`http://127.0.0.1:${port}/api/health`);
+      expect(await health.json()).toEqual({ status: 'ok' });
+    } finally {
+      server.kill();
+      await exited;
+    }
+  }, 180_000);
+
+  it('npm start does not start the server on a database it does not recognise', async () => {
+    const url = await freshDatabase('gem_mig_start_drift_test');
+    pushSchema(url, 'prisma/snapshots/1_main.prisma');
+    await sql(url, 'ALTER TABLE "Gym" ADD COLUMN "oddity" TEXT');
+    const r = run(url, ['scripts/start.js']);
+    expect(r.out).not.toMatch(/GEM backend running/);
+    expect(r.status).toBe(1);
+    expect(r.out).toMatch(/does not match any schema/);
   }, 180_000);
 
   it('leaves a database it does not recognise exactly as it is, and fails the deploy', async () => {
