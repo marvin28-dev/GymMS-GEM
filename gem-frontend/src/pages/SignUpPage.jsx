@@ -15,6 +15,7 @@ import LangToggle from '../components/LangToggle';
 import { useIsMobile } from '../hooks/useIsMobile';
 import GemMark from '../components/ui/GemMark';
 import PoweredBy from '../components/ui/PoweredBy';
+import DemoVideo from '../components/ui/DemoVideo';
 
 // ─── Countries ────────────────────────────────────────────────────────────────
 
@@ -394,6 +395,8 @@ function WelcomeStep({ onStart, onDemo, onSignIn }) {
           {t('signup.welcomeSub')}
         </p>
 
+        <DemoVideo compact title={t('signup.welcomeVideoTitle')} caption={t('signup.welcomeVideoTitle')} badge="2 min" style={{ marginBottom: 20 }} />
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px', marginBottom: 28 }}>
           {features.map(({ icon: Icon, label }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -506,6 +509,8 @@ function WelcomeStep({ onStart, onDemo, onSignIn }) {
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
+        <DemoVideo title={t('signup.welcomeVideoTitle')} caption={t('signup.welcomeVideoTitle')} badge="2 min" style={{ marginBottom: 16 }} />
+
         <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 20px' }}>
           {features.map(({ icon: Icon, label }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>

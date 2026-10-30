@@ -6,6 +6,11 @@ import fs from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { registerGym, signIn, addStaff, call } from './support/session.mjs';
 
+// The landing and sign-up pages embed the walkthrough video; no test waits on YouTube
+test.beforeEach(async ({ page }) => {
+  await page.route(/^https:\/\/([a-z0-9-]+\.)*(youtube\.com|ytimg\.com|googlevideo\.com)\//, route => route.abort());
+});
+
 const CREDIT = 'Powered by Ekoteksolutions Inc.';
 const credit = (page) => page.locator('[data-powered-by]:visible').first();
 const thisMonth = () => { const d = new Date(); return `${d.toLocaleString('en-US', { month: 'short' })} ${d.getFullYear()}`; };

@@ -20,6 +20,8 @@ export function contentPolicy(apiUrl, photoHost = 'https://res.cloudinary.com') 
     `img-src 'self' data: blob:${photos ? ` ${photos}` : ''}`,
     `connect-src 'self'${api ? ` ${api}` : ''}${photos ? ` ${photos}` : ''}`,
     "media-src 'self' blob:",
+    // The walkthrough video's player (components/ui/DemoVideo.jsx)
+    'frame-src https://www.youtube.com',
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

@@ -27,6 +27,10 @@ describe("the page's content policy", () => {
     expect(directive(policy, 'object-src')).toBe("object-src 'none'");
   });
 
+  it("lets in YouTube's player for the walkthrough video, and no other frame", () => {
+    expect(directive(policy, 'frame-src')).toBe('frame-src https://www.youtube.com');
+  });
+
   it('leaves the API out when its address is not a URL, instead of breaking the policy', () => {
     expect(directive(contentPolicy('not a url'), 'connect-src')).toBe("connect-src 'self' https://res.cloudinary.com");
   });

@@ -9,8 +9,8 @@ test.use({ timezoneId: 'Africa/Douala' });
 // server, which can take 10 seconds or more in Firefox when every test runs at once
 test.describe.configure({ timeout: 120_000 });
 
-// The landing and sign-up pages embedded a YouTube video until D-34 (F-141);
-// the block stays so no test ever waits on one
+// The landing and sign-up pages embed the walkthrough video (taken out by D-34,
+// put back at the owner's request on 30 October 2026); no test waits on YouTube
 test.beforeEach(async ({ page }) => {
   await page.route(/^https:\/\/([a-z0-9-]+\.)*(youtube\.com|ytimg\.com|googlevideo\.com)\//, route => route.abort());
 });

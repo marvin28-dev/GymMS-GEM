@@ -7,6 +7,7 @@ import LangToggle from '../components/LangToggle';
 import { useIsMobile } from '../hooks/useIsMobile';
 import GemMark from '../components/ui/GemMark';
 import PoweredBy from '../components/ui/PoweredBy';
+import DemoVideo from '../components/ui/DemoVideo';
 
 export default function LandingPage() {
   const nav = useNavigate();
@@ -89,6 +90,22 @@ export default function LandingPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* ── Product Video ── */}
+      <section style={{ maxWidth: 900, margin: '0 auto', padding: isMobile ? '0 16px 56px' : '0 24px 88px' }}>
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? 20 : 32 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-gold)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: 10 }}>{t('landing.videoLabel')}</div>
+          <h2 style={{ fontFamily: 'Manrope, sans-serif', fontSize: isMobile ? 20 : 'clamp(22px, 3.5vw, 34px)', fontWeight: 800, letterSpacing: '-0.4px', margin: '0 0 10px', textWrap: 'balance' }}>
+            {t('landing.videoTitle')}
+          </h2>
+          {!isMobile && (
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)', maxWidth: 460, margin: '0 auto', lineHeight: 1.7 }}>
+              {t('landing.videoSub')}
+            </p>
+          )}
+        </div>
+        <DemoVideo title={t('landing.platformOverview')} caption={isMobile ? null : t('landing.platformOverview')} compact={isMobile} style={isMobile ? undefined : { borderRadius: 16, boxShadow: '0 12px 48px rgba(0,0,0,0.35)' }} />
       </section>
 
       {/* ── Features ── */}

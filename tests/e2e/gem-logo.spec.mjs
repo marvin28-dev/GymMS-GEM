@@ -5,6 +5,11 @@
 import { test, expect } from '@playwright/test';
 import { registerGym, signIn } from './support/session.mjs';
 
+// The landing and sign-up pages embed the walkthrough video; no test waits on YouTube
+test.beforeEach(async ({ page }) => {
+  await page.route(/^https:\/\/([a-z0-9-]+\.)*(youtube\.com|ytimg\.com|googlevideo\.com)\//, route => route.abort());
+});
+
 const GEM = '21,17 43,17 53,27 32,50 11,27';
 
 async function showsTheMark(page) {
