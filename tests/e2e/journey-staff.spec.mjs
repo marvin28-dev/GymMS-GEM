@@ -25,9 +25,9 @@ test('J-22: a trainer added through the form is listed, and emailed how to sign 
   await dialog.getByPlaceholder('email@gemgym.cm').fill(email);
   await dialog.locator('select', { has: page.locator('option', { hasText: 'Trainer' }) }).first().selectOption({ label: 'Trainer' });
   await dialog.locator('input[type="date"]').first().fill(localDay());
-  await dialog.locator('input[autocomplete="street-address"]').fill('Rue de la Joie');
-  await dialog.locator('input[autocomplete="address-level2"]').fill('Douala');
-  await dialog.locator('input[autocomplete="address-level1"]').fill('Littoral');
+  await dialog.locator('input[data-address="street"]').fill('Rue de la Joie');
+  await dialog.locator('input[data-address="city"]').fill('Douala');
+  await dialog.locator('input[data-address="region"]').fill('Littoral');
   await dialog.getByRole('button', { name: 'Add Staff Member' }).click();
 
   await expect(page).toHaveURL(/\/staff\/[a-z0-9]+$/);

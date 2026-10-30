@@ -36,9 +36,9 @@ test('a photo that failed after adding someone is reported on their profile', as
   await dialog.getByPlaceholder('email@gemgym.cm').fill(`photo.${Date.now()}@example.test`);
   await dialog.locator('select', { has: page.locator('option', { hasText: 'Front Desk' }) }).first().selectOption({ label: 'Front Desk' });
   await dialog.locator('input[type="date"]').first().fill(new Date().toISOString().slice(0, 10));
-  await dialog.locator('input[autocomplete="street-address"]').fill('Rue de la Joie');
-  await dialog.locator('input[autocomplete="address-level2"]').fill('Douala');
-  await dialog.locator('input[autocomplete="address-level1"]').fill('Littoral');
+  await dialog.locator('input[data-address="street"]').fill('Rue de la Joie');
+  await dialog.locator('input[data-address="city"]').fill('Douala');
+  await dialog.locator('input[data-address="region"]').fill('Littoral');
   await dialog.getByRole('button', { name: 'Add Staff Member' }).click();
 
   await expect(page).toHaveURL(/\/staff\/[a-z0-9]+$/);

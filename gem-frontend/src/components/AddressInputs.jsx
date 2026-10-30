@@ -17,16 +17,16 @@ export default function AddressInputs({ value = {}, onChange, errors = {}, gymCo
   return (
     <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
       <GemInput label={t('members.houseNumber')} value={value.houseNumber || ''} onChange={set('houseNumber')} placeholder={t('members.houseNumberPh')} autoComplete="off" />
-      <GemInput label={t('members.street')} required error={errors.street} value={value.street || ''} onChange={set('street')} placeholder={getAddressPlaceholder()} autoComplete="street-address" />
+      <GemInput label={t('members.street')} required error={errors.street} value={value.street || ''} onChange={set('street')} placeholder={getAddressPlaceholder()} autoComplete="off" data-address="street" />
       <div>
-        <GemInput label={t('common.city')} required error={errors.city} list={`${id}-cities`} value={value.city || ''} onChange={set('city')} placeholder={citiesOf(country)[0] || t('common.city')} autoComplete="address-level2" />
+        <GemInput label={t('common.city')} required error={errors.city} list={`${id}-cities`} value={value.city || ''} onChange={set('city')} placeholder={citiesOf(country)[0] || t('common.city')} autoComplete="off" data-address="city" />
         <datalist id={`${id}-cities`}>{citiesOf(country).map(c => <option key={c} value={c} />)}</datalist>
       </div>
       <div>
-        <GemInput label={t('common.region')} required error={errors.region} list={`${id}-regions`} value={value.region || ''} onChange={set('region')} placeholder={regionsOf(country)[0] || t('common.region')} autoComplete="address-level1" />
+        <GemInput label={t('common.region')} required error={errors.region} list={`${id}-regions`} value={value.region || ''} onChange={set('region')} placeholder={regionsOf(country)[0] || t('common.region')} autoComplete="off" data-address="region" />
         <datalist id={`${id}-regions`}>{regionsOf(country).map(r => <option key={r} value={r} />)}</datalist>
       </div>
-      <GemInput label={t('common.postalCode')} value={value.postalCode || ''} onChange={set('postalCode')} placeholder="0000" autoComplete="postal-code" />
+      <GemInput label={t('common.postalCode')} value={value.postalCode || ''} onChange={set('postalCode')} placeholder="0000" autoComplete="off" data-address="postal" />
       <CountryField country={country} />
     </div>
   );

@@ -58,6 +58,7 @@ import { fieldErrorStyle, serverFieldError } from '../utils/formErrors';
 import TimeInput from '../components/ui/TimeInput';
 import DialogBox from '../components/ui/DialogBox';
 import { SkeletonLine, SkeletonCards } from '../components/Skeleton';
+import AppFooter from '../components/AppFooter';
 
 const formatDate = (d) => fmtDate(d);
 const staffFullName = (s) => s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim();
@@ -1947,6 +1948,8 @@ export default function FrontDeskPage() {
           </div>
         )}
       </div>
+
+      <AppFooter style={{ padding: isMobile ? '20px 16px 24px' : '6px 16px 8px', flexShrink:0 }} />
 
       {/* ── Report Issue Modal ── */}
       <Modal open={showIssueModal} onClose={()=>{ setShowIssueModal(false); setIssueSuccess(false); setIssueError(''); }} title={t('frontDesk.reportIssueTitle')} maxWidth={480}>

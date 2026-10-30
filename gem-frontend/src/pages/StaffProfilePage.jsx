@@ -719,7 +719,19 @@ export default function StaffProfilePage() {
   // so an adjustment added afterwards could never apply. The period being worked
   // on is therefore the first month with nothing recorded against it yet.
   const paidMonths = new Set(payRecords.map(r => r.month));
-  const unpaidMonthOptions = payMonthOptions().filter(m => !paidMonths.has(m));
+  const dueDay = payDay || gymPayDay;
+  // Someone added after a month's pay day is first paid on the next one, as the
+  // server issues it (addedAfter in jobs/autoPayroll.js). That month is not theirs
+  // to be paid for, so it was shown as overdue from the day they were added.
+  const addedAfterPayDay = (label) => {
+    const start = monthStart(label);
+    const added = memberData?.createdAt ? new Date(memberData.createdAt) : null;
+    if (!start || !added || !dueDay) return false;
+    const lastDay = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+    const payDate = new Date(start.getFullYear(), start.getMonth(), Math.min(Number(dueDay), lastDay));
+    return new Date(added.getFullYear(), added.getMonth(), added.getDate()) > payDate;
+  };
+  const unpaidMonthOptions = payMonthOptions().filter(m => !paidMonths.has(m) && !addedAfterPayDay(m));
   const activePayMonth = unpaidMonthOptions[0] || currentPayMonth;
   // Bonuses and deductions are shown for that period alone: every recurring
   // item, plus the one-off items tagged with it.
@@ -865,8 +877,6 @@ export default function StaffProfilePage() {
   const viewerId = String(me.id ?? '');
   const isCalInvite = (tk) => !!tk && (!!tk.eventId || tk.category === 'Calendar');
   const canRespondInvite = (tk) => isCalInvite(tk) && String(tk.assignedToId ?? '') === viewerId;
-
-  const dueDay = payDay || gymPayDay;
 
   // Where the active period stands, as one line: the month is carried by the
   // due date itself, so there is no second line repeating it.
@@ -1869,7 +1879,7 @@ export default function StaffProfilePage() {
                 </button>
                 {showChangePw && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-                    <GemInput label={t('staff.currentPassword')} required type="password" autoComplete="current-password" value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))} />
+                    <GemInput label={t('staff.currentPassword')} required type="password" autoComplete="new-password" value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))} />
                     <GemInput label={t('staff.newPassword')} required type="password" autoComplete="new-password" value={pwForm.next} onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))} />
                     <GemInput label={t('staff.confirmNewPassword')} required type="password" autoComplete="new-password" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} />
                     {pwError && <div style={{ fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{pwError}</div>}
@@ -2707,7 +2717,7 @@ export default function StaffProfilePage() {
             </button>
             {showChangePw && (
               <div style={{ padding: '0 20px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
-                <GemInput label={t('staff.currentPassword')} required type="password" autoComplete="current-password" value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))} />
+                <GemInput label={t('staff.currentPassword')} required type="password" autoComplete="new-password" value={pwForm.current} onChange={e => setPwForm(f => ({ ...f, current: e.target.value }))} />
                 <GemInput label={t('staff.newPassword')} required type="password" autoComplete="new-password" value={pwForm.next} onChange={e => setPwForm(f => ({ ...f, next: e.target.value }))} />
                 <GemInput label={t('staff.confirmNewPassword')} required type="password" autoComplete="new-password" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} />
                 {pwError && <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{pwError}</div>}

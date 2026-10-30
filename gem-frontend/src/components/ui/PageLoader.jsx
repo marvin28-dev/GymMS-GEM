@@ -3,6 +3,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { SkeletonLine } from '../Skeleton';
 import GemMark from './GemMark';
+import SupportLinks from '../SupportLinks';
 
 // What a screen shows while it is still on its way: a page's code arriving the
 // first time it is opened, or a profile's record. It used to be nothing at all.
@@ -29,6 +30,7 @@ function SlowNotice({ t }) {
       >
         {t('common.reload')}
       </button>
+      <SupportLinks quiet label={t('common.supportLine')} />
     </div>
   );
 }

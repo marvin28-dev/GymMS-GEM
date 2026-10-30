@@ -848,7 +848,7 @@ function AccountStep({ form, set, errors, showPw, setShowPw, showConfirm, setSho
         </div>
 
         <Field label={t('signup.email')} icon={Mail} required error={errors.email}>
-          <input type="email" autoComplete="username" style={inp(errors.email)} value={form.email} onChange={e => set('email', e.target.value)} placeholder={t('signup.emailPh')} />
+          <input type="email" autoComplete="off" style={inp(errors.email)} value={form.email} onChange={e => set('email', e.target.value)} placeholder={t('signup.emailPh')} />
         </Field>
 
         <Field label={t('signup.phone')} icon={Phone} required error={errors.managerPhone}>

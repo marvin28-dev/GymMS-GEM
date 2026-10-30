@@ -1,7 +1,7 @@
 // "Powered by Ekoteksolutions Inc." as the owner asked: kept quiet, at the foot
-// of the public pages and of the account menu, never in the sidebar or the
-// middle of a form. The payslip PDF is checked here; the emails and the
-// receipt PDF by tests/api/member-emails.test.mjs.
+// of the public pages, of every screen of the app and of the account menu,
+// never in the sidebar or the middle of a form. The payslip PDF is checked
+// here; the emails and the receipt PDF by tests/api/member-emails.test.mjs.
 import fs from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { registerGym, signIn, addStaff, call } from './support/session.mjs';
@@ -30,15 +30,39 @@ test('the public pages credit Ekoteksolutions Inc. at their foot (desk or phone)
   }
 });
 
-test('the app credits Ekoteksolutions Inc. in the account menu, and nowhere else on screen (desk or phone)', async ({ page }) => {
+// The owner, 30 October 2026: at the foot of every screen of the app, below
+// the page, never in the sidebar or the phone's drawer
+test('the app credits Ekoteksolutions Inc. at the foot of every screen and in the account menu (desk or phone)', async ({ page, isMobile }) => {
   const owner = await registerGym();
   await signIn(page, owner);
-  await page.goto('/dashboard');
-  await expect(page.getByRole('button', { name: 'Your account' })).toBeVisible();
-  await expect(page.locator('[data-powered-by]:visible')).toHaveCount(0);
+  for (const path of ['/dashboard', '/members', '/settings']) {
+    await page.goto(path);
+    const foot = page.locator('[data-app-footer] [data-powered-by]');
+    await expect(foot, path).toHaveText(CREDIT);
+    await expect(page.locator('[data-powered-by]:visible'), path).toHaveCount(1);
+    // Below everything the page shows, and on a phone above the bottom bar
+    await foot.scrollIntoViewIfNeeded();
+    await expect(foot, path).toBeInViewport();
+    const main = await page.locator('main').boundingBox();
+    const line = await foot.boundingBox();
+    expect(line.y, path).toBeGreaterThanOrEqual(main.y);
+    if (isMobile) {
+      const bar = await page.locator('[data-bottom-bar]').boundingBox();
+      expect(line.y + line.height, path).toBeLessThanOrEqual(bar.y);
+    }
+  }
   await page.getByRole('button', { name: 'Your account' }).click();
-  await expect(credit(page)).toHaveText(CREDIT);
-  await expect(credit(page)).toBeInViewport();
+  await expect(page.locator('[data-powered-by]:visible')).toHaveCount(2);
+});
+
+test('the front desk credits Ekoteksolutions Inc. at its foot (desk or phone)', async ({ page }) => {
+  const owner = await registerGym();
+  await signIn(page, owner);
+  await page.goto('/front-desk');
+  const foot = page.locator('[data-app-footer] [data-powered-by]');
+  await expect(foot).toHaveText(CREDIT);
+  await foot.scrollIntoViewIfNeeded();
+  await expect(foot).toBeInViewport();
 });
 
 test('the credit is in French on a French screen (desk or phone)', async ({ page }) => {

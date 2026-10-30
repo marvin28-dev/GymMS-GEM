@@ -12,6 +12,8 @@ import { roleName } from '../utils/roleNames';
 import LoadFailed from './ui/LoadFailed';
 import GemMark from './ui/GemMark';
 import PoweredBy from './ui/PoweredBy';
+import SupportLinks from './SupportLinks';
+import { hasSupport } from '../utils/support';
 
 const ROLE_KEYS = {
   general_manager: 'generalManager',
@@ -483,7 +485,8 @@ export default function Header({ isMobile: isMobileProp }) {
                 <LogOut size={14} strokeWidth={1.8} />
                 {t('header.signOut')}
               </button>
-              <PoweredBy style={{ padding: '8px 16px 10px', borderTop: '1px solid var(--border-subtle)', fontSize: 10.5 }} />
+              <SupportLinks quiet label={t('common.supportLine')} style={{ padding: '8px 16px 0', borderTop: '1px solid var(--border-subtle)' }} />
+              <PoweredBy style={{ padding: hasSupport ? '2px 16px 10px' : '8px 16px 10px', borderTop: hasSupport ? 'none' : '1px solid var(--border-subtle)', fontSize: 10.5 }} />
             </div>
           )}
         </div>

@@ -19,9 +19,9 @@ test('a visitor paid in part is added owing the rest, with no date that is never
   await d.locator('input[inputmode="tel"]').nth(0).fill('677445566');
   await d.getByPlaceholder('Full name').fill('Next Of Kin');
   await d.locator('input[inputmode="tel"]').nth(1).fill('677998877');
-  await d.locator('input[autocomplete="street-address"]').fill('Rue du Marché');
-  await d.locator('input[autocomplete="address-level2"]').fill('Douala');
-  await d.locator('input[autocomplete="address-level1"]').fill('Littoral');
+  await d.locator('input[data-address="street"]').fill('Rue du Marché');
+  await d.locator('input[data-address="city"]').fill('Douala');
+  await d.locator('input[data-address="region"]').fill('Littoral');
   await d.getByText('Ten Visits').click();
   await d.getByRole('button', { name: 'Collect payment' }).click();
   await d.locator('input[inputmode="numeric"]').last().fill('6000');

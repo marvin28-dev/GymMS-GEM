@@ -3,6 +3,7 @@ import { Compass } from 'lucide-react';
 import { isAuthed, getHomeRoute } from '../utils/auth';
 import { useLanguage } from '../contexts/LanguageContext';
 import GemMark from '../components/ui/GemMark';
+import SupportLinks from '../components/SupportLinks';
 
 // An address that leads nowhere says so (D-6); it used to land silently on the
 // home page, which read as the link working.
@@ -28,6 +29,7 @@ export default function NotFoundPage() {
           <button type="button" onClick={() => nav(home, { replace: true })} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', color: '#0a0a0f', borderRadius: 10, padding: '11px 28px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'DM Sans' }}>
             {t('common.notFoundHome')}
           </button>
+          <SupportLinks quiet label={t('common.supportLine')} style={{ marginTop: 20 }} />
         </div>
       </div>
     </div>

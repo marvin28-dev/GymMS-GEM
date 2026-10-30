@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef, useMemo } from 'react';
-import { CloudUpload, Save, Sun, Moon, Check, Palette, Plus, Trash2, Languages, Eye, EyeOff, ChevronRight, ChevronLeft, X, RotateCcw } from 'lucide-react';
+import { CloudUpload, Save, Sun, Moon, Check, Palette, Plus, Trash2, Languages, Eye, EyeOff, ChevronRight, ChevronLeft, X, RotateCcw, Lock } from 'lucide-react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getMyGym, updateMyGym } from '../services/gym.service';
@@ -19,7 +19,7 @@ import LoadFailed from '../components/ui/LoadFailed';
 import { SkeletonLine } from '../components/Skeleton';
 import { PAYMENT_METHODS } from '../utils/paymentMethods';
 import { capFirst, getDateLocale } from '../utils/date';
-import { DEFAULT_ACCESS_TYPES, ACCESS_TYPES_KEY } from '../utils/accessTypes';
+import { DEFAULT_ACCESS_TYPES, ACCESS_TYPES_KEY, ownAccessTypes, isFullAccess } from '../utils/accessTypes';
 import { store, unstore } from '../utils/storage';
 
 const cardStyle = { background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, boxShadow: 'var(--shadow-card)' };
@@ -549,13 +549,17 @@ export default function SettingsPage() {
       setAccessTypesError(err?.response?.data?.error || t('settings.saveFailed'));
     }
   };
+  // Full Access is always offered (utils/accessTypes.js); the list holds the gym's own
+  const ownTypes = ownAccessTypes(accessTypes);
   const addAccessType = () => {
     const val = newAccessType.trim();
-    if (!val || accessTypes.includes(val)) return;
-    saveAccessTypes([...accessTypes, val]);
+    if (!val) return;
+    if (isFullAccess(val)) { setAccessTypesError(t('settings.fullAccessAlways')); return; }
+    if (ownTypes.some(type => type.toLowerCase() === val.toLowerCase())) { setAccessTypesError(t('settings.accessTypeExists')); return; }
+    saveAccessTypes([...ownTypes, val]);
     setNewAccessType('');
   };
-  const removeAccessType = (type) => saveAccessTypes(accessTypes.filter(t => t !== type));
+  const removeAccessType = (type) => saveAccessTypes(ownTypes.filter(other => other !== type));
 
 
   // ── Setup indicators ─────────────────────────────────────────────────────────
@@ -924,7 +928,8 @@ export default function SettingsPage() {
                 </span>
               )}
               {gymDirty && <button style={revertBtn} onClick={revertGym}><RotateCcw size={13} /> {t('settings.revertChanges')}</button>}
-              <button style={primaryBtn} onClick={saveGymProfile} disabled={gymSaving || !gymDirty}><Save size={13} />{gymSaving ? t('common.saving') : t('common.saveChanges')}</button>
+              {/* Like every other section, Save confirms the profile during setup even when nothing was changed */}
+              <button data-save-gym-profile style={{ ...primaryBtn, opacity: (gymSaving || (!gymDirty && !setupOpen)) ? 0.6 : 1 }} onClick={saveGymProfile} disabled={gymSaving || (!gymDirty && !setupOpen)}><Save size={13} />{gymSaving ? t('common.saving') : t('common.saveChanges')}</button>
             </div>
           </div>
         </div>
@@ -1256,7 +1261,11 @@ export default function SettingsPage() {
             <div>
               <Label>{t('settings.accessTypes')}</Label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-                {accessTypes.map(type => (
+                <div data-access-type-fixed style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'var(--bg-elevated)', borderRadius: 10, padding: '10px 14px', border: '1px solid var(--border-subtle)' }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans', fontWeight: 600 }}>{t('packages.fullAccess')}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--text-muted)', fontFamily: 'DM Sans', flexShrink: 0 }}><Lock size={12} aria-hidden="true" /> {t('settings.alwaysOffered')}</span>
+                </div>
+                {ownTypes.map(type => (
                   <div key={type} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-elevated)', borderRadius: 10, padding: '10px 14px', border: '1px solid var(--border-subtle)' }}>
                     <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'DM Sans' }}>{type}</span>
                     <RowMenu title={t('common.actions')} items={[
@@ -1264,7 +1273,7 @@ export default function SettingsPage() {
                     ]} />
                   </div>
                 ))}
-                {accessTypes.length === 0 && (
+                {ownTypes.length === 0 && (
                   <div style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans', padding: '12px 0', textAlign: 'center' }}>
                     {t('settings.noAccessTypes')}
                   </div>
@@ -1274,7 +1283,7 @@ export default function SettingsPage() {
                 <input
                   style={{ ...inputStyle, flex: 1 }}
                   value={newAccessType}
-                  onChange={e => setNewAccessType(e.target.value)}
+                  onChange={e => { setNewAccessType(e.target.value); setAccessTypesError(''); }}
                   onKeyDown={e => e.key === 'Enter' && addAccessType()}
                   placeholder={t('settings.accessTypePlaceholder')}
                 />

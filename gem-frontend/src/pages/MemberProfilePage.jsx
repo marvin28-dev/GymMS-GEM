@@ -47,6 +47,7 @@ import { packageAllowance } from '../utils/packages';
 import DialogBox from '../components/ui/DialogBox';
 import Avatar from '../components/ui/Avatar';
 import PageLoader from '../components/ui/PageLoader';
+import { accessText } from '../utils/accessTypes';
 
 const formatDate = (d) => fmtDate(d);
 
@@ -1183,7 +1184,7 @@ function ChangePackageModal({ open, onClose, member, packagesList = [], onSave }
           <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <InfoRow label={t('memberProfile.packagePrice')} value={fmtMoney(pkg.price)} />
             <InfoRow label={t('memberProfile.durationLabel')} value={durationText(pkg.duration, t)} />
-            <InfoRow label={t('memberProfile.accessLabel')} value={pkg.access} />
+            <InfoRow label={t('memberProfile.accessLabel')} value={accessText(pkg.access, t) || pkg.access} />
             <InfoRow label={t('memberProfile.newEndDateLabel')} value={formatDate(calcEndDateFromPkg(today, pkg))} />
           </div>
         )}

@@ -3,9 +3,27 @@ import { SUPPORT, hasSupport } from '../utils/support';
 
 // "Need help?" and GEM's contacts, on the sign-in and sign-up pages. Nothing
 // at all while the contacts are not set (utils/support.js). `inline` puts the
-// line and the links on one row.
-export default function SupportLinks({ label, style, inline = false }) {
+// line and the links on one row; `quiet` is one line of small text, for the
+// foot of every screen, the account menu and the screens that say something
+// went wrong.
+export default function SupportLinks({ label, style, inline = false, quiet = false }) {
   if (!hasSupport) return null;
+  if (quiet) {
+    const link = { color: 'var(--accent-gold)', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' };
+    return (
+      <p data-support style={{ margin: 0, fontSize: 11, lineHeight: 1.6, color: 'var(--text-muted)', fontFamily: 'DM Sans, sans-serif', ...style }}>
+        {label}{' '}
+        {SUPPORT.whatsapp && (
+          <>
+            <a href={`tel:+${SUPPORT.whatsapp}`} style={link}>{SUPPORT.whatsappLabel}</a>
+            {' ('}<a href={SUPPORT.whatsappUrl} target="_blank" rel="noreferrer" style={link}>WhatsApp</a>{')'}
+          </>
+        )}
+        {SUPPORT.whatsapp && SUPPORT.email && ' · '}
+        {SUPPORT.email && <a href={`mailto:${SUPPORT.email}`} style={link}>{SUPPORT.email}</a>}
+      </p>
+    );
+  }
   const chip = { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: inline ? 11 : 12, fontWeight: 600, textDecoration: 'none', borderRadius: inline ? 6 : 8, padding: inline ? '4px 10px' : '6px 12px' };
   const links = (
     <>

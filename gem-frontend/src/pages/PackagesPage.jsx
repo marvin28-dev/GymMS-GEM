@@ -8,7 +8,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import FAB from '../components/FAB';
 import { useLanguage } from '../contexts/LanguageContext';
 import Modal from '../components/ui/Modal';
-import { ACCESS_TYPES_KEY, DEFAULT_ACCESS_TYPES } from '../utils/accessTypes';
+import { ACCESS_TYPES_KEY, DEFAULT_ACCESS_TYPES, FULL_ACCESS, isFullAccess, ownAccessTypes, accessOptions, accessText } from '../utils/accessTypes';
 import { useGymSettings, legacyList } from '../hooks/useGymSettings';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import ManagerAuthModal from '../components/ui/ManagerAuthModal';
@@ -60,6 +60,7 @@ export default function PackagesPage() {
   const [pendingSave, setPendingSave] = useState(null);
   const [deletePkg, setDeletePkg] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const hasFullAccess = form.accessType.some(isFullAccess);
   const [errors, setErrors] = useState({});
   // A refused delete, shown at the top of the page (the dialogs close at once)
   const [deleteError, setDeleteError] = useState('');
@@ -210,7 +211,7 @@ export default function PackagesPage() {
       duration: form.durationValue ? `${form.durationValue} ${form.durationType}` : undefined,
       durationDays: durationDays || undefined,
       sessions: form.sessionLimit || 'Unlimited',
-      access: form.accessType.length > 0 ? form.accessType.join(', ') : undefined,
+      access: form.accessType.some(isFullAccess) ? FULL_ACCESS : form.accessType.length > 0 ? form.accessType.join(', ') : undefined,
       status: form.status,
       notes: form.notes || undefined,
     };
@@ -294,25 +295,33 @@ export default function PackagesPage() {
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{t('packages.access')}</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 12px' }}>
-                {accessTypeOptions.map(opt => {
-                  const checked = form.accessType.includes(opt);
+                {accessOptions(accessTypeOptions, form.accessType).map(opt => {
+                  const full = isFullAccess(opt);
+                  // Full Access is everything: ticked, the others are cleared and greyed out
+                  const covered = !full && hasFullAccess;
+                  const checked = full ? hasFullAccess : !covered && form.accessType.includes(opt);
                   return (
-                    <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: checked ? 'var(--text-primary)' : 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
+                    <label key={opt} data-access-option={opt} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: covered ? 'not-allowed' : 'pointer', fontSize: 13, color: checked ? 'var(--text-primary)' : covered ? 'var(--text-muted)' : 'var(--text-secondary)', fontFamily: 'DM Sans', fontWeight: full ? 600 : 400 }}>
                       <input
                         type="checkbox"
                         checked={checked}
+                        disabled={covered}
                         onChange={() => setForm(f => ({
                           ...f,
-                          accessType: checked
-                            ? f.accessType.filter(a => a !== opt)
-                            : [...f.accessType, opt],
+                          accessType: full
+                            ? (checked ? [] : [FULL_ACCESS])
+                            : checked ? f.accessType.filter(a => a !== opt) : [...f.accessType, opt],
                         }))}
-                        style={{ accentColor: 'var(--accent-gold)', width: 14, height: 14, flexShrink: 0 }}
+                        style={{ accentColor: 'var(--accent-gold)', width: 14, height: 14, flexShrink: 0, cursor: 'inherit' }}
                       />
-                      {opt}
+                      {full ? t('packages.fullAccess') : opt}
                     </label>
                   );
                 })}
+                {hasFullAccess && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontFamily: 'DM Sans', lineHeight: 1.5 }}>{t('packages.fullAccessCovers')}</div>}
+                {!ownAccessTypes(accessTypeOptions).length && (
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontFamily: 'DM Sans', lineHeight: 1.5 }}>{t('packages.ownAccessHint')}</div>
+                )}
               </div>
             </div>
           </div>
@@ -351,7 +360,7 @@ export default function PackagesPage() {
                   ...(!profilePkg.isVisitor ? [{ label: t('packages.dayPassPrice'), value: profilePkg.dayPassPrice != null ? formatMoney(profilePkg.dayPassPrice) : '-' }] : []),
                   { label: t('packages.duration'), value: durationText(profilePkg.duration, t) },
                   { label: t('packages.sessions'), value: sessionsText(profilePkg.sessions, t) },
-                  { label: t('packages.accessLevel'), value: profilePkg.access },
+                  { label: t('packages.accessLevel'), value: accessText(profilePkg.access, t) },
                 ].map(r => (
                   <div key={r.label} style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: '12px 14px' }}>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 4 }}>{r.label}</div>
@@ -626,7 +635,7 @@ export default function PackagesPage() {
                   <td style={{ ...td, fontSize: 13, color: 'var(--text-secondary)' }}>{durationText(pkg.duration, t)}</td>
                   <td style={{ ...td, fontSize: 14, fontWeight: 700, fontFamily: 'Manrope, sans-serif', color: 'var(--accent-gold)' }}>{formatMoney(pkg.price)}</td>
                   <td style={{ ...td, fontSize: 13, color: 'var(--text-secondary)' }}>{sessionsText(pkg.sessions, t)}</td>
-                  <td style={{ ...td, fontSize: 12, color: 'var(--text-secondary)' }}>{pkg.access}</td>
+                  <td style={{ ...td, fontSize: 12, color: 'var(--text-secondary)' }}>{accessText(pkg.access, t)}</td>
                   <td style={td}><StatusBadge status={pkg.status} /></td>
                   <td style={td}>
                     <RowMenu title={t('common.actions')} items={[

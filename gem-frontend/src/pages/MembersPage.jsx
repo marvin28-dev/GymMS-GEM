@@ -86,21 +86,21 @@ function AddressFields({ form, set, errors, inp, gymCountry }) {
           onChange={e => set('houseNumber', e.target.value)} placeholder={t('members.houseNumberPh')} />
       </ModalField>
       <ModalField label={t('members.street')} required error={errors.street}>
-        <input autoComplete="street-address" style={inp(errors.street)} value={form.street}
+        <input autoComplete="off" data-address="street" style={inp(errors.street)} value={form.street}
           onChange={e => set('street', e.target.value)} placeholder={getAddressPlaceholder()} />
       </ModalField>
       <ModalField label={t('common.city')} required error={errors.city}>
-        <input autoComplete="address-level2" list="gem-cities" style={inp(errors.city)} value={form.city}
+        <input autoComplete="off" data-address="city" list="gem-cities" style={inp(errors.city)} value={form.city}
           onChange={e => set('city', e.target.value)} placeholder={t('common.city')} />
         <datalist id="gem-cities">{citiesOf(country).map(c => <option key={c} value={c} />)}</datalist>
       </ModalField>
       <ModalField label={t('common.region')} required error={errors.region}>
-        <input autoComplete="address-level1" list="gem-regions" style={inp(errors.region)} value={form.region || ''}
+        <input autoComplete="off" data-address="region" list="gem-regions" style={inp(errors.region)} value={form.region || ''}
           onChange={e => set('region', e.target.value)} placeholder={regionsOf(country)[0] || t('common.region')} />
         <datalist id="gem-regions">{regionsOf(country).map(r => <option key={r} value={r} />)}</datalist>
       </ModalField>
       <ModalField label={t('common.postalCode')}>
-        <input autoComplete="postal-code" style={inp(false)} value={form.postalCode}
+        <input autoComplete="off" data-address="postal" style={inp(false)} value={form.postalCode}
           onChange={e => set('postalCode', e.target.value)} placeholder="0000" />
       </ModalField>
       <CountryField country={country} labelStyle={labelStyle} />
@@ -833,11 +833,11 @@ export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gy
         <ModalSectionHeader title={t('members.personalInfo')} />
         <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <ModalField label={t('members.firstName')} required error={errors.firstName}>
-            <input autoComplete="given-name" style={inp(errors.firstName)} value={form.firstName}
+            <input autoComplete="off" style={inp(errors.firstName)} value={form.firstName}
               onChange={e => set('firstName', e.target.value)} placeholder={t('members.firstName')} />
           </ModalField>
           <ModalField label={t('members.lastName')} required error={errors.lastName}>
-            <input autoComplete="family-name" style={inp(errors.lastName)} value={form.lastName}
+            <input autoComplete="off" style={inp(errors.lastName)} value={form.lastName}
               onChange={e => set('lastName', e.target.value)} placeholder={t('members.lastName')} />
           </ModalField>
           <ModalField label={t('members.gender')} required error={errors.gender}>
@@ -849,14 +849,14 @@ export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gy
             </select>
           </ModalField>
           <ModalField label={t('members.dob')}>
-            <input autoComplete="bday" style={inp(false)} type="date" value={form.dob} onChange={e => set('dob', e.target.value)} />
+            <input autoComplete="off" style={inp(false)} type="date" value={form.dob} onChange={e => set('dob', e.target.value)} />
           </ModalField>
           <ModalField label={t('common.email')} required error={errors.email}>
-            <input type="email" autoComplete="email" style={inp(errors.email)} value={form.email}
+            <input type="email" autoComplete="off" style={inp(errors.email)} value={form.email}
               onChange={e => set('email', e.target.value)} placeholder="email@example.com" />
           </ModalField>
           <ModalField label={t('common.phoneNumber')} required error={errors.phone}>
-            <input autoComplete="tel" inputMode="tel" style={inp(errors.phone)} value={form.phone}
+            <input autoComplete="off" inputMode="tel" style={inp(errors.phone)} value={form.phone}
               onChange={e => set('phone', e.target.value.replace(/[^\d\s+\-()]/g, ''))} placeholder={getPhonePlaceholder()} />
           </ModalField>
         </div>
@@ -1204,11 +1204,11 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
         <ModalSectionHeader title={t('members.personalInfo')} />
         <div className="gem-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <ModalField label={t('members.firstName')} required error={errors.firstName}>
-            <input autoComplete="given-name" style={inp(errors.firstName)} value={form.firstName}
+            <input autoComplete="off" style={inp(errors.firstName)} value={form.firstName}
               onChange={e => set('firstName', e.target.value)} placeholder={t('members.firstName')} />
           </ModalField>
           <ModalField label={t('members.lastName')} required error={errors.lastName}>
-            <input autoComplete="family-name" style={inp(errors.lastName)} value={form.lastName}
+            <input autoComplete="off" style={inp(errors.lastName)} value={form.lastName}
               onChange={e => set('lastName', e.target.value)} placeholder={t('members.lastName')} />
           </ModalField>
           <ModalField label={t('members.gender')} required error={errors.gender}>
@@ -1220,15 +1220,15 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
             </select>
           </ModalField>
           <ModalField label={t('members.dob')}>
-            <input autoComplete="bday" style={inp(false)} type="date" value={form.dob}
+            <input autoComplete="off" style={inp(false)} type="date" value={form.dob}
               onChange={e => set('dob', e.target.value)} />
           </ModalField>
           <ModalField label={t('common.email')} required error={errors.email}>
-            <input type="email" autoComplete="email" style={inp(errors.email)} value={form.email}
+            <input type="email" autoComplete="off" style={inp(errors.email)} value={form.email}
               onChange={e => set('email', e.target.value)} placeholder="email@example.com" />
           </ModalField>
           <ModalField label={t('common.phone')} required error={errors.phone}>
-            <input autoComplete="tel" inputMode="tel" style={inp(errors.phone)} value={form.phone}
+            <input autoComplete="off" inputMode="tel" style={inp(errors.phone)} value={form.phone}
               onChange={e => set('phone', e.target.value.replace(/[^\d\s+\-()]/g, ''))} placeholder={getPhonePlaceholder()} />
           </ModalField>
         </div>

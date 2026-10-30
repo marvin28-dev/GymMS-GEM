@@ -186,7 +186,7 @@ export default function ManagerAuthModal({ open, onClose, onConfirm, onVerified,
               onChange={e => { setCode(usePassword ? e.target.value : e.target.value.replace(/\D/g, '').slice(0, 4)); setError(''); }}
               onKeyDown={e => e.key === 'Enter' && handleSubmit()}
               inputMode={usePassword ? 'text' : 'numeric'}
-              autoComplete="off"
+              autoComplete={usePassword && !showCode ? 'new-password' : 'off'}
               autoCorrect="off"
               spellCheck={false}
               name="gem-verify-field"

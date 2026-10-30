@@ -51,6 +51,7 @@ export default function BottomTabBar({ onMoreClick }) {
 
   return (
     <div
+      data-bottom-bar
       style={{
         position: 'fixed',
         bottom: 0,

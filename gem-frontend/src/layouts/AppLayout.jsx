@@ -9,6 +9,7 @@ import { hasNavigation } from '../utils/rolePages';
 import { getRole } from '../utils/auth';
 import EmailConfirmBanner from '../components/EmailConfirmBanner';
 import PageLoader from '../components/ui/PageLoader';
+import AppFooter from '../components/AppFooter';
 
 export default function AppLayout() {
   const { pathname } = useLocation();
@@ -44,6 +45,7 @@ export default function AppLayout() {
           <Suspense fallback={<div style={{ padding: 16 }}><PageLoader /></div>}>
             <Outlet />
           </Suspense>
+          <AppFooter style={{ padding: '28px 16px 0' }} />
         </main>
 
         {/* Bottom tab bar */}
@@ -79,6 +81,8 @@ export default function AppLayout() {
             <Outlet />
           </Suspense>
         </main>
+        {/* Support contacts and the maker's credit at the foot of every screen (the owner, 30 October 2026) */}
+        <AppFooter style={{ padding: '0 28px 18px' }} />
       </div>
     </div>
   );

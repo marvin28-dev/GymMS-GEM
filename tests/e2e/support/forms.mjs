@@ -18,9 +18,9 @@ export async function fillNewMember(page, lastName, open = () => page.getByRole(
   await d.locator('input[inputmode="tel"]').nth(0).fill('677445566');
   await d.getByPlaceholder('Full name').fill('Next Of Kin');
   await d.locator('input[inputmode="tel"]').nth(1).fill('677998877');
-  await d.locator('input[autocomplete="street-address"]').fill('Rue du Marché');
-  await d.locator('input[autocomplete="address-level2"]').fill('Douala');
-  await d.locator('input[autocomplete="address-level1"]').fill('Littoral');
+  await d.locator('input[data-address="street"]').fill('Rue du Marché');
+  await d.locator('input[data-address="city"]').fill('Douala');
+  await d.locator('input[data-address="region"]').fill('Littoral');
   await d.locator('select', { has: page.locator('option', { hasText: 'Select package...' }) }).selectOption({ index: 1 });
   await d.locator('input[type="date"][min]').first().fill(localDay());
   await d.locator('select', { has: page.locator('option', { hasText: 'Walk-in' }) }).selectOption({ label: 'Walk-in' });
@@ -39,9 +39,9 @@ export async function fillNewVisitor(page, lastName, bundle, open = () => page.g
   await d.locator('input[inputmode="tel"]').nth(0).fill('677445566');
   await d.getByPlaceholder('Full name').fill('Next Of Kin');
   await d.locator('input[inputmode="tel"]').nth(1).fill('677998877');
-  await d.locator('input[autocomplete="street-address"]').fill('Rue du Marché');
-  await d.locator('input[autocomplete="address-level2"]').fill('Douala');
-  await d.locator('input[autocomplete="address-level1"]').fill('Littoral');
+  await d.locator('input[data-address="street"]').fill('Rue du Marché');
+  await d.locator('input[data-address="city"]').fill('Douala');
+  await d.locator('input[data-address="region"]').fill('Littoral');
   await d.getByText(bundle).click();
   await d.getByRole('button', { name: 'Collect payment' }).click();
   await d.getByRole('button', { name: /Confirm Payment/ }).click();
