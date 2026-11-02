@@ -33,6 +33,13 @@ test('J-26: a gym moved to Nigeria prices everything in naira', async ({ page })
 
 test('J-26: a change to the opening hours can be reverted, and saved', async ({ page }) => {
   const owner = await registerGym();
+  // A gym past setup (while setup is open, Save confirms a section with nothing
+  // changed: tests/e2e/setup-and-pay.spec.mjs). Finishing it for real takes the
+  // owner's photo, ID and rota, a package and an employee.
+  await page.route('**/api/gyms/me/setup', async route => {
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...(await response.json()), complete: true } });
+  });
   await openGymProfile(page, owner);
   const save = page.getByRole('button', { name: 'Save Changes' }).first();
   const revert = page.getByRole('button', { name: 'Revert' });
