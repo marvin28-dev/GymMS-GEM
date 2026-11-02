@@ -1,8 +1,8 @@
 import { Mail, MessageCircle } from 'lucide-react';
 import { SUPPORT, hasSupport } from '../utils/support';
 
-// "Need help?" and GEM's contacts, on the sign-in and sign-up pages. Nothing
-// at all while the contacts are not set (utils/support.js). `inline` puts the
+// "Need help?" and GEM's contacts (utils/support.js), on the sign-in and sign-up
+// pages. Nothing at all if a build ever has none. `inline` puts the
 // line and the links on one row; `quiet` is one line of small text, for the
 // foot of every screen, the account menu and the screens that say something
 // went wrong.
@@ -13,12 +13,8 @@ export default function SupportLinks({ label, style, inline = false, quiet = fal
     return (
       <p data-support style={{ margin: 0, fontSize: 11, lineHeight: 1.6, color: 'var(--text-muted)', fontFamily: 'DM Sans, sans-serif', ...style }}>
         {label}{' '}
-        {SUPPORT.whatsapp && (
-          <>
-            <a href={`tel:+${SUPPORT.whatsapp}`} style={link}>{SUPPORT.whatsappLabel}</a>
-            {' ('}<a href={SUPPORT.whatsappUrl} target="_blank" rel="noreferrer" style={link}>WhatsApp</a>{')'}
-          </>
-        )}
+        {/* The number is for WhatsApp only, never a call */}
+        {SUPPORT.whatsapp && <a href={SUPPORT.whatsappUrl} target="_blank" rel="noreferrer" style={link}>WhatsApp {SUPPORT.whatsappLabel}</a>}
         {SUPPORT.whatsapp && SUPPORT.email && ' · '}
         {SUPPORT.email && <a href={`mailto:${SUPPORT.email}`} style={link}>{SUPPORT.email}</a>}
       </p>
@@ -33,8 +29,8 @@ export default function SupportLinks({ label, style, inline = false, quiet = fal
         </a>
       )}
       {SUPPORT.whatsapp && (
-        <a href={SUPPORT.whatsappUrl} target="_blank" rel="noreferrer" style={{ ...chip, color: '#22c55e', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)' }}>
-          <MessageCircle size={inline ? 11 : 12} /> WhatsApp
+        <a href={SUPPORT.whatsappUrl} target="_blank" rel="noreferrer" style={{ ...chip, color: 'var(--accent-green)', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)' }}>
+          <MessageCircle size={inline ? 11 : 12} /> WhatsApp {SUPPORT.whatsappLabel}
         </a>
       )}
     </>

@@ -420,6 +420,8 @@ function WelcomeStep({ onStart, onDemo, onSignIn }) {
             {t('signup.welcomeSignIn')} <ArrowRight size={13} strokeWidth={2} />
           </button>
         </div>
+
+        <SupportLinks inline label={t('signup.welcomeSupport')} style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }} />
       </div>
     );
   }
