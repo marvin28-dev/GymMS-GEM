@@ -7,7 +7,10 @@ import { test, expect } from '@playwright/test';
 import { registerGym, signIn, call } from './support/session.mjs';
 import { localDay } from './support/forms.mjs';
 
-// Holds the requests matching `pattern` until release() is called
+// Holds the requests matching `pattern` until release() is called. A page opened
+// while one is held is not waited on to finish loading: WebKit on a busy machine
+// starts the request before the page's load event and holds that event with it.
+const OPEN = { waitUntil: 'domcontentloaded' };
 async function hold(page, pattern) {
   let release;
   const gate = new Promise(r => { release = r; });
@@ -57,7 +60,7 @@ test('a member profile shows its shape while the record loads (desk or phone)', 
   });
   await signIn(page, owner);
   const release = await hold(page, new RegExp(`/api/members/${member.id}(\\?|$)`));
-  await page.goto(`/members/${member.id}`);
+  await page.goto(`/members/${member.id}`, OPEN);
   const loader = page.locator('[data-page-loader="profile"]');
   await expect(loader).toBeVisible();
   release();
@@ -69,7 +72,7 @@ test('a staff profile shows its shape while the record loads (desk or phone)', a
   const owner = await registerGym();
   await signIn(page, owner);
   const release = await hold(page, new RegExp(`/api/staff/${owner.user.id}(\\?|$)`));
-  await page.goto(`/staff/${owner.user.id}`);
+  await page.goto(`/staff/${owner.user.id}`, OPEN);
   const loader = page.locator('[data-page-loader="profile"]');
   await expect(loader).toBeVisible();
   release();
@@ -84,7 +87,7 @@ test('Notifications says nothing about the list until it has come back (desk or 
   const owner = await registerGym();
   await signIn(page, owner);
   const release = await hold(page, /\/api\/notifications(\?|$)/);
-  await page.goto('/notifications');
+  await page.goto('/notifications', OPEN);
   await expect(page.locator('main [style*="gem-skeleton"]').first()).toBeVisible();
   await expect(page.getByText('No notifications')).toHaveCount(0);
   await expect(page.getByText('All caught up!')).toHaveCount(0);
@@ -98,7 +101,7 @@ test('Payments shows placeholders, not 0 and an empty history, until the payment
   const owner = await registerGym();
   await signIn(page, owner);
   const release = await hold(page, /\/api\/payments(\?|$)/);
-  await page.goto('/payments');
+  await page.goto('/payments', OPEN);
   await expect(page.locator('main [style*="gem-skeleton"]').first()).toBeVisible();
   await expect(page.locator('main')).not.toContainText('0 FCFA');
   await expect(page.locator('main')).not.toContainText('Showing 0');
@@ -112,7 +115,7 @@ test('Members shows placeholder rows until the list arrives (desk or phone)', as
   const owner = await registerGym();
   await signIn(page, owner);
   const release = await hold(page, /\/api\/members(\?|$)/);
-  await page.goto('/members');
+  await page.goto('/members', OPEN);
   await expect(page.locator('main [style*="gem-skeleton"]').first()).toBeVisible();
   await expect(page.getByText('No members found')).toHaveCount(0);
   release();
@@ -125,7 +128,7 @@ test('Daily Overview shows placeholders, not zeros, until the day is counted (de
   await signIn(page, owner);
   const releaseReport = await hold(page, /\/api\/reports\/eod/);
   const releaseTasks = await hold(page, /\/api\/tasks(\?|$)/);
-  await page.goto('/operations');
+  await page.goto('/operations', OPEN);
   await expect(page.locator('main [style*="gem-skeleton"]').first()).toBeVisible();
   await expect(page.locator('main')).not.toContainText('0 FCFA');
   releaseReport();
@@ -137,7 +140,7 @@ test('the Calendar says it is loading until its events arrive (desk or phone)', 
   const owner = await registerGym();
   await signIn(page, owner);
   const release = await hold(page, /\/api\/calendar(\?|$)/);
-  await page.goto('/calendar');
+  await page.goto('/calendar', OPEN);
   const loading = page.locator('[data-inline-loader]');
   await expect(loading).toBeVisible();
   await expect(loading).toHaveAttribute('role', 'status');
@@ -150,7 +153,7 @@ test("the front desk's panels show placeholders, not 'no check-ins', until the d
   const owner = await registerGym();
   await signIn(page, owner);
   const release = await hold(page, /\/api\/attendance(\?|$)/);
-  await page.goto('/front-desk');
+  await page.goto('/front-desk', OPEN);
   await expect(page.getByRole('button', { name: 'Check In', exact: true })).toBeVisible();
   await expect(page.locator('[style*="gem-skeleton"]').first()).toBeVisible();
   await expect(page.getByText('No check-ins in this period')).toHaveCount(0);
