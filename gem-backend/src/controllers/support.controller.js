@@ -123,4 +123,4 @@ async function getMine(req, res) {
   res.json(list);
 }
 
-module.exports = { create, getMine, reportHtml, KINDS };
+module.exports = { create, getMine };
