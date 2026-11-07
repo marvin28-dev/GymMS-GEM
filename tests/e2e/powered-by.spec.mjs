@@ -92,24 +92,25 @@ test('the payslip PDF credits Ekoteksolutions Inc. at its foot', async ({ page }
   expect(pdf).toContain(CREDIT);
 });
 
-// GEM's support contacts wherever someone may be stuck (the owner, 30 October
-// 2026): the foot of every screen and of the desk, the account menu, and page
-// not found. The number is for WhatsApp only, never a call.
-test("GEM support's WhatsApp and email are at the foot of every screen and wherever someone may be stuck (desk or phone)", async ({ page }) => {
+// GEM's support contacts are not at the foot of the screens (the owner,
+// 7 November 2026): the foot carries the credit alone, the account menu offers
+// Help & support (tests/e2e/support-page.spec.mjs), and a screen where something
+// went wrong, page not found among them, gives the WhatsApp and email.
+test("the foot of the app and of the desk carries only the credit, and page not found gives GEM support's contacts (desk or phone)", async ({ page }) => {
   const owner = await registerGym();
   await signIn(page, owner);
-  const support = (scope) => scope.locator('[data-support]').filter({ has: page.locator('a[href="https://wa.me/13439889766"]') });
   for (const path of ['/dashboard', '/front-desk']) {
     await page.goto(path);
-    const line = support(page.locator('[data-app-footer]'));
-    await expect(line, path).toContainText('Something not working? Contact GEM support: WhatsApp +1 343 988 9766 · marvin.ekokobe01@gmail.com');
-    await expect(line.locator('a[href="mailto:marvin.ekokobe01@gmail.com"]'), path).toHaveCount(1);
+    const foot = page.locator('[data-app-footer]');
+    await expect(foot.locator('[data-powered-by]'), path).toHaveText(CREDIT);
+    await expect(foot.locator('[data-support]'), path).toHaveCount(0);
+    await expect(page.locator('[data-support]:visible'), path).toHaveCount(0);
     await expect(page.locator('a[href^="tel:"]'), path).toHaveCount(0);
   }
   await page.goto('/dashboard');
   await page.getByRole('button', { name: 'Your account' }).click();
-  // The menu's line joins the one at the foot of the page
-  await expect(page.locator('[data-support]:visible')).toHaveCount(2);
+  await expect(page.locator('[data-account-menu]').getByRole('button', { name: 'Help & support' })).toBeVisible();
+  await expect(page.locator('[data-support]:visible')).toHaveCount(0);
   await page.goto('/no-such-page');
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
   await expect(page.locator('[data-support]').filter({ hasText: '+1 343 988 9766' }).first()).toBeVisible();

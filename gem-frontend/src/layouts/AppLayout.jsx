@@ -81,7 +81,7 @@ export default function AppLayout() {
             <Outlet />
           </Suspense>
         </main>
-        {/* Support contacts and the maker's credit at the foot of every screen (the owner, 30 October 2026) */}
+        {/* The maker's credit at the foot of every screen (the owner, 30 October 2026) */}
         <AppFooter style={{ padding: '0 28px 18px' }} />
       </div>
     </div>

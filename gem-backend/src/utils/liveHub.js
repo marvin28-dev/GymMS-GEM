@@ -30,7 +30,8 @@ function announceWrites(req, res, next) {
   res.on('finish', () => {
     if (res.statusCode >= 400 || !req.user?.gymId) return;
     const resource = (req.originalUrl.split('?')[0].split('/')[2]) || 'unknown';
-    if (resource === 'auth' || resource === 'live') return;
+    // A support report is the sender's alone: no other screen shows it
+    if (resource === 'auth' || resource === 'live' || resource === 'support') return;
     broadcast(req.user.gymId, { resource, origin: req.headers['x-client-id'] || null });
   });
   next();

@@ -18,6 +18,7 @@ const StaffPage = lazy(() => import("../pages/StaffPage"));
 const StaffProfilePage = lazy(() => import("../pages/StaffProfilePage"));
 const NotificationsPage = lazy(() => import("../pages/NotificationsPage"));
 const SettingsPage = lazy(() => import("../pages/SettingsPage"));
+const SupportPage = lazy(() => import("../pages/SupportPage"));
 import { Navigate } from "react-router-dom";
 
 export const appRoutes = [
@@ -40,6 +41,7 @@ export const appRoutes = [
   { path: "/my-profile", element: <StaffProfilePage /> },
   { path: "/notifications", element: <NotificationsPage /> },
   { path: "/settings", element: <SettingsPage /> },
+  { path: "/support", element: <SupportPage /> },
   // The log now lives in Settings; an old link still gets there
   { path: "/logs", element: <Navigate to="/settings?section=logs" replace /> },
 ];

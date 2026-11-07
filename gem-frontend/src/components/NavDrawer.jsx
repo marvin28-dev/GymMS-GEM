@@ -2,7 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   X, LayoutGrid, Users, CheckSquare, Calendar, Monitor,
   ClipboardList, ShoppingBag, Activity, CreditCard, BarChart3,
-  Package, MessageSquare, Users2, Settings, LogOut,
+  Package, MessageSquare, Users2, Settings, LogOut, LifeBuoy,
 } from 'lucide-react';
 import { getAuth, clearAuth } from '../utils/auth';
 import { pagesFor } from '../utils/rolePages';
@@ -50,6 +50,12 @@ const DRAWER_SECTIONS = [
       { labelKey: 'nav.settings', icon: Settings, path: '/settings' },
     ],
   },
+  {
+    sectionKey: 'nav.sectionHelp',
+    items: [
+      { labelKey: 'nav.support', icon: LifeBuoy, path: '/support' },
+    ],
+  },
 ];
 
 export default function NavDrawer({ open, onClose }) {
@@ -72,7 +78,7 @@ export default function NavDrawer({ open, onClose }) {
   };
 
   const go = (path) => {
-    navigate(path);
+    navigate(path, path === '/support' ? { state: { from: pathname } } : undefined);
     onClose();
   };
 

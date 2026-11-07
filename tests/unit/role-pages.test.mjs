@@ -14,10 +14,18 @@ describe('pagesFor', () => {
     expect(pagesFor('instructor').pages).toContain('members');
   });
 
-  it('gives an unknown or missing role its own record only', () => {
+  it('gives an unknown or missing role its own record only (and Help & support)', () => {
     for (const role of ['accountant', '', null, undefined, 'something-new']) {
-      expect(pagesFor(role).pages).toEqual(['my-profile', 'notifications']);
+      expect(pagesFor(role).pages).toEqual(['my-profile', 'notifications', 'support']);
       expect(hasNavigation(role)).toBe(false);
     }
+  });
+
+  // The owner, 7 November 2026: anyone signed in can tell GEM something is wrong
+  it('lets every role open Help & support', () => {
+    for (const role of ['manager', 'front_desk', 'trainer', 'instructor', 'coach', 'other', 'accountant']) {
+      expect(pagesFor(role).pages, role).toContain('support');
+    }
+    expect(hasNavigation('other')).toBe(false);
   });
 });

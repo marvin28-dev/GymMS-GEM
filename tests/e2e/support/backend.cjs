@@ -67,5 +67,5 @@ require('http').createServer((req, res) => {
   const to = url.searchParams.get('to');
   const list = to ? outbox.filter(m => [].concat(m.to || []).map(String).includes(to)) : outbox;
   res.writeHead(200, { 'content-type': 'application/json' });
-  res.end(JSON.stringify(list.map(m => ({ to: m.to, from: m.from, subject: m.subject, html: m.html, text: m.text }))));
+  res.end(JSON.stringify(list.map(m => ({ to: m.to, from: m.from, replyTo: m.replyTo, subject: m.subject, html: m.html, text: m.text }))));
 }).listen(OUTBOX_PORT, '127.0.0.1');

@@ -18,6 +18,7 @@ const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
 const FrontDeskPage = lazy(() => import("../pages/FrontDeskPage"));
 const MemberProfilePage = lazy(() => import("../pages/MemberProfilePage"));
 const StaffProfilePage = lazy(() => import("../pages/StaffProfilePage"));
+const SupportPage = lazy(() => import("../pages/SupportPage"));
 
 export default function AppRoutes() {
   // Clear expired auth before any route logic so isAuthed() reflects reality
@@ -53,6 +54,8 @@ export default function AppRoutes() {
               not exit to the dashboard either. No :id means StaffProfilePage
               falls back to the signed-in user, i.e. your own record. */}
           <Route path="/front-desk/my-profile" element={<StaffProfilePage />} />
+          {/* Help & support from the desk, without leaving it */}
+          <Route path="/front-desk/support" element={<SupportPage />} />
         </Route>
       </Route>
 

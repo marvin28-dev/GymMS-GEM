@@ -1,8 +1,10 @@
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import SupportLinks from '../SupportLinks';
 
 // What a list or panel shows when it could not be loaded, so a failed load is
-// never mistaken for an empty one. onRetry adds a Try again button.
+// never mistaken for an empty one. onRetry adds a Try again button. GEM's
+// support contacts sit underneath, for when trying again does not help.
 export default function LoadFailed({ message, onRetry, style }) {
   const { t } = useLanguage();
   return (
@@ -22,6 +24,7 @@ export default function LoadFailed({ message, onRetry, style }) {
           <RefreshCw size={12} /> {t('common.retry')}
         </button>
       )}
+      <SupportLinks quiet tint label={t('common.stillNotWorking')} style={{ flexBasis: '100%', paddingLeft: 25 }} />
     </div>
   );
 }

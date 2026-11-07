@@ -31,7 +31,7 @@ test('the public pages pass', async ({ page }) => {
 
 // One test a screen, so each has its own time and names the screen that failed
 test.describe('the app\'s screens pass', () => {
-  for (const screen of ['/dashboard', '/members', '/members/:id', '/payments', '/staff', '/settings?section=gym-profile', '/settings?section=payment', '/calendar', '/tasks', '/sales', '/accounting', '/communication', '/attendance', '/packages', '/notifications', '/operations']) {
+  for (const screen of ['/dashboard', '/members', '/members/:id', '/payments', '/staff', '/settings?section=gym-profile', '/settings?section=payment', '/calendar', '/tasks', '/sales', '/accounting', '/communication', '/attendance', '/packages', '/notifications', '/operations', '/support']) {
     test(screen, async ({ page }) => {
       const owner = await registerGym();
       let path = screen;
@@ -50,7 +50,7 @@ test.describe('the app\'s screens pass', () => {
 
 // D-48 set the light theme's colours too
 test.describe('the screens pass in the light theme', () => {
-  for (const screen of ['/', '/dashboard', '/members', '/calendar', '/attendance', '/sales', '/settings?section=gym-profile']) {
+  for (const screen of ['/', '/dashboard', '/members', '/calendar', '/attendance', '/sales', '/settings?section=gym-profile', '/support']) {
     test(screen, async ({ page }) => {
       await page.addInitScript(() => { try { localStorage.setItem('gem-theme', 'light'); } catch { /* the test fails below if the theme did not apply */ } });
       const owner = await registerGym();

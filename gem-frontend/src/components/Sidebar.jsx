@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Users2,
   Settings,
+  LifeBuoy,
   X,
 } from 'lucide-react';
 import { getAuth } from '../utils/auth';
@@ -42,6 +43,7 @@ const PATH_TO_NAV_KEY = {
   '/communication':'communication',
   '/staff':        'staff',
   '/settings':     'settings',
+  '/support':      'support',
 };
 
 const NAV_SECTIONS = [
@@ -82,6 +84,12 @@ const NAV_SECTIONS = [
     items: [
       { label: 'Staff', icon: Users2, path: '/staff' },
       { label: 'Settings', icon: Settings, path: '/settings' },
+    ],
+  },
+  {
+    title: 'HELP',
+    items: [
+      { label: 'Help & support', icon: LifeBuoy, path: '/support' },
     ],
   },
 ];
@@ -324,7 +332,7 @@ export default function Sidebar({ open, onClose, isMobile }) {
         {NAV_SECTIONS.map(section => {
           const visibleItems = section.items.filter(item => canSee(item.path));
           if (visibleItems.length === 0) return null;
-          const sectionTitleKeys = { MAIN: 'nav.sectionMain', MEMBERS: 'nav.sectionMembers', OPERATIONS: 'nav.sectionOperations', FINANCE: 'nav.sectionFinance', ADMIN: 'nav.sectionAdmin' };
+          const sectionTitleKeys = { MAIN: 'nav.sectionMain', MEMBERS: 'nav.sectionMembers', OPERATIONS: 'nav.sectionOperations', FINANCE: 'nav.sectionFinance', ADMIN: 'nav.sectionAdmin', HELP: 'nav.sectionHelp' };
           return (
             <div key={section.title}>
               <div style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '2.5px', color: 'var(--text-muted)', padding: '12px 20px 6px', fontFamily: 'DM Sans, sans-serif' }}>
@@ -339,7 +347,7 @@ export default function Sidebar({ open, onClose, isMobile }) {
                     item={{ ...item, label: translatedLabel, badge: item.badgeKey ? badges[item.badgeKey] : item.badge }}
                     isActive={location.pathname === item.path || location.pathname.startsWith(item.path + '/')}
                     hasWarning={setupWarnings.includes(item.path)}
-                    onClick={() => { navigate(item.path); onClose?.(); }}
+                    onClick={() => { navigate(item.path, item.path === '/support' ? { state: { from: location.pathname } } : undefined); onClose?.(); }}
                   />
                 );
               })}

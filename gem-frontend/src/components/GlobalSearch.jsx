@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, LayoutGrid, Users, Package, MessageSquare, Monitor, CheckSquare,
   Activity, ClipboardList, ShoppingBag, CreditCard, BarChart3, Users2,
-  Settings as SettingsIcon, Calendar, User, X, UserCircle, Ticket,
+  Settings as SettingsIcon, Calendar, User, X, UserCircle, Ticket, LifeBuoy,
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getAuth, getRole } from '../utils/auth';
@@ -32,6 +32,7 @@ const PAGE_DESTS = [
   { page: 'accounting', path: '/accounting', icon: BarChart3, labelKey: 'nav.accounting', kw: 'finance expenses payroll paystub reports marketing profit review' },
   { page: 'staff', path: '/staff', icon: Users2, labelKey: 'nav.staff', kw: 'team employees roster access code deactivate trainer manager' },
   { page: 'settings', path: '/settings', icon: SettingsIcon, labelKey: 'nav.settings', kw: 'preferences configure setup' },
+  { page: 'support', path: '/support', icon: LifeBuoy, labelKey: 'nav.support', kw: 'help problem bug error not working broken complaint complain suggestion idea question report contact whatsapp email aide assistance probleme plainte' },
 ];
 
 const SETTINGS_DESTS = [

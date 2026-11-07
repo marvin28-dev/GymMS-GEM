@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Settings, LogOut, User, Trash2, Menu } from 'lucide-react';
+import { Bell, Settings, LogOut, User, Trash2, Menu, LifeBuoy } from 'lucide-react';
 import { getAll as getNotifs, markAllRead as apiMarkAllRead, remove as removeNotif, removeAll as removeAllNotifs } from '../services/notifications.service';
 import { getAuth, clearAuth, getRole } from '../utils/auth';
 import { TASKS_PATH } from '../utils/rolePages';
@@ -12,8 +12,6 @@ import { roleName } from '../utils/roleNames';
 import LoadFailed from './ui/LoadFailed';
 import GemMark from './ui/GemMark';
 import PoweredBy from './ui/PoweredBy';
-import SupportLinks from './SupportLinks';
-import { hasSupport } from '../utils/support';
 
 const ROLE_KEYS = {
   general_manager: 'generalManager',
@@ -407,6 +405,7 @@ export default function Header({ isMobile: isMobileProp }) {
           {/* Avatar dropdown */}
           {showAvatar && (
             <div
+              data-account-menu
               style={{
                 position: 'absolute',
                 top: 'calc(100% + 12px)',
@@ -448,6 +447,7 @@ export default function Header({ isMobile: isMobileProp }) {
               {[
                 { icon: User, labelKey: 'header.myProfile', action: () => { navigate('/my-profile'); setShowAvatar(false); } },
                 authUser.role === 'general_manager' && { icon: Settings, labelKey: 'nav.settings', action: () => { navigate('/settings'); setShowAvatar(false); } },
+                { icon: LifeBuoy, labelKey: 'nav.support', action: () => { navigate('/support', { state: { from: window.location.pathname } }); setShowAvatar(false); } },
               ].filter(Boolean).map(({ icon: Icon, labelKey, action }) => (
                 <button
                   type="button"
@@ -485,8 +485,7 @@ export default function Header({ isMobile: isMobileProp }) {
                 <LogOut size={14} strokeWidth={1.8} />
                 {t('header.signOut')}
               </button>
-              <SupportLinks quiet label={t('common.supportLine')} style={{ padding: '8px 16px 0', borderTop: '1px solid var(--border-subtle)' }} />
-              <PoweredBy style={{ padding: hasSupport ? '2px 16px 10px' : '8px 16px 10px', borderTop: hasSupport ? 'none' : '1px solid var(--border-subtle)', fontSize: 10.5 }} />
+              <PoweredBy style={{ padding: '8px 16px 10px', borderTop: '1px solid var(--border-subtle)', fontSize: 10.5 }} />
             </div>
           )}
         </div>

@@ -741,6 +741,31 @@ model ApprovalRequest {
   @@index([memberId])
 }
 
+// A problem, complaint, suggestion or question sent to GEM from the Support
+// page. Kept here as well as emailed to GEM's support address, so a report is
+// not lost when the email cannot be sent. Standalone, like ApprovalRequest; the
+// sender is written out as they were.
+model SupportRequest {
+  id          String    @id @default(cuid())
+  gymId       String
+  staffId     String
+  senderName  String
+  senderEmail String?
+  senderPhone String?
+  senderRole  String
+  // problem | complaint | suggestion | question
+  kind        String
+  subject     String
+  message     String
+  // Where they were and what they used, to help find a fault
+  page        String?
+  userAgent   String?
+  emailedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([gymId, staffId, createdAt])
+}
+
 enum StaffRole {
   general_manager
   manager

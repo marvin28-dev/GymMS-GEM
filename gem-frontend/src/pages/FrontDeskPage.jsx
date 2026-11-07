@@ -6,7 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import CodeInput from '../components/ui/CodeInput';
 import {
   Search, X, UserCheck, ChevronLeft, ChevronRight, MessageSquare,
-  AlertTriangle, CheckCircle, AlertCircle, Clock, LogOut, ArrowLeft, UserCircle,
+  AlertTriangle, CheckCircle, AlertCircle, Clock, LogOut, ArrowLeft, UserCircle, LifeBuoy,
   ShoppingCart, ShoppingBag, Plus, Minus, Trash2, Phone, Mail, Eye, EyeOff,
   CreditCard, Wrench, FileText, Download, UserPlus, TrendingUp, Receipt,
   RefreshCw, Smartphone, LogIn,
@@ -1417,6 +1417,7 @@ export default function FrontDeskPage() {
             if (isDeskAccount) { navigate(toKioskLink(link)); return; }
             requestExit(link || '/dashboard');
           }} />
+          <button onClick={() => navigate('/front-desk/support', { state: { from: '/front-desk' } })} aria-label={t('nav.support')} title={t('nav.support')} style={{ ...secondaryBtn, padding: isMobile ? '6px 10px' : '6px 14px', fontSize:12 }}><LifeBuoy size={13}/>{!isMobile && ` ${t('support.short')}`}</button>
           {isDeskAccount ? (
             <>
               <button onClick={() => navigate('/front-desk/my-profile')} aria-label={t('frontDesk.myProfile')} title={t('frontDesk.myProfile')} style={{ ...secondaryBtn, padding: isMobile ? '6px 10px' : '6px 14px', fontSize:12 }}><UserCircle size={13}/>{!isMobile && ` ${t('frontDesk.myProfile')}`}</button>
