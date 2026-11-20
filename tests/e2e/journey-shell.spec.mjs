@@ -14,8 +14,10 @@ test('J-27: Ctrl+K searches pages and members, and Enter opens the first', async
   await signIn(page, owner);
   await page.goto('/dashboard');
   await expect(page).toHaveURL(/\/dashboard$/);
-  await page.keyboard.press('Control+k');
+  // The shortcut is heard once the header is on screen
   const box = page.getByPlaceholder('Search pages, settings, people…').first();
+  await expect(box).toBeAttached();
+  await page.keyboard.press('Control+k');
   await expect(box).toBeFocused();
   await box.fill('Payments');
   await box.press('Enter');
@@ -32,8 +34,10 @@ test('J-27: the search offers a trainer only the pages a trainer may open', asyn
   const trainer = await addStaff(owner, { role: 'trainer' });
   await signIn(page, trainer);
   await page.goto('/dashboard');
-  await page.keyboard.press('Control+k');
   const box = page.getByPlaceholder('Search pages, settings, people…').first();
+  await expect(box).toBeAttached();
+  await page.keyboard.press('Control+k');
+  await expect(box).toBeFocused();
   await box.fill('Accounting');
   await expect(page.getByText('Nothing found for "Accounting"')).toBeVisible();
   await box.fill('Calendar');

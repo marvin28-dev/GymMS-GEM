@@ -72,8 +72,11 @@ test('Help & support is in the menu for every role, and search finds it', async 
   await expect(page.getByRole('heading', { name: 'Help & support' })).toBeVisible();
 
   await page.goto('/dashboard');
-  await page.keyboard.press('Control+k');
+  // The shortcut is heard once the header is on screen (WebKit draws it a
+  // moment after the page's load event)
   const box = page.getByPlaceholder('Search pages, settings, people…').first();
+  await expect(box).toBeAttached();
+  await page.keyboard.press('Control+k');
   await expect(box).toBeFocused();
   await box.fill('complaint');
   await box.press('Enter');
