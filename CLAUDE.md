@@ -7,7 +7,7 @@ Full-stack multi-tenant gym management system. Built for Cameroon-based gyms (cu
 - **Frontend:** React 18 + Vite, inline styles (no CSS framework), Lucide icons, DM Sans + Manrope fonts
 - **Backend:** Node.js + Express, Prisma ORM, PostgreSQL
 - **Auth:** JWT (8h expiry), stored in localStorage (`gem_auth`), daily re-login enforced via `loginDate` stamp
-- **Hosting:** Vercel (frontend, `gym-ms-gem.vercel.app`). The live backend is on **Render** (`gem-backend-xxob.onrender.com`, read from the live page's `VITE_API_URL` on 30 October 2026), not Railway: `gem-backend/railway.json` is not used by it. Its start command must be `npm start`, which migrates the database before serving (`scripts/start.js`)
+- **Hosting:** Vercel (frontend). Its address is **`www.gymelitemangement.com`** (spelled "mangement", as bought on GoDaddy on 7 November 2026; the owner will move to the correct spelling later). The bare domain redirects to `www`, the domain's DNS is on Vercel's nameservers (`ns1`/`ns2.vercel-dns.com`, since 20 November 2026), and `gym-ms-gem.vercel.app` still serves the same build. Render's `FRONTEND_URL` and `ALLOWED_ORIGINS` name the new domain. The live backend is on **Render** (`gem-backend-xxob.onrender.com`, read from the live page's `VITE_API_URL` on 30 October 2026), not Railway: `gem-backend/railway.json` is not used by it. Its start command must be `npm start`, which migrates the database before serving (`scripts/start.js`)
 - **Git:** GitHub — `marvin28-dev/GymMS-GEM`, main branch
 
 ## Project Structure
