@@ -12,6 +12,8 @@ const RECOMMENDED = [
   ['CLOUDINARY_CLOUD_NAME', 'photo uploads will fail'],
   ['CLOUDINARY_API_KEY', 'photo uploads will fail'],
   ['CLOUDINARY_API_SECRET', 'photo uploads will fail'],
+  ['ADMIN_EMAIL', 'nobody can sign in to GEM\'s admin dashboard'],
+  ['ADMIN_PASSWORD', 'nobody can sign in to GEM\'s admin dashboard'],
 ];
 
 const set = (v) => String(v ?? '').trim() !== '';
@@ -24,6 +26,8 @@ function checkConfig(env = process.env) {
   }
   const warnings = RECOMMENDED.filter(([k]) => !set(env[k])).map(([k, what]) => `${k} is not set: ${what}.`);
   if (env.JWT_SECRET.length < 32) warnings.push('JWT_SECRET is shorter than 32 characters: use a long random value.');
+  // The admin password opens every gym's records
+  if (set(env.ADMIN_PASSWORD) && String(env.ADMIN_PASSWORD).length < 12) warnings.push('ADMIN_PASSWORD is shorter than 12 characters: use a long one, it opens every gym.');
   return { warnings };
 }
 

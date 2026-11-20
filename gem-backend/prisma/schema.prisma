@@ -42,9 +42,19 @@ model Gym {
   minUpfrontPercent           Int       @default(50)
   paymentDeadlineDays         Int       @default(30)
   managerCode                 String?
+  // GEM's side of the gym, kept by the admin dashboard: when GEM starts
+  // charging (createdAt + the trial days when empty), its own price per member
+  // (the platform's when empty), and a pause on the whole account while a
+  // bill is unpaid. adminNote is GEM's private note about the gym.
+  trialEndsAt                 DateTime?
+  billingRate                 Int?
+  lockedAt                    DateTime?
+  lockReason                  String?
+  adminNote                   String?
   createdAt                   DateTime  @default(now())
   updatedAt                   DateTime  @updatedAt
 
+  invoices        GymInvoice[]
   staff           Staff[]
   members         Member[]
   packages        Package[]
@@ -763,9 +773,107 @@ model SupportRequest {
   page        String?
   userAgent   String?
   emailedAt   DateTime?
+  // GEM's side, from the admin dashboard: new | in_progress | resolved, the
+  // answer the sender is sent and sees on their Support page, and a note
+  // only GEM reads
+  status      String    @default("new")
+  reply       String?
+  repliedAt   DateTime?
+  resolvedAt  DateTime?
+  adminNote   String?
   createdAt   DateTime  @default(now())
 
   @@index([gymId, staffId, createdAt])
+  @@index([status, createdAt])
+}
+
+// ── GEM's own records, kept by the admin dashboard (not by any gym) ──────────
+
+// The platform's settings: one row (id 1). What a gym pays per active member a
+// month, in which currency, how many days a sent bill has before it is due,
+// how long a new gym's free trial lasts, and how to pay GEM.
+model PlatformSettings {
+  id                  Int      @id @default(1)
+  pricePerMember      Int      @default(250)
+  currency            String   @default("XAF")
+  dueDays             Int      @default(10)
+  trialDays           Int      @default(7)
+  paymentInstructions String   @default("")
+  // The last month whose bills the monthly job prepared, so it prepares each
+  // month once (and, on its first run, starts from the month just ended)
+  lastPreparedPeriod  String?
+  updatedAt           DateTime @default(now()) @updatedAt
+}
+
+// What a gym owes GEM for one month (period "2026-11"): its active members on
+// the month's last day, at its rate, for the days after its free trial.
+// draft (prepared, only GEM sees it) -> sent (the gym sees it, due on dueDate)
+// -> paid, or void. Overdue is a sent bill past its due date.
+model GymInvoice {
+  id            String    @id @default(cuid())
+  gymId         String
+  period        String
+  periodStart   DateTime
+  periodEnd     DateTime
+  billableDays  Int
+  daysInPeriod  Int
+  members       Int
+  rate          Int
+  currency      String
+  discount      Int       @default(0)
+  amount        Int
+  note          String?
+  status        String    @default("draft")
+  sentAt        DateTime?
+  dueDate       DateTime?
+  paidAt        DateTime?
+  paidAmount    Int?
+  paidMethod    String?
+  paidReference String?
+  remindedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  gym Gym @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  @@unique([gymId, period])
+  @@index([status, dueDate])
+}
+
+// Someone thinking of using GEM for their gym: from the landing page's "Book
+// a demo" form, or added by hand. new -> contacted -> demo -> won | lost.
+// gymId is the gym they became, linked when a gym signs up with their email.
+model Lead {
+  id           String    @id @default(cuid())
+  name         String
+  gymName      String
+  email        String?
+  phone        String?
+  city         String?
+  country      String?
+  members      Int?
+  message      String?
+  source       String    @default("website")
+  status       String    @default("new")
+  notes        String?
+  nextFollowUp DateTime?
+  gymId        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+
+  @@index([status, createdAt])
+}
+
+// A message from GEM to every gym, or to one: each gym gets it as a
+// notification, and its owner an email when asked
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  gymId     String?
+  emailed   Boolean  @default(false)
+  gyms      Int      @default(0)
+  createdAt DateTime @default(now())
 }
 
 enum StaffRole {

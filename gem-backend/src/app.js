@@ -113,6 +113,10 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/coach', require('./routes/coach.routes'));
 app.use('/api/support', require('./routes/support.routes'));
+app.use('/api/billing', require('./routes/billing.routes'));
+app.use('/api/leads', require('./routes/lead.routes'));
+// GEM's own admin dashboard, apart from every gym
+app.use('/api/admin', require('./routes/admin.routes'));
 
 // Asks the database too: a deploy that cannot reach it must not look healthy
 // (F-179). Three seconds is long enough for a slow answer, short enough for a

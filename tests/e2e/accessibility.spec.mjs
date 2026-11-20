@@ -31,7 +31,7 @@ test('the public pages pass', async ({ page }) => {
 
 // One test a screen, so each has its own time and names the screen that failed
 test.describe('the app\'s screens pass', () => {
-  for (const screen of ['/dashboard', '/members', '/members/:id', '/payments', '/staff', '/settings?section=gym-profile', '/settings?section=payment', '/calendar', '/tasks', '/sales', '/accounting', '/communication', '/attendance', '/packages', '/notifications', '/operations', '/support']) {
+  for (const screen of ['/dashboard', '/members', '/members/:id', '/payments', '/staff', '/settings?section=gym-profile', '/settings?section=payment', '/settings?section=billing', '/calendar', '/tasks', '/sales', '/accounting', '/communication', '/attendance', '/packages', '/notifications', '/operations', '/support']) {
     test(screen, async ({ page }) => {
       const owner = await registerGym();
       let path = screen;

@@ -12,6 +12,7 @@ import { notifyDataChanged } from '../utils/events';
 import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import RowMenu from '../components/ui/RowMenu';
 import ActivityLog from './LogsPage';
+import GemBilling from '../components/GemBilling';
 import { useSetupStatus, setSetupStatus } from '../hooks/useSetupStatus';
 import { confirmSetupSection } from '../services/gym.service';
 import TimeInput from '../components/ui/TimeInput';
@@ -52,6 +53,8 @@ const SECTIONS = [
   { id: 'membership' },
   { id: 'packages' },
   { id: 'notifications' },
+  // What the gym pays GEM: the owner's alone, like the rest of Settings
+  { id: 'billing' },
   // The gym's activity log. Settings is the owner's alone, like the log itself.
   { id: 'logs' },
 ];
@@ -632,6 +635,7 @@ export default function SettingsPage() {
     membership: t('settings.membershipDefaults'),
     packages: t('settings.packageSettings'),
     notifications: t('settings.notificationPreferences'),
+    billing: t('settings.gemBilling'),
     logs: t('settings.activityLog'),
   };
 
@@ -1307,6 +1311,7 @@ export default function SettingsPage() {
         </>
       )}
 
+      {activeSection === 'billing' && <GemBilling />}
       {activeSection === 'logs' && <ActivityLog />}
     </>
   );

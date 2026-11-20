@@ -20,7 +20,7 @@ async function currentAccount(id) {
   if (hit && hit.at > Date.now() - CACHE_MS) return hit.account;
   const account = await prisma.staff.findUnique({
     where: { id },
-    select: { gymId: true, role: true, isActive: true, gym: { select: { currency: true } } },
+    select: { gymId: true, role: true, isActive: true, gym: { select: { currency: true, lockedAt: true } } },
   });
   accounts.set(id, { account, at: Date.now() });
   return account;
@@ -55,6 +55,19 @@ function forgetAccount(id) {
   accounts.delete(String(id));
 }
 
+// The gym itself changed for everyone in it (paused or reopened by GEM)
+function forgetGym(gymId) {
+  for (const [id, hit] of accounts) if (hit.account?.gymId === gymId) accounts.delete(id);
+}
+
+// A gym GEM has paused (an unpaid bill) can still sign in, see what it owes,
+// and write to GEM support; nothing else answers until it is reopened
+const LOCKED = {
+  error: 'This gym\'s GEM account is paused. The owner can see why in Settings, GEM billing.',
+  code: 'GYM_LOCKED',
+};
+const LOCKED_MAY_REACH = ['/api/auth', '/api/live', '/api/billing', '/api/support'];
+
 async function authenticate(req, res, next) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
@@ -66,6 +79,8 @@ async function authenticate(req, res, next) {
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
+  // GEM's admin signs in apart from every gym; that token opens nothing here
+  if (payload.admin || !payload.id) return res.status(401).json({ error: 'Invalid or expired token' });
 
   let account;
   try {
@@ -79,6 +94,10 @@ async function authenticate(req, res, next) {
     return res.status(401).json({ error: 'This account no longer exists.', code: 'ACCOUNT_GONE' });
   }
   if (!account.isActive) return res.status(401).json(DEACTIVATED);
+  if (account.gym?.lockedAt) {
+    const path = req.baseUrl || req.originalUrl || '';
+    if (!LOCKED_MAY_REACH.some(p => path.startsWith(p))) return res.status(403).json(LOCKED);
+  }
 
   req.user = { ...payload, role: account.role };
   return withCurrency(account.gym?.currency, () => confineOther(req, res, next));
@@ -106,4 +125,4 @@ function confineOther(req, res, next) {
 }
 
 module.exports = {
-  confineOther, authenticate, requireRole, forgetAccount, rememberRevoked, DEACTIVATED };
+  confineOther, authenticate, requireRole, forgetAccount, forgetGym, rememberRevoked, isRevoked, DEACTIVATED, LOCKED };

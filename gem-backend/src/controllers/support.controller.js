@@ -4,6 +4,9 @@ const { deliver } = require('../utils/sendEmail');
 const E = require('../utils/emailLayout');
 const { attemptCounter, refuseTooMany } = require('../utils/attempts');
 const { supportEmail } = require('../utils/support');
+const { sendSupportReply } = require('../utils/gemEmail');
+const { broadcast } = require('../utils/liveHub');
+const { bestEffort } = require('../utils/bestEffort');
 
 // What someone can tell GEM from the Support page
 const KINDS = {
@@ -25,7 +28,9 @@ const ROLE_NAMES = {
   trainer: 'Trainer', instructor: 'Trainer', coach: 'Trainer', other: 'Other', accountant: 'Accountant',
 };
 
-const SHOWN = { id: true, kind: true, subject: true, message: true, emailedAt: true, createdAt: true };
+// What the sender sees of their own report, GEM's answer included (never GEM's note)
+const SHOWN = { id: true, kind: true, subject: true, message: true, emailedAt: true, createdAt: true, status: true, reply: true, repliedAt: true, resolvedAt: true };
+const STATUSES = ['new', 'in_progress', 'resolved'];
 
 function getResend() {
   if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is not set');
@@ -123,4 +128,65 @@ async function getMine(req, res) {
   res.json(list);
 }
 
-module.exports = { create, getMine };
+// ── GET /api/admin/support ───────────────────────────────────────────────────
+// Every report from every gym, for GEM's admin
+async function adminList(req, res) {
+  const reports = await prisma.supportRequest.findMany({ orderBy: { createdAt: 'desc' }, take: 1000 });
+  const gymIds = [...new Set(reports.map(r => r.gymId))];
+  const gyms = gymIds.length ? await prisma.gym.findMany({ where: { id: { in: gymIds } }, select: { id: true, name: true, code: true } }) : [];
+  const gymBy = new Map(gyms.map(g => [g.id, g]));
+  res.json(reports.map(r => ({ ...r, gym: gymBy.get(r.gymId) || null })));
+}
+
+const withGym = async (report) => ({ ...report, gym: await prisma.gym.findUnique({ where: { id: report.gymId }, select: { id: true, name: true, code: true } }) });
+
+// ── PATCH /api/admin/support/:id { status?, adminNote? } ─────────────────────
+async function adminUpdate(req, res) {
+  const report = await prisma.supportRequest.findUnique({ where: { id: req.params.id } });
+  if (!report) return res.status(404).json({ error: 'Report not found' });
+  const b = req.body || {};
+  const data = {};
+  if ('status' in b) {
+    if (!STATUSES.includes(b.status)) return res.status(400).json({ error: 'Choose new, in progress or resolved.', field: 'status' });
+    data.status = b.status;
+    data.resolvedAt = b.status === 'resolved' ? (report.resolvedAt || new Date()) : null;
+  }
+  if ('adminNote' in b) {
+    const note = String(b.adminNote ?? '').trim();
+    if (note.length > 4000) return res.status(400).json({ error: 'Keep the note under 4,000 characters.', field: 'adminNote' });
+    data.adminNote = note || null;
+  }
+  const saved = await prisma.supportRequest.update({ where: { id: report.id }, data });
+  if ('status' in data) broadcast(report.gymId, { resource: 'support', origin: null });
+  res.json(await withGym(saved));
+}
+
+// ── POST /api/admin/support/:id/reply { reply, resolve? } ────────────────────
+// GEM's answer: the sender is told in the app and, when they have an address,
+// by email, and sees it under their report on the Support page
+async function adminReply(req, res) {
+  const report = await prisma.supportRequest.findUnique({ where: { id: req.params.id } });
+  if (!report) return res.status(404).json({ error: 'Report not found' });
+  const reply = String(req.body?.reply ?? '').trim();
+  if (!reply) return res.status(400).json({ error: 'Write the answer.', field: 'reply' });
+  if (reply.length > MAX_MESSAGE) return res.status(400).json({ error: `Keep it under ${MAX_MESSAGE} characters.`, field: 'reply' });
+  const resolve = req.body?.resolve === true;
+  const now = new Date();
+  const saved = await prisma.supportRequest.update({
+    where: { id: report.id },
+    data: { reply, repliedAt: now, status: resolve ? 'resolved' : 'in_progress', resolvedAt: resolve ? now : null },
+  });
+  const sender = await prisma.staff.findUnique({ where: { id: report.staffId }, select: { id: true, gymId: true } });
+  if (sender?.gymId === report.gymId) {
+    await prisma.notification.create({
+      data: { gymId: report.gymId, staffId: sender.id, type: 'system', link: '/support', title: `GEM support answered: ${report.subject}`.slice(0, 190), body: reply.slice(0, 500) },
+    }).catch(err => console.error('Support answer notice failed:', err.message));
+    broadcast(report.gymId, { resource: 'notifications', origin: null });
+  }
+  broadcast(report.gymId, { resource: 'support', origin: null });
+  const gym = await prisma.gym.findUnique({ where: { id: report.gymId }, select: { id: true, code: true, name: true } });
+  bestEffort(sendSupportReply(saved, gym), 'Support answer email');
+  res.json({ ...saved, gym });
+}
+
+module.exports = { create, getMine, adminList, adminUpdate, adminReply };

@@ -43,6 +43,7 @@ const SETTINGS_DESTS = [
   { page: 'settings', path: '/settings?section=membership', labelKey: 'settings.membershipDefaults', kw: 'registration fee freeze freezing frozen fee auto renew renewal grace period minimum upfront deposit' },
   { page: 'settings', path: '/settings?section=packages', labelKey: 'settings.packageSettings', kw: 'access types' },
   { page: 'settings', path: '/settings?section=notifications', labelKey: 'settings.notificationPreferences', kw: 'alerts email welcome expiry reminders low stock overdue end of day eod' },
+  { page: 'settings', path: '/settings?section=billing', labelKey: 'settings.gemBilling', kw: 'gem bill invoice subscription pay plan trial price per member facture abonnement' },
 ];
 
 // Lower-case and drop accents, so "gele" finds "gelé" and "francais" finds "français".

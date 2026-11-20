@@ -37,12 +37,17 @@ export function symbolGoesFirst() {
 }
 
 // Prices are whole units of currency throughout GEM, never fractions.
-export const formatMoney = (amount) => {
+export const formatMoney = (amount) => formatMoneyIn(amount, getCurrencyCode());
+
+// The same, in a currency named outright: GEM's own bills to a gym are in
+// GEM's currency, and the admin dashboard has no gym session to read one from
+export function formatMoneyIn(amount, code) {
+  const c = String(code || 'XAF').toUpperCase();
   // fr-FR groups thousands with a narrow no-break space (U+202F) some fonts have
   // no glyph for, which shows as a stray mark; normalise to a plain space.
-  const n = Math.round(Number(amount) || 0).toLocaleString(getMoneyLocale()).replace(/[\u202F\u00A0]/g, ' ');
-  const symbol = getCurrencySymbol();
-  return symbolGoesFirst() ? `${symbol}${n}` : `${n} ${symbol}`;
-};
+  const n = Math.round(Number(amount) || 0).toLocaleString(LOCALES[c] || 'en-GB').replace(/[\u202F\u00A0]/g, ' ');
+  const symbol = SYMBOLS[c] || c;
+  return SYMBOL_FIRST.has(c) ? `${symbol}${n}` : `${n} ${symbol}`;
+}
 
 export { SYMBOLS as CURRENCY_SYMBOLS };

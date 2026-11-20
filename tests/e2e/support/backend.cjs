@@ -16,6 +16,9 @@ Object.assign(process.env, {
   ALLOWED_ORIGINS: '',
   RESEND_API_KEY: 're_test_not_a_real_key',
   EMAIL_FROM_ADDRESS: '',
+  // GEM's admin dashboard (tests only; never a real account)
+  ADMIN_EMAIL: 'admin@gem.test',
+  ADMIN_PASSWORD: 'Admin-pass-for-tests-1',
   RAILWAY_ENVIRONMENT: '',
   // The helpers set up each test's gym from this one machine; behind a trusted
   // proxy hop each setup call can name its own address, so the real per-address
@@ -56,8 +59,22 @@ require(path.join(BACKEND, 'src/index.js'));
 // link, a welcome): GET /outbox?to=address. Only on this machine's loopback.
 const { outbox } = require('../../api/fakes/resend.cjs');
 const { OUTBOX_PORT } = require('./ports.cjs');
+// POST /backdate?gym=code: the gym signed up 70 days ago and its members joined
+// 40 days ago, so last month can be billed (GEM's admin dashboard tests)
+const prisma = appRequire('./utils/prisma.js');
+async function backdate(code) {
+  const gym = await prisma.gym.findUnique({ where: { code }, select: { id: true } });
+  if (!gym) return false;
+  await prisma.gym.update({ where: { id: gym.id }, data: { createdAt: new Date(Date.now() - 70 * 864e5) } });
+  await prisma.member.updateMany({ where: { gymId: gym.id, isVisitor: false }, data: { status: 'active', startDate: new Date(Date.now() - 40 * 864e5) } });
+  return true;
+}
 require('http').createServer((req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1');
+  if (url.pathname === '/backdate' && req.method === 'POST') {
+    backdate(String(url.searchParams.get('gym') || '')).then(ok => res.writeHead(ok ? 200 : 404).end(), err => res.writeHead(500).end(err.message));
+    return;
+  }
   if (url.pathname !== '/outbox') { res.writeHead(404).end(); return; }
   const to = url.searchParams.get('to');
   const list = to ? outbox.filter(m => [].concat(m.to || []).map(String).includes(to)) : outbox;

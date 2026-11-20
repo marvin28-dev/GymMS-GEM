@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getAuth, clearAuth } from '../utils/auth';
+import { getAuth, clearAuth, updateSessionUser } from '../utils/auth';
 import { notifyDataChanged, CLIENT_ID, LIVE_CHANGED } from '../utils/events';
 import translations from '../i18n/translations';
 
@@ -69,6 +69,13 @@ api.interceptors.response.use(
   },
   (error) => {
     sayTooManyInLanguage(error);
+    // GEM paused the gym's account while someone was using it: they stay signed
+    // in, and the screen that says why replaces the page
+    if (error.response?.status === 403 && error.response?.data?.code === 'GYM_LOCKED') {
+      updateSessionUser({ gymLocked: true });
+      if (window.location.pathname !== '/account-paused') window.location.href = '/account-paused';
+      return Promise.reject(error);
+    }
     if (error.response?.status === 401 && SIGN_OUT_CODES.has(error.response?.data?.code)) {
       signOut();
       return Promise.reject(error);

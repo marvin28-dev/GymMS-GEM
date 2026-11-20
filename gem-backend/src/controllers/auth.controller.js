@@ -12,6 +12,11 @@ const { bestEffort } = require('../utils/bestEffort');
 const { newResetToken, hashResetToken } = require('../utils/resetToken');
 const { isDemoGym, demoCode } = require('../utils/sendEmail');
 const { newConfirmation, confirmBlock, sendConfirmation, confirmByToken } = require('../utils/emailConfirm');
+const { linkLeadToGym } = require('../utils/leads');
+
+// Codes no gym may take: /admin/login is GEM's own admin sign-in, not a gym's
+const RESERVED_CODES = ['admin'];
+const codeTaken = async (code) => code === demoCode() || RESERVED_CODES.includes(code) || !!(await prisma.gym.findUnique({ where: { code } }));
 
 const asActor = (s) => ({ id: s.id, name: fullName(s), role: s.role });
 const MINUTE = 60 * 1000;
@@ -73,8 +78,7 @@ async function register(req, res) {
   const currency = named || currencyForCountry(country);
 
   // The demo's code is the web app's demo screen, whether or not the demo exists here
-  const existing = gymCode === demoCode() || await prisma.gym.findUnique({ where: { code: gymCode } });
-  if (existing) return res.status(409).json({ error: 'Gym code already taken', field: 'gymCode' });
+  if (await codeTaken(gymCode)) return res.status(409).json({ error: 'Gym code already taken', field: 'gymCode' });
 
   const passwordHash = await bcrypt.hash(String(password), 10);
   // The owner confirms their address from the welcome email (D-8)
@@ -124,6 +128,8 @@ async function register(req, res) {
   bestEffort(prisma.notification.create({ data: { gymId: gym.id, title: 'Complete your gym profile', body: 'Add your gym phone number, email, location, and branding details so everything looks professional.', type: 'system', audience: 'owner' } }), 'Profile notification');
 
   const owner = gym.staff[0];
+  // Someone who asked for a demo and has now signed up: their lead is won
+  bestEffort(linkLeadToGym(gym.id, owner.email), 'Linking the lead to the new gym');
   // Welcome email, best-effort for the same reason
   bestEffort(Promise.resolve().then(() => getResend().emails.send({
     from: E.sender(null),
@@ -256,6 +262,8 @@ function openSession(staff, gym) {
       gymCity: gym.city || null,
       gymCurrency: gym.currency || null,
       emailUnconfirmed: !!staff.emailVerifyHash,
+      // GEM has paused the gym's account: the app shows why instead of its pages
+      gymLocked: !!gym.lockedAt,
     },
   };
 }
@@ -365,7 +373,7 @@ async function me(req, res) {
     select: {
       id: true, firstName: true, lastName: true,
       email: true, role: true, department: true, gymId: true, avatarColor: true, photo: true, emailVerifyHash: true,
-      gym: { select: { code: true, name: true, country: true, city: true, currency: true } },
+      gym: { select: { code: true, name: true, country: true, city: true, currency: true, lockedAt: true } },
     },
   });
   if (!staff) return res.status(404).json({ error: 'User not found' });
@@ -380,6 +388,7 @@ async function me(req, res) {
     gymCountry: staff.gym?.country || null,
     gymCity: staff.gym?.city || null,
     gymCurrency: staff.gym?.currency || null,
+    gymLocked: !!staff.gym?.lockedAt,
   });
 }
 
@@ -442,8 +451,7 @@ async function verifyManager(req, res) {
 async function checkGymCode(req, res) {
   const code = (req.params.code || '').toLowerCase().trim();
   if (!code || !/^[a-z0-9-]+$/.test(code)) return res.json({ available: false });
-  const existing = code === demoCode() || await prisma.gym.findUnique({ where: { code } });
-  res.json({ available: !existing });
+  res.json({ available: !(await codeTaken(code)) });
 }
 
 async function forgotPassword(req, res) {

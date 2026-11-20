@@ -28,6 +28,9 @@ function useOneAccountPerBrowser() {
       if ((now?.key || null) === (shown?.key || null)) return;
       const signedOutOf = shown;
       shown = now;
+      // GEM's admin dashboard is not a gym's screen: a gym signing in or out in
+      // another tab leaves it where it is
+      if (window.location.pathname.startsWith('/admin')) return;
       if (now) window.location.replace(getHomeRoute());
       else window.location.replace(signedOutOf?.gymCode ? `/${signedOutOf.gymCode}/login` : '/login');
     };
@@ -117,6 +120,8 @@ function useInactivityLogout() {
   // Poll for inactivity - fires warning when threshold exceeded
   useEffect(() => {
     const interval = setInterval(() => {
+      // A gym's session times out on a gym's screens, not over GEM's admin dashboard
+      if (window.location.pathname.startsWith('/admin')) return;
       if (isAuthed() && !isDemoMode() && isInactive() && !warningActive.current) {
         warningActive.current = true;
         setCountdown(WARNING_SECONDS);

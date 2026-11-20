@@ -8,6 +8,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import GemMark from '../components/ui/GemMark';
 import PoweredBy from '../components/ui/PoweredBy';
 import DemoVideo from '../components/ui/DemoVideo';
+import DemoRequestForm from '../components/DemoRequestForm';
 
 export default function LandingPage() {
   const nav = useNavigate();
@@ -144,7 +145,20 @@ export default function LandingPage() {
                 {t('landing.signIn')} <ChevronRight size={isMobile ? 14 : 16} />
               </OutlineBtn>
             </div>
+            <a href="#demo" data-demo-link style={{ display: 'inline-block', marginTop: 18, fontSize: 13.5, color: 'var(--accent-gold)', fontWeight: 600, textDecoration: 'none' }}>{t('landing.demoLink')}</a>
           </div>
+        </div>
+      </section>
+
+      {/* ── Book a free demo: each request is a lead on GEM's admin dashboard ── */}
+      <section id="demo" aria-labelledby="demo-title" style={{ maxWidth: 760, margin: '0 auto', padding: isMobile ? '24px 20px 48px' : '40px 24px 88px', scrollMarginTop: 80 }}>
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? 20 : 28 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-gold)', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: 10 }}>{t('landing.demoLabel')}</div>
+          <h2 id="demo-title" style={{ fontFamily: 'Manrope, sans-serif', fontSize: isMobile ? 22 : 'clamp(24px, 3.5vw, 34px)', fontWeight: 800, letterSpacing: '-0.4px', margin: '0 0 10px', textWrap: 'balance' }}>{t('landing.demoTitle')}</h2>
+          <p style={{ fontSize: isMobile ? 13 : 15, color: 'var(--text-secondary)', maxWidth: 520, margin: '0 auto', lineHeight: 1.7 }}>{t('landing.demoSub')}</p>
+        </div>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: isMobile ? 16 : 20, padding: isMobile ? '20px 16px' : '28px 28px', position: 'relative' }}>
+          <DemoRequestForm isMobile={isMobile} />
         </div>
       </section>
 

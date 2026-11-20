@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { AlertTriangle, MessageSquareWarning, Lightbulb, HelpCircle, Send, CheckCircle, Inbox, ArrowLeft, Clock } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { useLiveTick } from '../hooks/useLiveRefresh';
 import { getAuth } from '../utils/auth';
 import { fmtDate, fmtTime } from '../utils/date';
 import { serverFieldError, fieldErrorStyle, revealFirstError } from '../utils/formErrors';
@@ -62,7 +63,9 @@ export default function SupportPage() {
       .catch(() => setHistoryFailed(true))
       .finally(() => setHistoryLoading(false));
   }, []);
-  useEffect(() => { loadHistory(); }, [loadHistory]);
+  // GEM's answer arrives while the page is open
+  const liveTick = useLiveTick(['support']);
+  useEffect(() => { loadHistory(); }, [loadHistory, liveTick]);
 
   const set = (field, value) => {
     setForm(f => ({ ...f, [field]: value }));
@@ -201,11 +204,18 @@ export default function SupportPage() {
               <li key={r.id} data-support-report style={{ padding: '12px 0', borderTop: i ? '1px solid var(--border-subtle)' : 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', minWidth: 0, overflowWrap: 'anywhere' }}>{r.subject}</span>
-                  <span data-support-status={r.emailedAt ? 'sent' : 'not-sent'} style={{
-                    marginLeft: 'auto', fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap',
-                    background: r.emailedAt ? 'var(--accent-green-dim)' : 'var(--accent-yellow-dim)',
-                    color: r.emailedAt ? 'var(--accent-green)' : 'var(--accent-yellow)',
-                  }}>{r.emailedAt ? t('support.statusSent') : t('support.statusNotSent')}</span>
+                  {(() => {
+                    // Where GEM is with it, once it has looked; before that, whether it reached GEM
+                    const [key, look, text] = r.status === 'resolved' ? ['resolved', 'green', t('support.statusResolved')]
+                      : r.status === 'in_progress' ? ['in-progress', 'blue', t('support.statusInProgress')]
+                        : r.emailedAt ? ['sent', 'green', t('support.statusSent')] : ['not-sent', 'yellow', t('support.statusNotSent')];
+                    return (
+                      <span data-support-status={key} style={{
+                        marginLeft: 'auto', fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap',
+                        background: `var(--accent-${look}-dim)`, color: `var(--accent-${look})`,
+                      }}>{text}</span>
+                    );
+                  })()}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-muted)' }}>
                   <span>{t(KIND_LABEL[r.kind] || 'support.kindQuestion')}</span>
@@ -213,6 +223,12 @@ export default function SupportPage() {
                   <Clock size={11} />
                   <span>{fmtDate(r.createdAt)} {fmtTime(r.createdAt)}</span>
                 </div>
+                {r.reply && (
+                  <div data-support-reply style={{ marginTop: 6, borderLeft: '3px solid var(--accent-gold)', background: 'var(--accent-gold-dim)', borderRadius: '0 10px 10px 0', padding: '8px 12px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-gold)', marginBottom: 3 }}>{t('support.answered', { date: fmtDate(r.repliedAt) })}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.5 }}>{r.reply}</div>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

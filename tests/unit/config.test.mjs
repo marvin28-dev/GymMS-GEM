@@ -8,6 +8,7 @@ const { checkConfig } = createRequire(new URL('../../gem-backend/src/app.js', im
 const complete = {
   DATABASE_URL: 'postgresql://localhost/gem', JWT_SECRET: 'x'.repeat(40), FRONTEND_URL: 'https://gem.example',
   RESEND_API_KEY: 're_x', CLOUDINARY_CLOUD_NAME: 'c', CLOUDINARY_API_KEY: 'k', CLOUDINARY_API_SECRET: 's',
+  ADMIN_EMAIL: 'owner@gem.example', ADMIN_PASSWORD: 'a-long-admin-password',
 };
 
 describe('the start-up check', () => {
@@ -28,5 +29,13 @@ describe('the start-up check', () => {
       'RESEND_API_KEY is not set: no email will be sent.',
       'JWT_SECRET is shorter than 32 characters: use a long random value.',
     ]);
+  });
+
+  it('warns when nobody can sign in to the admin dashboard, or its password is short', () => {
+    expect(checkConfig({ ...complete, ADMIN_EMAIL: '', ADMIN_PASSWORD: undefined }).warnings).toEqual([
+      'ADMIN_EMAIL is not set: nobody can sign in to GEM\'s admin dashboard.',
+      'ADMIN_PASSWORD is not set: nobody can sign in to GEM\'s admin dashboard.',
+    ]);
+    expect(checkConfig({ ...complete, ADMIN_PASSWORD: 'short' }).warnings).toEqual(['ADMIN_PASSWORD is shorter than 12 characters: use a long one, it opens every gym.']);
   });
 });

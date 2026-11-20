@@ -98,6 +98,28 @@ export async function stubPrinting(page) {
   });
 }
 
+// GEM's admin dashboard (ADMIN_EMAIL and ADMIN_PASSWORD in backend.cjs)
+export const ADMIN = { email: 'admin@gem.test', password: 'Admin-pass-for-tests-1' };
+export async function adminToken() {
+  return (await call('POST', '/admin/login', { body: ADMIN })).token;
+}
+// Opens the admin dashboard signed in, the way its sign-in page keeps the session
+export async function signInAdmin(page) {
+  const token = await adminToken();
+  await page.addInitScript(({ token: tk, email }) => {
+    if (!/^https?:$/.test(location.protocol) || sessionStorage.getItem('e2e_admin')) return;
+    sessionStorage.setItem('e2e_admin', '1');
+    localStorage.setItem('gem_admin_auth', JSON.stringify({ token: tk, admin: { email } }));
+  }, { token, email: ADMIN.email });
+  return token;
+}
+// The gym signed up 70 days ago and its members joined 40 days ago, so last
+// month can be billed (the /backdate helper in backend.cjs)
+export async function backdateGym(code) {
+  const res = await fetch(OUTBOX_URL.replace(/\/outbox$/, `/backdate?gym=${encodeURIComponent(code)}`), { method: 'POST' });
+  if (!res.ok) throw new Error(`backdate failed: ${res.status}`);
+}
+
 // Opens the app as this account: the session is put where the sign-in page
 // puts it, before the app's own code runs.
 export async function signIn(page, session) {

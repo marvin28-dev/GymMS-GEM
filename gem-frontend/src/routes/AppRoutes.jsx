@@ -19,6 +19,18 @@ const FrontDeskPage = lazy(() => import("../pages/FrontDeskPage"));
 const MemberProfilePage = lazy(() => import("../pages/MemberProfilePage"));
 const StaffProfilePage = lazy(() => import("../pages/StaffProfilePage"));
 const SupportPage = lazy(() => import("../pages/SupportPage"));
+const AccountPausedPage = lazy(() => import("../pages/AccountPausedPage"));
+// GEM's own admin dashboard: loaded only when opened, never by a gym
+const AdminLoginPage = lazy(() => import("../pages/admin/AdminLoginPage"));
+const AdminLayout = lazy(() => import("../pages/admin/AdminLayout"));
+const AdminOverview = lazy(() => import("../pages/admin/AdminOverview"));
+const AdminGyms = lazy(() => import("../pages/admin/AdminGyms"));
+const AdminGymDetail = lazy(() => import("../pages/admin/AdminGymDetail"));
+const AdminBilling = lazy(() => import("../pages/admin/AdminBilling"));
+const AdminLeads = lazy(() => import("../pages/admin/AdminLeads"));
+const AdminProblems = lazy(() => import("../pages/admin/AdminProblems"));
+const AdminAnnouncements = lazy(() => import("../pages/admin/AdminAnnouncements"));
+const AdminSettings = lazy(() => import("../pages/admin/AdminSettings"));
 
 export default function AppRoutes() {
   // Clear expired auth before any route logic so isAuthed() reflects reality
@@ -41,6 +53,24 @@ export default function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
+
+      {/* GEM's admin dashboard, apart from every gym (its own sign-in) */}
+      <Route path="/admin/login" element={<AdminLoginPage />} />
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<AdminOverview />} />
+        <Route path="gyms" element={<AdminGyms />} />
+        <Route path="gyms/:id" element={<AdminGymDetail />} />
+        <Route path="billing" element={<AdminBilling />} />
+        <Route path="leads" element={<AdminLeads />} />
+        <Route path="problems" element={<AdminProblems />} />
+        <Route path="announcements" element={<AdminAnnouncements />} />
+        <Route path="settings" element={<AdminSettings />} />
+      </Route>
+
+      {/* A gym GEM has paused: signed in, but only this screen opens */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/account-paused" element={<AccountPausedPage />} />
+      </Route>
 
       {/* Fullscreen Front Desk (no app layout) */}
       <Route element={<ProtectedRoute />}>

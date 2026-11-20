@@ -16,6 +16,9 @@ Object.assign(process.env, {
   ALLOWED_ORIGINS: '',
   RESEND_API_KEY: 're_test_not_a_real_key',
   EMAIL_FROM_ADDRESS: '',
+  // GEM's admin dashboard (tests only; never a real account)
+  ADMIN_EMAIL: 'admin@gem.test',
+  ADMIN_PASSWORD: 'Admin-pass-for-tests-1',
   RAILWAY_ENVIRONMENT: '',
   CLOUDINARY_CLOUD_NAME: 'test',
   CLOUDINARY_API_KEY: 'test',

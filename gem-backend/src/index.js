@@ -10,6 +10,7 @@ const { startTaskReminders } = require('./jobs/taskReminders');
 const { startLogRetention } = require('./jobs/logRetention');
 const { startFreezeFees } = require('./jobs/freezeFees');
 const { startScheduledMessages } = require('./jobs/scheduledMessages');
+const { startMonthlyBills } = require('./jobs/monthlyBills');
 const prisma = require('./utils/prisma');
 const { closeGracefully } = require('./utils/shutdown');
 const { logFailure } = require('./utils/bestEffort');
@@ -25,7 +26,7 @@ const PORT = process.env.PORT || 5000;
 let jobs = [];
 const server = app.listen(PORT, () => {
   console.log(`GEM backend running on http://localhost:${PORT}`);
-  jobs = [startPayrollReminders(), startTaskReminders(), startLogRetention(), startFreezeFees(), startScheduledMessages()];
+  jobs = [startPayrollReminders(), startTaskReminders(), startLogRetention(), startFreezeFees(), startScheduledMessages(), startMonthlyBills()];
 });
 
 // A deploy stops this server with SIGTERM; Node's default is to quit on the

@@ -1,10 +1,13 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { isAuthed, checkDailyExpiry, getRole, getHomeRoute } from "../utils/auth";
+import { isAuthed, checkDailyExpiry, getRole, getHomeRoute, getAuth } from "../utils/auth";
 import { pagesFor } from "../utils/rolePages";
 
 export default function ProtectedRoute() {
+  const { pathname } = useLocation();
   if (checkDailyExpiry()) return <Navigate to="/login" replace />;
   if (!isAuthed()) return <Navigate to="/login" replace />;
+  // GEM has paused the gym's account: only the screen that says so opens
+  if (getAuth()?.user?.gymLocked && pathname !== '/account-paused') return <Navigate to="/account-paused" replace />;
   return <Outlet />;
 }
 
