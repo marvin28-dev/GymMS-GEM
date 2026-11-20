@@ -5,11 +5,11 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import { useLanguage } from '../contexts/LanguageContext';
 import CodeInput from '../components/ui/CodeInput';
 import {
-  Search, X, UserCheck, ChevronLeft, ChevronRight, MessageSquare,
+  Search, X, UserCheck, ChevronLeft, ChevronRight,
   AlertTriangle, CheckCircle, AlertCircle, Clock, LogOut, ArrowLeft, UserCircle, LifeBuoy,
   ShoppingCart, ShoppingBag, Plus, Minus, Trash2, Phone, Mail, Eye, EyeOff,
   CreditCard, Wrench, FileText, Download, UserPlus, TrendingUp, Receipt,
-  RefreshCw, Smartphone, LogIn,
+  RefreshCw, LogIn,
 } from 'lucide-react';
 import StatusBadge from '../components/ui/StatusBadge';
 import MemberStatusTags from '../components/ui/MemberStatusTags';
@@ -985,10 +985,9 @@ export default function FrontDeskPage() {
     }
   };
 
-  // Re-send the member their own check-in code. Email goes through the server;
-  // a text opens the desk device's own messaging app, prefilled, since the gym
-  // has no SMS gateway of its own. Both take the member to act on (defaulting to
-  // the search result) and return { ok, text }; the code modal shows the shared state.
+  // Re-send the member their own check-in code by email (texting was taken
+  // out). Takes the member to act on (defaulting to the search result) and
+  // returns { ok, text }; the code modal shows the shared state.
   const emailCodeToMember = async (m = foundMember) => {
     if (!m || m._isStaff) return { ok: false, text: '' };
     if (!m.email) { const r = { ok: false, text: t('frontDesk.noEmailOnFile') }; setSendCodeSent(false); setSendCodeMsg(r.text); return r; }
@@ -1004,15 +1003,6 @@ export default function FrontDeskPage() {
       setSendingCode(false);
     }
   };
-  const textCodeToMember = (m = foundMember) => {
-    if (!m || m._isStaff) return { ok: false, text: '' };
-    if (!m.phone) { const r = { ok: false, text: t('frontDesk.noPhoneOnFile') }; setSendCodeSent(false); setSendCodeMsg(r.text); return r; }
-    const body = t('frontDesk.codeSmsBody', { gym: gymData?.name || 'the gym', code: m.accessCode || '' });
-    window.location.href = `sms:${m.phone}?body=${encodeURIComponent(body)}`;
-    const r = { ok: true, text: t('frontDesk.codeTextOpened') };
-    setSendCodeSent(true); setSendCodeMsg(r.text); return r;
-  };
-
   const handleCodeVerifyCheckIn = async () => {
     if (codeEntered.trim() === foundMember.accessCode) {
       try {
@@ -2192,11 +2182,7 @@ export default function FrontDeskPage() {
             {codeError && <div role="alert" style={{ fontSize:11, color:'#ef4444', fontFamily:'DM Sans' }}>{codeError}</div>}
             <div style={{ paddingTop:4, borderTop:'1px solid var(--border-subtle)' }}>
               <div style={{ fontSize:10, fontWeight:700, letterSpacing:'1px', color:'var(--text-muted)', fontFamily:'DM Sans', margin:'8px 0' }}>{t('frontDesk.forgotCode')}</div>
-              <div style={{ display:'flex', gap:8 }}>
-                <button onClick={emailCodeToMember} disabled={sendingCode} style={{ ...secondaryBtn, flex:1, justifyContent:'center', padding:'7px 10px', fontSize:11.5, opacity:sendingCode?0.6:1, cursor:sendingCode?'default':'pointer' }}><Mail size={13}/> {t('frontDesk.sendByEmail')}</button>
-                <button onClick={textCodeToMember} style={{ ...secondaryBtn, flex:1, justifyContent:'center', padding:'7px 10px', fontSize:11.5 }}><MessageSquare size={13}/> {t('frontDesk.sendByText')}</button>
-              </div>
-              <div style={{ marginTop:8, fontSize:11, color:'var(--text-muted)', fontFamily:'DM Sans', lineHeight:1.5 }}>{t('frontDesk.textCodeHint')}</div>
+              <button onClick={() => emailCodeToMember()} disabled={sendingCode} style={{ ...secondaryBtn, width:'100%', justifyContent:'center', padding:'7px 10px', fontSize:11.5, opacity:sendingCode?0.6:1, cursor:sendingCode?'default':'pointer' }}><Mail size={13}/> {t('frontDesk.sendByEmail')}</button>
               {sendCodeMsg && <div style={{ marginTop:8, fontSize:11, fontFamily:'DM Sans', color: sendCodeSent ? '#34d399' : 'var(--accent-red)' }}>{sendCodeMsg}</div>}
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>

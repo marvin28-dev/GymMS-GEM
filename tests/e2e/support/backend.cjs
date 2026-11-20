@@ -16,11 +16,6 @@ Object.assign(process.env, {
   ALLOWED_ORIGINS: '',
   RESEND_API_KEY: 're_test_not_a_real_key',
   EMAIL_FROM_ADDRESS: '',
-  SMS_PROVIDER: '',
-  TWILIO_ACCOUNT_SID: '',
-  TWILIO_AUTH_TOKEN: '',
-  TWILIO_FROM: '',
-  TWILIO_MESSAGING_SERVICE_SID: '',
   RAILWAY_ENVIRONMENT: '',
   // The helpers set up each test's gym from this one machine; behind a trusted
   // proxy hop each setup call can name its own address, so the real per-address

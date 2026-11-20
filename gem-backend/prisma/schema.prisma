@@ -608,9 +608,11 @@ model CalendarEvent {
   @@index([gymId, date])
 }
 
-// A message to members by email, text (SMS) or both. The audience is kept as
-// the rule it was chosen by and worked out when it is sent; targetGroup is that
-// audience in words. Each person it went to is a CommunicationDelivery.
+// A message to members by email. The audience is kept as the rule it was
+// chosen by and worked out when it is sent; targetGroup is that audience in
+// words. Each person it went to is a CommunicationDelivery. Texting was taken
+// out on 20 November 2026; channel, smsSent and smsFailed stay so older rows
+// still read and texting can come back without a migration.
 model Communication {
   id          String    @id @default(cuid())
   gymId       String

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Mail, MessageSquare, Send, Clock, FileText, Trash2, Eye, RefreshCw, X, Pencil, Ban, Info, Loader2, Users,
+  Mail, Send, Clock, FileText, Trash2, Eye, RefreshCw, X, Pencil, Ban, Info, Loader2, Users,
 } from 'lucide-react';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useLiveTick } from '../hooks/useLiveRefresh';
@@ -21,12 +21,13 @@ import { fmtDate, todayStr, dayStr } from '../utils/date';
 import { softAll, failed } from '../utils/loadAll';
 import { gymCache } from '../utils/gymCache';
 import { serverFieldError, fieldErrorStyle, revealFirstError } from '../utils/formErrors';
-import { smsInfo, TOKENS, fillIn, hasFillIns } from '../utils/smsCount';
+import { TOKENS } from '../utils/fillIn';
 import FillInPreview from '../components/FillInPreview';
 
-// Messages to members by email, text (SMS) or both. The server works out who an
-// audience reaches when it sends, fills in each person's name, end date and
-// balance, and records every delivery; this page writes, schedules and follows them.
+// Messages to members by email (texting was taken out until V2). The server
+// works out who an audience reaches when it sends, fills in each person's name,
+// end date and balance, and records every delivery; this page writes, schedules
+// and follows them.
 
 const card = { background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 14, boxShadow: 'var(--shadow-card)' };
 const input = { width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 14px', fontSize: 13.5, color: 'var(--text-primary)', fontFamily: 'DM Sans, sans-serif', outline: 'none', boxSizing: 'border-box' };
@@ -40,13 +41,11 @@ const chip = (on) => ({
 
 const AUDIENCES = ['all', 'active', 'ending', 'inactive', 'owing', 'package', 'members'];
 const STATUS_FILTERS = ['all', 'sent', 'scheduled', 'draft', 'failed'];
-const wants = (channel, kind) => channel === kind || channel === 'both';
-
 
 // "1 person" / "3 people": key1 is the singular form
 const nt = (t, key, vars) => (vars.n === 1 ? t(`${key}1`, vars) : t(key, vars));
 
-const emptyDraft = () => ({ id: null, channel: 'email', audience: { type: 'all' }, picked: [], subject: '', body: '', when: 'now', date: '', time: '' });
+const emptyDraft = () => ({ id: null, audience: { type: 'all' }, picked: [], subject: '', body: '', when: 'now', date: '', time: '' });
 
 export default function CommunicationPage() {
   const { t } = useLanguage();
@@ -98,23 +97,16 @@ export default function CommunicationPage() {
   const audienceKey = JSON.stringify(d.audience);
   useEffect(() => {
     if (d.audience.type === 'package' && !d.audience.packageId) { setPreview(null); return undefined; }
-    if (d.audience.type === 'members' && !d.audience.memberIds?.length) { setPreview({ total: 0, withEmail: 0, withPhone: 0, key: audienceKey }); return undefined; }
+    if (d.audience.type === 'members' && !d.audience.memberIds?.length) { setPreview({ total: 0, withEmail: 0, key: audienceKey }); return undefined; }
     let alive = true;
     const timer = setTimeout(() => previewAudience(d.audience).then(r => { if (alive) setPreview({ ...r.data, key: audienceKey }); }).catch(() => {}), 250);
     return () => { alive = false; clearTimeout(timer); };
   }, [audienceKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const smsReady = !!channels?.sms?.ready;
   const emailReady = channels ? !!channels.email?.ready : true;
   // the first person's own values, once the count is for the current choice
   const sample = preview?.key === audienceKey ? preview?.sample || null : null;
-  // a text is counted as it will really go out, names filled in
-  const sms = smsInfo(sample && hasFillIns(d.body) ? fillIn(d.body, sample) : d.body);
-  const reach = preview ? {
-    total: preview.total,
-    email: wants(d.channel, 'email') ? preview.withEmail : 0,
-    sms: wants(d.channel, 'sms') ? preview.withPhone : 0,
-  } : null;
+  const reach = preview ? { total: preview.total, email: preview.withEmail } : null;
 
   // ── Writing ──
   const insertToken = (key) => {
@@ -145,10 +137,9 @@ export default function CommunicationPage() {
   const check = (action, counted = preview) => {
     const e = {};
     if (action !== 'draft') {
-      if (wants(d.channel, 'sms') && !smsReady) e.channel = t('communication.smsNotReady');
-      if (wants(d.channel, 'email') && !d.subject.trim()) e.subject = t('communication.needSubject');
+      if (!emailReady) e._form = t('communication.emailNotReady');
+      if (!d.subject.trim()) e.subject = t('communication.needSubject');
       if (!d.body.trim()) e.body = t('communication.needBody');
-      else if (wants(d.channel, 'sms') && sms.parts > 6) e.body = t('communication.tooLongForText');
       if (d.audience.type === 'package' && !d.audience.packageId) e.audience = t('communication.choosePackage');
       else if (d.audience.type === 'members' && !d.picked.length) e.audience = t('communication.choosePeople');
       else if (counted && counted.total === 0) e.audience = t('communication.nobodyMatches');
@@ -167,7 +158,7 @@ export default function CommunicationPage() {
     setBusy(true); setNotice('');
     try {
       const res = await createCommunication({
-        id: d.id || undefined, action, channel: d.channel, subject: d.subject.trim(), body: d.body.trim(), audience: d.audience,
+        id: d.id || undefined, action, subject: d.subject.trim(), body: d.body.trim(), audience: d.audience,
         scheduledAt: action === 'schedule' ? scheduledAt()?.toISOString() : undefined,
       });
       const n = people;
@@ -180,7 +171,7 @@ export default function CommunicationPage() {
       load();
     } catch (err) {
       const se = serverFieldError(err, t('communication.sendFailed'));
-      setErrors(se.field ? { [se.field]: se.message } : { _form: se.message });
+      setErrors(se.field && se.field !== 'channel' ? { [se.field]: se.message } : { _form: se.message });
     }
     setBusy(false); setConfirm(null);
   };
@@ -202,7 +193,7 @@ export default function CommunicationPage() {
     const picked = a.type === 'members' ? (a.memberIds || []).map(id => members.find(m => m.id === id)).filter(Boolean) : [];
     const at = c.scheduledAt ? new Date(c.scheduledAt) : null;
     setD({
-      id: c.id, channel: c.channel || 'email', audience: a, picked, subject: c.subject || '', body: c.body || '',
+      id: c.id, audience: a, picked, subject: c.subject || '', body: c.body || '',
       when: c.status === 'scheduled' ? 'later' : 'now',
       date: at ? dayStr(at) : '', time: at ? `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` : '',
     });
@@ -212,7 +203,7 @@ export default function CommunicationPage() {
   };
 
   // ── History ──
-  const titleOf = (c) => (c.channel === 'sms' ? c.body : c.subject) || c.body || t('communication.untitled');
+  const titleOf = (c) => c.subject || c.body || t('communication.untitled');
   const pkgName = (id) => packages.find(p => p.id === id)?.name || '';
   const audienceText = (c) => {
     const a = c.audience;
@@ -228,9 +219,9 @@ export default function CommunicationPage() {
   };
   const shown = history.filter(c => filter === 'all'
     || (filter === 'sent' && ['sent', 'partial', 'sending'].includes(c.status))
-    || (filter === 'failed' && (c.status === 'failed' || c.emailFailed + c.smsFailed > 0))
+    || (filter === 'failed' && (c.status === 'failed' || c.emailFailed > 0))
     || c.status === filter);
-  const countOf = (f) => (f === 'all' ? history.length : history.filter(c => (f === 'sent' ? ['sent', 'partial', 'sending'].includes(c.status) : f === 'failed' ? (c.status === 'failed' || c.emailFailed + c.smsFailed > 0) : c.status === f)).length);
+  const countOf = (f) => (f === 'all' ? history.length : history.filter(c => (f === 'sent' ? ['sent', 'partial', 'sending'].includes(c.status) : f === 'failed' ? (c.status === 'failed' || c.emailFailed > 0) : c.status === f)).length);
 
   const doRetry = async (id) => {
     setHistoryError('');
@@ -250,23 +241,14 @@ export default function CommunicationPage() {
     { label: t('common.view'), icon: <Eye size={15} />, onClick: () => setViewId(c.id), hidden: c.status === 'draft' },
     { label: t('communication.editDraft'), icon: <Pencil size={15} />, onClick: () => openDraft(c), hidden: !['draft', 'scheduled'].includes(c.status) },
     { label: t('communication.unschedule'), icon: <Ban size={15} />, onClick: () => doUnschedule(c.id), hidden: c.status !== 'scheduled' },
-    { label: t('communication.retryFailed'), icon: <RefreshCw size={15} />, onClick: () => doRetry(c.id), hidden: !(c.emailFailed + c.smsFailed > 0) || c.status === 'sending' },
+    { label: t('communication.retryFailed'), icon: <RefreshCw size={15} />, onClick: () => doRetry(c.id), hidden: !(c.emailFailed > 0) || c.status === 'sending' },
     { label: t('common.delete'), icon: <Trash2 size={15} />, onClick: () => setDeleteId(c.id), danger: true, hidden: c.status === 'sending' },
   ];
 
   // ── Pieces ──
   const err = (k) => errors[k] && <span role="alert" style={fieldErrorStyle}>{errors[k]}</span>;
-  const ChannelIcons = ({ channel, size = 13 }) => (
-    <span style={{ display: 'inline-flex', gap: 4, color: 'var(--text-secondary)' }} title={t(`communication.ch_${channel || 'email'}`)}>
-      {wants(channel || 'email', 'email') && <Mail size={size} />}{wants(channel, 'sms') && <MessageSquare size={size} />}
-    </span>
-  );
 
-  const banners = channels && [
-    channels.email?.testMode && wants(d.channel, 'email') && t('communication.emailTestMode'),
-    !smsReady && t('communication.smsOff'),
-    smsReady && channels.sms?.testMode && wants(d.channel, 'sms') && t('communication.smsTestMode'),
-  ].filter(Boolean);
+  const banners = channels && [channels.email?.testMode && t('communication.emailTestMode')].filter(Boolean);
 
   const compose = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -285,25 +267,6 @@ export default function CommunicationPage() {
           ))}
         </div>
       )}
-
-      {/* How it goes */}
-      <div>
-        <span style={label}>{t('communication.sendBy')}</span>
-        <div role="radiogroup" aria-label={t('communication.sendBy')} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, padding: 4, background: 'var(--bg-elevated)', borderRadius: 12, border: `1px solid ${errors.channel ? 'var(--accent-red)' : 'var(--border-subtle)'}` }}>
-          {[['email', Mail], ['sms', MessageSquare], ['both', Send]].map(([k, Icon]) => {
-            const on = d.channel === k;
-            const off = (k !== 'email' && !smsReady) || (k !== 'sms' && !emailReady);
-            return (
-              <button key={k} type="button" role="radio" aria-checked={on} data-channel={k} disabled={off} title={off ? t('communication.smsOff') : undefined}
-                onClick={() => set({ channel: k })}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 6px', borderRadius: 9, border: 'none', cursor: off ? 'not-allowed' : 'pointer', opacity: off ? 0.4 : 1, fontSize: 13, fontWeight: on ? 700 : 500, fontFamily: 'DM Sans', background: on ? 'var(--bg-card)' : 'transparent', color: on ? 'var(--accent-gold)' : 'var(--text-secondary)', boxShadow: on ? '0 1px 3px rgba(0,0,0,0.2)' : 'none' }}>
-                <Icon size={14} /> {t(`communication.ch_${k}`)}
-              </button>
-            );
-          })}
-        </div>
-        {err('channel')}
-      </div>
 
       {/* Who it is for */}
       <div>
@@ -341,8 +304,8 @@ export default function CommunicationPage() {
                         style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontFamily: 'DM Sans' }}
                         onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-elevated)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
                         <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{m.firstName} {m.lastName}</span>
-                        <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6, color: 'var(--text-muted)' }}>
-                          <Mail size={12} style={{ opacity: m.email ? 1 : 0.25 }} /><MessageSquare size={12} style={{ opacity: m.phone ? 1 : 0.25 }} />
+                        <span style={{ marginLeft: 'auto', display: 'inline-flex', color: 'var(--text-muted)' }}>
+                          <Mail size={12} style={{ opacity: m.email ? 1 : 0.25 }} />
                         </span>
                       </button>
                     ))}
@@ -366,27 +329,23 @@ export default function CommunicationPage() {
               <><Users size={13} color="var(--accent-gold)" /><b style={{ color: 'var(--text-primary)' }}>{nt(t, 'communication.peopleN', { n: reach.total })}</b></>
             )}
             {(d.audience.excludeIds || []).length > 0 && <span data-left-out style={{ whiteSpace: 'nowrap', color: 'var(--accent-yellow)' }}>· {nt(t, 'communication.leftOutN', { n: d.audience.excludeIds.length })}</span>}
-            {wants(d.channel, 'email') && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>· <Mail size={11} /> {t('communication.reachEmail', { n: reach.email })}</span>}
-            {wants(d.channel, 'sms') && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>· <MessageSquare size={11} /> {t('communication.reachSms', { n: reach.sms })}</span>}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>· <Mail size={11} /> {t('communication.reachEmail', { n: reach.email })}</span>
           </div>
         )}
         {err('audience')}
       </div>
 
-      {/* Subject, for email */}
-      {wants(d.channel, 'email') && (
-        <div>
-          <label style={label} htmlFor="comm-subject">{t('communication.subjectField')}</label>
-          <input id="comm-subject" value={d.subject} maxLength={150} onChange={e => set({ subject: e.target.value })} placeholder={t('communication.subjectPh')} style={{ ...input, borderColor: errors.subject ? 'var(--accent-red)' : 'var(--border-subtle)' }} />
-          {err('subject')}
-        </div>
-      )}
+      <div>
+        <label style={label} htmlFor="comm-subject">{t('communication.subjectField')}</label>
+        <input id="comm-subject" value={d.subject} maxLength={150} onChange={e => set({ subject: e.target.value })} placeholder={t('communication.subjectPh')} style={{ ...input, borderColor: errors.subject ? 'var(--accent-red)' : 'var(--border-subtle)' }} />
+        {err('subject')}
+      </div>
 
       {/* The message */}
       <div>
         <label style={label} htmlFor="comm-body">{t('communication.messageField')}</label>
         <textarea id="comm-body" ref={bodyRef} value={d.body} onChange={e => set({ body: e.target.value })} rows={isMobile ? 6 : 7} maxLength={5000}
-          placeholder={t(d.channel === 'sms' ? 'communication.bodyPhSms' : 'communication.bodyPh')}
+          placeholder={t('communication.bodyPh')}
           style={{ ...input, resize: 'vertical', lineHeight: 1.55, minHeight: 130, fontSize: isMobile ? 16 : 13.5, borderColor: errors.body ? 'var(--accent-red)' : 'var(--border-subtle)' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
           <span style={{ fontSize: 11.5, color: 'var(--text-muted)', fontFamily: 'DM Sans' }}>{t('communication.insert')}</span>
@@ -396,13 +355,8 @@ export default function CommunicationPage() {
               + {t(`communication.${lk}`)}
             </button>
           ))}
-          {wants(d.channel, 'sms') && d.body && (
-            <span data-sms-count style={{ marginLeft: 'auto', fontSize: 11.5, color: sms.parts > 6 ? 'var(--accent-red)' : sms.parts > 1 ? 'var(--accent-yellow)' : 'var(--text-muted)', fontFamily: 'DM Sans', fontVariantNumeric: 'tabular-nums' }}>
-              {t(sms.parts === 1 ? 'communication.smsOne' : 'communication.smsParts', { len: sms.len, limit: sms.limit, n: sms.parts })}
-            </span>
-          )}
         </div>
-        <FillInPreview body={d.body} subject={wants(d.channel, 'email') ? d.subject : ''} sample={sample} />
+        <FillInPreview body={d.body} subject={d.subject} sample={sample} />
         {err('body')}
       </div>
 
@@ -436,7 +390,7 @@ export default function CommunicationPage() {
   );
 
   const statusPill = (c) => {
-    const failed = (c.emailFailed || 0) + (c.smsFailed || 0), sent = (c.emailSent || 0) + (c.smsSent || 0);
+    const failed = c.emailFailed || 0, sent = c.emailSent || 0;
     const look = {
       draft: ['var(--text-muted)', 'rgba(140,140,150,0.14)', t('communication.st_draft')],
       scheduled: ['var(--accent-blue)', 'var(--accent-blue-dim)', t('communication.st_scheduled')],
@@ -474,10 +428,7 @@ export default function CommunicationPage() {
       ) : shown.map(c => (
         <div key={c.id} data-message-row={c.status} style={{ ...card, padding: '12px 14px', display: 'flex', gap: 10 }}>
           <div style={{ flex: 1, minWidth: 0 }} onClick={() => (c.status === 'draft' ? openDraft(c) : setViewId(c.id))}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <ChannelIcons channel={c.channel} />
-              <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'DM Sans', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titleOf(c)}</span>
-            </div>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'DM Sans', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titleOf(c)}</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Sans', margin: '4px 0 6px' }}>{audienceText(c)} · {when(c)}</div>
             {statusPill(c)}
           </div>
@@ -502,11 +453,8 @@ export default function CommunicationPage() {
             <tr key={c.id} data-message-row={c.status} style={{ cursor: 'pointer' }} onClick={() => (c.status === 'draft' ? openDraft(c) : setViewId(c.id))}
               onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card-hover)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
               <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-subtle)', maxWidth: 280 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <ChannelIcons channel={c.channel} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titleOf(c)}</span>
-                </div>
-                {c.channel !== 'sms' && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.body}</div>}
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titleOf(c)}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.body}</div>
               </td>
               <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-subtle)', fontSize: 12.5, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{audienceText(c)}</td>
               <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-subtle)', fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{when(c)}</td>
@@ -523,11 +471,8 @@ export default function CommunicationPage() {
 
   const confirmText = confirm && (() => {
     const n = reach?.total ?? 0;
-    const lines = [];
-    if (wants(d.channel, 'email')) lines.push(nt(t, 'communication.confirmEmails', { n: reach.email }));
-    if (wants(d.channel, 'sms')) lines.push(nt(t, sms.parts > 1 ? 'communication.confirmTextsParts' : 'communication.confirmTexts', { n: reach.sms, parts: sms.parts }));
-    const missing = Math.max(0, n - Math.max(reach.email, reach.sms));
-    return `${confirm === 'schedule' ? t('communication.confirmSchedule', { n, when: `${fmtDate(scheduledAt())} ${d.time}` }) : t('communication.confirmSend', { n })} ${lines.join(' ')}${missing ? ` ${nt(t, 'communication.confirmMissing', { n: missing })}` : ''}`;
+    const missing = Math.max(0, n - reach.email);
+    return `${confirm === 'schedule' ? t('communication.confirmSchedule', { n, when: `${fmtDate(scheduledAt())} ${d.time}` }) : t('communication.confirmSend', { n })} ${nt(t, 'communication.confirmEmails', { n: reach.email })}${missing ? ` ${nt(t, 'communication.confirmMissing', { n: missing })}` : ''}`;
   })();
 
   return (
@@ -571,15 +516,15 @@ export default function CommunicationPage() {
         message={confirmText || ''} confirmLabel={confirm === 'schedule' ? t('communication.schedule') : t('communication.send')} />
       <ConfirmModal open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={() => { doDelete(deleteId); setDeleteId(null); }}
         title={t('communication.deleteTitle')} message={t('communication.deleteMessage')} confirmLabel={t('common.delete')} danger />
-      <AudienceList open={showPeople} onClose={() => setShowPeople(false)} audience={d.audience} channel={d.channel} t={t}
+      <AudienceList open={showPeople} onClose={() => setShowPeople(false)} audience={d.audience} t={t}
         onChange={(audience) => set({ audience })} />
-      <MessageDetails id={viewId} onClose={() => setViewId(null)} audienceText={audienceText} statusPill={statusPill} onRetry={doRetry} t={t} isMobile={isMobile} />
+      <MessageDetails id={viewId} onClose={() => setViewId(null)} audienceText={audienceText} statusPill={statusPill} onRetry={doRetry} t={t} />
     </div>
   );
 }
 
 // One message: what was said, to whom, and how each delivery went
-function MessageDetails({ id, onClose, audienceText, statusPill, onRetry, t, isMobile }) {
+function MessageDetails({ id, onClose, audienceText, statusPill, onRetry, t }) {
   const [c, setC] = useState(null);
   const [tab, setTab] = useState('all');
   const liveTick = useLiveTick(['communications']);
@@ -603,9 +548,9 @@ function MessageDetails({ id, onClose, audienceText, statusPill, onRetry, t, isM
         <div data-message-details style={{ display: 'flex', flexDirection: 'column', gap: 16, fontFamily: 'DM Sans' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 17, fontWeight: 800, color: 'var(--text-primary)' }}>{c.channel === 'sms' ? t('communication.textMessage') : (c.subject || t('communication.untitled'))}</div>
+              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 17, fontWeight: 800, color: 'var(--text-primary)' }}>{c.subject || t('communication.untitled')}</div>
               <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>
-                {t(`communication.ch_${c.channel || 'email'}`)} · {audienceText(c)} · {c.sentBy ? `${c.sentBy.firstName} ${c.sentBy.lastName}` : ''}
+                {[audienceText(c), c.sentBy ? `${c.sentBy.firstName} ${c.sentBy.lastName}` : ''].filter(Boolean).join(' · ')}
               </div>
             </div>
             {statusPill(c)}
@@ -613,10 +558,9 @@ function MessageDetails({ id, onClose, audienceText, statusPill, onRetry, t, isM
           {c.testMode && <div style={{ fontSize: 12, color: 'var(--text-secondary)', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '9px 12px', display: 'flex', gap: 8 }}><Info size={14} color="var(--accent-gold)" style={{ flexShrink: 0, marginTop: 1 }} />{t('communication.sentInTestMode')}</div>}
           <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px 16px', fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{c.body}</div>
           {c.status !== 'draft' && c.status !== 'scheduled' && (
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : 4}, 1fr)`, gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {tile(c.emailSent || 0, t('communication.tileEmails'), 'var(--accent-blue)')}
-              {tile(c.smsSent || 0, t('communication.tileTexts'), 'var(--accent-gold)')}
-              {tile((c.emailFailed || 0) + (c.smsFailed || 0), t('communication.tileFailed'), 'var(--accent-red)')}
+              {tile(c.emailFailed || 0, t('communication.tileFailed'), 'var(--accent-red)')}
               {tile(c.skipped || 0, t('communication.tileNoContact'), 'var(--text-secondary)')}
             </div>
           )}
@@ -635,7 +579,7 @@ function MessageDetails({ id, onClose, audienceText, statusPill, onRetry, t, isM
               <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 12, maxHeight: 300, overflowY: 'auto' }}>
                 {rows.map(r => (
                   <div key={r.id} data-delivery={r.status} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderBottom: '1px solid var(--border-subtle)', fontSize: 12.5 }}>
-                    {r.channel === 'sms' ? <MessageSquare size={13} color="var(--text-muted)" /> : <Mail size={13} color="var(--text-muted)" />}
+                    <Mail size={13} color="var(--text-muted)" />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.name}</div>
                       <div style={{ color: 'var(--text-muted)', fontSize: 11.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.address || ''}{r.error ? `${r.address ? ' · ' : ''}${r.error}` : ''}</div>
@@ -655,7 +599,7 @@ function MessageDetails({ id, onClose, audienceText, statusPill, onRetry, t, isM
 
 // Everyone a group reaches. Unticking someone leaves them out of this message
 // (audience.excludeIds); the group itself is unchanged.
-function AudienceList({ open, onClose, audience, onChange, channel, t }) {
+function AudienceList({ open, onClose, audience, onChange, t }) {
   const [people, setPeople] = useState(null);
   const [q, setQ] = useState('');
   const { excludeIds = [], ...group } = audience;
@@ -676,7 +620,6 @@ function AudienceList({ open, onClose, audience, onChange, channel, t }) {
   const query = q.trim().toLowerCase();
   const shown = (people || []).filter(p => !query || p.name.toLowerCase().includes(query) || String(p.memberCode).toLowerCase().includes(query));
   const total = (people || []).length, included = (people || []).filter(p => !out.has(p.id)).length;
-  const needEmail = channel === 'email' || channel === 'both', needPhone = channel === 'sms' || channel === 'both';
   return (
     <Modal open={open} onClose={onClose} title={t('communication.whoGetsIt')} maxWidth={520}>
       <div data-people-list style={{ display: 'flex', flexDirection: 'column', gap: 12, fontFamily: 'DM Sans' }}>
@@ -694,18 +637,16 @@ function AudienceList({ open, onClose, audience, onChange, channel, t }) {
           {people && shown.length === 0 && <div style={{ padding: '20px 14px', fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>{t('communication.nothingHere')}</div>}
           {shown.map(p => {
             const on = !out.has(p.id);
-            const unreachable = (needEmail && !p.email && (!needPhone || !p.phone)) || (needPhone && !p.phone && (!needEmail || !p.email));
             return (
               <label key={p.id} data-person={p.id} data-included={on ? '1' : '0'}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', opacity: on ? 1 : 0.5 }}>
                 <input type="checkbox" checked={on} onChange={() => toggle(p.id)} style={{ width: 16, height: 16, accentColor: '#c9a96e', flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', textDecoration: on ? 'none' : 'line-through' }}>{p.name}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{p.memberCode}{unreachable ? ` · ${t('communication.cantBeReached')}` : ''}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{p.memberCode}{p.email ? '' : ` · ${t('communication.cantBeReached')}`}</div>
                 </div>
-                <span style={{ display: 'inline-flex', gap: 8, color: 'var(--text-muted)' }}>
+                <span style={{ display: 'inline-flex', color: 'var(--text-muted)' }}>
                   <Mail size={13} style={{ opacity: p.email ? 1 : 0.25 }} aria-label={p.email ? t('communication.hasEmail') : t('memberProfile.msgNoEmail')} />
-                  <MessageSquare size={13} style={{ opacity: p.phone ? 1 : 0.25 }} aria-label={p.phone ? t('communication.hasPhone') : t('memberProfile.msgNoPhone')} />
                 </span>
               </label>
             );

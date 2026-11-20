@@ -1090,10 +1090,10 @@ Only once a sending domain is verified in Resend and `EMAIL_FROM_ADDRESS` is set
 5. Register a new gym with your own address. **Verify:** the "Confirm your email address" link arrives, opens GEM and the reminder in the app goes away (D-8).
 6. In Settings, Language, choose Français for "Emails to members" and record a payment. **Verify:** the receipt and its PDF arrive in French, accents intact (D-23).
 
-### TEST 25.5 - Text messages
-Texting is paused. When it is switched on:
-1. Set `SMS_PROVIDER=log` first and send a message to one member. **Verify:** it appears in the server log.
-2. Switch to Twilio and send one text to a staff phone. **Verify:** it arrives with the gym's name as sender.
+### TEST 25.5 - No text messages anywhere
+Texting was taken out on 20 November 2026 (it comes back in V2 with a provider of its own).
+1. Open Communication, a member's Send Message, Send check-in code, and the desk's "Member forgot their code?". **Verify:** each offers email only, and no screen mentions a text or SMS.
+2. Add a member with a phone number. **Verify:** the number is still asked for and kept.
 
 ### TEST 25.6 - Printing on a real printer
 1. Print the end-of-day report, a payment receipt and the members export from Chrome, Firefox and Safari.

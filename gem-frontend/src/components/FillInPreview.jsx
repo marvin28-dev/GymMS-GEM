@@ -1,6 +1,6 @@
 import { Eye } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { fillIn, hasFillIns } from '../utils/smsCount';
+import { fillIn, hasFillIns } from '../utils/fillIn';
 
 // A message with {firstName} and the like reads as code in the box, so this
 // shows it as the first person will actually get it. sample is the server's

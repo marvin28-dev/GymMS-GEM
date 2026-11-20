@@ -16,7 +16,7 @@ import LoadFailed from '../components/ui/LoadFailed';
 import { Edit2, CreditCard, LogIn, Snowflake, XCircle,
   Package, RefreshCw, MessageSquare, StickyNote, Plus, User,
   Eye, EyeOff, Save, Lock, UserCheck, AlertTriangle,
-  Download, FileText, Users, UserMinus, Ticket, Camera, Trash2, Mail, Smartphone, X, Phone, Check
+  Download, FileText, Users, UserMinus, Ticket, Camera, Trash2, Mail, X, Phone, Check
 } from 'lucide-react';
 import MemberStatusTags from '../components/ui/MemberStatusTags';
 import RowMenu from '../components/ui/RowMenu';
@@ -706,9 +706,8 @@ function CheckInCodeModal({ open, onClose, member, onSuccess }) {
 }
 
 // ─── Send Code Modal ──────────────────────────────────────────────────────────
-// Re-sends a member their own check-in code. Email goes through the server;
-// a text opens this device's messaging app prefilled, since there is no SMS gateway.
-function SendCodeModal({ open, onClose, member, gymName }) {
+// Re-sends a member their own check-in code by email (texting was taken out).
+function SendCodeModal({ open, onClose, member }) {
   const { t } = useLanguage();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg]   = useState('');
@@ -726,12 +725,6 @@ function SendCodeModal({ open, onClose, member, gymName }) {
       setOk(false); setMsg(err?.response?.data?.error || t('memberProfile.codeSendFailed'));
     } finally { setBusy(false); }
   };
-  const textIt = () => {
-    if (!member?.phone) { setOk(false); setMsg(t('memberProfile.noPhoneOnFile')); return; }
-    const body = t('memberProfile.codeSmsBody', { gym: gymName || 'the gym', code: member.accessCode || '' });
-    window.location.href = `sms:${member.phone}?body=${encodeURIComponent(body)}`;
-    setOk(true); setMsg(t('memberProfile.codeTextOpened'));
-  };
 
   return (
     <Modal open={open} onClose={onClose} title={t('memberProfile.sendAccessCodeTitle')} maxWidth={380}>
@@ -740,16 +733,13 @@ function SendCodeModal({ open, onClose, member, gymName }) {
           {t('memberProfile.sendCodeMessage')}{' '}
           <strong style={{ color: 'var(--text-primary)' }}>{member?.firstName} {member?.lastName}</strong>.
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button style={{ ...secondaryBtn, flex: 1, justifyContent: 'center', opacity: busy ? 0.6 : 1, cursor: busy ? 'default' : 'pointer' }} onClick={emailIt} disabled={busy}>
-            <Mail size={13} /> {busy ? t('memberProfile.sending') : t('memberProfile.sendByEmail')}
-          </button>
-          <button style={{ ...secondaryBtn, flex: 1, justifyContent: 'center' }} onClick={textIt}>
-            <Smartphone size={13} /> {t('memberProfile.sendByText')}
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: member?.email ? 'var(--text-secondary)' : 'var(--accent-red)', fontFamily: 'DM Sans' }}>
+          <Mail size={14} style={{ flexShrink: 0 }} />{member?.email || t('memberProfile.noEmailOnFile')}
         </div>
-        <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontFamily: 'DM Sans', lineHeight: 1.5 }}>{t('memberProfile.textCodeHint')}</div>
-        {msg && <div style={{ fontSize: 12, fontFamily: 'DM Sans', color: ok ? '#34d399' : 'var(--accent-red)' }}>{msg}</div>}
+        <button style={{ ...secondaryBtn, justifyContent: 'center', opacity: busy || !member?.email ? 0.6 : 1, cursor: busy || !member?.email ? 'default' : 'pointer' }} onClick={emailIt} disabled={busy || !member?.email}>
+          <Mail size={13} /> {busy ? t('memberProfile.sending') : t('memberProfile.sendByEmail')}
+        </button>
+        {msg &&<div style={{ fontSize: 12, fontFamily: 'DM Sans', color: ok ? '#34d399' : 'var(--accent-red)' }}>{msg}</div>}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
           <button style={secondaryBtn} onClick={onClose}>{t('common.close')}</button>
         </div>
@@ -2565,10 +2555,11 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
                 {showCode ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
             )}
-            {/* Send code to phone */}
+            {/* Email the member their code */}
             {canManage && <button
               onClick={() => setShowSendCodeModal(true)}
-              title={t('members.sendSmsCode')}
+              title={t('memberProfile.sendCheckInCode')}
+              aria-label={t('memberProfile.sendCheckInCode')}
               style={{
                 background: 'none', border: '1px solid var(--border-subtle)',
                 cursor: 'pointer', color: 'var(--text-muted)', display: 'flex',
@@ -2578,7 +2569,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
               onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent-gold)'; e.currentTarget.style.borderColor = 'rgba(212,175,55,0.4)'; }}
               onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
             >
-              <MessageSquare size={13} />
+              <Mail size={13} />
             </button>}
           </div>
         </div>
@@ -2979,16 +2970,16 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: 'var(--bg-elevated)' }}>
-              {[t('memberProfile.dateCol'), t('memberProfile.subjectCol'), t('memberProfile.typeCol'), t('memberProfile.sentByCol'), t('memberProfile.statusCol')].map(h => (
+              {[t('memberProfile.dateCol'), t('memberProfile.subjectCol'), t('memberProfile.sentByCol'), t('memberProfile.statusCol')].map(h => (
                 <th key={h} style={thStyle}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {memberMessages.length === 0 && messagesFailed ? (
-              <tr><td colSpan={5} style={{ padding: 16 }}><LoadFailed message={t('memberProfile.messagesLoadFailed')} onRetry={loadMessages} /></td></tr>
+              <tr><td colSpan={4} style={{ padding: 16 }}><LoadFailed message={t('memberProfile.messagesLoadFailed')} onRetry={loadMessages} /></td></tr>
             ) : memberMessages.length === 0 ? (
-              <tr><td colSpan={5} style={{ padding: 0 }}><EmptyState icon={MessageSquare} title={t('memberProfile.noMessagesTitle')} hint={t('memberProfile.noMessagesHint')} /></td></tr>
+              <tr><td colSpan={4} style={{ padding: 0 }}><EmptyState icon={MessageSquare} title={t('memberProfile.noMessagesTitle')} hint={t('memberProfile.noMessagesHint')} /></td></tr>
             ) : memberMessages.map(m => {
               const c = m.communication || {};
               const tone = m.status === 'sent' ? ['var(--accent-green)', 'var(--accent-green-dim)'] : m.status === 'failed' ? ['var(--accent-red)', 'var(--accent-red-dim)'] : ['var(--text-muted)', 'rgba(140,140,150,0.14)'];
@@ -2999,13 +2990,8 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
                 >
                   <td style={{ ...tdStyle, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{fmtDate(c.sentAt || m.createdAt)}</td>
                   <td style={{ ...tdStyle, maxWidth: 320 }}>
-                    <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.channel === 'sms' ? (c.body || '') : (c.subject || c.body || '')}</div>
-                    {m.channel !== 'sms' && c.body && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{c.body}</div>}
-                  </td>
-                  <td style={tdStyle}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: m.channel === 'sms' ? 'var(--accent-gold-dim)' : 'var(--accent-blue-dim)', color: m.channel === 'sms' ? 'var(--accent-gold)' : 'var(--accent-blue)', borderRadius: 20, padding: '2px 9px', fontSize: 11 }}>
-                      {m.channel === 'sms' ? <MessageSquare size={11} /> : <Mail size={11} />}{t(`communication.ch_${m.channel}`)}
-                    </span>
+                    <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.subject || c.body || ''}</div>
+                    {c.body && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{c.body}</div>}
                   </td>
                   <td style={tdStyle}>{c.sentBy ? `${c.sentBy.firstName} ${c.sentBy.lastName}` : ''}</td>
                   <td style={tdStyle} title={m.error || undefined}>
@@ -3362,7 +3348,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
       <SendMessageModal open={showMessageModal} onClose={() => setShowMessageModal(false)} members={member ? [member] : []}
         onSent={() => setTimeout(loadMessages, 800)} />
       <CheckInCodeModal open={showCheckInCodeModal} onClose={() => setShowCheckInCodeModal(false)} member={member} onSuccess={handleCheckIn} />
-      <SendCodeModal    open={showSendCodeModal}    onClose={() => setShowSendCodeModal(false)}    member={member} gymName={gymData?.name} />
+      <SendCodeModal    open={showSendCodeModal}    onClose={() => setShowSendCodeModal(false)}    member={member} />
 
       {/* Profile Photo Modal */}
       {showPhotoModal && (

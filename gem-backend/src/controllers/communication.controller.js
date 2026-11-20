@@ -1,13 +1,9 @@
 const prisma = require('../utils/prisma');
 const { logActivity } = require('../utils/activityLog');
 const { AUDIENCES, resolveAudience, hasEmail, fieldValues, channelStatus, deliverCommunication } = require('../utils/messaging');
-const { toE164 } = require('../utils/phone');
-const { smsParts } = require('../utils/sms');
 const { logFailure } = require('../utils/bestEffort');
 
 const MANAGEMENT = ['general_manager', 'manager'];
-const CHANNELS = ['email', 'sms', 'both'];
-const wants = (channel, kind) => channel === kind || channel === 'both';
 const SENT_BY = { sentBy: { select: { id: true, firstName: true, lastName: true } } };
 
 const idList = (v) => [...new Set((Array.isArray(v) ? v : []).map(String))].slice(0, 5000);
@@ -56,18 +52,16 @@ async function previewAudience(req, res) {
   const audience = readAudience(req.body?.audience);
   const gym = await prisma.gym.findUnique({ where: { id: req.user.gymId }, select: { name: true, country: true, phone: true, currency: true } });
   const people = await resolveAudience(req.user.gymId, audience);
-  const reachable = (m) => ({ email: hasEmail(m), phone: !!toE164(m.phone, gym?.country, gym?.phone) });
-  const withEmail = people.filter(m => reachable(m).email).length;
-  const withPhone = people.filter(m => reachable(m).phone).length;
+  const withEmail = people.filter(hasEmail).length;
   res.json({
-    total: people.length, withEmail, withPhone,
+    total: people.length, withEmail,
     names: people.slice(0, 6).map(m => `${m.firstName || ''} ${m.lastName || ''}`.trim()),
     first: people[0] ? { firstName: people[0].firstName, lastName: people[0].lastName } : null,
     // what the fill-ins become for the first person, so the page can show what they will read
     sample: people[0] ? fieldValues(people[0], gym || {}) : null,
     ...(req.body?.list ? {
       people: people.slice(0, 3000).map(m => ({
-        id: m.id, name: `${m.firstName || ''} ${m.lastName || ''}`.trim(), memberCode: m.memberCode || '', ...reachable(m),
+        id: m.id, name: `${m.firstName || ''} ${m.lastName || ''}`.trim(), memberCode: m.memberCode || '', email: hasEmail(m),
       })),
     } : {}),
   });
@@ -99,12 +93,13 @@ async function forMember(req, res) {
 // message is updated rather than a new one made.
 async function create(req, res) {
   const action = ['send', 'schedule', 'draft'].includes(req.body?.action) ? req.body.action : 'send';
-  const channel = CHANNELS.includes(req.body?.channel) ? req.body.channel : null;
+  // Email is the only way a message goes (texting was taken out, see messaging.js)
+  const channel = 'email';
   const subject = String(req.body?.subject || '').trim();
   const body = String(req.body?.body ?? req.body?.message ?? '').trim();
   const audience = readAudience(req.body?.audience);
   if (!mayWrite(req.user, audience)) return res.status(403).json({ error: 'Only a manager can write to a group of members.' });
-  if (!channel) return res.status(400).json({ error: 'Choose how to send it: email, text or both.', field: 'channel' });
+  if (req.body?.channel !== undefined && req.body.channel !== 'email') return res.status(400).json({ error: 'Messages go by email only.', field: 'channel' });
 
   let existing = null;
   if (req.body?.id) {
@@ -116,12 +111,9 @@ async function create(req, res) {
   if (action === 'draft') {
     if (!subject && !body) return res.status(400).json({ error: 'Write something before saving a draft.', field: 'body' });
   } else {
-    if (wants(channel, 'email') && !subject) return res.status(400).json({ error: 'Add a subject for the email.', field: 'subject' });
+    if (!subject) return res.status(400).json({ error: 'Add a subject for the email.', field: 'subject' });
     if (!body) return res.status(400).json({ error: 'Write the message.', field: 'body' });
-    const status = channelStatus();
-    if (wants(channel, 'email') && !status.email.ready) return res.status(400).json({ error: 'Email is not set up yet.', field: 'channel' });
-    if (wants(channel, 'sms') && !status.sms.ready) return res.status(400).json({ error: 'Texting is not set up yet, so this can only go by email for now.', field: 'channel' });
-    if (wants(channel, 'sms') && smsParts(body) > 6) return res.status(400).json({ error: 'That is too long for a text. Keep it to 6 parts (about 900 characters).', field: 'body' });
+    if (!channelStatus().email.ready) return res.status(400).json({ error: 'Email is not set up yet.', field: 'channel' });
   }
   if (subject.length > 150) return res.status(400).json({ error: 'Keep the subject under 150 characters.', field: 'subject' });
   if (body.length > 5000) return res.status(400).json({ error: 'Keep the message under 5,000 characters.', field: 'body' });
@@ -153,7 +145,7 @@ async function create(req, res) {
     ? await prisma.communication.findUnique({ where: { id: existing.id }, include: SENT_BY })
     : await prisma.communication.create({ data: { gymId: req.user.gymId, ...data }, include: SENT_BY });
 
-  const what = { email: 'an email', sms: 'a text', both: 'an email and a text' }[channel];
+  const what = 'an email';
   logActivity(req, {
     category: 'members',
     action: action === 'draft' ? 'message.draft' : action === 'schedule' ? 'message.scheduled' : 'message.sent',
@@ -179,10 +171,8 @@ async function retry(req, res) {
   const comm = await prisma.communication.findFirst({ where: { id: req.params.id, gymId: req.user.gymId } });
   if (!comm) return res.status(404).json({ error: 'Message not found' });
   if (comm.status === 'sending') return res.status(409).json({ error: 'It is still being sent.' });
-  const failed = await prisma.communicationDelivery.findMany({ where: { communicationId: comm.id, status: 'failed' } });
+  const failed = await prisma.communicationDelivery.findMany({ where: { communicationId: comm.id, status: 'failed', channel: 'email' } });
   if (!failed.length) return res.status(400).json({ error: 'Nothing failed, so there is nothing to retry.' });
-  const status = channelStatus();
-  if (failed.some(d => d.channel === 'sms') && !status.sms.ready) return res.status(400).json({ error: 'Texting is not set up yet.' });
   // Taken only if no other retry has taken it meanwhile (F-054)
   const { count } = await prisma.communication.updateMany({ where: { id: comm.id, status: { not: 'sending' } }, data: { status: 'sending' } });
   if (!count) return res.status(409).json({ error: 'It is still being sent.' });

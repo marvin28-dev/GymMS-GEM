@@ -2,8 +2,6 @@ const { Resend } = require('resend');
 const prisma = require('./prisma');
 const E = require('./emailLayout');
 const { formatMoney, currencyOf } = require('./money');
-const { readPhone } = require('./phone');
-const { smsStatus, sendSms } = require('./sms');
 const { broadcast } = require('./liveHub');
 const { isDemoGym } = require('./sendEmail');
 
@@ -68,14 +66,13 @@ const emailReady = () => !!process.env.RESEND_API_KEY;
 // The sending address Resend gives every account before a domain is verified
 // only delivers to the account's own inbox.
 const emailTestMode = () => (process.env.EMAIL_FROM_ADDRESS || 'onboarding@resend.dev') === 'onboarding@resend.dev';
+// Messages go by email only: texting was taken out (the owner, 20 November
+// 2026) until a provider the gyms can afford is chosen. The channel columns
+// stay so older rows still read.
 function channelStatus() {
-  return {
-    email: { ready: emailReady(), testMode: emailTestMode(), from: process.env.EMAIL_FROM_ADDRESS || 'onboarding@resend.dev' },
-    sms: smsStatus(),
-  };
+  return { email: { ready: emailReady(), testMode: emailTestMode(), from: process.env.EMAIL_FROM_ADDRESS || 'onboarding@resend.dev' } };
 }
 
-const wants = (channel, kind) => channel === kind || channel === 'both';
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 // Emails go 100 to a request (Resend's batch), which keeps within its rate limit
@@ -103,21 +100,6 @@ async function sendEmails(gym, items) {
   return out;
 }
 
-// Texts go two at a time: providers queue them, and a burst can be refused
-async function sendTexts(items) {
-  const out = new Array(items.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const i = next++;
-      try { const r = await sendSms({ to: items[i].address, body: items[i].text }); out[i] = { ok: true, id: r.id }; }
-      catch (err) { out[i] = { ok: false, error: err.message || 'The text could not be sent' }; }
-    }
-  };
-  await Promise.all([worker(), worker()]);
-  return out;
-}
-
 // Sends a message to everyone it is for, records each delivery and the totals.
 // only: a list of earlier delivery rows to try again (Retry failed) instead.
 async function deliverCommunication(id, { only = null } = {}) {
@@ -128,33 +110,19 @@ async function deliverCommunication(id, { only = null } = {}) {
     ? await prisma.member.findMany({ where: { gymId: comm.gymId, id: { in: [...new Set(only.map(d => d.memberId).filter(Boolean))] } }, select: MEMBER_FIELDS })
     : await resolveAudience(comm.gymId, comm.audience || {});
   const byId = new Map(members.map(m => [m.id, m]));
-  const sms = smsStatus();
   const rows = [];
-  const emails = [], texts = [];
-  const targets = only ? only.map(d => ({ m: byId.get(d.memberId), channel: d.channel, row: d })).filter(x => x.m) : members.flatMap(m => [
-    ...(wants(comm.channel, 'email') ? [{ m, channel: 'email' }] : []),
-    ...(wants(comm.channel, 'sms') ? [{ m, channel: 'sms' }] : []),
-  ]);
+  const emails = [];
+  const targets = only ? only.map(d => ({ m: byId.get(d.memberId), row: d })).filter(x => x.m) : members.map(m => ({ m }));
   for (const t of targets) {
     const name = `${t.m.firstName || ''} ${t.m.lastName || ''}`.trim();
-    const base = { communicationId: comm.id, gymId: comm.gymId, memberId: t.m.id, name, channel: t.channel, rowId: t.row?.id };
+    const base = { communicationId: comm.id, gymId: comm.gymId, memberId: t.m.id, name, channel: 'email', rowId: t.row?.id };
     if (isDemoGym(gym)) { rows.push({ ...base, status: 'skipped', error: 'Demo gym: nothing is sent' }); continue; }
-    if (t.channel === 'email') {
-      if (!hasEmail(t.m)) { rows.push({ ...base, status: 'skipped', error: 'No email address' }); continue; }
-      const subject = personalise(comm.subject, t.m, gym), text = personalise(comm.body, t.m, gym);
-      emails.push({ base: { ...base, address: t.m.email.trim() }, address: t.m.email.trim(), subject, text, html: emailHtml(gym, subject, text) });
-    } else {
-      const read = readPhone(t.m.phone, gym.country, gym.phone);
-      const phone = read.e164;
-      if (!phone) { rows.push({ ...base, status: 'skipped', error: { missing: 'No phone number', no_country: 'No country code: set the gym’s country in Settings', invalid: 'The phone number is not valid' }[read.problem] }); continue; }
-      if (!sms.ready) { rows.push({ ...base, address: phone, status: 'failed', error: 'Texting is not set up' }); continue; }
-      texts.push({ base: { ...base, address: phone }, address: phone, text: personalise(comm.body, t.m, gym) });
-    }
+    if (!hasEmail(t.m)) { rows.push({ ...base, status: 'skipped', error: 'No email address' }); continue; }
+    const subject = personalise(comm.subject, t.m, gym), text = personalise(comm.body, t.m, gym);
+    emails.push({ base: { ...base, address: t.m.email.trim() }, address: t.m.email.trim(), subject, text, html: emailHtml(gym, subject, text) });
   }
   const emailResults = emails.length ? await sendEmails(gym, emails) : [];
   emails.forEach((it, i) => rows.push({ ...it.base, status: emailResults[i].ok ? 'sent' : 'failed', error: emailResults[i].ok ? null : emailResults[i].error, providerId: emailResults[i].id || null }));
-  const textResults = texts.length ? await sendTexts(texts) : [];
-  texts.forEach((it, i) => rows.push({ ...it.base, status: textResults[i].ok ? 'sent' : 'failed', error: textResults[i].ok ? null : textResults[i].error, providerId: textResults[i].id || null }));
 
   // Record each delivery: a retry updates the row it retried
   for (const r of rows.filter(x => x.rowId)) {
@@ -169,19 +137,15 @@ async function deliverCommunication(id, { only = null } = {}) {
   if (fresh.length) await prisma.communicationDelivery.createMany({ data: fresh });
 
   // Totals from every delivery of this message, so a retry adds up correctly
-  const all = await prisma.communicationDelivery.findMany({ where: { communicationId: comm.id }, select: { memberId: true, channel: true, status: true } });
-  const count = (channel, status) => all.filter(d => d.channel === channel && d.status === status).length;
+  const all = await prisma.communicationDelivery.findMany({ where: { communicationId: comm.id, channel: 'email' }, select: { memberId: true, status: true } });
+  const count = (status) => all.filter(d => d.status === status).length;
   const totals = {
     total: new Set(all.map(d => d.memberId)).size,
-    emailSent: count('email', 'sent'), emailFailed: count('email', 'failed'),
-    smsSent: count('sms', 'sent'), smsFailed: count('sms', 'failed'),
-    skipped: all.filter(d => d.status === 'skipped').length,
+    emailSent: count('sent'), emailFailed: count('failed'), skipped: count('skipped'),
   };
-  const sent = totals.emailSent + totals.smsSent, failed = totals.emailFailed + totals.smsFailed;
-  // Someone with no email or number is counted apart (skipped), not as a failure
-  const status = !sent ? 'failed' : failed ? 'partial' : 'sent';
-  const testMode = (wants(comm.channel, 'email') && emailTestMode()) || (wants(comm.channel, 'sms') && !!sms.testMode);
-  const updated = await prisma.communication.update({ where: { id: comm.id }, data: { ...totals, status, testMode, sentAt: comm.sentAt || new Date() } });
+  // Someone with no email is counted apart (skipped), not as a failure
+  const status = !totals.emailSent ? 'failed' : totals.emailFailed ? 'partial' : 'sent';
+  const updated = await prisma.communication.update({ where: { id: comm.id }, data: { ...totals, channel: 'email', status, testMode: emailTestMode(), sentAt: comm.sentAt || new Date() } });
   broadcast(comm.gymId, { resource: 'communications', origin: null });
   return updated;
 }

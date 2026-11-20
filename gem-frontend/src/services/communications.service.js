@@ -6,16 +6,16 @@ export const getAll = () =>
 export const getOne = (id) =>
   api.get(`/communications/${id}`);
 
-// Whether email and texting are set up (and whether either is in test mode)
+// Whether email is set up, and whether it is in test mode
 export const getChannels = () =>
   api.get('/communications/channels');
 
-// How many people an audience reaches, and how many have an email or a phone
-// With list, everyone it reaches: { people: [{ id, name, memberCode, email, phone }] }
+// How many people an audience reaches, and how many have an email
+// With list, everyone it reaches: { people: [{ id, name, memberCode, email }] }
 export const previewAudience = (audience, { list = false } = {}) =>
   api.post('/communications/audience', { audience, ...(list ? { list: true } : {}) });
 
-// { id?, action: 'send' | 'schedule' | 'draft', channel: 'email' | 'sms' | 'both', subject, body, audience, scheduledAt }
+// { id?, action: 'send' | 'schedule' | 'draft', subject, body, audience, scheduledAt }
 export const create = (data) =>
   api.post('/communications', data);
 

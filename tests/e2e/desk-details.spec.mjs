@@ -1,9 +1,10 @@
 // F-125: front desk details. The code dialog says why a check-in was refused,
 // "staff on duty" reads the schedule in any language, the longer time filters
 // show the days they cover, the phone shows the programme and recent
-// check-ins, and the month starts on Monday.
+// check-ins, and the month starts on Monday. A member who forgot their code is
+// emailed it from the code dialog (texting was taken out on 20 November 2026).
 import { test, expect } from '@playwright/test';
-import { registerGym, signIn, addStaff, call } from './support/session.mjs';
+import { registerGym, signIn, addStaff, call, mailTo, uniqueCode } from './support/session.mjs';
 
 const day = (offset = 0) => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10);
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -38,6 +39,28 @@ test('the code dialog says why a check-in was refused', async ({ page }) => {
   await dialog.getByPlaceholder('••••').fill(accessCode);
   await dialog.getByPlaceholder('••••').press('Enter');
   await expect(dialog.getByRole('alert')).toContainText('already checked in');
+});
+
+// "Email it" was handed the click instead of the member, so it always said
+// there was no email on file
+test('a member who forgot their code is emailed it from the code dialog, and nothing offers a text', async ({ page }) => {
+  const owner = await registerGym();
+  const email = `fern.${uniqueCode('f')}@example.test`;
+  await call('POST', '/members', { token: owner.token, body: { firstName: 'Fern', lastName: 'Forgot', email, city: 'Douala', region: 'Littoral', regFeeMethod: 'cash', startDate: day(), endDate: day(30) } });
+  await openDesk(page, owner);
+  const search = page.getByPlaceholder('Type code, name, phone, or ID...');
+  await expect(async () => {
+    await search.fill('');
+    await search.fill('Forgot');
+    await expect(page.locator('[data-fdtour="checkin-search"]').getByText('Fern Forgot').first()).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await page.getByRole('button', { name: '✓', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Verify Access Code' });
+  await expect(dialog).toContainText('Member forgot their code?');
+  await expect(dialog.getByRole('button', { name: /text/i })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Email it' }).click();
+  await expect(dialog).toContainText(`Check-in code emailed to ${email}.`);
+  await expect.poll(async () => (await mailTo(email)).some(m => m.subject.startsWith('Your check-in code'))).toBe(true);
 });
 
 test('staff on duty reads the schedule in French too', async ({ page }) => {

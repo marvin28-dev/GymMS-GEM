@@ -1,9 +1,9 @@
 // The Communication page (J-21): who a message reaches, every delivery
 // recorded (sent, failed with the reason, skipped), the fill-ins made for each
 // person, retrying the failures, scheduling (sent once), drafts, and who may
-// write to whom. Email goes to the fake Resend client; texts use the "log"
-// provider, which sends nothing.
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+// write to whom. Messages go by email only (texting was taken out on 20
+// November 2026); email goes to the fake Resend client.
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startServer, backend, outbox } from './helpers/server.mjs';
 import { registerGym, addStaff, addMember, uniqueCode, eventually } from './helpers/fixtures.mjs';
 
@@ -15,7 +15,6 @@ beforeAll(async () => {
   other = await registerGym(api);
 });
 afterAll(() => stop());
-afterEach(() => { process.env.SMS_PROVIDER = ''; });
 
 const audience = (gym, aud, extra = {}) => api.post('/api/communications/audience', { audience: aud, ...extra }, { token: gym.token });
 const send = (gym, body, token = gym.token) => api.post('/api/communications', {
@@ -45,10 +44,11 @@ describe('who a message reaches', () => {
   let gym, people;
   beforeAll(async () => { ({ gym, people } = await gymWithMembers()); });
 
-  it('is everyone but deactivated members, counted by how they can be reached', async () => {
+  it('is everyone but deactivated members, counted by who has an email', async () => {
     const res = await audience(gym, { type: 'all' });
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ total: 4, withEmail: 3, withPhone: 4 });
+    expect(res.body).toMatchObject({ total: 4, withEmail: 3 });
+    expect(res.body).not.toHaveProperty('withPhone');
     expect(res.body.names.some(n => n.startsWith('Gone'))).toBe(false);
   });
 
@@ -61,7 +61,7 @@ describe('who a message reaches', () => {
   it('lists the people on request, leaves out the ones taken off, and fills in the first one', async () => {
     const listed = await audience(gym, { type: 'all' }, { list: true });
     expect(listed.body.people).toHaveLength(4);
-    expect(listed.body.people.find(p => p.id === people.cy.id)).toMatchObject({ email: false, phone: true });
+    expect(listed.body.people.find(p => p.id === people.cy.id)).toEqual({ id: people.cy.id, name: expect.stringMatching(/^Cy /), memberCode: expect.any(String), email: false });
     const without = await audience(gym, { type: 'all', excludeIds: [people.ada.id] });
     expect(without.body.total).toBe(3);
     expect(without.body.sample.firstname).toBe('Ben');
@@ -158,26 +158,28 @@ describe('a message that cannot go', () => {
     expect((await send(gym, { audience: { type: 'members', memberIds: [] } })).body.field).toBe('audience');
   });
 
-  it('cannot go by text while texting is not set up', async () => {
-    const res = await send(gym, { channel: 'sms' });
-    expect(res.status).toBe(400);
-    expect(res.body.field).toBe('channel');
+  // Texting was taken out: a text, or email and text, is refused, even as a
+  // draft or scheduled, and the page is only told about email
+  it('goes by email only', async () => {
+    for (const channel of ['sms', 'both']) {
+      for (const action of ['send', 'schedule', 'draft']) {
+        const res = await send(gym, { channel, action, scheduledAt: new Date(Date.now() + 3600e3).toISOString() });
+        expect(res.status, `${channel} ${action}`).toBe(400);
+        expect(res.body).toEqual({ error: 'Messages go by email only.', field: 'channel' });
+      }
+    }
+    const channels = await api.get('/api/communications/channels', { token: gym.token });
+    expect(Object.keys(channels.body)).toEqual(['email']);
   });
 
-  it('cannot be a text of more than 6 parts', async () => {
-    process.env.SMS_PROVIDER = 'log';
-    const res = await send(gym, { channel: 'sms', body: 'x'.repeat(153 * 6 + 1) });
-    expect(res.status).toBe(400);
-    expect(res.body.field).toBe('body');
-  });
-
-  it('goes by text in test mode to each number in its international form', async () => {
-    process.env.SMS_PROVIDER = 'log';
-    const res = await send(gym, { channel: 'sms', subject: '', body: 'Hi {firstName}' });
+  it('is sent as an email when no channel is named, and its deliveries are emails', async () => {
+    const res = await api.post('/api/communications', {
+      action: 'send', subject: `No channel ${uniqueCode('s')}`, body: 'Hello {firstName}', audience: { type: 'all' },
+    }, { token: gym.token });
     expect(res.status).toBe(202);
     const done = await finished(res.body.id);
-    expect(done).toMatchObject({ status: 'sent', smsSent: 4, testMode: true });
-    expect((await deliveries(res.body.id)).every(r => r.address === '+237677112233')).toBe(true);
+    expect(done).toMatchObject({ channel: 'email', status: 'sent', emailSent: 3, skipped: 1, smsSent: 0, smsFailed: 0 });
+    expect((await deliveries(res.body.id)).every(r => r.channel === 'email')).toBe(true);
   });
 });
 

@@ -22,7 +22,7 @@ const PAGE_DESTS = [
   { page: 'calendar', path: '/calendar', icon: Calendar, labelKey: 'nav.calendar', kw: 'schedule events classes diary invite agenda' },
   { page: 'members', path: '/members', icon: Users, labelKey: 'nav.members', kw: 'clients visitors freeze unfreeze frozen renew renewal extend cancel membership reactivate day pass convert visitor check-in code balance debt owing' },
   { page: 'packages', path: '/packages', icon: Package, labelKey: 'nav.packages', kw: 'plans pricing bundles visitor bundle day pass price sessions duration validity' },
-  { page: 'communication', path: '/communication', icon: MessageSquare, labelKey: 'nav.communication', kw: 'message email sms announce bulk broadcast' },
+  { page: 'communication', path: '/communication', icon: MessageSquare, labelKey: 'nav.communication', kw: 'message email announce bulk broadcast' },
   { page: 'front-desk', path: '/front-desk', icon: Monitor, labelKey: 'nav.frontDesk', kw: 'check in kiosk reception register walk in quick expense' },
   { page: 'attendance', path: '/attendance', icon: CheckSquare, labelKey: 'nav.attendance', kw: 'check in checkout log visits history day pass heatmap busiest' },
   { page: 'operations', path: '/operations', icon: Activity, labelKey: 'nav.operations', kw: 'daily overview issues equipment maintenance end of day eod report' },

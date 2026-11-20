@@ -1,6 +1,6 @@
 // The rules CLAUDE.md leans on, as the screens and the server work them out:
 // who needs attention, what "expiring soon" is, prices and profit, revenue,
-// text-message parts and fill-ins, money and dates as written, and a coach's
+// message fill-ins, money and dates as written, and a coach's
 // on-track reading. Where the browser and the server each keep a copy of a
 // rule, both are checked against the same cases.
 import { describe, it, expect } from 'vitest';
@@ -20,7 +20,7 @@ globalThis.localStorage = new MemoryStorage();
 const { membershipEndsThisWeek, memberNeedsAttention, taskOverdue, taskNeedsAttention } = await import('../../gem-frontend/src/utils/attention.js');
 const { saleUnitPrice, profitPerItem, marginPct, profitOf } = await import('../../gem-frontend/src/utils/productPrice.js');
 const { revenueOf } = await import('../../gem-frontend/src/utils/revenue.js');
-const { smsInfo, fillIn, hasFillIns } = await import('../../gem-frontend/src/utils/smsCount.js');
+const { fillIn, hasFillIns, hasEmail } = await import('../../gem-frontend/src/utils/fillIn.js');
 const { formatMoney } = await import('../../gem-frontend/src/utils/currency.js');
 const { ordinalDay, addDaysStr, todayStr, dayStr } = await import('../../gem-frontend/src/utils/date.js');
 const { trackOf, followUpsOf } = await import('../../gem-frontend/src/utils/coaching.js');
@@ -29,8 +29,6 @@ const ladder = await import('../../gem-frontend/src/utils/hierarchy.js');
 const backend = createRequire(new URL('../../gem-backend/src/app.js', import.meta.url));
 const server = {
   money: backend('./utils/money.js'),
-  phone: backend('./utils/phone.js'),
-  sms: backend('./utils/sms.js'),
   method: backend('./utils/paymentMethod.js'),
   ladder: backend('./utils/hierarchy.js'),
 };
@@ -129,23 +127,15 @@ describe('revenue', () => {
   });
 });
 
-describe('text messages', () => {
-  const cases = ['', 'a'.repeat(160), 'a'.repeat(161), 'Réunion à 9h', 'Hi 😀', '€'.repeat(80), '€'.repeat(81), 'x'.repeat(153 * 6), 'ê'.repeat(71)];
-  it('count their parts the same in the composer and on the server', () => {
-    for (const text of cases) expect(smsInfo(text).parts, JSON.stringify(text.slice(0, 12))).toBe(server.sms.smsParts(text));
-  });
-  it('split at 160 and 153, or 70 and 67 once a character is outside the SMS alphabet', () => {
-    expect(smsInfo('a'.repeat(160)).parts).toBe(1);
-    expect(smsInfo('a'.repeat(161)).parts).toBe(2);
-    expect(smsInfo('ê'.repeat(70))).toMatchObject({ parts: 1, unicode: true });
-    expect(smsInfo('ê'.repeat(71)).parts).toBe(2);
-    // The euro sign takes two places
-    expect(smsInfo('€'.repeat(81)).parts).toBe(2);
-  });
+describe('messages to members', () => {
   it('fill in what they know, whatever the capitals, and leave the rest as written', () => {
     const sample = { firstname: 'Ada', balance: '3 500 FCFA' };
     expect(hasFillIns('Hi {firstName}')).toBe(true);
     expect(fillIn('Hi {FirstName}, you owe { balance }. {gymCode}', sample)).toBe('Hi Ada, you owe 3 500 FCFA. {gymCode}');
+  });
+  it('reach a member only by a real email address', () => {
+    expect([{ email: 'ada@example.test' }, { email: ' ada@example.test ' }].every(hasEmail)).toBe(true);
+    expect([{ email: '' }, { email: 'ada' }, { email: 'ada@example' }, {}, null].some(hasEmail)).toBe(false);
   });
 });
 
@@ -172,22 +162,6 @@ describe('payment methods', () => {
     expect(['Mobile Money', 'mobile_money', 'Mobile Pay'].map(server.method.toPaymentMethod)).toEqual(['mobile_money', 'mobile_money', 'mobile_money']);
     expect(['Credit/Debit Card', 'Card', 'card'].map(server.method.toPaymentMethod)).toEqual(['card', 'card', 'card']);
     expect(server.method.toPaymentMethod('Bank Transfer')).toBe('bank_transfer');
-  });
-});
-
-describe('phone numbers for texts', () => {
-  it('take the gym\'s country code when written the local way', () => {
-    expect(server.phone.readPhone('6 77 12 34 56', 'Cameroon')).toEqual({ e164: '+237677123456' });
-    expect(server.phone.readPhone('237677123456', 'Cameroon')).toEqual({ e164: '+237677123456' });
-    expect(server.phone.readPhone('00237677123456', '')).toEqual({ e164: '+237677123456' });
-    expect(server.phone.readPhone('+44 7700 900123', 'Cameroon')).toEqual({ e164: '+447700900123' });
-    expect(server.phone.readPhone('0803 123 4567', 'Nigeria')).toEqual({ e164: '+2348031234567' });
-  });
-  it('fall back to the dial code of the gym\'s own phone, and say what is missing', () => {
-    expect(server.phone.readPhone('677123456', '', '+237 670 000 000')).toEqual({ e164: '+237677123456' });
-    expect(server.phone.readPhone('677123456', '', '')).toEqual({ problem: 'no_country' });
-    expect(server.phone.readPhone('', 'Cameroon')).toEqual({ problem: 'missing' });
-    expect(server.phone.readPhone('+12', 'Cameroon')).toEqual({ problem: 'invalid' });
   });
 });
 
