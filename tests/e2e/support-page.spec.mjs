@@ -135,10 +135,20 @@ test('when GEM support cannot be reached, the page says so and gives the WhatsAp
     await page.getByLabel('Details *').fill('Hello');
   };
 
-  // The server kept it but the email did not go
-  await page.route('**/api/support', route => (route.request().method() === 'POST'
-    ? route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ emailed: false, report: { id: 'r1', kind: 'question', subject: 'Kept only', message: 'Hello', emailedAt: null, createdAt: new Date().toISOString() } }) })
-    : route.fallback()));
+  // First the server keeps a report but its email does not go; then the server
+  // cannot be reached at all. The page reloads its list after a send, so the
+  // kept report is in that list too.
+  const kept = { id: 'r1', kind: 'question', subject: 'Kept only', message: 'Hello', emailedAt: null, createdAt: new Date().toISOString() };
+  let reachable = true;
+  await page.route('**/api/support', async (route) => {
+    if (route.request().method() === 'POST') {
+      return reachable
+        ? route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ emailed: false, report: kept }) })
+        : route.abort();
+    }
+    const res = await route.fetch();
+    return route.fulfill({ response: res, json: [kept, ...(await res.json())] });
+  });
   await fill('Kept only');
   await page.getByRole('button', { name: 'Send to GEM support' }).click();
   const notSent = page.locator('[data-support-outcome="not-sent"]');
@@ -148,8 +158,7 @@ test('when GEM support cannot be reached, the page says so and gives the WhatsAp
   await expect(page.locator('[data-support-report]').filter({ hasText: 'Kept only' }).locator('[data-support-status]')).toHaveText('Not sent');
 
   // The server could not be reached at all
-  await page.unroute('**/api/support');
-  await page.route('**/api/support', route => (route.request().method() === 'POST' ? route.abort() : route.fallback()));
+  reachable = false;
   await page.getByRole('button', { name: 'Send something else' }).click();
   await fill('Lost');
   await page.getByRole('button', { name: 'Send to GEM support' }).click();
