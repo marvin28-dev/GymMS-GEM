@@ -34,6 +34,8 @@ function merge(settings) {
     // null until the gym has saved its own list
     accessTypes: Array.isArray(s.accessTypes) ? s.accessTypes : null,
     productCategories: Array.isArray(s.productCategories) ? s.productCategories : null,
+    // The language new members and staff start with in the forms
+    emailLanguage: s.emailLanguage === 'fr' ? 'fr' : 'en',
   };
 }
 

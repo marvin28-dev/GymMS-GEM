@@ -149,7 +149,7 @@ async function create(req, res) {
     prisma.member
       .findUnique({
         where: { id: memberId },
-        select: { firstName: true, lastName: true, email: true, memberCode: true },
+        select: { firstName: true, lastName: true, email: true, memberCode: true, language: true },
       })
       .then(m => m && sendPaymentReceipt(payment, m, req.user.gymId))
       .catch(err => console.error('Payment receipt email failed:', err.message));
@@ -166,7 +166,7 @@ async function sendReceipt(req, res) {
   if (!payment) return res.status(404).json({ error: 'Payment not found' });
   try {
     const m = payment.memberId
-      ? await prisma.member.findUnique({ where: { id: payment.memberId }, select: { firstName: true, lastName: true, email: true, memberCode: true } })
+      ? await prisma.member.findUnique({ where: { id: payment.memberId }, select: { firstName: true, lastName: true, email: true, memberCode: true, language: true } })
       : null;
     if (m) await sendPaymentReceipt(payment, m, req.user.gymId);
   } catch (err) {

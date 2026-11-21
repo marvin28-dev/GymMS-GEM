@@ -2,12 +2,20 @@ import { useState, useCallback, useEffect } from 'react';
 import translations from '../i18n/translations';
 import { LanguageContext } from './LanguageContext';
 import { readStored, store } from '../utils/storage';
+import { LANGUAGE_EVENT, LANGUAGES } from '../utils/language';
 
 export function LanguageProvider({ children }) {
   const [lang, setLang] = useState(() => readStored('gem-lang') || 'en');
 
   // The page's own language, so screen readers read French as French
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
+
+  // Signing in, or changing your own language, switches the screen at once
+  useEffect(() => {
+    const follow = (e) => { if (LANGUAGES.includes(e.detail)) setLang(e.detail); };
+    window.addEventListener(LANGUAGE_EVENT, follow);
+    return () => window.removeEventListener(LANGUAGE_EVENT, follow);
+  }, []);
 
   const switchLang = useCallback((newLang) => {
     setLang(newLang);

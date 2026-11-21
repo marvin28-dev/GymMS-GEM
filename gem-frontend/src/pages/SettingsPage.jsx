@@ -5,7 +5,8 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { getMyGym, updateMyGym } from '../services/gym.service';
 import { uploadPhoto } from '../services/upload.service';
 import { legacyList, refreshGymSettings } from '../hooks/useGymSettings';
-import { getAuth, updateSessionGym } from '../utils/auth';
+import { getAuth, updateSessionGym, updateSessionUser } from '../utils/auth';
+import { update as updateStaff } from '../services/staff.service';
 import { COUNTRIES, countryByName } from '../utils/countries';
 import { getCurrencySymbol, CURRENCY_SYMBOLS, getCurrencyCode, formatMoney } from '../utils/currency';
 import { notifyDataChanged } from '../utils/events';
@@ -159,6 +160,17 @@ function Label({ children }) {
 
 export default function SettingsPage() {
   const { lang, switchLang, t } = useLanguage();
+  // The screen's language is also the account's: GEM opens in it at the next
+  // sign-in and the owner's emails are written in it
+  const [ownLanguageError, setOwnLanguageError] = useState('');
+  const chooseLanguage = (code) => {
+    switchLang(code);
+    setOwnLanguageError('');
+    const me = getAuth()?.user;
+    if (!me?.id) return;
+    updateSessionUser({ language: code });
+    updateStaff(me.id, { language: code }).catch(() => setOwnLanguageError(t('common.languageNotSaved')));
+  };
   const isMobile = useIsMobile();
   const [activeSection, setActiveSection] = useState(() => {
     const asked = new URLSearchParams(window.location.search).get('section');
@@ -1047,7 +1059,7 @@ export default function SettingsPage() {
                   type="button"
                   key={option.code}
                   aria-pressed={selected}
-                  onClick={() => switchLang(option.code)}
+                  onClick={() => chooseLanguage(option.code)}
                   style={{
                     border: `2px solid ${selected ? '#818cf8' : 'var(--border-subtle)'}`,
                     borderRadius: 12, padding: '18px 20px', cursor: 'pointer',
@@ -1076,6 +1088,7 @@ export default function SettingsPage() {
               {t('settings.currentLangHint')}
             </span>
           </div>
+          {ownLanguageError && <div role="alert" style={{ padding: '0 24px 20px', fontSize: 12, color: 'var(--accent-red)' }}>{ownLanguageError}</div>}
         </div>
         {emailLanguageCard}
       </>)}
@@ -1390,11 +1403,12 @@ export default function SettingsPage() {
                               <p id="gem-interface-language-title" style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'DM Sans', marginBottom: 14 }}>{t('settings.interfaceLanguage')}</p>
                               <div data-interface-language role="group" aria-labelledby="gem-interface-language-title" style={{ display: 'flex', gap: 8 }}>
                                 {[['en', 'English'], ['fr', 'Français']].map(([code, label]) => (
-                                  <button key={code} type="button" aria-pressed={lang === code} onClick={() => switchLang(code)} style={{ flex: 1, padding: '11px', borderRadius: 10, border: `2px solid ${lang === code ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, background: lang === code ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', cursor: 'pointer', fontSize: 13, fontWeight: lang === code ? 600 : 400, color: lang === code ? 'var(--accent-gold)' : 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
+                                  <button key={code} type="button" aria-pressed={lang === code} onClick={() => chooseLanguage(code)} style={{ flex: 1, padding: '11px', borderRadius: 10, border: `2px solid ${lang === code ? 'var(--accent-gold)' : 'var(--border-subtle)'}`, background: lang === code ? 'var(--accent-gold-dim)' : 'var(--bg-elevated)', cursor: 'pointer', fontSize: 13, fontWeight: lang === code ? 600 : 400, color: lang === code ? 'var(--accent-gold)' : 'var(--text-secondary)', fontFamily: 'DM Sans' }}>
                                     {label}
                                   </button>
                                 ))}
                               </div>
+                              {ownLanguageError && <div role="alert" style={{ marginTop: 10, fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{ownLanguageError}</div>}
                             </div>
                           );
                           return null;

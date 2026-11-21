@@ -48,7 +48,7 @@ async function sendMemberWelcome(member, gymId) {
   if (!member?.email) return false;
   const gym = await getGym(gymId);
   if (!gym) return false;
-  const lang = languageOf(gym), T = textFor(gym), W = T.welcome;
+  const lang = languageOf(gym, member), T = textFor(gym, member), W = T.welcome;
 
   const body = [
     E.greeting(member.firstName, lang),
@@ -77,7 +77,7 @@ async function sendPaymentReceipt(payment, member, gymId) {
   if (!member?.email) return false;
   const gym = await getGym(gymId);
   if (!gym) return false;
-  const lang = languageOf(gym), T = textFor(gym), R = T.receipt;
+  const lang = languageOf(gym, member), T = textFor(gym, member), R = T.receipt;
 
   const currency = currencyOf(gym);
   const amount = formatMoney(payment.amount, currency);
@@ -121,7 +121,7 @@ async function sendAccessCode(member, gymId) {
   if (!member?.email) return false;
   const gym = await getGym(gymId);
   if (!gym) return false;
-  const lang = languageOf(gym), T = textFor(gym), C = T.code;
+  const lang = languageOf(gym, member), T = textFor(gym, member), C = T.code;
 
   const body = [
     E.greeting(member.firstName, lang),
@@ -141,7 +141,7 @@ async function sendMembershipUpdate(member, action, gymId) {
   if (!member?.email) return false;
   const gym = await getGym(gymId);
   if (!gym) return false;
-  const lang = languageOf(gym), T = textFor(gym);
+  const lang = languageOf(gym, member), T = textFor(gym, member);
   const m = T.changes[action];
   if (!m) return false;
   const showUntil = action !== 'cancel_membership' && action !== 'convert_to_visitor';
@@ -168,7 +168,7 @@ async function sendCoachIntro(member, coach, gymId) {
   if (!member?.email || !coach) return false;
   const gym = await getGym(gymId);
   if (!gym) return false;
-  const lang = languageOf(gym), T = textFor(gym), K = T.coach;
+  const lang = languageOf(gym, member), T = textFor(gym, member), K = T.coach;
   const name = `${coach.firstName || ''} ${coach.lastName || ''}`.trim();
 
   const body = [

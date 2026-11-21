@@ -14,9 +14,12 @@ import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import RowMenu from '../components/ui/RowMenu';
 import GemInput from '../components/ui/GemInput';
 import GemSelect from '../components/ui/GemSelect';
+import LanguageChoice from '../components/ui/LanguageChoice';
+import { useGymSettings } from '../hooks/useGymSettings';
+import { showInLanguage } from '../utils/language';
 import { getAll as getStaffApi, create as createStaff, update as updateStaff, addNote as addStaffNote } from '../services/staff.service';
 import { uploadPhoto } from '../services/upload.service';
-import { getRole, getAuth, getPhonePlaceholder } from '../utils/auth';
+import { getRole, getAuth, getPhonePlaceholder, updateSessionUser } from '../utils/auth';
 import { roleName } from '../utils/roleNames';
 import { canView, canManage, isOwner, rankOf } from '../utils/hierarchy';
 import { fmtDate, todayStr } from '../utils/date';
@@ -113,6 +116,7 @@ const EMPTY_FORM = {
   photoFile: null,
   photoIdData: '',
   photoIdFile: null,
+  language: '',
 };
 
 const AVATAR_COLORS = ['gold', 'blue', 'green', 'red', 'purple'];
@@ -159,6 +163,8 @@ const SectionHeader = ({ title }) => (
 // ─── Staff Form Modal ─────────────────────────────────────────────────────────
 function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveError, saveField }) {
   const { t } = useLanguage();
+  // Someone new starts in the gym's language; an account without one shows it too
+  const gymLanguage = useGymSettings()?.emailLanguage || 'en';
   // One field per line on a phone: two half-width selects clip their own text
   const formColumns = useIsMobile() ? '1fr' : '1fr 1fr';
   const [form, setForm] = useState(EMPTY_FORM);
@@ -246,6 +252,7 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
           salary: initial.salary ?? '',
           photoData: initial.photo || initial.photoData || '',
           photoIdData: initial.photoId || initial.photoIdData || '',
+          language: initial.language || '',
         });
       } else {
         setForm(EMPTY_FORM);
@@ -319,6 +326,7 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
           <GemInput label={`${t('common.phone')} *`} error={fieldErr('phone')} placeholder={getPhonePlaceholder()} inputMode="tel" value={form.phone} onChange={e => { set('phone', e.target.value.replace(/[^\d\s+\-()]/g, '')); setAddrErrors(x => ({ ...x, phone: undefined })); }} />
           <GemInput label={t('common.email')} error={fieldErr('email')} required={mode !== 'edit'} type="email" placeholder="email@gemgym.cm" value={form.email} onChange={e => { set('email', e.target.value); setAddrErrors(x => ({ ...x, email: undefined })); }} />
         </div>
+        <LanguageChoice label={t('common.personLanguage')} hint={isOwnRow ? t('common.ownLanguageHint') : t('common.staffLanguageHint')} value={form.language || gymLanguage} onChange={v => set('language', v)} />
 
         {/* ── Address ── */}
         <SectionHeader title={t('common.address')} />
@@ -504,6 +512,7 @@ function StaffFormModal({ open, onClose, onSave, initial, mode, saving, saveErro
 export default function StaffPage() {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const gymLanguage = useGymSettings()?.emailLanguage || 'en';
   const isMobile = useIsMobile();
   // Your own row: you cannot switch your own account off
   const myId = getAuth()?.user?.id;
@@ -587,12 +596,19 @@ export default function StaffPage() {
       // The owner account is always active and cannot be deactivated
       isActive: editingStaff?.role === 'general_manager' ? true : form.status !== 'inactive',
       ...(modalMode === 'edit' ? {} : { avatarColor: AVATAR_COLORS[colorIdx] }),
+      // Someone new always gets one; an edit sends it only once it has been chosen
+      ...(modalMode === 'edit' ? (form.language ? { language: form.language } : {}) : { language: form.language || gymLanguage }),
       // Salary is set on the staff profile itself, behind the manager PIN
     };
     try {
       if (modalMode === 'edit' && editingStaff) {
         const res = await updateStaff(editingStaff.id, payload);
         setStaffList(prev => prev.map(s => s.id === editingStaff.id ? { ...s, ...res.data } : s));
+        // Your own language changes the screen at once
+        if (String(editingStaff.id) === String(getAuth()?.user?.id) && res.data?.language) {
+          updateSessionUser({ language: res.data.language });
+          showInLanguage(res.data.language);
+        }
         // A note typed here is added to their file, after the notes already there
         if (note) await addStaffNote(editingStaff.id, note);
         setModalOpen(false);

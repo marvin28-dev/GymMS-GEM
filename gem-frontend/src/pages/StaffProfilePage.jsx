@@ -13,10 +13,12 @@ import LoadFailed from '../components/ui/LoadFailed';
 import ManagerAuthModal from '../components/ui/ManagerAuthModal';
 import { canManage as outranks, canSeePrivateFields } from '../utils/hierarchy';
 import GemInput from '../components/ui/GemInput';
+import LanguageChoice from '../components/ui/LanguageChoice';
+import { languageName, showInLanguage } from '../utils/language';
 import GemSelect from '../components/ui/GemSelect';
 import { getOne as getStaffMember, getCode as getStaffCode, regenerateCode as regenerateStaffCode, update as updateStaff, addNote as addStaffNote, resendInvite as resendStaffInvite } from '../services/staff.service';
 import { uploadPhoto } from '../services/upload.service';
-import { getAuth, getRole, MIN_PASSWORD } from '../utils/auth';
+import { getAuth, getRole, MIN_PASSWORD, updateSessionUser } from '../utils/auth';
 import { jobOf, departmentOfRole, assigneeName } from '../utils/departments';
 import { getAll as getTasks, update as updateTask } from '../services/tasks.service';
 import { getAll as getCalendar } from '../services/calendar.service';
@@ -287,6 +289,8 @@ export default function StaffProfilePage() {
   // Role and rota: anyone who outranks them. Switching a staff member
   // active/inactive is the general manager's alone.
   const canEditStanding = managesTarget;
+  // Your own language is yours; someone you manage has theirs set by you
+  const canEditLanguage = isSelf || managesTarget;
   const canChangeStatus = role === 'general_manager' && managesTarget;
   // Pay is the owner's alone, on the server as well as here
   const canEditPayroll = role === 'general_manager';
@@ -1084,6 +1088,8 @@ export default function StaffProfilePage() {
       // The salary means something different either side of this switch, so it
       // travels with it and never on its own, and only the owner may send it.
       ...(typeChanged && canEditPayroll ? { employmentType: editType, salary: resolvedPay } : {}),
+      // Your own, or the language of someone you manage, once it is chosen
+      ...(canEditLanguage && editForm.language ? { language: editForm.language } : {}),
     };
     // Upload photos to Cloudinary if new files were selected
     if (editForm.photoFile) {
@@ -1110,6 +1116,11 @@ export default function StaffProfilePage() {
         joinDate: res?.data?.joinDate || prev.joinDate || null,
         ...(apiFields.photo ? { photoData: apiFields.photo } : {}),
       }));
+      // Your own language changes the screen at once
+      if (isSelf && res?.data?.language) {
+        updateSessionUser({ language: res.data.language });
+        showInLanguage(res.data.language);
+      }
       setShowEditModal(false);
     } catch (err) {
       console.error('Staff update failed:', err);
@@ -1710,6 +1721,7 @@ export default function StaffProfilePage() {
       { labelKey: 'staff.joinDate', value: fmtDate(memberData.joinDate) },
       { labelKey: 'staff.emergencyContact', value: memberData.emergencyContact || '-' },
       { labelKey: 'staff.emergencyPhone', value: memberData.emergencyPhone || '-' },
+      { labelKey: 'common.personLanguage', value: languageName(memberData.language) },
     ];
 
     const checkItems = [
@@ -2265,6 +2277,7 @@ export default function StaffProfilePage() {
             <AddressInputs value={editForm} gymCountry={getAuth()?.user?.gymCountry || ''} errors={editFieldErrors} onChange={(k, v) => { setEF(k, v); setEditFieldErrors(f => ({ ...f, [k]: undefined })); }} />
             <GemInput label={t('staff.emergencyContact')} value={editForm.emergencyContact || ''} onChange={e => setEF('emergencyContact', e.target.value)} />
             <GemInput label={t('staff.emergencyPhone')} value={editForm.emergencyPhone || ''} onChange={e => setEF('emergencyPhone', e.target.value)} />
+            {canEditLanguage && <LanguageChoice label={t('common.personLanguage')} hint={isSelf ? t('common.ownLanguageHint') : t('common.staffLanguageHint')} value={editForm.language || 'en'} onChange={v => setEF('language', v)} />}
             {editError && <div style={{ fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans' }}>{editError}</div>}
             <button onClick={saveEdit} disabled={editSaving} style={{ background: 'linear-gradient(135deg, #c9a96e, #b08d4a)', border: 'none', borderRadius: 10, padding: '12px', cursor: editSaving ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, color: '#0a0a0f', fontFamily: 'DM Sans', opacity: editSaving ? 0.7 : 1 }}>
               {editSaving ? t('staff.saving') : t('staff.saveChanges')}
@@ -2628,6 +2641,7 @@ export default function StaffProfilePage() {
               { labelKey: 'staff.statusLabel', value: memberData.status },
               { labelKey: 'staff.emergencyContact', value: memberData.emergencyContact || '-' },
               { labelKey: 'staff.emergencyPhone', value: memberData.emergencyPhone || '-' },
+              { labelKey: 'common.personLanguage', value: languageName(memberData.language) },
             ].map(i => (
               <div key={i.labelKey} style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: 12 }}>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{t(i.labelKey)}</div>
@@ -3275,6 +3289,7 @@ export default function StaffProfilePage() {
           </div>
           <GemInput label={t('staff.emergencyContact')} value={editForm.emergencyContact || ''} onChange={e => setEF('emergencyContact', e.target.value)} />
           <GemInput label={t('staff.emergencyPhone')} value={editForm.emergencyPhone || ''} onChange={e => setEF('emergencyPhone', e.target.value)} />
+          {canEditLanguage && <div style={{ gridColumn: '1 / -1' }}><LanguageChoice label={t('common.personLanguage')} hint={isSelf ? t('common.ownLanguageHint') : t('common.staffLanguageHint')} value={editForm.language || 'en'} onChange={v => setEF('language', v)} /></div>}
         </div>
         {editError && (
           <div style={{ background: 'var(--accent-red-dim)', border: '1px solid var(--accent-red)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--accent-red)', fontFamily: 'DM Sans', marginTop: 12 }}>

@@ -405,7 +405,7 @@ async function raiseApprovalTasks({ gymId, card }) {
   if (!open) {
     const managers = await prisma.staff.findMany({
       where: { gymId, isActive: true, role: { in: MANAGER_ROLES } },
-      select: { id: true, email: true, firstName: true },
+      select: { id: true, email: true, firstName: true, language: true },
     });
     await Promise.all(managers.map(m => prisma.notification.create({
       data: {

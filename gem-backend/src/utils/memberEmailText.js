@@ -1,7 +1,7 @@
-// What members are sent, in the gym's language for them (D-23): its
-// settings.emailLanguage, English unless the gym chose French. Staff emails
-// stay in English for now; staff read GEM itself in the language they choose.
+// What members are sent, in the member's own language (Member.language), else
+// the gym's language for members (settings.emailLanguage, D-23), else English.
 const { MAKER } = require('./emailLayout');
+const { memberLanguage } = require('./language');
 
 const TEXT = {
   en: {
@@ -119,7 +119,8 @@ const TEXT = {
 };
 
 const EMAIL_LANGUAGES = ['en', 'fr'];
-const languageOf = (gym) => (gym?.settings?.emailLanguage === 'fr' ? 'fr' : 'en');
-const textFor = (gym) => TEXT[languageOf(gym)];
+// The member's own language, else the gym's language for members
+const languageOf = (gym, member = null) => memberLanguage(member, gym);
+const textFor = (gym, member = null) => TEXT[languageOf(gym, member)];
 
 module.exports = { TEXT, EMAIL_LANGUAGES, languageOf, textFor };

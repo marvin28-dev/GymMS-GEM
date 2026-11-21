@@ -313,7 +313,7 @@ function LoginPinPad({ onDigit, onBack, onConfirm, confirmEnabled }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function FrontDeskPage() {
   const gymSettings = useGymSettings();
-  const { t } = useLanguage();
+  const { t, switchLang } = useLanguage();
   const translateRole = (role) => { const k = ROLE_KEYS[role]; return k ? t(`staff.${k}`) : (role || ''); };
   const tProdCat = (cat) => { const k = PROD_CAT_KEYS[cat]; return k ? t(`frontDesk.${k}`) : cat; };
   const tExpCat = (cat) => expenseCategoryName(cat, t);
@@ -721,6 +721,8 @@ export default function FrontDeskPage() {
         const s = { staffId: selStaff.id, staffName: staffFullName(selStaff) };
         sessionStorage.setItem('fd_session', JSON.stringify(s));
         setSession(s);
+        // The desk speaks the language of whoever opened it
+        if (selStaff.language) switchLang(selStaff.language);
         setLoginStep('select'); setSelStaff(null); setLoginPin(''); setLoginError('');
         return;
       }

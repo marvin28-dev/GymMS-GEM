@@ -12,6 +12,8 @@ const { bestEffort } = require('../utils/bestEffort');
 const { newResetToken, hashResetToken } = require('../utils/resetToken');
 const { isDemoGym, demoCode } = require('../utils/sendEmail');
 const { newConfirmation, confirmBlock, sendConfirmation, confirmByToken } = require('../utils/emailConfirm');
+const { readLanguage } = require('../utils/language');
+const { textFor: staffText, languageOf: staffLang } = require('../utils/staffEmailText');
 const { linkLeadToGym } = require('../utils/leads');
 
 // Codes no gym may take: /admin/login is GEM's own admin sign-in, not a gym's
@@ -81,6 +83,8 @@ async function register(req, res) {
   if (await codeTaken(gymCode)) return res.status(409).json({ error: 'Gym code already taken', field: 'gymCode' });
 
   const passwordHash = await bcrypt.hash(String(password), 10);
+  // The owner keeps the language they signed up in: GEM opens in it and writes to them in it
+  const ownerLanguage = readLanguage(req.body.language).value || 'en';
   // The owner confirms their address from the welcome email (D-8)
   const confirmation = newConfirmation();
 
@@ -110,6 +114,7 @@ async function register(req, res) {
             role: 'general_manager',
             avatarColor: '#c9a96e',
             accessCode: generateAccessCode(),
+            language: ownerLanguage,
             ...confirmation.data,
           },
         },
@@ -130,22 +135,23 @@ async function register(req, res) {
   const owner = gym.staff[0];
   // Someone who asked for a demo and has now signed up: their lead is won
   bestEffort(linkLeadToGym(gym.id, owner.email), 'Linking the lead to the new gym');
-  // Welcome email, best-effort for the same reason
+  // Welcome email, best-effort for the same reason, in the owner's language
+  const OT = staffText(owner), W = OT.newGym, ownerLang = staffLang(owner);
   bestEffort(Promise.resolve().then(() => getResend().emails.send({
     from: E.sender(null),
     to: owner.email,
-    subject: `Welcome to GEM, ${owner.firstName}! Your gym is ready.`,
+    subject: W.subject(owner.firstName),
     html: E.layout({
-      brand: E.gemBrand, preheader: `${gym.name} is live on GEM. Your gym code is ${gym.code}.`, eyebrow: 'Your gym is ready', title: `Welcome, ${owner.firstName}`,
+      lang: ownerLang, brand: E.gemBrand, preheader: W.preheader(gym.name, gym.code), eyebrow: W.eyebrow, title: W.title(owner.firstName),
       body: [
-        E.pHtml(`Your gym ${E.strong(gym.name)} is live on GEM. Keep these details somewhere safe.`),
-        E.tiles([{ label: 'Gym code', value: gym.code, mono: true }, { label: 'Your role', value: 'General Manager' }]),
-        E.details([['Sign-in email', owner.email]]),
-        confirmBlock(confirmation.token),
-        E.button(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/${encodeURIComponent(gym.code)}/login`, 'Open your gym'),
-        '<div style="font-family:Manrope,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:800;color:#16161d;margin:0 0 12px;">Next steps</div>',
-        E.steps(['Add your packages and prices in Settings.', 'Choose the payment methods you accept.', 'Add your staff. Each one gets an email with how to sign in.']),
-        E.small("If you didn't create this account, you can ignore this email."),
+        E.pHtml(W.line(E.strong(gym.name))),
+        E.tiles([{ label: W.gymCode, value: gym.code, mono: true }, { label: W.yourRole, value: W.owner }]),
+        E.details([[W.signInEmail, owner.email]]),
+        confirmBlock(confirmation.token, OT),
+        E.button(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/${encodeURIComponent(gym.code)}/login`, W.open),
+        `<div style="font-family:Manrope,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:800;color:#16161d;margin:0 0 12px;">${ownerLang === 'fr' ? 'Prochaines étapes' : 'Next steps'}</div>`,
+        E.steps(W.steps),
+        E.small(W.notYou),
       ].join(''),
     }),
   })).then((sent) => { if (sent?.error) throw new Error(sent.error.message || 'refused'); }), 'New gym welcome email');
@@ -177,6 +183,7 @@ async function register(req, res) {
       gymCity: gym.city || null,
       gymCurrency: gym.currency || null,
       emailUnconfirmed: true,
+      language: owner.language || 'en',
     },
   });
 }
@@ -233,7 +240,17 @@ async function login(req, res) {
 
   loginMissesByAccount.clear(accountKey);
   logActivity(null, { gymId: gym.id, actor: asActor(staff), category: 'security', action: 'auth.login', summary: 'Signed in' });
-  res.json(openSession(staff, gym));
+  res.json(openSession(await adoptLanguage(staff, req.body.language), gym));
+}
+
+// An account made before people had a language of their own takes the one its
+// owner signs in with; from then on, the account's language is GEM's
+async function adoptLanguage(staff, screenLanguage) {
+  if (staff.language) return staff;
+  const language = readLanguage(screenLanguage).value;
+  if (!language) return staff;
+  await prisma.staff.update({ where: { id: staff.id }, data: { language } }).catch(() => null);
+  return { ...staff, language };
 }
 
 // Signs someone in: the token and who they are. A part-time front desk
@@ -264,6 +281,8 @@ function openSession(staff, gym) {
       emailUnconfirmed: !!staff.emailVerifyHash,
       // GEM has paused the gym's account: the app shows why instead of its pages
       gymLocked: !!gym.lockedAt,
+      // The language GEM opens in for them (none yet: the screen keeps its own)
+      language: staff.language || null,
     },
   };
 }
@@ -345,7 +364,7 @@ async function setFirstPassword(req, res) {
   const updated = await prisma.staff.update({
     where: { id: staff.id },
     data: { passwordHash, mustSetPassword: false, resetToken: null, resetTokenExpiry: null },
-  });
+  }).then(saved => adoptLanguage(saved, req.body.language));
 
   logActivity(null, {
     gymId: gym.id, actor: asActor(updated), category: 'security', action: 'auth.password_first_set',
@@ -372,7 +391,7 @@ async function me(req, res) {
     where: { id: req.user.id },
     select: {
       id: true, firstName: true, lastName: true,
-      email: true, role: true, department: true, gymId: true, avatarColor: true, photo: true, emailVerifyHash: true,
+      email: true, role: true, department: true, gymId: true, avatarColor: true, photo: true, emailVerifyHash: true, language: true,
       gym: { select: { code: true, name: true, country: true, city: true, currency: true, lockedAt: true } },
     },
   });
@@ -389,6 +408,7 @@ async function me(req, res) {
     gymCity: staff.gym?.city || null,
     gymCurrency: staff.gym?.currency || null,
     gymLocked: !!staff.gym?.lockedAt,
+    language: staff.language || null,
   });
 }
 
@@ -487,19 +507,21 @@ async function forgotPassword(req, res) {
     const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
 
     if (isDemoGym(gym)) return res.status(400).json({ error: 'The demo gym sends no email. Its sign-in details are on its sign-in screen.' });
+    // In the language of the account it is for
+    const lang = staffLang(staff), T = staffText(staff), R = T.reset.forgot;
     const { error: sendError } = await getResend().emails.send({
       from: E.sender(gym.name),
       // The address on the account, not as it was typed (spaces and all)
       to: staff.email,
-      subject: 'Reset your GEM password',
+      subject: R.subject,
       html: E.layout({
-        brand: E.gymBrand(gym), gym, preheader: 'A link to choose a new password, valid for 15 minutes.', eyebrow: 'Password', title: 'Reset your password',
+        lang, brand: E.gymBrand(gym), gym, preheader: R.preheader, eyebrow: T.reset.eyebrow, title: R.title,
         body: [
-          E.greeting(staff.firstName),
-          E.pHtml(`We received a request to reset the password for your ${E.strong(gym.name)} account on GEM. Press the button to choose a new one.`),
-          E.button(resetUrl, 'Reset password'),
-          E.note('<strong style="color:#b4232a;">This link expires in 15 minutes.</strong> If you asked for another link after this one, only the newest works.', 'red'),
-          E.small("If you didn't ask for this, you can ignore this email: your password stays as it is."),
+          E.greeting(staff.firstName, lang),
+          E.pHtml(R.line(E.strong(gym.name))),
+          E.button(resetUrl, R.button),
+          E.note(R.expires, 'red'),
+          E.small(R.ignore),
         ].join(''),
       }),
     });

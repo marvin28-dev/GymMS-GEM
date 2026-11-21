@@ -4,6 +4,7 @@ const E = require('./emailLayout');
 const { formatMoney, currencyOf } = require('./money');
 const { broadcast } = require('./liveHub');
 const { isDemoGym } = require('./sendEmail');
+const { memberLanguage } = require('./language');
 
 // Who a message can go to. Deactivated members are never written to.
 const AUDIENCES = ['all', 'active', 'ending', 'inactive', 'owing', 'package', 'members'];
@@ -32,7 +33,7 @@ function groupWhere(gymId, audience) {
 
 const MEMBER_FIELDS = {
   id: true, firstName: true, lastName: true, email: true, phone: true, memberCode: true,
-  endDate: true, balance: true, status: true, isVisitor: true, package: { select: { name: true } },
+  endDate: true, balance: true, status: true, isVisitor: true, language: true, package: { select: { name: true } },
 };
 const resolveAudience = (gymId, audience) => prisma.member.findMany({ where: audienceWhere(gymId, audience), select: MEMBER_FIELDS, orderBy: { firstName: 'asc' } });
 
@@ -55,11 +56,12 @@ function personalise(text, m, gym) {
   return String(text || '').replace(/\{\s*([a-zA-Z]+)\s*\}/g, (all, key) => (key.toLowerCase() in values ? values[key.toLowerCase()] : all));
 }
 
-// The message as an email: the gym's own layout, the text as paragraphs
-function emailHtml(gym, subject, body) {
+// The message as an email: the gym's own layout (in the member's language),
+// the text as paragraphs
+function emailHtml(gym, subject, body, lang = 'en') {
   const paragraphs = String(body).split(/\n\s*\n/).map(block => block.trim()).filter(Boolean)
     .map(block => E.pHtml(E.esc(block).replace(/\n/g, '<br>')));
-  return E.layout({ brand: E.gymBrand(gym), gym, preheader: String(body).replace(/\s+/g, ' ').slice(0, 110), title: subject, body: paragraphs.join('') });
+  return E.layout({ lang, brand: E.gymBrand(gym), gym, preheader: String(body).replace(/\s+/g, ' ').slice(0, 110), title: subject, body: paragraphs.join('') });
 }
 
 const emailReady = () => !!process.env.RESEND_API_KEY;
@@ -119,7 +121,7 @@ async function deliverCommunication(id, { only = null } = {}) {
     if (isDemoGym(gym)) { rows.push({ ...base, status: 'skipped', error: 'Demo gym: nothing is sent' }); continue; }
     if (!hasEmail(t.m)) { rows.push({ ...base, status: 'skipped', error: 'No email address' }); continue; }
     const subject = personalise(comm.subject, t.m, gym), text = personalise(comm.body, t.m, gym);
-    emails.push({ base: { ...base, address: t.m.email.trim() }, address: t.m.email.trim(), subject, text, html: emailHtml(gym, subject, text) });
+    emails.push({ base: { ...base, address: t.m.email.trim() }, address: t.m.email.trim(), subject, text, html: emailHtml(gym, subject, text, memberLanguage(t.m, gym)) });
   }
   const emailResults = emails.length ? await sendEmails(gym, emails) : [];
   emails.forEach((it, i) => rows.push({ ...it.base, status: emailResults[i].ok ? 'sent' : 'failed', error: emailResults[i].ok ? null : emailResults[i].error, providerId: emailResults[i].id || null }));

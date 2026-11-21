@@ -3,6 +3,7 @@ const prisma = require('./prisma');
 const E = require('./emailLayout');
 const { deliver } = require('./sendEmail');
 const { newResetToken, hashResetToken } = require('./resetToken');
+const { TEXT, textFor, languageOf } = require('./staffEmailText');
 
 // Confirming the address someone signs in with (D-8): a new gym's owner, and
 // anyone whose address changes. The link is what proves the address reaches
@@ -25,26 +26,27 @@ function newConfirmation() {
 const confirmUrl = (token) => `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${encodeURIComponent(token)}`;
 
 // The block a welcome email carries, and the whole email when an address changes
-function confirmBlock(token) {
+function confirmBlock(token, T = TEXT.en) {
   return [
-    E.p('Confirm that this is your email address, so password links and notices from GEM reach you.'),
-    E.button(confirmUrl(token), 'Confirm my email'),
-    E.small(`The link works for ${CONFIRM_DAYS} days. You can ask for a new one from GEM at any time.`),
+    E.p(T.confirm.line),
+    E.button(confirmUrl(token), T.confirm.button),
+    E.small(T.confirm.valid(CONFIRM_DAYS)),
   ].join('');
 }
 
 // Never throws: the account and the change stand whether or not the email lands
 async function sendConfirmation({ staff, gym, token }) {
+  const lang = languageOf(staff), T = textFor(staff), C = T.confirm;
   try {
     await deliver(getResend(), {
       from: E.sender(gym?.name || null),
       to: staff.email,
-      subject: 'Confirm your email address',
+      subject: C.subject,
       html: E.layout({
-        brand: gym ? E.gymBrand(gym) : E.gemBrand, ...(gym ? { gym } : {}),
-        preheader: 'One click to confirm your email address on GEM.',
-        eyebrow: 'Your account', title: 'Confirm your email',
-        body: [E.greeting(staff.firstName), confirmBlock(token)].join(''),
+        lang, brand: gym ? E.gymBrand(gym) : E.gemBrand, ...(gym ? { gym } : {}),
+        preheader: C.preheader,
+        eyebrow: C.eyebrow, title: C.title,
+        body: [E.greeting(staff.firstName, lang), confirmBlock(token, T)].join(''),
       }),
     }, gym);
     return { sent: true };

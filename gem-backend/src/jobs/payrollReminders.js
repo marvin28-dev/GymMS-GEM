@@ -1,5 +1,6 @@
 const prisma = require('../utils/prisma');
 const E = require('../utils/emailLayout');
+const { textFor, languageOf } = require('../utils/staffEmailText');
 const { Resend } = require('resend');
 const { deliver, isDemoGym } = require('../utils/sendEmail');
 const { autoIssueForGym, payDateThisMonth, addedAfter } = require('./autoPayroll');
@@ -71,20 +72,21 @@ async function sendOverdueEmail(owner, gymName, count, period, gymCode) {
   if (!process.env.RESEND_API_KEY || !owner?.email) return false;
 
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const plural = count === 1 ? 'staff member is' : 'staff members are';
+  // In the owner's own language
+  const lang = languageOf(owner), P = textFor(owner).payroll;
 
   await deliver(resend, {
     from: E.sender(gymName),
     to: owner.email,
-    subject: `Payroll overdue at ${gymName} for ${period}`,
+    subject: P.subject(gymName, period),
     html: E.layout({
-      brand: { name: gymName }, preheader: `${count} ${plural} waiting for ${period} pay.`, eyebrow: 'Payroll', title: 'Payroll is overdue',
+      lang, brand: { name: gymName }, preheader: P.preheader(count, period), eyebrow: P.eyebrow, title: P.title,
       body: [
-        E.greeting(owner.firstName),
-        E.pHtml(`At ${E.strong(gymName)}, some staff are past their pay date and still waiting to be paid for ${E.strong(period)}.`),
-        E.highlight({ label: 'Waiting to be paid', value: String(count), sub: count === 1 ? 'staff member' : 'staff members', tone: 'red' }),
-        E.button(`${process.env.FRONTEND_URL || 'http://localhost:5173'}${gymCode ? `/${encodeURIComponent(gymCode)}` : ''}/login`, 'Open GEM and pay them'),
-        E.small('For privacy, this email has no names, pay dates or amounts. They are only shown inside GEM.'),
+        E.greeting(owner.firstName, lang),
+        E.pHtml(P.line(E.strong(gymName), E.strong(period))),
+        E.highlight({ label: P.waiting, value: String(count), sub: P.staff(count), tone: 'red' }),
+        E.button(`${process.env.FRONTEND_URL || 'http://localhost:5173'}${gymCode ? `/${encodeURIComponent(gymCode)}` : ''}/login`, P.button),
+        E.small(P.privacy),
       ].join(''),
     }),
   });
@@ -100,7 +102,7 @@ async function checkGym(gym, now) {
   // payroll activity to front desk and other staff.
   const owner = await prisma.staff.findFirst({
     where: { gymId: gym.id, role: 'general_manager', isActive: true },
-    select: { id: true, firstName: true, email: true },
+    select: { id: true, firstName: true, email: true, language: true },
   });
   if (!owner) return;
 

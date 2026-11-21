@@ -35,6 +35,8 @@ const SELF_EDITABLE = new Set([
   'houseNumber', 'street', 'city', 'region', 'postalCode', 'country',
   'photo', 'avatarColor',
   'emergencyContact', 'emergencyPhone',
+  // The language GEM opens in for them, and that their emails are in
+  'language',
 ]);
 
 // Fields that decide someone's standing or pay. Changing these on your own

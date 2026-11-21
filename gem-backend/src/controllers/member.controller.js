@@ -6,6 +6,7 @@ const { sendMemberWelcome, sendPaymentReceipt, sendAccessCode, sendMembershipUpd
 const { findEmailConflict, emailConflictMessage } = require('../utils/emailGuard');
 
 const { readPaymentMethod } = require('../utils/paymentMethod');
+const { readLanguage } = require('../utils/language');
 
 const { logActivity, changesBetween, describeChanges, fullName, money } = require('../utils/activityLog');
 
@@ -16,7 +17,7 @@ const MEMBER_FIELDS = {
   isVisitor: 'Visitor', freezeStartDate: 'Freeze start', regFeeDate: 'Registration fee date',
   accessCode: 'Check-in code', dob: 'Date of birth', houseNumber: 'House number', street: 'Street',
   city: 'City', region: 'Region', country: 'Country', postalCode: 'Postal code', emergencyContact: 'Emergency contact',
-  emergencyPhone: 'Emergency phone', howHeard: 'How they heard of us', notes: 'Notes',
+  emergencyPhone: 'Emergency phone', howHeard: 'How they heard of us', notes: 'Notes', language: 'Language',
 };
 
 // A 4-digit check-in code no one else in the gym holds. A staff member's own
@@ -196,6 +197,8 @@ async function create(req, res) {
     howHeard, notes,
   } = req.body;
   const gymId = req.user.gymId;
+  const language = readLanguage(req.body.language);
+  if (language.error) return res.status(400).json({ error: language.error, field: 'language' });
 
   if (!String(firstName || '').trim() || !String(lastName || '').trim()) {
     return res.status(400).json({ error: 'firstName and lastName are required' });
@@ -274,6 +277,7 @@ async function create(req, res) {
     emergencyPhone: emergencyPhone?.trim() || undefined,
     howHeard: howHeard?.trim() || undefined,
     notes: notes?.trim() || undefined,
+    language: language.value || undefined,
   };
 
   // The member and the money taken for them are written together, so neither
@@ -394,7 +398,7 @@ async function update(req, res) {
     'freezeStartDate', 'preFreezEndDate', 'passesTotal', 'passesRemaining', 'dayPasses',
     'dob', 'houseNumber', 'street', 'city', 'region', 'postalCode', 'country',
     'emergencyContact', 'emergencyPhone',
-    'howHeard', 'notes',
+    'howHeard', 'notes', 'language',
   ]);
 
   const safeData = Object.fromEntries(
@@ -402,6 +406,11 @@ async function update(req, res) {
   );
 
   if ('dayPasses' in safeData) safeData.dayPasses = Math.max(0, Number(safeData.dayPasses) || 0);
+  if ('language' in safeData) {
+    const language = readLanguage(safeData.language);
+    if (language.error) return res.status(400).json({ error: language.error, field: 'language' });
+    safeData.language = language.value;
+  }
   if ('country' in safeData) {
     const homeGym = await prisma.gym.findUnique({ where: { id: req.user.gymId }, select: { country: true } });
     if (homeGym?.country) safeData.country = homeGym.country;
@@ -490,7 +499,7 @@ async function sendCode(req, res) {
       gymId: req.user.gymId,
       OR: [{ id: req.params.id }, { memberCode: req.params.id }],
     },
-    select: { id: true, firstName: true, email: true, accessCode: true },
+    select: { id: true, firstName: true, email: true, accessCode: true, language: true },
   });
   if (!member) return res.status(404).json({ error: 'Member not found' });
   if (!member.email) return res.status(400).json({ error: 'This member has no email on file.' });

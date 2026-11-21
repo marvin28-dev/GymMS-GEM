@@ -788,6 +788,11 @@ const translations = {
       "countryNotSet": "Set the gym’s country in Settings",
       "done": "Done",
       "remove": "Remove",
+      "personLanguage": "Language",
+      "memberLanguageHint": "Their emails (welcome, receipts, membership changes) are written in this language.",
+      "staffLanguageHint": "GEM opens in this language when they sign in, and their emails are in it too.",
+      "ownLanguageHint": "GEM opens in this language when you sign in, and your emails are in it too.",
+      "languageNotSaved": "Your language could not be saved. Try again.",
     },
     status: {
       active: 'Active', expiring: 'Expiring', expiringSoon: 'Expiring Soon',
@@ -3359,6 +3364,11 @@ const translations = {
       "countryNotSet": "Renseignez le pays de la salle dans les Paramètres",
       "done": "OK",
       "remove": "Retirer",
+      "personLanguage": "Langue",
+      "memberLanguageHint": "Ses e-mails (bienvenue, reçus, changements d'abonnement) sont écrits dans cette langue.",
+      "staffLanguageHint": "GEM s'ouvre dans cette langue quand cette personne se connecte, et ses e-mails sont aussi dans cette langue.",
+      "ownLanguageHint": "GEM s'ouvre dans cette langue quand vous vous connectez, et vos e-mails sont aussi dans cette langue.",
+      "languageNotSaved": "Votre langue n'a pas pu être enregistrée. Réessayez.",
     },
     status: {
       active: 'Actif', expiring: 'Expirant', expiringSoon: 'Expire bientôt',

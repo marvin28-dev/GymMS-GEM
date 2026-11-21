@@ -1,4 +1,9 @@
 import api from './api';
+import { readStored } from '../utils/storage';
+
+// The language the screen is in: an account that has none yet takes it, and a
+// new gym's owner keeps the one they signed up in
+const screenLanguage = () => (readStored('gem-lang') === 'fr' ? 'fr' : 'en');
 
 // Whether an email is a new account that still has to choose its password
 export const loginStatus = (gymCode, email) =>
@@ -6,13 +11,13 @@ export const loginStatus = (gymCode, email) =>
 
 // A new account's first password. The reply signs them in and carries their 4-digit code.
 export const setFirstPassword = (gymCode, email, password, code) =>
-  api.post('/auth/set-password', { gymCode, email, password, code });
+  api.post('/auth/set-password', { gymCode, email, password, code, language: screenLanguage() });
 
 export const login = (gymCode, email, password) =>
-  api.post('/auth/login', { gymCode, email, password });
+  api.post('/auth/login', { gymCode, email, password, language: screenLanguage() });
 
 export const register = (data) =>
-  api.post('/auth/register', data);
+  api.post('/auth/register', { language: screenLanguage(), ...data });
 
 // Confirming an email address (D-8)
 export const verifyEmail = (token) => api.post('/auth/verify-email', { token });

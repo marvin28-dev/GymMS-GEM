@@ -12,6 +12,8 @@ const { deliver } = require('../utils/sendEmail');
 const { bestEffort } = require('../utils/bestEffort');
 const { newResetToken } = require('../utils/resetToken');
 const { newConfirmation, sendConfirmation } = require('../utils/emailConfirm');
+const { readLanguage } = require('../utils/language');
+const { textFor: staffText, languageOf: staffLang } = require('../utils/staffEmailText');
 
 const STAFF_FIELDS = {
   firstName: 'First name', lastName: 'Last name', email: 'Email', phone: 'Phone',
@@ -19,6 +21,7 @@ const STAFF_FIELDS = {
   salary: 'Salary', payDay: 'Pay day', joinDate: 'Join date', shiftStart: 'Shift start',
   schedule: 'Schedule', scheduleOverrides: 'Schedule changes', staffNotes: 'Notes', photo: 'Photo',
   password: 'Password', emergencyContact: 'Emergency contact', emergencyPhone: 'Emergency phone',
+  language: 'Language',
 };
 // Named in the log, never copied into it
 const STAFF_HIDDEN = new Set(['schedule', 'scheduleOverrides', 'staffNotes', 'photo', 'password']);
@@ -45,17 +48,19 @@ async function sendResetLinkEmail(staff, gymId, sentBy) {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
   const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
 
+  // In the language of the person it is for
+  const lang = staffLang(staff), T = staffText(staff), R = T.reset.byManager;
   await deliver(getResend(), {
     from: E.sender(gym?.name),
     to: staff.email,
-    subject: `Reset your password for ${gymName} on GEM`,
+    subject: R.subject(gymName),
     html: E.layout({
-      brand: E.gymBrand(gym), gym, preheader: 'A link to choose a new password, valid for 24 hours.', eyebrow: 'Password', title: 'Choose a new password',
+      lang, brand: E.gymBrand(gym), gym, preheader: R.preheader, eyebrow: T.reset.eyebrow, title: R.title,
       body: [
-        E.greeting(staff.firstName),
-        E.pHtml(`${sentBy ? `${E.strong(sentBy)} sent you` : 'Here is'} a link to choose a new password for your account at ${E.strong(gymName)}.`),
-        E.button(resetUrl, 'Choose a new password'),
-        E.note('<strong style="color:#b4232a;">This link expires in 24 hours.</strong> If you did not expect it, ignore this email and your password stays as it is.', 'red'),
+        E.greeting(staff.firstName, lang),
+        E.pHtml(R.line(sentBy ? E.strong(sentBy) : '', E.strong(gymName))),
+        E.button(resetUrl, R.button),
+        E.note(R.expires, 'red'),
       ].join(''),
     }),
   }, gym);
@@ -94,7 +99,7 @@ async function getAll(req, res) {
       id: true, firstName: true, lastName: true,
       email: true, phone: true, role: true,
       department: true, schedule: true, avatarColor: true, photo: true, photoId: true, isActive: true, createdAt: true,
-      accessCode: true, salary: true, employmentType: true,
+      accessCode: true, salary: true, employmentType: true, language: true,
       houseNumber: true, street: true, city: true, region: true, postalCode: true, country: true,
     },
     orderBy: { firstName: 'asc' },
@@ -129,7 +134,7 @@ async function getOne(req, res) {
       avatarColor: true, photo: true, photoId: true, isActive: true, createdAt: true,
       schedule: true, scheduleOverrides: true, salary: true, staffNotes: true, payDay: true, employmentType: true,
       houseNumber: true, street: true, city: true, region: true, postalCode: true, country: true,
-      emergencyContact: true, emergencyPhone: true,
+      emergencyContact: true, emergencyPhone: true, language: true,
     },
   });
   if (!staff) return res.status(404).json({ error: 'Staff not found' });
@@ -161,7 +166,7 @@ const STAFF_SELECT = {
   department: true, joinDate: true, shiftStart: true, payDay: true, schedule: true, staffNotes: true,
   avatarColor: true, photo: true, photoId: true, isActive: true, createdAt: true, salary: true, employmentType: true,
   houseNumber: true, street: true, city: true, region: true, postalCode: true, country: true,
-  emergencyContact: true, emergencyPhone: true,
+  emergencyContact: true, emergencyPhone: true, language: true,
 };
 
 async function create(req, res) {
@@ -183,6 +188,8 @@ async function create(req, res) {
   if (!String(body.region || '').trim()) return res.status(400).json({ error: 'Enter the region.', field: 'region' });
   const role = normalizeRole(body.role);
   if (!NEW_ROLES.includes(role)) return res.status(400).json({ error: 'Choose their role.', field: 'role' });
+  const language = readLanguage(body.language);
+  if (language.error) return res.status(400).json({ error: language.error, field: 'language' });
   if (!canCreateRole(req.user, role)) {
     return res.status(403).json({ error: 'You cannot create an account at or above your own level.' });
   }
@@ -222,6 +229,7 @@ async function create(req, res) {
     joinDate,
     employmentType: body.employmentType === 'Part Time' ? 'Part Time' : 'Full Time',
     isActive: body.isActive !== false && body.isActive !== 'false',
+    language: language.value || null,
   };
   for (const key of NEW_STAFF_TEXT) {
     if (body[key] !== undefined && body[key] !== null) data[key] = String(body[key]).trim() || null;
@@ -351,6 +359,11 @@ async function update(req, res) {
   } = req.body;
 
   const data = {};
+  if (req.body.language !== undefined) {
+    const language = readLanguage(req.body.language);
+    if (language.error) return res.status(400).json({ error: language.error, field: 'language' });
+    data.language = language.value;
+  }
   if (firstName !== undefined) data.firstName = firstName;
   if (lastName !== undefined) data.lastName = lastName;
   if (email !== undefined) data.email = email;
@@ -430,7 +443,7 @@ async function update(req, res) {
         department: true, joinDate: true, shiftStart: true,
         avatarColor: true, photo: true, photoId: true, isActive: true, salary: true, staffNotes: true, payDay: true, employmentType: true,
         houseNumber: true, street: true, city: true, region: true, postalCode: true, country: true,
-        emergencyContact: true, emergencyPhone: true,
+        emergencyContact: true, emergencyPhone: true, language: true,
       },
     });
   } catch (err) {
@@ -736,7 +749,7 @@ async function checkActive(req, res) {
 async function resendInvite(req, res) {
   const staff = await prisma.staff.findFirst({
     where: { id: req.params.id, gymId: req.user.gymId },
-    select: { id: true, firstName: true, lastName: true, email: true, role: true, isActive: true },
+    select: { id: true, firstName: true, lastName: true, email: true, role: true, isActive: true, language: true },
   });
   if (!staff) return res.status(404).json({ error: 'Staff not found' });
   if (!canManage(req.user, staff)) {

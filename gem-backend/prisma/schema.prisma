@@ -117,6 +117,9 @@ model Staff {
   emailVerifiedAt    DateTime?
   emailVerifyHash    String?
   emailVerifyExpires DateTime?
+  // The language GEM opens in when they sign in, and their emails are in
+  // ("en" / "fr"); empty reads as English
+  language           String?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -234,6 +237,9 @@ model Member {
   emergencyContact       String?
   emergencyPhone         String?
   howHeard               String?
+  // The language their emails are in ("en" / "fr"); empty follows the gym's
+  // settings.emailLanguage
+  language               String?
   notes                  String?
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt

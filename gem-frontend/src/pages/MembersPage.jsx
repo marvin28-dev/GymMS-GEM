@@ -32,6 +32,7 @@ import { checkIn as checkInApi } from '../services/attendance.service';
 import { uploadPhoto } from '../services/upload.service';
 import { fmtDate, todayStr, addDaysStr } from '../utils/date';
 import { useGymSettings } from '../hooks/useGymSettings';
+import LanguageChoice from '../components/ui/LanguageChoice';
 import { enabledMethods, acceptedMethod } from '../utils/paymentMethods';
 import { memberNeedsAttention, membershipEndsThisWeek, isActiveMember } from '../utils/attention';
 import { citiesOf, regionsOf } from '../utils/address';
@@ -628,6 +629,8 @@ function MemberCheckinModal({ open, onClose, member, onCheckedIn }) {
 export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gymData: gymDataProp = {} }) {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  // A new member starts in the gym's language for members
+  const gymLanguage = useGymSettings()?.emailLanguage || 'en';
 
   const [gymData, setGymData] = useState(gymDataProp);
 
@@ -643,7 +646,7 @@ export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gy
     houseNumber: '', street: '', city: '', region: '', postalCode: '', country: '',
     emergencyContact: '', emergencyPhone: '',
     packageId: '', startDate: '', endDate: '',
-    howHeard: '', notes: '', photo: null, photoPreview: null,
+    howHeard: '', notes: '', photo: null, photoPreview: null, language: '',
   };
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
@@ -754,6 +757,7 @@ export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gy
         passesRemaining: packageAllowance(selectedPkg),
         howHeard: form.howHeard || undefined,
         notes: form.notes || undefined,
+        language: form.language || gymLanguage,
         // The server collects the registration fee as a payment (and emails the
         // receipt) when the gym charges one; it just needs how it was paid.
         regFeeMethod: regPaid?.method,
@@ -860,6 +864,7 @@ export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gy
               onChange={e => set('phone', e.target.value.replace(/[^\d\s+\-()]/g, ''))} placeholder={getPhonePlaceholder()} />
           </ModalField>
         </div>
+        <LanguageChoice label={t('common.personLanguage')} hint={t('common.memberLanguageHint')} value={form.language || gymLanguage} onChange={v => set('language', v)} />
 
         {/* ── Address ── */}
         <ModalSectionHeader title={t('common.address')} />
@@ -960,6 +965,8 @@ export function AddMemberModal({ open, onClose, onCreated, packagesList = [], gy
 export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], gymData = {} }) {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  // A new visitor starts in the gym's language for members
+  const gymLanguage = useGymSettings()?.emailLanguage || 'en';
   const minPct   = gymData.minUpfrontPercent   || 50;
 
   const vPkgs = packagesList
@@ -996,7 +1003,7 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
     bundleId: '',
     amountPaid: '', paymentMethod: 'Cash',
     howHeard: '', notes: '',
-    photo: null, photoPreview: null,
+    photo: null, photoPreview: null, language: '',
   };
   const [form, setForm]     = useState(emptyForm);
   const [errors, setErrors] = useState({});
@@ -1098,6 +1105,7 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
         dayPasses: isDayPass ? 1 : 0,
         howHeard: form.howHeard || undefined,
         notes: form.notes || undefined,
+        language: form.language || gymLanguage,
         // Saved with the visitor, so the visitor and the payment exist together or not at all
         initialPayment: {
           amount: amountPaidN, method: visitorPaid.method,
@@ -1232,6 +1240,7 @@ export function AddVisitorModal({ open, onClose, onCreated, packagesList = [], g
               onChange={e => set('phone', e.target.value.replace(/[^\d\s+\-()]/g, ''))} placeholder={getPhonePlaceholder()} />
           </ModalField>
         </div>
+        <LanguageChoice label={t('common.personLanguage')} hint={t('common.memberLanguageHint')} value={form.language || gymLanguage} onChange={v => set('language', v)} />
 
         {/* ── Address ── */}
         <ModalSectionHeader title={t('common.address')} />

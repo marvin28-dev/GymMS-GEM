@@ -24,6 +24,8 @@ import VisitKindBadge from '../components/ui/VisitKindBadge';
 import Modal from '../components/ui/Modal';
 import GemInput from '../components/ui/GemInput';
 import GemSelect from '../components/ui/GemSelect';
+import LanguageChoice from '../components/ui/LanguageChoice';
+import { languageName } from '../utils/language';
 import { getAuth, getRole, getPhonePlaceholder } from '../utils/auth';
 import { isFitness } from '../utils/rolePages';
 import AddressInputs from '../components/AddressInputs';
@@ -150,6 +152,7 @@ function DobRow({ dob }) {
 // ─── Edit Member Modal ────────────────────────────────────────────────────────
 function EditPersonalModal({ open, onClose, member, onSave }) {
   const { t } = useLanguage();
+  const gymLanguage = useGymSettings()?.emailLanguage || 'en';
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -172,6 +175,7 @@ function EditPersonalModal({ open, onClose, member, onSave }) {
       country:          member.country          || '',
       emergencyContact: member.emergencyContact || '',
       emergencyPhone:   member.emergencyPhone   || '',
+      language:         member.language         || gymLanguage,
     });
   });
   useEffect(() => { if (open) setFieldErrors({}); }, [open]);
@@ -221,6 +225,7 @@ function EditPersonalModal({ open, onClose, member, onSave }) {
           <GemInput label={`${t('memberProfile.phone')} *`} error={fieldErrors.phone} inputMode="tel" value={form.phone} onChange={e => { setForm(f => ({ ...f, phone: e.target.value.replace(/[^\d\s+\-()]/g, '') })); setFieldErrors(fe => ({ ...fe, phone: undefined })); }} placeholder={getPhonePlaceholder()} />
           <GemInput label={`${t('memberProfile.email')} *`} error={fieldErrors.email} type="email" value={form.email} onChange={set('email')} placeholder="email@example.com" />
         </div>
+        <LanguageChoice label={t('common.personLanguage')} hint={t('common.memberLanguageHint')} value={form.language || gymLanguage} onChange={v => setForm(f => ({ ...f, language: v }))} />
 
         <SectionLabel title={t('memberProfile.addressSection')} />
         <AddressInputs value={form} gymCountry={gymCountry} errors={fieldErrors} onChange={(k, v) => { setForm(f => ({ ...f, [k]: v })); setFieldErrors(fe => ({ ...fe, [k]: undefined })); }} />
@@ -2490,6 +2495,7 @@ export default function MemberProfilePage({ memberId: propId, onBack, fromFrontD
         <InfoRow label={t('memberProfile.howTheyHeard')} value={member.howHeard || '-'} />
         <InfoRow label={t('memberProfile.emergencyContact')} value={member.emergencyContact || '-'} />
         <InfoRow label={t('memberProfile.emergencyPhone')} value={member.emergencyPhone || '-'} />
+        <div data-member-language><InfoRow label={t('common.personLanguage')} value={languageName(member.language || (gymData?.settings?.emailLanguage === 'fr' ? 'fr' : 'en'))} /></div>
 
         {/* Registration Fee. expiry only */}
         {gymData?.registrationFeeRequired && gymData?.registrationFeeFrequency === 'yearly' && member.regFeeDate && (() => {

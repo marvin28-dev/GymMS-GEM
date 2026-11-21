@@ -1,18 +1,19 @@
 // Emails GEM itself sends a gym's owner (not the gym to its members): bills,
 // reminders, an account paused or reopened, an answer to a support report,
-// announcements. On the shared layout, from "GEM", in English like every
-// email to staff. Each one is best-effort: what it reports already happened.
+// announcements. On the shared layout, from "GEM", in each owner's own language
+// (Staff.language). Each one is best-effort: what it reports already happened.
 const { Resend } = require('resend');
 const prisma = require('./prisma');
 const E = require('./emailLayout');
 const { deliver } = require('./sendEmail');
 const { formatMoney } = require('./money');
 const { supportEmail } = require('./support');
+const { TEXT, textFor, languageOf } = require('./staffEmailText');
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const monthName = (period) => {
+// "November 2026", "novembre 2026": a bill's month in the reader's language
+const monthName = (period, lang = 'en') => {
   const [y, m] = String(period).split('-').map(Number);
-  return m ? `${MONTHS[m - 1]} ${y}` : String(period);
+  return m ? new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }) : String(period);
 };
 const appUrl = (path) => `${process.env.FRONTEND_URL || 'http://localhost:5173'}${path}`;
 
@@ -21,10 +22,10 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
 }
 
-// The owners of a gym who can be written to
+// The owners of a gym who can be written to, each in their own language
 const ownersOf = async (gymId) => (await prisma.staff.findMany({
   where: { gymId, role: 'general_manager', isActive: true },
-  select: { id: true, firstName: true, email: true },
+  select: { id: true, firstName: true, email: true, language: true },
 })).filter(o => String(o.email || '').trim());
 
 async function toOwners(gym, build) {
@@ -33,7 +34,7 @@ async function toOwners(gym, build) {
   let sent = 0;
   for (const owner of owners) {
     try {
-      const { subject, html } = build(owner);
+      const { subject, html } = build(owner, languageOf(owner), textFor(owner).gem);
       await deliver(resend, { from: E.sender(null), to: owner.email, replyTo: supportEmail(), subject, html }, gym);
       sent += 1;
     } catch (err) {
@@ -44,95 +45,95 @@ async function toOwners(gym, build) {
 }
 
 // The bill's figures as rows
-function billRows(inv) {
+function billRows(inv, lang = 'en', B = TEXT.en.gem.bill) {
   const money = (n) => formatMoney(n, inv.currency);
   return [
-    ['Month', monthName(inv.period)],
-    ['Active members', String(inv.members)],
-    ['Price per member', money(inv.rate)],
-    inv.billableDays < inv.daysInPeriod ? ['Days charged', `${inv.billableDays} of ${inv.daysInPeriod} (after your free trial)`] : null,
-    inv.discount ? ['Discount', `-${money(inv.discount)}`] : null,
-    inv.dueDate ? ['Due by', E.longDate(inv.dueDate)] : null,
+    [B.month, monthName(inv.period, lang)],
+    [B.members, String(inv.members)],
+    [B.rate, money(inv.rate)],
+    inv.billableDays < inv.daysInPeriod ? [B.days, B.daysOf(inv.billableDays, inv.daysInPeriod)] : null,
+    inv.discount ? [B.discount, `-${money(inv.discount)}`] : null,
+    inv.dueDate ? [B.dueBy, E.longDate(inv.dueDate, lang)] : null,
   ];
 }
 
-const howToPay = (settings) => (settings.paymentInstructions
-  ? E.note(`<strong>How to pay</strong><br>${E.esc(settings.paymentInstructions).replace(/\r?\n/g, '<br>')}`)
-  : E.note('Reply to this email to arrange payment.'));
+const howToPay = (settings, B = TEXT.en.gem.bill) => (settings.paymentInstructions
+  ? E.note(`<strong>${E.esc(B.howToPay)}</strong><br>${E.esc(settings.paymentInstructions).replace(/\r?\n/g, '<br>')}`)
+  : E.note(E.esc(B.replyToPay)));
 
 // A bill sent, a reminder that it is due or overdue, or a thank-you once paid
 function sendBill(gym, inv, settings, kind = 'sent') {
   const amount = formatMoney(kind === 'paid' ? (inv.paidAmount ?? inv.amount) : inv.amount, inv.currency);
-  const month = monthName(inv.period);
-  const copy = {
-    sent: { subject: `Your GEM bill for ${month}: ${amount}`, eyebrow: 'Your GEM bill', title: `${month}: ${amount}`, line: `Here is what ${gym.name} owes GEM for ${month}.` },
-    reminder: { subject: `Reminder: your GEM bill for ${month} is due`, eyebrow: 'Payment reminder', title: `${amount} is due`, line: `Your GEM bill for ${month} has not been paid yet. Please pay it so your account stays open.` },
-    paid: { subject: `Thank you: GEM received ${amount}`, eyebrow: 'Payment received', title: 'Thank you', line: `We received ${amount} for ${gym.name}'s GEM bill for ${month}.` },
-  }[kind];
-  return toOwners(gym, (owner) => ({
-    subject: copy.subject,
-    html: E.layout({
-      brand: E.gemBrand, preheader: copy.line, eyebrow: copy.eyebrow, title: copy.title,
-      body: [
-        E.greeting(owner.firstName),
-        E.p(copy.line),
-        E.highlight({ label: kind === 'paid' ? 'Paid' : 'Amount due', value: amount, tone: kind === 'paid' ? 'green' : kind === 'reminder' ? 'amber' : 'gold' }),
-        E.details(billRows(inv)),
-        inv.note ? E.note(E.esc(inv.note), 'grey') : '',
-        kind === 'paid' ? '' : howToPay(settings),
-        E.button(appUrl('/settings?section=billing'), 'See it in GEM'),
-      ].join(''),
-    }),
-  }));
+  return toOwners(gym, (owner, lang, G) => {
+    const B = G.bill, copy = B[kind], month = monthName(inv.period, lang);
+    const line = copy.line(gym.name, month, amount);
+    return {
+      subject: copy.subject(month, amount),
+      html: E.layout({
+        lang, brand: E.gemBrand, preheader: line, eyebrow: copy.eyebrow, title: copy.title(month, amount),
+        body: [
+          E.greeting(owner.firstName, lang),
+          E.p(line),
+          E.highlight({ label: kind === 'paid' ? B.paidLabel : B.due, value: amount, tone: kind === 'paid' ? 'green' : kind === 'reminder' ? 'amber' : 'gold' }),
+          E.details(billRows(inv, lang, B)),
+          inv.note ? E.note(E.esc(inv.note), 'grey') : '',
+          kind === 'paid' ? '' : howToPay(settings, B),
+          E.button(appUrl('/settings?section=billing'), B.see),
+        ].join(''),
+      }),
+    };
+  });
 }
 
 // The account paused for an unpaid bill, or opened again
 function sendLockChange(gym, locked, reason, settings) {
-  return toOwners(gym, (owner) => ({
-    subject: locked ? `Your GEM account for ${gym.name} is paused` : `Your GEM account for ${gym.name} is open again`,
-    html: E.layout({
-      brand: E.gemBrand,
-      preheader: locked ? 'Your staff cannot use GEM until the account is reopened.' : 'Everyone can use GEM again.',
-      eyebrow: locked ? 'Account paused' : 'Account open', title: locked ? 'Your account is paused' : 'Welcome back',
-      body: [
-        E.greeting(owner.firstName),
-        E.p(locked
-          ? `GEM has paused ${gym.name}'s account. Until it is reopened, your staff can sign in but cannot use GEM.`
-          : `${gym.name}'s GEM account is open again. Everyone can carry on as before.`),
-        locked && reason ? E.details([['Why', reason]]) : '',
-        locked ? howToPay(settings) : '',
-        E.button(appUrl(locked ? '/settings?section=billing' : '/dashboard'), locked ? 'See what is due' : 'Open GEM'),
-      ].join(''),
-    }),
-  }));
+  return toOwners(gym, (owner, lang, G) => {
+    const L = G.lock;
+    return {
+      subject: L.subject(gym.name, locked),
+      html: E.layout({
+        lang, brand: E.gemBrand, preheader: L.preheader(locked), eyebrow: L.eyebrow(locked), title: L.title(locked),
+        body: [
+          E.greeting(owner.firstName, lang),
+          E.p(L.line(gym.name, locked)),
+          locked && reason ? E.details([[L.why, reason]]) : '',
+          locked ? howToPay(settings, G.bill) : '',
+          E.button(appUrl(locked ? '/settings?section=billing' : '/dashboard'), locked ? L.seeDue : L.open),
+        ].join(''),
+      }),
+    };
+  });
 }
 
-// GEM support's answer to a report
+// GEM support's answer to a report, in the language of whoever sent it
 async function sendSupportReply(report, gym) {
   if (!report.senderEmail) return 0;
+  const sender = report.staffId ? await prisma.staff.findUnique({ where: { id: report.staffId }, select: { language: true } }) : null;
+  const lang = languageOf(sender), R = textFor(sender).gem.reply;
   await deliver(getResend(), {
     from: E.sender(null), to: report.senderEmail, replyTo: supportEmail(),
     subject: `Re: ${report.subject}`,
     html: E.layout({
-      brand: E.gemBrand, preheader: String(report.reply).slice(0, 110), eyebrow: 'GEM support', title: report.subject,
+      lang, brand: E.gemBrand, preheader: String(report.reply).slice(0, 110), eyebrow: R.eyebrow, title: report.subject,
       body: [
-        E.greeting(String(report.senderName || '').split(' ')[0]),
+        E.greeting(String(report.senderName || '').split(' ')[0], lang),
         E.pHtml(E.esc(report.reply).replace(/\r?\n/g, '<br>')),
-        E.details([['Your report', report.subject], ['Status', report.status === 'resolved' ? 'Resolved' : 'In progress']]),
-        E.button(appUrl('/support'), 'See it in GEM'),
+        E.details([[R.yourReport, report.subject], [R.status, report.status === 'resolved' ? R.resolved : R.inProgress]]),
+        E.button(appUrl('/support'), R.see),
       ].join(''),
     }),
   }, gym);
   return 1;
 }
 
-// A message from GEM to a gym's owners
+// A message from GEM to a gym's owners: the words are GEM's own, the frame
+// around them is in each owner's language
 function sendAnnouncement(gym, title, body) {
-  return toOwners(gym, (owner) => ({
+  return toOwners(gym, (owner, lang, G) => ({
     subject: title,
     html: E.layout({
-      brand: E.gemBrand, preheader: String(body).slice(0, 110), eyebrow: 'From GEM', title,
-      body: [E.greeting(owner.firstName), ...String(body).split(/\n\s*\n/).map(b => E.pHtml(E.esc(b.trim()).replace(/\n/g, '<br>')))].join(''),
+      lang, brand: E.gemBrand, preheader: String(body).slice(0, 110), eyebrow: G.fromGem, title,
+      body: [E.greeting(owner.firstName, lang), ...String(body).split(/\n\s*\n/).map(b => E.pHtml(E.esc(b.trim()).replace(/\n/g, '<br>')))].join(''),
     }),
   }));
 }

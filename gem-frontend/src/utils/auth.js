@@ -2,6 +2,7 @@ import { countryByName } from './countries';
 import { pagesFor } from './rolePages';
 import { todayStr } from './date';
 import { readStored, readStoredJson, store, storeJson, storedKeys, unstore } from './storage';
+import { showInLanguage } from './language';
 
 const KEY          = 'gem_auth';
 const ACTIVITY_KEY = 'gem_last_activity';
@@ -37,6 +38,8 @@ export function setAuth(payload) {
   // Signing in says where the gym is, which is what the forms suggest from
   const country = payload?.user?.gymCountry;
   if (country) store(COUNTRY_KEY, country);
+  // GEM opens in the language of whoever signed in
+  showInLanguage(payload?.user?.language);
   return true;
 }
 
