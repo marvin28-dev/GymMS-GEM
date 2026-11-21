@@ -23,7 +23,8 @@ export default function SupportLinks({ label, style, inline = false, quiet = fal
       </p>
     );
   }
-  const chip = { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: inline ? 11 : 12, fontWeight: 600, textDecoration: 'none', borderRadius: inline ? 6 : 8, padding: inline ? '4px 10px' : '6px 12px' };
+  // Sized so the email and WhatsApp buttons share one line in a 400px form
+  const chip = { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, textDecoration: 'none', borderRadius: inline ? 6 : 8, padding: inline ? '4px 10px' : '6px 10px', whiteSpace: 'nowrap' };
   const links = (
     <>
       {SUPPORT.email && (
@@ -49,7 +50,7 @@ export default function SupportLinks({ label, style, inline = false, quiet = fal
   return (
     <div data-support style={style}>
       {label && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '0 0 12px', letterSpacing: '0.2px' }}>{label}</p>}
-      <div style={{ display: 'flex', gap: 10, justifyContent: start ? 'flex-start' : 'center', flexWrap: 'wrap' }}>{links}</div>
+      <div style={{ display: 'flex', gap: 8, justifyContent: start ? 'flex-start' : 'center', flexWrap: 'wrap' }}>{links}</div>
     </div>
   );
 }
